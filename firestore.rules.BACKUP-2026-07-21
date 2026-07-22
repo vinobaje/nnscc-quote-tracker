@@ -1,0 +1,290 @@
+rules_version = '2';
+// =====================================================================
+// Multi-tenant enforcing rules — DEPLOYED 2026-07-10 (Phase 4 cutover).
+// Enforces: request.auth.token.companyId (custom claim) == resource.data.companyId
+// on every company-scoped collection. Employees/companies have bootstrap
+// exceptions so login + join-by-invite still work before a claim exists.
+// Rollback: `git show <prev>:firestore.rules` then redeploy.
+// =====================================================================
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---------- Helpers ----------
+    function isSignedIn() { return request.auth != null; }
+
+    // The companyId custom claim (string) — null if the caller has no claim yet
+    // (anonymous / brand-new user mid-onboarding).
+    function callerCompany() {
+      return isSignedIn() && 'companyId' in request.auth.token
+        ? request.auth.token.companyId : null;
+    }
+
+    // Doc belongs to the caller's company.
+    function inCompany() {
+      return isSignedIn() && resource.data.companyId == callerCompany();
+    }
+
+    // New doc is being created in the caller's own company.
+    function creatingInOwnCompany() {
+      return isSignedIn() && request.resource.data.companyId == callerCompany();
+    }
+
+    // For employee login bootstrap: match the signed-in user's email to a doc's
+    // email (case-insensitive) BEFORE a companyId claim exists.
+    function emailSelf() {
+      return isSignedIn()
+        && 'email' in request.auth.token
+        && request.auth.token.email != null
+        && 'email' in resource.data
+        && request.auth.token.email.lower() == resource.data.email.lower();
+    }
+
+    // Standard tenant collection: read/write only within the caller's company.
+    // (List queries already filter by companyId — Phase 1 — so they pass.)
+    // Used inline per-collection below.
+
+    // ---------- Unified screen access (role + per-employee) ----------
+    // See UNIFIED_ACCESS_CONTROL_CONTRACT.md. Enforces READS of sensitive screens'
+    // collections. Uses the STORED config literally; "role not configured" = ALLOW
+    // (the client still gates by default), so this only HARD-denies what an admin
+    // explicitly restricted. Same-doc get() is de-duped/billed once per evaluation.
+    function companyDoc() {
+      return get(/databases/$(database)/documents/companies/$(callerCompany())).data;
+    }
+    function callerRoleKey() {
+      return request.auth.token.get('isAdmin', false) ? 'admin'
+           : request.auth.token.get('isManager', false) ? 'manager'
+           : request.auth.token.get('isPropertyManager', false) ? 'propertyManager'
+           : request.auth.token.get('isBoardMember', false) ? 'boardMember'
+           : 'employee';
+    }
+    function screenAllowed(path) {
+      return request.auth.token.get('isAdmin', false)
+        || (
+          // role baseline: not configured → allow; configured → path must be listed
+          (!(callerRoleKey() in companyDoc().get('rolePermissions', {}))
+            || (path in companyDoc().get('rolePermissions', {})[callerRoleKey()]))
+          // per-employee override: empty/absent → allow; else must be listed
+          && (!(path in companyDoc().get('employeeScreenAccess', {}))
+            || companyDoc().get('employeeScreenAccess', {})[path].size() == 0
+            || (request.auth.token.get('employeeId', '') in companyDoc().get('employeeScreenAccess', {})[path]))
+        );
+    }
+    // Per-action gate (ACTION_PERMISSIONS_CONTRACT.md §8). Requires screen access
+    // AND that the caller's role lists `action` for `path`. Absent role/path/list →
+    // ALL applicable actions allowed (backward compatible). `action` uses the shared
+    // keys: create | edit | delete | comment | export | settings ('edit' = update).
+    function actionAllowed(path, action) {
+      return request.auth.token.get('isAdmin', false)
+        || (
+          screenAllowed(path)
+          && companyDoc().get('actionPermissions', {})
+               .get(callerRoleKey(), {})
+               .get(path, ['create','edit','delete','comment','export','settings'])
+               .hasAny([action])
+        );
+    }
+
+    // ============================================================
+    // COMPANIES — claimless READ closed.
+    // The 3 pre-claim lookups (invite-code join, pre-login status, signup name
+    // check) now go through the companyBootstrap Cloud Function (Admin SDK),
+    // and the fetch-ALL reads were fixed to target the company by id. So reads
+    // require your own claim. `update` still allows claimless during signup
+    // (before the companyId claim propagates); `create` is signup.
+    // ============================================================
+    match /companies/{companyId} {
+      allow read: if isSignedIn() && companyId == callerCompany();
+      allow create: if isSignedIn();                                   // signup creates the company
+      // Same-company writes for normal fields, BUT the permission/feature config
+      // (rolePermissions, featureToggles, featureEmployeeAccess, employeeScreenAccess,
+      // photoVisibilityRoles) may only be changed by an admin — otherwise a non-admin
+      // could grant their own role more access or open up all photos.
+      allow update: if isSignedIn()
+        && (companyId == callerCompany() || callerCompany() == null)
+        && (
+          !request.resource.data.diff(resource.data).affectedKeys()
+              .hasAny(['rolePermissions', 'featureToggles', 'featureEmployeeAccess', 'employeeScreenAccess', 'photoVisibilityRoles', 'actionPermissions'])
+          || request.auth.token.get('isAdmin', false)
+        );
+      allow delete: if isSignedIn() && companyId == callerCompany() && request.auth.token.get('isAdmin', false);
+    }
+
+    // ============================================================
+    // EMPLOYEES — bootstrap: a user must find/link their OWN record at first
+    // login (by email, before a claim exists) and read the company roster after.
+    // ============================================================
+    match /employees/{employeeId} {
+      allow read: if isSignedIn() && (
+        resource.data.companyId == callerCompany() ||     // company roster
+        resource.data.authUserId == request.auth.uid ||   // your own (linked)
+        emailSelf()                                        // your own (first login)
+      );
+      // Add to your own company, or onboarding/join before you have a claim.
+      allow create: if isSignedIn() && (
+        request.resource.data.companyId == callerCompany() ||
+        callerCompany() == null
+      );
+      // Own record (incl. first-login authUserId link), or a same-company user for
+      // normal fields (status, fcmToken, site assignments, lastLoginAt).
+      // PRIVILEGE GUARD: the role/privilege flags may only be CHANGED by an admin
+      // (any flag) or a manager (non-admin flags). This blocks a same-company user
+      // from writing isAdmin=true onto their own doc and escalating via the
+      // claim-sync trigger. Writes that don't touch those flags are unaffected.
+      allow update: if isSignedIn()
+        && (resource.data.companyId == callerCompany()
+            || resource.data.authUserId == request.auth.uid
+            || emailSelf())
+        && (
+          !request.resource.data.diff(resource.data).affectedKeys()
+              .hasAny(['isAdmin', 'isManager', 'isPropertyManager', 'isBoardMember'])
+          || request.auth.token.get('isAdmin', false)
+          || (request.auth.token.get('isManager', false)
+              && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['isAdmin']))
+        );
+      // Deleting an employee is a privileged, destructive action (it also strips the
+      // person's auth link) — restrict to an admin, or a manager deleting a NON-admin.
+      // A regular employee must not be able to remove coworkers or the owner.
+      allow delete: if isSignedIn()
+        && resource.data.companyId == callerCompany()
+        && (
+          request.auth.token.get('isAdmin', false)
+          || (request.auth.token.get('isManager', false)
+              && resource.data.get('isAdmin', false) == false)
+        );
+    }
+
+    // ============================================================
+    // USERS (auth refs) — own doc only.
+    // ============================================================
+    match /users/{uid} {
+      allow read, write: if isSignedIn() && request.auth.uid == uid;
+    }
+
+    // ============================================================
+    // SUBSCRIPTION PLANS — global read-only reference data.
+    // ============================================================
+    match /subscriptionPlans/{planId} {
+      allow read: if isSignedIn();
+      allow write: if false;   // managed server-side only
+    }
+
+    // ============================================================
+    // JOB SITES — tenant-scoped read/write; keep the site-limit check on create.
+    // ============================================================
+    match /jobSites/{siteId} {
+      allow read: if inCompany();
+      allow create: if creatingInOwnCompany()
+        && (
+          get(/databases/$(database)/documents/companies/$(request.resource.data.companyId)).data.subscriptionStatus == 'enterprise'
+          || !('siteCount' in get(/databases/$(database)/documents/companies/$(request.resource.data.companyId)).data)
+          || get(/databases/$(database)/documents/companies/$(request.resource.data.companyId)).data.siteCount == null
+          || get(/databases/$(database)/documents/companies/$(request.resource.data.companyId)).data.siteCount <
+             (get(/databases/$(database)/documents/companies/$(request.resource.data.companyId)).data.subscriptionStatus == 'professional' ? 20 :
+              get(/databases/$(database)/documents/companies/$(request.resource.data.companyId)).data.subscriptionStatus == 'starter' ? 5 :
+              get(/databases/$(database)/documents/companies/$(request.resource.data.companyId)).data.subscriptionStatus == 'trial' ? 5 : 2)
+        );
+      allow update, delete: if inCompany();
+    }
+
+    // ============================================================
+    // STANDARD TENANT COLLECTIONS
+    // read/update/delete: doc.companyId == caller's claim
+    // create: new doc's companyId == caller's claim
+    // ============================================================
+    match /activityEntries/{id}          { allow read, update, delete: if inCompany(); allow create: if creatingInOwnCompany(); }
+    match /activityTemplates/{id}        { allow read, update, delete: if inCompany(); allow create: if creatingInOwnCompany(); }
+    match /recurringActivityTemplates/{id}{ allow read, update, delete: if inCompany(); allow create: if creatingInOwnCompany(); }
+    match /recurringTaskTemplates/{id}   { allow read, update, delete: if inCompany(); allow create: if creatingInOwnCompany(); }
+    match /announcements/{id}            { allow read, update, delete: if inCompany(); allow create: if creatingInOwnCompany(); }
+    match /tasks/{id}                    { allow read, update, delete: if inCompany(); allow create: if creatingInOwnCompany(); }
+    match /taskComments/{id}             { allow read, update, delete: if inCompany(); allow create: if creatingInOwnCompany(); }
+    match /timeEntries/{id}              { allow read, update, delete: if inCompany(); allow create: if creatingInOwnCompany(); }
+    match /locationPoints/{id}           { allow read, update, delete: if inCompany(); allow create: if creatingInOwnCompany(); }
+    match /photos/{id}                   { allow read, update, delete: if inCompany(); allow create: if creatingInOwnCompany(); }
+    match /photoComments/{id}            { allow read, update, delete: if inCompany(); allow create: if creatingInOwnCompany(); }
+    // NOTE: senderId is the EMPLOYEE doc id, not the Firebase Auth uid — a sender can
+    // only delete their own message, matched against the employeeId claim (an admin
+    // may delete any). request.auth.uid would NEVER equal senderId (broken before).
+    match /messages/{id}                 { allow read, update: if inCompany(); allow create: if creatingInOwnCompany();
+                                           allow delete: if inCompany()
+                                             && (resource.data.senderId == request.auth.token.get('employeeId', '')
+                                                 || request.auth.token.get('isAdmin', false)); }
+    // TODO(DM privacy, phase 5): tighten message READS to participants:
+    //   allow read: if inCompany() && (resource.data.chatType != 'Direct'
+    //     || resource.data.senderId == request.auth.uid
+    //     || resource.data.recipientId == request.auth.uid);
+    // ⚠️ PREREQUISITE: rules are NOT filters — every client (iOS/web/Flutter) must
+    // first REPLACE its single "all company messages" listener with split queries
+    // (channels by companyId+chatType; DMs by senderId==me / recipientId==me), or
+    // the whole list query is denied. Until then DM privacy stays client-side.
+    match /schedules/{id}                { allow read, update, delete: if inCompany(); allow create: if creatingInOwnCompany(); }
+    match /shiftSwapRequests/{id}        { allow read, update, delete: if inCompany(); allow create: if creatingInOwnCompany(); }
+    match /clients/{id}                  { allow read, update, delete: if inCompany(); allow create: if creatingInOwnCompany(); }
+    match /workRequests/{id}             { allow read, update, delete: if inCompany(); allow create: if creatingInOwnCompany(); }
+    match /equipment/{id}                { allow read, update, delete: if inCompany(); allow create: if creatingInOwnCompany(); }
+    match /inventory/{id}                { allow read, update, delete: if inCompany(); allow create: if creatingInOwnCompany(); }
+    match /checklistTemplates/{id}       { allow read, update, delete: if inCompany(); allow create: if creatingInOwnCompany(); }
+    match /completedChecklists/{id}      { allow read, update, delete: if inCompany(); allow create: if creatingInOwnCompany(); }
+    match /dailyLogs/{id}                { allow read, update, delete: if inCompany(); allow create: if creatingInOwnCompany(); }
+    match /incidentReports/{id}          { allow read: if inCompany() && screenAllowed('/incidents'); allow update: if inCompany() && actionAllowed('/incidents','edit'); allow delete: if inCompany() && actionAllowed('/incidents','delete'); allow create: if creatingInOwnCompany() && actionAllowed('/incidents','create'); }
+    match /certifications/{id}           { allow read, update, delete: if inCompany(); allow create: if creatingInOwnCompany(); }
+    match /toolboxTalks/{id}             { allow read, update, delete: if inCompany(); allow create: if creatingInOwnCompany(); }
+    match /geofenceViolations/{id}       { allow read, update, delete: if inCompany(); allow create: if creatingInOwnCompany(); }
+    match /locationPermissionAlerts/{id} { allow read, update, delete: if inCompany(); allow create: if creatingInOwnCompany(); }
+    match /quotes/{id}                   { allow read, update, delete: if inCompany(); allow create: if creatingInOwnCompany(); }
+    match /invoices/{id}                 { allow read, update, delete: if inCompany(); allow create: if creatingInOwnCompany(); }
+    match /budgets/{id}                  { allow read: if inCompany() && screenAllowed('/budget'); allow update: if inCompany() && actionAllowed('/budget','edit'); allow delete: if inCompany() && actionAllowed('/budget','delete'); allow create: if creatingInOwnCompany() && actionAllowed('/budget','create'); }
+    match /expenses/{id}                 { allow read: if inCompany() && screenAllowed('/budget'); allow update: if inCompany() && actionAllowed('/budget','edit'); allow delete: if inCompany() && actionAllowed('/budget','delete'); allow create: if creatingInOwnCompany() && actionAllowed('/budget','create'); }
+    match /buildingSystems/{id}          { allow read: if inCompany() && screenAllowed('/building-systems'); allow update: if inCompany() && actionAllowed('/building-systems','edit'); allow delete: if inCompany() && actionAllowed('/building-systems','delete'); allow create: if creatingInOwnCompany() && actionAllowed('/building-systems','create'); }
+    match /parkingSpaces/{id}            { allow read: if inCompany() && screenAllowed('/parking'); allow update: if inCompany() && actionAllowed('/parking','edit'); allow delete: if inCompany() && actionAllowed('/parking','delete'); allow create: if creatingInOwnCompany() && actionAllowed('/parking','create'); }
+    match /parkingMaps/{id}              { allow read: if inCompany() && screenAllowed('/parking'); allow update, delete: if inCompany() && actionAllowed('/parking','settings'); allow create: if creatingInOwnCompany() && actionAllowed('/parking','settings'); }
+    // Safety training: modules are manager-authored; records are IMMUTABLE evidence —
+    // only the employee can create their OWN record (employeeId claim must match, no
+    // admin bypass: a record someone else could write for you is worthless as proof),
+    // nobody can update one, and only an admin can delete (test-data cleanup).
+    match /trainingModules/{id}          { allow read: if inCompany(); allow create: if creatingInOwnCompany() && (request.auth.token.get('isManager', false) || request.auth.token.get('isAdmin', false)); allow update, delete: if inCompany() && (request.auth.token.get('isManager', false) || request.auth.token.get('isAdmin', false)); }
+    match /trainingRecords/{id}          { allow read: if inCompany(); allow create: if creatingInOwnCompany() && request.resource.data.employeeId == request.auth.token.get('employeeId', ''); allow update: if false; allow delete: if inCompany() && request.auth.token.get('isAdmin', false); }
+    match /cleaningAreas/{id}            { allow read, update, delete: if inCompany(); allow create: if creatingInOwnCompany(); }
+    match /cleaningRecords/{id}          { allow read, update, delete: if inCompany(); allow create: if creatingInOwnCompany(); }
+    match /complianceItems/{id}          { allow read: if inCompany() && screenAllowed('/compliance'); allow update: if inCompany() && actionAllowed('/compliance','edit'); allow delete: if inCompany() && actionAllowed('/compliance','delete'); allow create: if creatingInOwnCompany() && actionAllowed('/compliance','create'); }
+    match /buildingUnits/{id}            { allow read: if inCompany() && screenAllowed('/unit-history'); allow update: if inCompany() && actionAllowed('/unit-history','edit'); allow delete: if inCompany() && actionAllowed('/unit-history','delete'); allow create: if creatingInOwnCompany() && actionAllowed('/unit-history','create'); }
+    match /boardMeetings/{id}            { allow read: if inCompany() && screenAllowed('/board-meetings'); allow update: if inCompany() && actionAllowed('/board-meetings','edit'); allow delete: if inCompany() && actionAllowed('/board-meetings','delete'); allow create: if creatingInOwnCompany() && actionAllowed('/board-meetings','create'); }
+    match /vendors/{id}                  { allow read: if inCompany() && screenAllowed('/vendors'); allow update: if inCompany() && actionAllowed('/vendors','edit'); allow delete: if inCompany() && actionAllowed('/vendors','delete'); allow create: if creatingInOwnCompany() && actionAllowed('/vendors','create'); }
+
+    // ---- Formerly-flagged collections, now resolved ----
+    // tags & auditLogs carry companyId → tenant-scoped.
+    match /tags/{id}                 { allow read, update, delete: if inCompany(); allow create: if creatingInOwnCompany(); }
+    match /auditLogs/{id}            { allow read, update, delete: if inCompany(); allow create: if creatingInOwnCompany(); }
+    // equipmentLogs & inventoryTransactions now carry companyId (set on save) → tenant-scoped.
+    // (empty collections; note: reads currently filter by equipmentId/itemId — add a
+    //  companyId filter to those queries before they're used at scale.)
+    match /equipmentLogs/{id}        { allow read, update, delete: if inCompany(); allow create: if creatingInOwnCompany(); }
+    match /inventoryTransactions/{id}{ allow read, update, delete: if inCompany(); allow create: if creatingInOwnCompany(); }
+
+    // settings is a SUBCOLLECTION of a company doc (companies/{cid}/settings/branding)
+    // → allow only within the caller's own company (path param IS the companyId).
+    match /companies/{companyId}/settings/{settingId} {
+      allow read, write: if isSignedIn() && companyId == callerCompany();
+    }
+
+    // Gamification badges live under companies/{companyId}/badges (subcollection).
+    // The app (GamificationManager) reads + writes these, so they need a rule or
+    // the badges feature default-denies. Scoped to the owning company.
+    match /companies/{companyId}/badges/{badgeId} {
+      allow read, write: if isSignedIn() && companyId == callerCompany();
+    }
+
+    // deletion_logs — audit trail keyed to a deleted company (id = companyId).
+    match /deletion_logs/{companyId} {
+      allow read, write: if isSignedIn() && companyId == callerCompany();
+    }
+
+    // NOTE: activityComments, directChats, shiftSwaps, checklists,
+    // checklistSubmissions, settings(top-level) are EMPTY and the app never
+    // writes them — intentionally NOT matched here, so they fall through to
+    // DEFAULT DENY. (Add rules if a future feature starts using them.)
+
+    // Default deny for anything not matched above.
+  } // /documents
+}
