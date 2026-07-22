@@ -309,10 +309,40 @@ input:focus, select:focus { outline:2px solid var(--accent); outline-offset:-1px
 .dirgrid input { padding:5px 7px; font-size:12.5px; }
 .dirhdr { font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; }
 
+/* ---- board voting (beta) ---- */
+.votebox { width:min(680px,94vw); }
+.votebanner { background:var(--accent-soft); border:1px solid #B9CCDD; color:var(--accent-ink);
+  border-radius:7px; padding:10px 14px; margin:14px 0 0; font-size:13.5px;
+  display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.voteitem { border:1px solid var(--line); border-radius:8px; padding:12px 14px; margin:0 0 12px; background:var(--card); }
+.voteitem .vq { font-weight:700; font-size:14px; margin:0 0 3px; }
+.voteitem .vmeta { font-size:12px; color:var(--muted); margin:0 0 8px; }
+.vhash { font:11px ui-monospace,Menlo,monospace; background:var(--line-soft); border-radius:4px; padding:1px 6px; }
+.vtag { display:inline-block; font-size:11px; font-weight:700; border-radius:4px; padding:2px 8px; }
+.vtag.open { background:var(--amber-soft); color:var(--amber); }
+.vtag.approved { background:var(--good-soft); color:var(--good); }
+.vtag.rejected { background:var(--prio-soft); color:var(--prio); }
+.vtag.tied { background:var(--line-soft); color:var(--ink2); }
+.vtally { font-size:12.5px; margin:6px 0; color:var(--ink2); }
+.vballots { font-size:12.5px; margin:4px 0 8px; padding-left:18px; }
+.vballots li { margin:2px 0; }
+.vbtns { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin:8px 0 0; }
+.vbtns .btn.sel-approve { background:var(--good); border-color:var(--good); color:#fff; }
+.vbtns .btn.sel-reject { background:var(--prio); border-color:var(--prio); color:#fff; }
+.vbtns .btn.sel-abstain { background:var(--ink2); border-color:var(--ink2); color:#fff; }
+.vcomment { flex:1; min-width:180px; padding:5px 8px; font-size:12.5px; }
+.signbox { width:min(520px,94vw); }
+.sigcanvas { border:1.5px dashed var(--muted); border-radius:8px; background:#fff;
+  touch-action:none; display:block; width:100%; max-width:440px; cursor:crosshair; }
+.sigrow { display:flex; gap:14px; flex-wrap:wrap; margin:8px 0 0; }
+.sigblock { text-align:center; font-size:11.5px; color:var(--ink2); }
+.sigblock img { height:44px; display:block; margin:0 auto 2px; }
+.sigblock .signm { font-weight:700; border-top:1px solid var(--ink2); padding-top:2px; }
+
 @media print {
   :root { --paper:#fff; --card:#fff; }
   body { padding:0; font-size:12.5px; }
-  .appbar, .secnav, .edithint-inline, .archbanner, #editor { display:none !important; }
+  .appbar, .secnav, .edithint-inline, .archbanner, .votebanner, #editor { display:none !important; }
   #report { display:block !important; }
   .editable-head, .editable-txt { outline:none !important; }
   .editable-txt:empty::before { content:"" !important; }
@@ -358,6 +388,7 @@ input:focus, select:focus { outline:2px solid var(--accent); outline-offset:-1px
   <button class="btn" id="btnPrint" type="button">Print / PDF</button>
   <button class="btn" id="btnHistory" type="button">History</button>
   <button class="btn" id="btnDash" type="button" style="display:none" title="Totals across all report periods">📊 Dashboard</button>
+  <button class="btn" id="btnVotes" type="button" style="display:none" title="Board voting on quoted jobs">🗳 <span id="votesLabel">Votes</span></button>
   <div class="spacer"></div>
   <span class="barnote" id="cloudStatus"></span>
   <span class="barnote" id="saveNote"></span>
@@ -366,6 +397,7 @@ input:focus, select:focus { outline:2px solid var(--accent); outline-offset:-1px
     <button class="btn" id="btnMore" type="button">More ▾</button>
     <div class="dropdown">
       <button id="btnMemo" type="button">✨ AI board memo</button>
+      <button id="btnDecLog" type="button">📜 Decision log</button>
       <button id="btnBackup" type="button">Backup data (JSON)</button>
       <button id="btnRestore" type="button">Restore a backup…</button>
       <button id="btnPortable" type="button">Download portable copy</button>
@@ -426,6 +458,42 @@ input:focus, select:focus { outline:2px solid var(--accent); outline-offset:-1px
     <textarea id="memoText" spellcheck="false" placeholder="The drafted memo will appear here…"></textarea>
     <div class="row"><button class="btn" id="memoCopy" type="button">Copy to clipboard</button>
       <button class="btn ghost" id="memoClose" type="button">Close</button></div>
+  </div>
+</div>
+
+<div class="overlay" id="votesOverlay" role="dialog" aria-modal="true" aria-label="Board voting">
+  <div class="pinbox votebox">
+    <h3>🗳 Board voting</h3>
+    <div id="voteStart" style="display:none"></div>
+    <div id="votesList" class="histlist" style="max-height:min(560px,68vh)"><p class="histempty">Loading…</p></div>
+    <div class="row"><button class="btn ghost" id="votesClose" type="button">Close</button></div>
+  </div>
+</div>
+
+<div class="overlay" id="signOverlay" role="dialog" aria-modal="true" aria-label="Sign resolution">
+  <div class="pinbox signbox">
+    <h3>Sign the resolution</h3>
+    <p class="histempty" id="signIntro" style="margin:4px 0 10px"></p>
+    <div class="esrow" style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+      <label for="signName" style="min-width:70px">Full name</label>
+      <input id="signName" type="text" placeholder="as it should appear on the resolution" style="flex:1" autocomplete="name">
+    </div>
+    <canvas id="sigPad" class="sigcanvas" width="440" height="130"></canvas>
+    <div class="savenote" style="margin-top:4px">Draw your signature above (mouse or finger). Your signed-in Google account, the date, and the document hash are recorded with it.</div>
+    <div class="row">
+      <button class="btn" id="sigClear" type="button">Clear</button>
+      <button class="btn primary" id="sigSave" type="button">Sign resolution</button>
+      <button class="btn ghost" id="signCancel" type="button">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="decLogOverlay" role="dialog" aria-modal="true" aria-label="Decision log">
+  <div class="pinbox histbox">
+    <h3>📜 Decision log</h3>
+    <p class="histempty" style="margin:2px 0 8px">Append-only record of every vote opened, closed, and signed. Entries can never be edited or deleted — by anyone.</p>
+    <div id="decLogList" class="histlist"><p class="histempty">Loading…</p></div>
+    <div class="row"><button class="btn ghost" id="decLogClose" type="button">Close</button></div>
   </div>
 </div>
 
@@ -615,6 +683,7 @@ function cloudLine() {
   if (cloud.active.kind === "archived")
     return "📁 Viewing “" + (cloud.active.name || "past report") + "” — a past report";
   if (cloud.user && isEditor()) return "● Live data — editing as " + cloud.user.email;
+  if (cloud.user && isBoardMember()) return "● Signed in as " + cloud.user.email + " — board member (voting enabled)";
   if (cloud.user) return "● Signed in as " + cloud.user.email + " — not authorized to edit (view only)";
   return "● Live data";
 }
@@ -655,6 +724,7 @@ function cloudInit() {
   firebase.auth().onAuthStateChanged(function (u) {
     cloud.user = u || null;
     cloud.denied = false;                       /* fresh sign-in clears any prior denial */
+    subscribeBoard(u);                          /* board list + open-vote count (board/editors only) */
     document.getElementById("btnSignOut").style.display = u ? "" : "none";
     /* a signed-out viewer can no longer read an archived (editor-only) report */
     if (!u && cloud.active.kind === "archived") { backToCurrent(); return; }
@@ -933,6 +1003,10 @@ function renderReport() {
     '<a href="#secC">C · ' + esc(shortLabel(M.headC)) + "</a>" +
     '<a href="#secD">D · ' + esc(shortLabel(M.headD)) + "</a>" +
     '<a href="#secE">E · ' + esc(shortLabel(M.headE)) + "</a></nav>");
+  if (canVoteView() && votesCache.open > 0)
+    h.push('<div class="votebanner">🗳 <strong>' + votesCache.open + '</strong> board vote' +
+      (votesCache.open > 1 ? "s are" : " is") + ' open — your review is requested. ' +
+      '<button class="btn small" id="voteBannerBtn" type="button">Review &amp; vote</button></div>');
   if (EDITOR)
     h.push('<div class="edithint-inline">✎ You’re signed in as an editor — click almost anything to edit it right here (look for the dashed underline on hover): headings, descriptions, job names, contractor names, scope notes, and dollar amounts. Amounts you type are treated as the <strong>HST-included total</strong>; type an amount over “Enter amount” to turn a pending bid into a quote. Totals, the lowest-bid flag, and the charts recalculate automatically. Use the <strong>Edit</strong> tab to add or remove jobs and bids or toggle priority.</div>');
 
@@ -1153,6 +1227,7 @@ function renderEditor() {
   h.push(aiCardHTML());
   h.push(intakeCardHTML());
   h.push(dirCardHTML());
+  h.push(boardCardHTML());
   h.push('<p><button class="btn primary" id="btnAddJob" type="button">+ Add job</button></p>');
   state.jobs.forEach(function (j, ji) {
     var c = jobCalc(j);
@@ -1170,7 +1245,8 @@ function renderEditor() {
     }).join("");
     h.push('<div class="strow"><label>Status <select data-f="status">' + sopts + "</select></label>" +
       '<label>Decision date <input type="date" value="' + esc(j.statusDate || "") + '" data-f="statusDate"></label>' +
-      '<input type="text" value="' + esc(j.statusNote || "") + '" data-f="statusNote" placeholder="decision / progress note (shows in Section E)"></div>');
+      '<input type="text" value="' + esc(j.statusNote || "") + '" data-f="statusNote" placeholder="decision / progress note (shows in Section E)">' +
+      '<button class="btn small" data-act="openvote" type="button" title="Put this job to a board vote">🗳 Board vote</button></div>');
     h.push('<div class="ebids"><div class="ebrow hdr"><div>Contractor</div><div>Quote #</div><div>Amount</div><div>HST</div><div>Notes</div><div>Status</div><div></div></div>');
     j.bids.forEach(function (b, bi) {
       var t = bidTotal(b);
@@ -1408,6 +1484,24 @@ document.getElementById("editor").addEventListener("click", function (e) {
     if (ac && ar) startAttach(+ac.dataset.ji, +ar.dataset.bi);
     return;
   }
+  if (act === "openvote") {
+    var vc = e.target.closest(".ecard"); if (!vc) return;
+    var vj = state.jobs[+vc.dataset.ji];
+    if (vj) openVoteFor(vj);
+    return;
+  }
+  if (act === "board-add") {
+    var be = document.getElementById("boardNewEmail");
+    var bv = (be && be.value || "").trim().toLowerCase();
+    if (!bv || bv.indexOf("@") < 1) { alert("Enter the board member's email address."); return; }
+    if (boardState.members.indexOf(bv) >= 0) { alert("That email is already on the list."); return; }
+    boardState.members.push(bv);
+    boardSave(); renderEditor(); return;
+  }
+  if (act === "board-del") {
+    boardState.members.splice(+e.target.dataset.mi, 1);
+    boardSave(); renderEditor(); return;
+  }
   if (act === "delfile") {
     var fc = e.target.closest(".ecard"), fr = e.target.closest(".ebrow");
     if (!fc || !fr) return;
@@ -1516,6 +1610,31 @@ function dirCardHTML() {
   h.push('<p style="margin:10px 0 0"><button class="btn" data-act="dir-add" type="button">+ Add contractor</button></p>');
   h.push("</div></div>");
   return h.join("");
+}
+
+/* ---------- board members card (beta) — who may vote and sign ---------- */
+function boardCardHTML() {
+  var h = [];
+  h.push('<div class="ecard esettings" id="boardCard"><div class="ehead"><strong>Board members</strong>' +
+    '<span style="font-size:12.5px;color:var(--ink2)">— Google accounts allowed to vote and sign resolutions (they sign in like you do, but can’t edit)</span></div><div class="ebids">');
+  if (!cloud.on) h.push('<p class="edithint" style="margin:4px 0">Available on the live site only.</p>');
+  else {
+    boardState.members.forEach(function (m, mi) {
+      h.push('<div class="esrow"><label>Director ' + (mi + 1) + '</label><div style="flex:1">' + esc(m) +
+        '</div><button class="xbtn" data-act="board-del" data-mi="' + mi + '" title="Remove">✕</button></div>');
+    });
+    h.push('<div class="esrow"><label>Add member</label>' +
+      '<input type="email" id="boardNewEmail" placeholder="their.gmail@example.com" style="flex:1" autocomplete="off">' +
+      '<button class="btn" data-act="board-add" type="button">Add</button></div>');
+    h.push('<p class="edithint" style="margin:6px 0 0;font-size:12.5px">Board members see a 🗳 Votes button after signing in with Google. ' +
+      'Quorum is a majority of this list. Send them the beta link and they’re ready to vote.</p>');
+  }
+  h.push("</div></div>");
+  return h.join("");
+}
+function boardSave() {
+  cloud.db.doc(BOARD_PATH).set({ members: boardState.members })
+    .catch(function () { alert("Could not save the board-member list."); });
 }
 
 /* ---------- AI quote intake (beta): paste a quote email → prefilled job ---------- */
@@ -1667,6 +1786,425 @@ document.getElementById("memoCopy").onclick = function () {
   catch (e) { document.execCommand("copy"); }
 };
 
+/* ---------- board voting & resolutions (beta) ----------
+   Editors open a vote on a job; board members (emails in nnsccQuoteTrackerBeta/board)
+   each cast one recorded ballot; an editor closes the vote; board members then sign
+   the resolution in-app. Every step lands in an append-only decision log, and both
+   the vote and the signatures carry a SHA-256 hash of the exact data voted on, so
+   the record is tamper-evident. */
+var VOTES_COLL = "nnsccBoardVotesBeta";
+var DECLOG_COLL = "nnsccDecisionLogBeta";
+var BOARD_PATH = "nnsccQuoteTrackerBeta/board";
+var boardState = { members: [] };
+var votesCache = { open: 0 };
+function isBoardMember() {
+  return !!(cloud.user && boardState.members.indexOf(String(cloud.user.email || "").toLowerCase()) >= 0);
+}
+function canVoteView() { return isBoardMember() || isEditor(); }
+var boardUnsub = null, votesUnsub = null;
+function subscribeBoard(u) {
+  if (boardUnsub) { try { boardUnsub(); } catch (e) {} boardUnsub = null; }
+  if (votesUnsub) { try { votesUnsub(); } catch (e) {} votesUnsub = null; }
+  boardState = { members: [] }; votesCache.open = 0;
+  if (!u || !cloud.db) { updateReportsButton(); return; }
+  boardUnsub = cloud.db.doc(BOARD_PATH).onSnapshot(function (snap) {
+    boardState = (snap.exists && Array.isArray(snap.data().members))
+      ? { members: snap.data().members.map(function (m) { return String(m).toLowerCase(); }) }
+      : { members: [] };
+    cloudStatusMsg(cloudLine());
+    updateReportsButton();
+    if (document.body.dataset.view === "edit") renderEditor();
+  }, function () {});
+  /* open-vote count for the toolbar badge + report banner (board/editor read only) */
+  votesUnsub = cloud.db.collection(VOTES_COLL).where("status", "==", "open").onSnapshot(function (qs) {
+    var was = votesCache.open;
+    votesCache.open = qs.size;
+    updateReportsButton();
+    if (was !== qs.size && document.body.dataset.view === "report") renderReport();
+  }, function () {});
+}
+function sha256Hex(str) {
+  return crypto.subtle.digest("SHA-256", new TextEncoder().encode(str)).then(function (buf) {
+    return Array.prototype.map.call(new Uint8Array(buf), function (b) {
+      return ("0" + b.toString(16)).slice(-2);
+    }).join("");
+  });
+}
+/* canonical snapshot of the job as it stands — this exact string is hashed so
+   nobody can claim the numbers changed after the board voted */
+function jobSnapshotStr(j) {
+  var c = jobCalc(j);
+  return JSON.stringify({ report: state.reportName || "", jobNo: j.no, desc: j.desc,
+    bids: j.bids.map(function (b, i) { return { contractor: b.contractor || "",
+      qno: b.qno || "", totalInclHST: c.bids[i].total }; }) });
+}
+function decLog(text, voteId, hash) {
+  if (!cloud.db || !cloud.user) return;
+  cloud.db.collection(DECLOG_COLL).add({
+    at: firebase.firestore.FieldValue.serverTimestamp(),
+    by: cloud.user.email, text: text, voteId: voteId || "", hash: hash || ""
+  }).catch(function () {});
+}
+function openVoteFor(j) {
+  if (!isEditor()) return;
+  if (!boardState.members.length) { alert("Add the board members' emails first (Edit tab → Board members card)."); return; }
+  var c = jobCalc(j);
+  var carried = c.carriedBids[0];
+  var suggested = "Approve Job " + j.no + " — “" + (j.desc || "job") + "”" +
+    (carried ? " — award to " + ((carried.b.contractor || "").trim() || "the quoted contractor") +
+      " for " + money(c.cost) + " (incl. HST)" : "") + "?";
+  var q = prompt("Question the board will vote on:", suggested);
+  if (q == null || !q.trim()) return;
+  var snap = jobSnapshotStr(j);
+  sha256Hex(snap).then(function (hash) {
+    return cloud.db.collection(VOTES_COLL).add({
+      jobId: j.id, jobNo: j.no, jobDesc: j.desc || "",
+      question: q.trim(),
+      contractor: carried ? (carried.b.contractor || "") : "",
+      amountText: c.cost ? money(c.cost) + " (incl. HST)" : "no priced quote yet",
+      reportName: state.reportName || "",
+      snapshot: snap, snapshotHash: hash,
+      boardSize: boardState.members.length,
+      status: "open", result: null,
+      openedBy: cloud.user.email,
+      openedAt: firebase.firestore.FieldValue.serverTimestamp()
+    }).then(function (ref) {
+      decLog("Vote OPENED on Job " + j.no + " (“" + (j.desc || "") + "”): " + q.trim() +
+        " — data hash " + hash.slice(0, 12), ref.id, hash);
+      openVotesOverlay();
+    });
+  }).catch(function (e) { alert("Could not open the vote (" + ((e && e.code) || "error") + ")."); });
+}
+function tallyOf(ballots) {
+  var t = { a: 0, r: 0, ab: 0, cast: 0 };
+  ballots.forEach(function (b) {
+    if (b.choice === "approve") t.a++;
+    else if (b.choice === "reject") t.r++;
+    else t.ab++;
+    t.cast++;
+  });
+  return t;
+}
+function quorumOf(v) {
+  var size = v.boardSize || boardState.members.length || 1;
+  return Math.floor(size / 2) + 1;
+}
+/* the formal record: composed at close time, hashed, and what everybody signs */
+function resolutionTextOf(v, t) {
+  var M = state.meta || META_DEFAULTS;
+  return "RESOLUTION OF THE BOARD OF DIRECTORS\n" +
+    M.condoName + " — " + M.regNo + "\n" +
+    "Report period: " + (v.reportName || "—") + "\n\n" +
+    "QUESTION: " + v.question + "\n" +
+    "Job " + v.jobNo + ": " + v.jobDesc +
+    (v.contractor ? " — contractor: " + v.contractor : "") + " — " + v.amountText + "\n\n" +
+    "VOTES CAST: " + t.a + " approve / " + t.r + " reject / " + t.ab + " abstain " +
+    "(quorum " + quorumOf(v) + " of " + (v.boardSize || "—") + " directors)\n" +
+    "RESULT: " + (t.a > t.r ? "APPROVED" : (t.r > t.a ? "REJECTED" : "TIED")) +
+    (t.cast >= quorumOf(v) ? "" : " — QUORUM NOT MET") + "\n" +
+    "Data integrity hash (SHA-256 of the quoted amounts at vote time): " + v.snapshotHash;
+}
+function castBallot(voteId, choice, comment) {
+  var email = String(cloud.user.email).toLowerCase();
+  cloud.db.collection(VOTES_COLL).doc(voteId).collection("ballots").doc(email).set({
+    email: email, choice: choice, comment: comment || "",
+    at: firebase.firestore.FieldValue.serverTimestamp()
+  }).then(function () { loadVotesList(); })
+    .catch(function (e) {
+      alert(e && e.code === "permission-denied"
+        ? "This account is not on the board-member list (or the vote has closed)."
+        : "Could not record the ballot (" + ((e && e.code) || "error") + ").");
+    });
+}
+function closeVote(voteId, v, ballots) {
+  var t = tallyOf(ballots);
+  var result = t.a > t.r ? "approved" : (t.r > t.a ? "rejected" : "tied");
+  var quorumMet = t.cast >= quorumOf(v);
+  if (!confirm("Close this vote?\n\n" + t.a + " approve / " + t.r + " reject / " + t.ab + " abstain → " +
+      result.toUpperCase() + (quorumMet ? "" : "\n⚠ Quorum has NOT been met (" + t.cast + " of " +
+      quorumOf(v) + " needed)") + "\n\nOnce closed, board members sign the resolution; ballots can no longer be changed.")) return;
+  var resText = resolutionTextOf(v, t);
+  sha256Hex(resText).then(function (resHash) {
+    return cloud.db.collection(VOTES_COLL).doc(voteId).set({
+      status: "closed", result: result, quorumMet: quorumMet,
+      tally: { a: t.a, r: t.r, ab: t.ab, cast: t.cast },
+      resText: resText, resHash: resHash,
+      closedBy: cloud.user.email,
+      closedAt: firebase.firestore.FieldValue.serverTimestamp()
+    }, { merge: true }).then(function () {
+      decLog("Vote CLOSED on Job " + v.jobNo + " (“" + v.jobDesc + "”): " + result.toUpperCase() +
+        " — " + t.a + " approve / " + t.r + " reject / " + t.ab + " abstain" +
+        (quorumMet ? "" : " (quorum not met)") + " — resolution hash " + resHash.slice(0, 12), voteId, resHash);
+      loadVotesList();
+    });
+  }).catch(function (e) { alert("Could not close the vote (" + ((e && e.code) || "error") + ")."); });
+}
+function deleteVote(voteId, v) {
+  if (!confirm("Delete this test vote (“" + v.question + "”)?\n\nBallots and signatures under it are removed too. The decision-log entries it produced stay forever — the log is append-only.")) return;
+  var ref = cloud.db.collection(VOTES_COLL).doc(voteId);
+  Promise.all([ref.collection("ballots").get(), ref.collection("signatures").get()]).then(function (res) {
+    var dels = [];
+    res[0].forEach(function (d) { dels.push(d.ref.delete()); });
+    res[1].forEach(function (d) { dels.push(d.ref.delete()); });
+    return Promise.all(dels);
+  }).then(function () { return ref.delete(); })
+    .then(function () { loadVotesList(); })
+    .catch(function (e) { alert("Could not delete (" + ((e && e.code) || "error") + ")."); });
+}
+/* ---- votes overlay ---- */
+function openVotesOverlay() {
+  if (!canVoteView()) { alert("Sign in with a board-member or editor account to see board votes."); return; }
+  document.getElementById("votesOverlay").classList.add("open");
+  var st = document.getElementById("voteStart");
+  if (isEditor() && cloud.active.kind === "current") {
+    var opts = state.jobs.map(function (j) {
+      return '<option value="' + esc(j.id) + '">Job ' + esc(j.no) + " — " + esc(j.desc || "(no description)") + "</option>";
+    }).join("");
+    st.innerHTML = '<div class="vbtns" style="margin:0 0 12px"><select id="voteJobSel" style="flex:1;min-width:200px;padding:5px 8px">' +
+      opts + '</select><button class="btn primary" id="voteStartBtn" type="button">🗳 Open a vote</button></div>';
+    st.style.display = "";
+    document.getElementById("voteStartBtn").onclick = function () {
+      var j = findJob(document.getElementById("voteJobSel").value);
+      if (j) openVoteFor(j);
+    };
+  } else st.style.display = "none";
+  loadVotesList();
+}
+function loadVotesList() {
+  var el = document.getElementById("votesList");
+  el.innerHTML = '<p class="histempty">Loading…</p>';
+  cloud.db.collection(VOTES_COLL).orderBy("openedAt", "desc").limit(30).get().then(function (qs) {
+    if (qs.empty) { el.innerHTML = '<p class="histempty">No board votes yet.' +
+      (isEditor() ? " Pick a job above and open the first one." : "") + "</p>"; return; }
+    var rows = [];
+    qs.forEach(function (d) { rows.push({ id: d.id, v: d.data() }); });
+    rows.sort(function (a, b) {           /* open votes first, then newest closed */
+      return (a.v.status === "open" ? 0 : 1) - (b.v.status === "open" ? 0 : 1);
+    });
+    Promise.all(rows.map(function (r) {
+      var ref = cloud.db.collection(VOTES_COLL).doc(r.id);
+      return Promise.all([ref.collection("ballots").get(), ref.collection("signatures").get()])
+        .then(function (res) {
+          r.ballots = []; res[0].forEach(function (d) { r.ballots.push(d.data()); });
+          r.sigs = []; res[1].forEach(function (d) { r.sigs.push(d.data()); });
+          return r;
+        });
+    })).then(function (rows) {
+      votesRows = rows;
+      el.innerHTML = rows.map(voteItemHTML).join("");
+    });
+  }).catch(function (e) {
+    el.innerHTML = '<p class="histempty">Could not load votes (' + esc((e && e.code) || "error") + ").</p>";
+  });
+}
+var votesRows = [];   /* last-loaded sessions, for the delegated click handler */
+function voteItemHTML(r) {
+  var v = r.v, t = tallyOf(r.ballots);
+  var me = cloud.user ? String(cloud.user.email).toLowerCase() : "";
+  var mine = null;
+  r.ballots.forEach(function (b) { if (b.email === me) mine = b; });
+  var h = ['<div class="voteitem' + (v.status === "closed" ? " closed" : "") + '" data-vid="' + esc(r.id) + '">'];
+  var tag = v.status === "open" ? '<span class="vtag open">OPEN</span>'
+    : '<span class="vtag ' + esc(v.result || "tied") + '">' + esc(String(v.result || "closed").toUpperCase()) +
+      (v.quorumMet === false ? " · NO QUORUM" : "") + "</span>";
+  h.push('<p class="vq">' + tag + " " + esc(v.question) + "</p>");
+  h.push('<p class="vmeta">Job ' + esc(v.jobNo) + " · " + esc(v.amountText || "") +
+    (v.reportName ? " · " + esc(v.reportName) : "") + " · opened by " + esc(v.openedBy || "") +
+    ' · data hash <span class="vhash" title="SHA-256 of the quoted amounts when the vote opened — proof the numbers were not changed mid-vote">' +
+    esc((v.snapshotHash || "").slice(0, 12)) + "</span></p>");
+  h.push('<p class="vtally"><strong>' + t.a + "</strong> approve · <strong>" + t.r +
+    "</strong> reject · <strong>" + t.ab + "</strong> abstain — " + t.cast + " of " +
+    esc(v.boardSize || "?") + " directors (quorum " + quorumOf(v) + ")</p>");
+  if (r.ballots.length) {
+    h.push('<ul class="vballots">');
+    r.ballots.forEach(function (b) {
+      h.push("<li>" + esc(b.email) + ": <strong>" + esc(b.choice) + "</strong>" +
+        (b.comment ? " — “" + esc(b.comment) + "”" : "") + "</li>");
+    });
+    h.push("</ul>");
+  }
+  if (v.status === "open" && isBoardMember()) {
+    h.push('<div class="vbtns">' +
+      '<button class="btn small' + (mine && mine.choice === "approve" ? " sel-approve" : "") + '" data-vact="approve" type="button">✓ Approve</button>' +
+      '<button class="btn small' + (mine && mine.choice === "reject" ? " sel-reject" : "") + '" data-vact="reject" type="button">✗ Reject</button>' +
+      '<button class="btn small' + (mine && mine.choice === "abstain" ? " sel-abstain" : "") + '" data-vact="abstain" type="button">Abstain</button>' +
+      '<input class="vcomment" type="text" placeholder="optional comment" value="' + esc(mine ? mine.comment : "") + '">' +
+      (mine ? '<span class="savenote">your vote is recorded — click again to change it</span>' : "") + "</div>");
+  }
+  h.push('<div class="vbtns">');
+  if (v.status === "open" && isEditor())
+    h.push('<button class="btn small" data-vact="close" type="button">Close vote &amp; record result</button>');
+  if (v.status === "closed") {
+    var signed = r.sigs.some(function (s) { return s.email === me; });
+    if (isBoardMember() && !signed)
+      h.push('<button class="btn small primary" data-vact="sign" type="button">✍ Sign the resolution</button>');
+    h.push('<button class="btn small" data-vact="print" type="button">🖨 View / print resolution</button>');
+  }
+  if (isEditor())
+    h.push('<button class="btn small ddanger" data-vact="delete" type="button">Delete</button>');
+  h.push("</div>");
+  if (r.sigs.length) {
+    h.push('<div class="sigrow">');
+    r.sigs.forEach(function (s) {
+      h.push('<div class="sigblock">' + (s.sig ? '<img src="' + esc(s.sig) + '" alt="">' : "") +
+        '<div class="signm">' + esc(s.name || s.email) + '</div>' + esc(s.email) + "</div>");
+    });
+    h.push("</div>");
+  }
+  h.push("</div>");
+  return h.join("");
+}
+document.getElementById("votesList").addEventListener("click", function (e) {
+  var btn = e.target.closest("[data-vact]"); if (!btn) return;
+  var item = btn.closest(".voteitem"); if (!item) return;
+  var vid = item.dataset.vid;
+  var row = null;
+  votesRows.forEach(function (r) { if (r.id === vid) row = r; });
+  if (!row) return;
+  var act = btn.dataset.vact;
+  if (act === "approve" || act === "reject" || act === "abstain") {
+    var cm = item.querySelector(".vcomment");
+    castBallot(vid, act, cm ? cm.value.trim() : "");
+  }
+  else if (act === "close") closeVote(vid, row.v, row.ballots);
+  else if (act === "sign") openSignOverlay(vid, row.v);
+  else if (act === "print") printResolution(row);
+  else if (act === "delete") deleteVote(vid, row.v);
+});
+document.getElementById("btnVotes").onclick = openVotesOverlay;
+document.getElementById("votesClose").onclick = function () { document.getElementById("votesOverlay").classList.remove("open"); };
+document.getElementById("votesOverlay").addEventListener("click", function (e) { if (e.target === this) this.classList.remove("open"); });
+
+/* ---- signature pad ---- */
+var signTarget = null, sigDrawn = false;
+var sigPad = document.getElementById("sigPad");
+var sigCtx = sigPad.getContext("2d");
+function sigClear() {
+  sigCtx.clearRect(0, 0, sigPad.width, sigPad.height);
+  sigCtx.lineWidth = 2.2; sigCtx.lineCap = "round"; sigCtx.lineJoin = "round"; sigCtx.strokeStyle = "#1E2833";
+  sigDrawn = false;
+}
+(function () {
+  var drawing = false;
+  function pos(e) {
+    var r = sigPad.getBoundingClientRect();
+    return { x: (e.clientX - r.left) * (sigPad.width / r.width),
+             y: (e.clientY - r.top) * (sigPad.height / r.height) };
+  }
+  sigPad.addEventListener("pointerdown", function (e) {
+    e.preventDefault(); drawing = true; sigDrawn = true;
+    var p = pos(e); sigCtx.beginPath(); sigCtx.moveTo(p.x, p.y); sigCtx.lineTo(p.x + 0.1, p.y); sigCtx.stroke();
+    try { sigPad.setPointerCapture(e.pointerId); } catch (er) {}
+  });
+  sigPad.addEventListener("pointermove", function (e) {
+    if (!drawing) return; e.preventDefault();
+    var p = pos(e); sigCtx.lineTo(p.x, p.y); sigCtx.stroke();
+  });
+  sigPad.addEventListener("pointerup", function () { drawing = false; });
+  sigPad.addEventListener("pointercancel", function () { drawing = false; });
+})();
+function openSignOverlay(voteId, v) {
+  signTarget = { id: voteId, v: v };
+  document.getElementById("signIntro").textContent =
+    "Signing as " + cloud.user.email + " — resolution on Job " + v.jobNo + " (“" + v.jobDesc + "”), result: " +
+    String(v.result || "").toUpperCase() + ". Resolution hash " + (v.resHash || "").slice(0, 12) + ".";
+  var nm = document.getElementById("signName");
+  if (!nm.value) nm.value = cloud.user.displayName || "";
+  sigClear();
+  document.getElementById("signOverlay").classList.add("open");
+}
+document.getElementById("sigClear").onclick = sigClear;
+document.getElementById("signCancel").onclick = function () { document.getElementById("signOverlay").classList.remove("open"); };
+document.getElementById("signOverlay").addEventListener("click", function (e) { if (e.target === this) this.classList.remove("open"); });
+document.getElementById("sigSave").onclick = function () {
+  if (!signTarget) return;
+  var name = document.getElementById("signName").value.replace(/\s+/g, " ").trim();
+  if (!name) { alert("Type your full name — it appears under the signature line."); return; }
+  if (!sigDrawn) { alert("Draw your signature in the box (a typed name alone is not accepted here)."); return; }
+  var email = String(cloud.user.email).toLowerCase();
+  var dataUrl = sigPad.toDataURL("image/png");
+  var t = signTarget;
+  cloud.db.collection(VOTES_COLL).doc(t.id).collection("signatures").doc(email).set({
+    email: email, name: name, sig: dataUrl,
+    docHash: t.v.resHash || "",
+    at: firebase.firestore.FieldValue.serverTimestamp()
+  }).then(function () {
+    decLog(name + " (" + email + ") SIGNED the resolution on Job " + t.v.jobNo +
+      " (“" + t.v.jobDesc + "”) — hash " + (t.v.resHash || "").slice(0, 12), t.id, t.v.resHash || "");
+    document.getElementById("signOverlay").classList.remove("open");
+    loadVotesList();
+  }).catch(function (e) {
+    alert(e && e.code === "permission-denied"
+      ? "Signatures are only accepted from board-member accounts, once per person, after the vote is closed."
+      : "Could not save the signature (" + ((e && e.code) || "error") + ").");
+  });
+};
+/* ---- printable resolution ---- */
+function printResolution(r) {
+  var v = r.v, t = v.tally || tallyOf(r.ballots);
+  var M = state.meta || META_DEFAULTS;
+  var w = window.open("", "_blank");
+  if (!w) { alert("Allow pop-ups to view the printable resolution."); return; }
+  var h = ['<!doctype html><html><head><meta charset="utf-8"><title>Resolution — Job ' + esc(v.jobNo) + "</title>",
+    "<style>body{font:14px/1.6 Georgia,serif;color:#1E2833;max-width:680px;margin:40px auto;padding:0 20px}",
+    "h1{font-size:19px;text-align:center;letter-spacing:.5px}h2{font-size:15px;text-align:center;font-weight:400;margin-top:-8px}",
+    "hr{border:none;border-top:1px solid #999;margin:18px 0}.meta{font-size:12.5px;color:#555}",
+    ".hash{font:11px monospace;background:#f0f0f0;padding:2px 6px;border-radius:4px;word-break:break-all}",
+    ".sigs{display:flex;gap:30px;flex-wrap:wrap;margin-top:34px}.sig{text-align:center;font-size:12px}",
+    ".sig img{height:52px;display:block;margin:0 auto 2px}.sig .nm{border-top:1px solid #333;padding-top:3px;font-weight:700;min-width:180px}",
+    "@media print{.noprint{display:none}}</style></head><body>"];
+  h.push("<h1>RESOLUTION OF THE BOARD OF DIRECTORS</h1>");
+  h.push("<h2>" + esc(M.condoName) + " — " + esc(M.regNo) + "</h2><hr>");
+  h.push('<p class="meta">Report period: ' + esc(v.reportName || "—") + " · Vote opened by " + esc(v.openedBy || "") +
+    (v.closedBy ? " · closed by " + esc(v.closedBy) : "") + "</p>");
+  h.push("<p><strong>WHEREAS</strong> the following matter was put to the Board for decision:</p>");
+  h.push("<p style='margin-left:20px'><em>" + esc(v.question) + "</em><br>Job " + esc(v.jobNo) + ": " + esc(v.jobDesc) +
+    (v.contractor ? " — contractor: " + esc(v.contractor) : "") + " — " + esc(v.amountText || "") + "</p>");
+  h.push("<p><strong>AND WHEREAS</strong> the votes cast were: " + t.a + " in favour, " + t.r +
+    " opposed, " + t.ab + " abstaining (" + (t.cast || t.a + t.r + t.ab) + " of " + esc(v.boardSize || "—") +
+    " directors" + (v.quorumMet === false ? "; quorum was NOT met" : "") + ");</p>");
+  h.push("<p><strong>BE IT RESOLVED</strong> that the matter is <strong>" +
+    esc(String(v.result || "").toUpperCase()) + "</strong>.</p><hr>");
+  h.push('<p class="meta">Integrity record — quoted data at vote time (SHA-256): <span class="hash">' + esc(v.snapshotHash || "") + "</span><br>" +
+    'Resolution text (SHA-256): <span class="hash">' + esc(v.resHash || "") + "</span></p>");
+  if (r.sigs.length) {
+    h.push('<div class="sigs">');
+    r.sigs.forEach(function (s) {
+      var when = s.at && s.at.toDate ? s.at.toDate().toLocaleDateString("en-CA") : "";
+      h.push('<div class="sig">' + (s.sig ? '<img src="' + esc(s.sig) + '">' : "") +
+        '<div class="nm">' + esc(s.name || "") + "</div>" + esc(s.email) + (when ? "<br>signed " + esc(when) : "") + "</div>");
+    });
+    h.push("</div>");
+  } else h.push('<p class="meta">No signatures yet.</p>');
+  h.push('<p class="noprint" style="margin-top:30px"><button onclick="window.print()">Print / save as PDF</button></p>');
+  h.push("</body></html>");
+  w.document.write(h.join(""));
+  w.document.close();
+}
+/* ---- decision log ---- */
+function openDecLog() {
+  if (!canVoteView()) { alert("Sign in with a board-member or editor account first."); return; }
+  document.getElementById("decLogOverlay").classList.add("open");
+  var el = document.getElementById("decLogList");
+  el.innerHTML = '<p class="histempty">Loading…</p>';
+  cloud.db.collection(DECLOG_COLL).orderBy("at", "desc").limit(100).get().then(function (qs) {
+    if (qs.empty) { el.innerHTML = '<p class="histempty">Nothing recorded yet — entries appear when votes are opened, closed, and signed.</p>'; return; }
+    var h = [];
+    qs.forEach(function (d) {
+      var e = d.data();
+      var when = e.at && e.at.toDate ? e.at.toDate().toLocaleString("en-CA") : "";
+      h.push('<div class="histentry"><div class="histwho">' + esc(e.by || "") +
+        ' <span class="histwhen">· ' + esc(when) + "</span></div><ul><li>" + esc(e.text || "") + "</li></ul></div>");
+    });
+    el.innerHTML = h.join("");
+  }).catch(function (e) {
+    el.innerHTML = '<p class="histempty">Could not load the log (' + esc((e && e.code) || "error") + ").</p>";
+  });
+}
+document.getElementById("btnDecLog").onclick = openDecLog;
+document.getElementById("decLogClose").onclick = function () { document.getElementById("decLogOverlay").classList.remove("open"); };
+document.getElementById("decLogOverlay").addEventListener("click", function (e) { if (e.target === this) this.classList.remove("open"); });
+
 /* ---------- toolbar ---------- */
 function setView(v) {
   document.body.dataset.view = v;
@@ -1719,6 +2257,10 @@ function updateReportsButton() {
   if (lbl) lbl.textContent = activeReportName();
   var db = document.getElementById("btnDash");
   if (db) db.style.display = isEditor() ? "" : "none";   /* archived periods are editor-only */
+  var vb = document.getElementById("btnVotes");
+  if (vb) vb.style.display = canVoteView() ? "" : "none";
+  var vl = document.getElementById("votesLabel");
+  if (vl) vl.textContent = votesCache.open > 0 ? "Votes (" + votesCache.open + " open)" : "Votes";
   var btn = document.getElementById("btnReports");
   if (btn) btn.classList.toggle("viewing-archived", cloud.active.kind === "archived");
 }
@@ -1894,6 +2436,7 @@ document.getElementById("reportsOverlay").addEventListener("click", function (e)
 });
 document.getElementById("report").addEventListener("click", function (e) {
   if (e.target.closest(".archback")) backToCurrent();
+  if (e.target.closest("#voteBannerBtn")) openVotesOverlay();
 });
 
 /* ---------- inline bid expansion (click a “N bids” badge) ---------- */

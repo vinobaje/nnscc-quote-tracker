@@ -49,8 +49,20 @@ service cloud.firestore {
     // ---- BETA PREVIEW sandbox (quote-report-beta.web.app) ----
     // Same permission model as production, separate data so testing never
     // touches the real report.
+    // Board members (beta): emails allowed to vote and sign resolutions.
+    // The list lives in nnsccQuoteTrackerBeta/board {members:[emails]}, managed by editors.
+    function nnsccBoardBeta() {
+      return request.auth != null
+        && request.auth.token.get('email_verified', false) == true
+        && request.auth.token.email != null
+        && request.auth.token.email.lower() in
+           get(/databases/$(database)/documents/nnsccQuoteTrackerBeta/board).data.get('members', []);
+    }
+
     match /nnsccQuoteTrackerBeta/{docId} {
-      allow read: if docId == "main" || nnsccEditor();   // contractors doc is editor-only
+      // main is public; the board list is visible to any signed-in account
+      // (a board member needs to see they're on it); contractors stays editor-only
+      allow read: if docId == "main" || (docId == "board" && request.auth != null) || nnsccEditor();
       allow write: if nnsccEditor();
       match /audit/{entryId} {
         allow read: if true;
@@ -64,6 +76,41 @@ service cloud.firestore {
         allow read, create: if nnsccEditor();
         allow update, delete: if false;
       }
+    }
+
+    // Board voting (beta). Editors open/close vote sessions; each board member
+    // casts ONE ballot (doc id = their email) while the session is open, and may
+    // sign the resolution once it is closed. Editor deletes are allowed here only
+    // so beta test votes can be cleaned up — the decision log below is the
+    // permanent record and is append-only for everyone, including the owner.
+    match /nnsccBoardVotesBeta/{voteId} {
+      allow read: if nnsccBoardBeta() || nnsccEditor();
+      allow create, update: if nnsccEditor();
+      allow delete: if nnsccEditor();
+      match /ballots/{email} {
+        allow read: if nnsccBoardBeta() || nnsccEditor();
+        allow create, update: if nnsccBoardBeta()
+          && email == request.auth.token.email.lower()
+          && request.resource.data.email == email
+          && get(/databases/$(database)/documents/nnsccBoardVotesBeta/$(voteId)).data.status == "open";
+        allow delete: if nnsccEditor();
+      }
+      match /signatures/{email} {
+        allow read: if nnsccBoardBeta() || nnsccEditor();
+        allow create: if nnsccBoardBeta()
+          && email == request.auth.token.email.lower()
+          && request.resource.data.email == email
+          && get(/databases/$(database)/documents/nnsccBoardVotesBeta/$(voteId)).data.status == "closed";
+        allow update: if false;            // a placed signature can never be altered
+        allow delete: if nnsccEditor();
+      }
+    }
+    // Append-only decision log — the tamper-evident audit record of every vote
+    // opened, closed, and signed. Nothing here can ever be edited or deleted.
+    match /nnsccDecisionLogBeta/{entryId} {
+      allow read: if nnsccBoardBeta() || nnsccEditor();
+      allow create: if nnsccBoardBeta() || nnsccEditor();
+      allow update, delete: if false;
     }
 
     // Everything else denied.
