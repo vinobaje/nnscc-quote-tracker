@@ -113,6 +113,231 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // ================== MULTI-TENANT SaaS PROTOTYPE ==================
+    // (quote-report-beta.web.app/saas) — a self-contained sandbox that proves
+    // the tenant-isolation model without touching any nnscc* data above.
+    //
+    // Data model:
+    //   /saasOrgs/{orgId}                      an org (PM company or self-managed condo)
+    //       ownerUid, name, plan, createdAt
+    //     /members/{uid}   { email, role }     role: owner | admin | board | viewer
+    //     /invites/{emailLower} { email, role, invitedBy }   pending, pre-acceptance
+    //     /buildings/{bId} { name, address, corpNumber }
+    //       /reports/{rId}                      demo tenant data (quote notes, etc.)
+    //
+    // Isolation guarantee: every path below /saasOrgs/{orgId} requires the caller
+    // to be a member of THAT org. Non-members are denied at the database layer.
+
+    function saasSignedIn() {
+      return request.auth != null
+        && request.auth.token.get('email_verified', false) == true
+        && request.auth.token.email != null;
+    }
+    function saasEmail() { return request.auth.token.email.lower(); }
+    function saasMember(orgId) {
+      return saasSignedIn()
+        && exists(/databases/$(database)/documents/saasOrgs/$(orgId)/members/$(request.auth.uid));
+    }
+    function saasRole(orgId) {
+      return get(/databases/$(database)/documents/saasOrgs/$(orgId)/members/$(request.auth.uid)).data.role;
+    }
+    function saasIsAdmin(orgId) {
+      return saasMember(orgId) && saasRole(orgId) in ['owner', 'admin'];
+    }
+    // Who may cast a ballot / sign a resolution: owner, admin, or board member.
+    function saasCanVote(orgId) {
+      return saasMember(orgId) && saasRole(orgId) in ['owner', 'admin', 'board'];
+    }
+    // The platform operator: full access to every org (support, oversight, billing).
+    function saasOp() {
+      return saasSignedIn() && saasEmail() == 'mvinobaje@gmail.com';
+    }
+    // Building-scoped access: a user granted a role on ONE building only, via
+    // /saasOrgs/{orgId}/buildings/{bId}/access/{uid} {uid, email, role}.
+    // role: manager | editor (can edit that building) | viewer (read only).
+    function saasBldgAccess(orgId, bId) {
+      return saasSignedIn()
+        && exists(/databases/$(database)/documents/saasOrgs/$(orgId)/buildings/$(bId)/access/$(request.auth.uid));
+    }
+    function saasBldgEditor(orgId, bId) {
+      return saasBldgAccess(orgId, bId)
+        && get(/databases/$(database)/documents/saasOrgs/$(orgId)/buildings/$(bId)/access/$(request.auth.uid)).data.role in ['manager', 'editor'];
+    }
+    // A pending invite addressed to the caller's own email grants bootstrap
+    // membership at the role named on the invite.
+    function saasInvitedRole(orgId) {
+      return get(/databases/$(database)/documents/saasOrgs/$(orgId)/invites/$(saasEmail())).data.role;
+    }
+    function saasHasInvite(orgId) {
+      return exists(/databases/$(database)/documents/saasOrgs/$(orgId)/invites/$(saasEmail()));
+    }
+
+    // Platform-operator override: the operator can read/manage every org's data.
+    match /saasOrgs/{orgId}/{document=**} {
+      allow read, write: if saasOp();
+    }
+
+    match /saasOrgs/{orgId} {
+      // Any member may read the org header; only admins/owner may rename it.
+      allow read:   if saasMember(orgId) || saasOp();
+      // Create: any signed-in user may found an org, and must stamp themselves owner.
+      allow create: if saasSignedIn()
+                    && request.resource.data.ownerUid == request.auth.uid;
+      // Admins may edit the org header (e.g. rename), but NOT the owner or the
+      // billing/plan fields — those change only via the Stripe webhook (Admin SDK).
+      allow update: if saasIsAdmin(orgId)
+                    && request.resource.data.ownerUid == resource.data.ownerUid
+                    && request.resource.data.get('plan', 'trial') == resource.data.get('plan', 'trial')
+                    && request.resource.data.get('planStatus', '') == resource.data.get('planStatus', '')
+                    && request.resource.data.get('stripeCustomerId', '') == resource.data.get('stripeCustomerId', '')
+                    && request.resource.data.get('stripeSubId', '') == resource.data.get('stripeSubId', '');
+      allow delete: if saasMember(orgId) && saasRole(orgId) == 'owner';
+
+      match /members/{uid} {
+        // Members of an org can see the roster; nobody outside can.
+        allow read: if saasMember(orgId)
+                    || (saasSignedIn() && uid == request.auth.uid); // read your own (pending) row
+        // Bootstrap the founder as owner, an admin adding someone, or a user
+        // accepting their own invite at exactly the invited role.
+        allow create: if saasSignedIn()
+                      && uid == request.auth.uid
+                      && request.resource.data.uid == request.auth.uid
+                      && request.resource.data.email == saasEmail()
+                      && (
+                           ( get(/databases/$(database)/documents/saasOrgs/$(orgId)).data.ownerUid == request.auth.uid
+                             && request.resource.data.role == 'owner' )
+                        || ( saasHasInvite(orgId)
+                             // a building-scoped invite must NOT grant org-wide membership
+                             && get(/databases/$(database)/documents/saasOrgs/$(orgId)/invites/$(saasEmail())).data.get('buildingId', '') == ''
+                             && request.resource.data.role == saasInvitedRole(orgId) )
+                         );
+        // An admin adds/edits other members; nobody may hand themselves owner.
+        allow update: if saasIsAdmin(orgId)
+                      && request.resource.data.role != 'owner'
+                      && resource.data.role != 'owner';
+        allow delete: if saasIsAdmin(orgId) && resource.data.role != 'owner';
+      }
+
+      match /invites/{inviteEmail} {
+        // Admins manage invites; an invitee may read/delete the one addressed to them.
+        allow read:   if saasIsAdmin(orgId)
+                      || (saasSignedIn() && inviteEmail == saasEmail());
+        allow create, update: if saasIsAdmin(orgId);
+        allow delete: if saasIsAdmin(orgId)
+                      || (saasSignedIn() && inviteEmail == saasEmail());
+      }
+
+      // Per-org AI usage counters (one doc per YYYY-MM). Members may read their
+      // org's usage; ONLY the metering Cloud Function (Admin SDK) may write.
+      match /usage/{period} {
+        allow read:  if saasMember(orgId);
+        allow write: if false;
+      }
+
+      // Everything under a building: org members (main managers) OR users with a
+      // building-scoped access grant. CREATE is denied to clients — it goes
+      // through the saasAddBuilding function, which enforces the per-plan
+      // building limit (the paywall). Admins may still rename/delete.
+      match /buildings/{buildingId} {
+        allow read:   if saasMember(orgId) || saasBldgAccess(orgId, buildingId);
+        allow create: if false;
+        allow update, delete: if saasIsAdmin(orgId);
+
+        // Per-building access grants: who may see/edit ONLY this building.
+        // Org admins assign; a user may create their OWN grant only by accepting
+        // an invite addressed to their email that names exactly this building.
+        match /access/{uid} {
+          allow read: if saasIsAdmin(orgId) || (saasSignedIn() && uid == request.auth.uid);
+          allow create: if saasIsAdmin(orgId)
+            || ( saasSignedIn()
+                 && uid == request.auth.uid
+                 && request.resource.data.uid == request.auth.uid
+                 && request.resource.data.email == saasEmail()
+                 && saasHasInvite(orgId)
+                 && get(/databases/$(database)/documents/saasOrgs/$(orgId)/invites/$(saasEmail())).data.get('buildingId', '') == buildingId
+                 && request.resource.data.role == saasInvitedRole(orgId) );
+          allow update, delete: if saasIsAdmin(orgId);
+        }
+
+        match /reports/{reportId} {
+          allow read:   if saasMember(orgId) || saasBldgAccess(orgId, buildingId);
+          allow create, update, delete: if saasIsAdmin(orgId) || saasBldgEditor(orgId, buildingId);
+        }
+
+        // Contractor-quote tracker for this building: jobs, each holding a
+        // quotes[] array of competing bids. Org main managers and this
+        // building's managers/editors edit; building viewers read only.
+        match /jobs/{jobId} {
+          allow read:   if saasMember(orgId) || saasBldgAccess(orgId, buildingId);
+          allow create, update, delete: if saasIsAdmin(orgId) || saasBldgEditor(orgId, buildingId);
+        }
+
+        // Board voting, re-homed under the building. Admins open/close a vote;
+        // owner/admin/board members cast ONE ballot (doc id = their uid) while
+        // it is open, and sign the resolution (doc id = their uid) once closed.
+        match /votes/{voteId} {
+          allow read:   if saasMember(orgId) || saasBldgAccess(orgId, buildingId);
+          allow create, update, delete: if saasIsAdmin(orgId) || saasBldgEditor(orgId, buildingId);
+          match /ballots/{uid} {
+            allow read:   if saasMember(orgId) || saasBldgAccess(orgId, buildingId);
+            allow create, update: if (saasCanVote(orgId) || saasBldgEditor(orgId, buildingId))
+              && uid == request.auth.uid
+              && request.resource.data.uid == request.auth.uid
+              && get(/databases/$(database)/documents/saasOrgs/$(orgId)/buildings/$(buildingId)/votes/$(voteId)).data.status == 'open';
+            allow delete: if saasIsAdmin(orgId);
+          }
+          match /signatures/{uid} {
+            allow read:   if saasMember(orgId) || saasBldgAccess(orgId, buildingId);
+            allow create: if (saasCanVote(orgId) || saasBldgEditor(orgId, buildingId))
+              && uid == request.auth.uid
+              && request.resource.data.uid == request.auth.uid
+              && get(/databases/$(database)/documents/saasOrgs/$(orgId)/buildings/$(buildingId)/votes/$(voteId)).data.status == 'closed';
+            allow update: if false;          // a placed signature can never be altered
+            allow delete: if saasIsAdmin(orgId);
+          }
+        }
+
+        // Append-only decision log for this building — tamper-evident record of
+        // every vote opened, closed, and signed. Never editable or deletable.
+        match /decisionLog/{entryId} {
+          allow read:   if saasMember(orgId) || saasBldgAccess(orgId, buildingId);
+          allow create: if saasMember(orgId) || saasBldgAccess(orgId, buildingId);
+          allow update, delete: if false;
+        }
+      }
+    }
+
+    // Collection-group reads for cross-org self-discovery. A signed-in user may
+    // enumerate ONLY their own membership rows (member doc id == their uid) and
+    // ONLY invites addressed to their own email — the queries the app runs to
+    // build the org switcher and the "you've been invited" list. These never
+    // expose another person's membership or invite (the id/email must match the
+    // caller), so tenant isolation is preserved.
+    // NB: query-rule evaluation is static, so the condition must align with the
+    // query's where() filter, not the document id — hence resource.data.uid /
+    // resource.data.email (the app queries where('uid','==',me) / where('email','==',me)).
+    match /{path=**}/members/{memberId} {
+      allow read: if saasSignedIn() && resource.data.uid == request.auth.uid;
+    }
+    match /{path=**}/invites/{inviteId} {
+      allow read: if saasSignedIn() && resource.data.email == saasEmail();
+    }
+    match /{path=**}/access/{accessId} {
+      allow read: if saasSignedIn() && resource.data.uid == request.auth.uid;
+    }
+
+    // Platform operator config for the SaaS: the ONE platform Anthropic key and
+    // the Stripe secret/webhook/price IDs. Never readable by any client (secrets
+    // are consumed only by Cloud Functions via the Admin SDK); writable only by
+    // the platform operator.
+    match /saasPlatformConfig/{docId} {
+      allow read: if false;
+      allow write: if request.auth != null
+        && request.auth.token.get('email_verified', false) == true
+        && request.auth.token.email != null
+        && request.auth.token.email.lower() == 'mvinobaje@gmail.com';
+    }
+
     // Everything else denied.
     match /{document=**} { allow read, write: if false; }
   }

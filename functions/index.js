@@ -142,3 +142,7 @@ exports.nnsccTrackerAi = onCall(
     return { summary: out.summary, spendNote: out.spendNote, openNote: out.openNote };
   }
 );
+
+// NOTE: The multi-tenant CondoQuote SaaS functions (saas*) live in the
+// separate SAAS repo (github.com/vinobaje/SAAS), functions codebase "saas".
+// Do not add SaaS code here.
