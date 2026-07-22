@@ -1,0 +1,20 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /quoteAttachments/{allPaths=**} {
+      allow read: if true;
+      allow create, update: if request.auth != null
+        && request.auth.token.get('email_verified', false) == true
+        && request.auth.token.email != null
+        && (request.auth.token.email.lower() == 'mvinobaje@gmail.com'
+            || request.auth.token.email.lower() == 'nnscc292connect@cpomanagement.ca')
+        && request.resource.size < 15 * 1024 * 1024;
+      allow delete: if request.auth != null
+        && request.auth.token.get('email_verified', false) == true
+        && request.auth.token.email != null
+        && (request.auth.token.email.lower() == 'mvinobaje@gmail.com'
+            || request.auth.token.email.lower() == 'nnscc292connect@cpomanagement.ca');
+    }
+    match /{allPaths=**} { allow read, write: if false; }
+  }
+}

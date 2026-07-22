@@ -1,5 +1,4 @@
-<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body>
+<meta charset="utf-8">
 <title>Waterview Condominium — Contractor Quote Tracker</title>
 <style>
 :root {
@@ -87,6 +86,12 @@ html { scroll-behavior:smooth; }
 .editable-head { cursor:text; transition:outline-color .12s; }
 .editable-head:hover { outline:1px dashed var(--accent); outline-offset:5px; border-radius:4px; }
 .editable-head:focus { outline:2px solid var(--accent); outline-offset:5px; border-radius:4px; }
+/* inline editing for prose (descriptions, narrative, job names, branding) */
+.editable-txt { cursor:text; outline:1px dashed transparent; outline-offset:3px;
+  border-radius:3px; transition:outline-color .12s; }
+.editable-txt:hover { outline-color:currentColor; }
+.editable-txt:focus { outline:2px solid var(--accent); outline-offset:3px; }
+.editable-txt:empty::before { content:attr(data-ph); opacity:.5; }
 .edithint-inline { font-size:13px; color:var(--accent-ink); background:var(--accent-soft);
   border-radius:6px; padding:7px 12px; margin:12px 0 0; }
 .old-toolbar-spacer { display:none; }
@@ -176,8 +181,21 @@ body[data-view="edit"] #report { display:none; }
 .ecard.isprio { border-left:4px solid var(--prio); }
 .ehead { display:flex; gap:10px; align-items:center; padding:10px 12px; background:var(--accent-soft);
   border-bottom:1px solid var(--line); flex-wrap:wrap; }
-.ehead .jn { width:52px; }
-.ehead .desc { flex:1; min-width:220px; }
+.ehead .desc { flex:1; min-width:200px; }
+.draghandle { cursor:grab; color:var(--muted); font-size:17px; line-height:1; padding:2px 4px; user-select:none; }
+.draghandle:active { cursor:grabbing; }
+.movebtns { display:inline-flex; flex-direction:column; }
+.mvbtn { border:1px solid var(--line); background:var(--card); color:var(--ink2); cursor:pointer;
+  font-size:9px; line-height:1; padding:2px 5px; }
+.mvbtn:first-child { border-radius:5px 5px 0 0; border-bottom:none; }
+.mvbtn:last-child { border-radius:0 0 5px 5px; }
+.mvbtn:hover { background:var(--accent-soft); color:var(--accent-ink); }
+.jnbadge { display:inline-flex; align-items:center; justify-content:center; min-width:26px; height:26px;
+  padding:0 6px; background:var(--accent); color:#fff; border-radius:6px; font-size:13px; font-weight:650;
+  font-variant-numeric:tabular-nums; }
+.ecard.isprio .jnbadge { background:var(--prio); }
+.ecard.dragging { opacity:.5; }
+.ecard.dragover { outline:2px dashed var(--accent); outline-offset:2px; }
 .echk { display:flex; align-items:center; gap:5px; font-size:12.5px; color:var(--ink2); white-space:nowrap; }
 input[type=text], input[type=number], select {
   font:14px -apple-system,"Segoe UI",Roboto,sans-serif; color:var(--ink); background:#fff;
@@ -223,13 +241,42 @@ input:focus, select:focus { outline:2px solid var(--accent); outline-offset:-1px
 .histentry ul { margin:4px 0 0; padding-left:18px; font-size:13px; color:var(--ink2); }
 .histentry li { margin:2px 0; }
 .histempty { color:var(--muted); font-size:13.5px; }
+/* Reports library overlay */
+.repbox { width:min(560px, 92vw); }
+.repcur { font-size:14px; color:var(--ink); background:var(--accent-soft); border-radius:6px;
+  padding:10px 12px; margin:6px 0 14px; }
+.repnewform { border:1px solid var(--line); border-radius:7px; padding:12px; margin-bottom:14px; }
+.repnewform label { display:block; font-size:12.5px; font-weight:650; color:var(--ink2); margin-bottom:6px; }
+.repnewform input { width:100%; box-sizing:border-box; font-size:14px; letter-spacing:normal;
+  text-align:left; padding:8px 10px; }
+.repnewform .row { justify-content:flex-start; flex-wrap:wrap; margin-top:10px; }
+.rephint { margin:8px 0 0 !important; font-size:12px; color:var(--muted); }
+.rephead { font-size:12.5px; font-weight:700; text-transform:uppercase; letter-spacing:.04em;
+  color:var(--muted); margin:4px 0 2px; }
+.repitem { display:flex; align-items:center; justify-content:space-between; gap:10px;
+  border-top:1px solid var(--line-soft); padding:9px 2px; }
+.repitem:first-child { border-top:none; }
+.repitem.on { background:var(--accent-soft); border-radius:5px; padding-left:8px; padding-right:8px; }
+.repmeta strong { font-size:13.5px; }
+.repwhen { font-size:12px; color:var(--muted); font-weight:400; }
+.repbadge { font-size:11.5px; font-weight:700; color:var(--accent-ink); }
+.repactions { display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end; flex:0 0 auto; }
+.btn.small { padding:3px 9px; font-size:12.5px; }
+.btn.small.ddanger { color:var(--prio); }
+.btn.small.ddanger:hover { background:var(--prio); color:#fff; border-color:var(--prio); }
+.archbanner { background:#FBE7C6; border:1px solid #E4C578; color:#5A4409; border-radius:7px;
+  padding:9px 13px; margin:0 0 14px; font-size:13.5px; display:flex; align-items:center;
+  gap:10px; flex-wrap:wrap; }
+.archbanner .btn.small { background:#fff; }
+#reportNameLabel { font-weight:600; }
 
 @media print {
   :root { --paper:#fff; --card:#fff; }
   body { padding:0; font-size:12.5px; }
-  .appbar, .secnav, .edithint-inline, #editor { display:none !important; }
+  .appbar, .secnav, .edithint-inline, .archbanner, #editor { display:none !important; }
   #report { display:block !important; }
-  .editable-head { outline:none !important; }
+  .editable-head, .editable-txt { outline:none !important; }
+  .editable-txt:empty::before { content:"" !important; }
   /* Every section begins on a fresh page (summary stays with the letterhead),
      so a heading can never be orphaned at the bottom of a page. */
   #report section { break-before:page; margin-top:0; padding-top:8px; }
@@ -267,6 +314,7 @@ input:focus, select:focus { outline:2px solid var(--accent); outline-offset:-1px
     <button class="btn on" id="btnViewReport" type="button">Report</button>
     <button class="btn" id="btnViewEdit" type="button">Edit data</button>
   </div>
+  <button class="btn" id="btnReports" type="button" title="Save this period, start a new one, or open a past report">📁 <span id="reportNameLabel">Report</span> ▾</button>
   <button class="btn" id="btnPrint" type="button">Print / PDF</button>
   <button class="btn" id="btnHistory" type="button">History</button>
   <div class="spacer"></div>
@@ -298,16 +346,25 @@ input:focus, select:focus { outline:2px solid var(--accent); outline-offset:-1px
   </div>
 </div>
 
-<div class="overlay" id="pinOverlay" role="dialog" aria-modal="true" aria-labelledby="pinTitle">
-  <div class="pinbox">
-    <h3 id="pinTitle">Enter PIN</h3>
-    <p id="pinMsg"></p>
-    <input id="pinInput" type="password" inputmode="numeric" autocomplete="off" maxlength="12" aria-label="PIN">
-    <div class="err" id="pinErr"></div>
-    <div class="row">
-      <button class="btn ghost" id="pinCancel" type="button">Cancel</button>
-      <button class="btn primary" id="pinOk" type="button">Unlock</button>
+<div class="overlay" id="reportsOverlay" role="dialog" aria-modal="true" aria-label="Reports">
+  <div class="pinbox repbox">
+    <h3>Reports</h3>
+    <div id="repCurrent" class="repcur"></div>
+    <div id="repEditorTools" style="display:none">
+      <div class="repnewform" id="repNewForm">
+        <label for="repNewName">Start a new report period</label>
+        <input id="repNewName" type="text" placeholder="e.g. August 2026" autocomplete="off">
+        <div class="row">
+          <button class="btn" id="repNewBlank" type="button">Blank — keep branding</button>
+          <button class="btn" id="repNewCopy" type="button">Copy current report</button>
+        </div>
+        <p class="rephint">The current report is saved to the library first, then this new one becomes the live report everyone sees.</p>
+      </div>
+      <div class="rephead">Saved reports</div>
+      <div id="repList" class="histlist"><p class="histempty">Loading…</p></div>
     </div>
+    <p id="repViewerNote" class="histempty" style="display:none">Sign in as an authorized editor to save periods and open past reports.</p>
+    <div class="row"><button class="btn ghost" id="repClose" type="button">Close</button></div>
   </div>
 </div>
 
@@ -328,7 +385,12 @@ var META_DEFAULTS = { title: "Contractor Quote Report", condoName: "Waterview Co
   headB: "Competitive bid comparisons",
   headC: "Standard-priority schedule, by contractor",
   headD: "Committed spend by contractor",
-  headE: "Open items for the board" };
+  headE: "Open items for the board",
+  ledeA: "Jobs flagged high priority. Where a job carries a “bids” badge, competing quotes were obtained — see Section B; the carried (lowest) amount is shown here.",
+  ledeB: "Jobs where more than one contractor was invited to quote. The lowest received bid is flagged; invited contractors who have not yet returned a quote show as pending.",
+  ledeC: "All standard-priority jobs, in the board’s chosen order. Per-contractor totals are in Section D.",
+  ledeD: "Value of carried quotes per contractor (job count after each amount).",
+  ledeE: "" };
 /* short label for the floating nav pills: heading up to the first dash/comma, capped */
 function shortLabel(s) {
   s = String(s || "").split("—")[0].split(" - ")[0].split(",")[0].trim();
@@ -338,11 +400,19 @@ function shortLabel(s) {
   return (sp > 12 ? cut.slice(0, sp) : cut).trim() + "…";
 }
 function genId() { return "j" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+/* Keep jobs in priority-first order (preserving the board's chosen order within each
+   class, since Array.sort is stable), then number them 1..N by report position. */
+function orderJobs(arr) {
+  arr.sort(function (a, b) { return (b.priority ? 1 : 0) - (a.priority ? 1 : 0); });
+  arr.forEach(function (j, i) { j.no = i + 1; });
+}
 function normState(s) {
   if (!s || !Array.isArray(s.jobs)) s = JSON.parse(JSON.stringify(seed));
   s.meta = Object.assign({}, META_DEFAULTS, s.meta || {});
   s.ai = (s.ai && s.ai.summary) ? s.ai : null;
+  s.reportName = (typeof s.reportName === "string" && s.reportName.trim()) ? s.reportName.trim() : defaultPeriodName();
   s.jobs.forEach(function (j) { if (!j.id) j.id = genId(); });   /* stable identity for history */
+  orderJobs(s.jobs);
   return s;
 }
 var state;
@@ -419,8 +489,32 @@ function persist(msg, explicitChanges) {
 }
 
 /* ---------- Firestore live sync (active when the Firebase SDK loaded) ---------- */
-var cloud = { on: false, db: null, user: null, docExists: null };
-var DOC_PATH = "nnsccQuoteTracker/main";
+var cloud = { on: false, db: null, user: null, docExists: null, denied: false,
+              active: { kind: "current", id: null, name: null }, unsub: null };
+var CURRENT_PATH = "nnsccQuoteTracker/main";   /* the live/current report — public read */
+var REPORTS_COLL = "nnsccQuoteReports";        /* archived past-period reports — editor-only */
+/* path of the report currently on screen */
+function reportPath() {
+  return cloud.active.kind === "current" ? CURRENT_PATH : (REPORTS_COLL + "/" + cloud.active.id);
+}
+function monthYear(d) { return d.toLocaleDateString("en-CA", { month: "long", year: "numeric" }); }
+function defaultPeriodName() { return monthYear(new Date()); }
+function nextPeriodName() { var d = new Date(); d.setMonth(d.getMonth() + 1); return monthYear(d); }
+/* status-bar line reflecting sign-in state and which report is open */
+function cloudLine() {
+  if (cloud.active.kind === "archived")
+    return "📁 Viewing “" + (cloud.active.name || "past report") + "” — a past report";
+  if (cloud.user && isEditor()) return "● Live data — editing as " + cloud.user.email;
+  if (cloud.user) return "● Signed in as " + cloud.user.email + " — not authorized to edit (view only)";
+  return "● Live data";
+}
+/* Emails allowed to EDIT. This must mirror the Firestore security rules
+   (owner + the editors array in nnsccQuoteTrackerConfig/main). The rules are the
+   REAL enforcement on every write; this list gates the on-screen edit UI so that
+   only these signed-in accounts ever see click-to-edit or the Edit tab.
+   If you authorize a new editor in Firestore, add their address here too (lower-case). */
+var EDITOR_EMAILS = ["mvinobaje@gmail.com", "nnscc292connect@cpomanagement.ca"];
+function isAuthorizedEmail(e) { return EDITOR_EMAILS.indexOf(String(e || "").toLowerCase()) >= 0; }
 function cloudStatusMsg(t) { document.getElementById("cloudStatus").textContent = t; }
 function cloudInit() {
   if (!(window.firebase && firebase.initializeApp)) {
@@ -428,10 +522,10 @@ function cloudInit() {
   }
   try {
     firebase.initializeApp({
-      apiKey: "AIzaSyCrRmt9U0ycF3-IzxXcTXU0FHTLcOG1I5Q",
-      authDomain: "condo-super.firebaseapp.com",
-      projectId: "condo-super",
-      appId: "1:440569008836:web:27745293a95ebcd437af91"
+      apiKey: "AIzaSyDj3v0HtJ6g8UzfMoftCyEl3KPxsaOzrIs",
+      authDomain: "quote-tracker-ce2ba.firebaseapp.com",
+      projectId: "quote-tracker-ce2ba",
+      appId: "1:1346683787:web:be618e56f3bb9b3b67a58e"
     });
     cloud.db = firebase.firestore();
     try { cloud.fns = firebase.app().functions("us-central1"); } catch (e) { cloud.fns = null; }
@@ -439,49 +533,98 @@ function cloudInit() {
     cloud.on = true;
   } catch (e) { cloudStatusMsg("Offline copy — saves to this browser only"); return; }
 
-  cloud.db.doc(DOC_PATH).onSnapshot(function (snap) {
-    cloud.docExists = snap.exists;
-    if (snap.exists) {
-      var remote = snap.data();
-      cloud.lastMeta = { by: remote.updatedBy || "",
-        at: remote.updatedAt && remote.updatedAt.toDate ? remote.updatedAt.toDate() : null };
-      updateLastUpd();
-      if (remote && Array.isArray(remote.jobs) &&
-          JSON.stringify({ j: remote.jobs, m: remote.meta || null, a: remote.ai || null }) !==
-          JSON.stringify({ j: state.jobs, m: state.meta || null, a: state.ai || null })) {
-        state = normState({ jobs: remote.jobs, meta: remote.meta, ai: remote.ai });
-        lastSaved = deepCopy(state);
-        try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) {}
-        renderReport();
-        if (document.body.dataset.view === "edit") renderEditor();
-      } else { lastSaved = deepCopy(state); }
-      cloudStatusMsg("● Live data" + (cloud.user ? " — editing as " + cloud.user.email : ""));
-    } else {
-      cloudStatusMsg(cloud.user ? "Uploading data to cloud…" : "● Live — first sign-in will upload the data");
-      if (cloud.user) cloudPush();
-    }
-  }, function (err) {
-    cloudStatusMsg("Cloud unavailable — saving to this browser (" + err.code + ")");
-  });
+  subscribeActive();
 
   firebase.auth().onAuthStateChanged(function (u) {
     cloud.user = u || null;
+    cloud.denied = false;                       /* fresh sign-in clears any prior denial */
     document.getElementById("btnSignOut").style.display = u ? "" : "none";
-    cloudStatusMsg(u ? "● Live data — editing as " + u.email : "● Live data");
-    if (u && cloud.docExists === false) cloudPush();
+    /* a signed-out viewer can no longer read an archived (editor-only) report */
+    if (!u && cloud.active.kind === "archived") { backToCurrent(); return; }
+    var authed = isEditor();
+    cloudStatusMsg(cloudLine());
+    if (u && authed && cloud.active.kind === "current" && cloud.docExists === false) cloudPush();  /* only editors seed the current doc */
+    /* reflect edit affordances immediately */
+    renderReport();
+    if (document.body.dataset.view === "edit" && !authed) setView("report");
+    else if (document.body.dataset.view === "edit") renderEditor();
+    /* fulfil a pending "Edit data" click that was waiting on sign-in */
+    if (pendingEdit) {
+      pendingEdit = false;
+      if (authed) setView("edit");
+      else if (u) notAuthorizedNotice(u.email);
+    }
   });
+}
+/* (re)subscribe the live listener to whichever report is active */
+function subscribeActive() {
+  if (cloud.unsub) { try { cloud.unsub(); } catch (e) {} cloud.unsub = null; }
+  cloud.docExists = null;
+  cloud.unsub = cloud.db.doc(reportPath()).onSnapshot(onReportSnap, onReportErr);
+}
+function onReportSnap(snap) {
+  cloud.docExists = snap.exists;
+  if (snap.exists) {
+    var remote = snap.data();
+    cloud.lastMeta = { by: remote.updatedBy || "",
+      at: remote.updatedAt && remote.updatedAt.toDate ? remote.updatedAt.toDate() : null };
+    updateLastUpd();
+    if (remote && Array.isArray(remote.jobs) &&
+        JSON.stringify({ j: remote.jobs, m: remote.meta || null, a: remote.ai || null, n: remote.reportName || null }) !==
+        JSON.stringify({ j: state.jobs, m: state.meta || null, a: state.ai || null, n: state.reportName || null })) {
+      state = normState({ jobs: remote.jobs, meta: remote.meta, ai: remote.ai, reportName: remote.reportName });
+      lastSaved = deepCopy(state);
+      try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) {}
+      renderReport();
+      if (document.body.dataset.view === "edit") renderEditor();
+    } else { lastSaved = deepCopy(state); }
+    updateReportsButton();
+    cloudStatusMsg(cloudLine());
+  } else if (cloud.active.kind === "archived") {
+    cloudStatusMsg("That report is no longer available.");
+    backToCurrent();
+  } else {
+    cloudStatusMsg(cloud.user ? "Uploading data to cloud…" : "● Live — first sign-in will upload the data");
+    if (cloud.user && isEditor()) cloudPush();
+  }
+}
+function onReportErr(err) {
+  var code = err && err.code || "";
+  if (code === "permission-denied" && cloud.active.kind === "archived") {
+    cloudStatusMsg("You’re not authorized to view that past report.");
+    backToCurrent();
+    return;
+  }
+  cloudStatusMsg("Cloud unavailable — saving to this browser (" + code + ")");
+}
+/* return to the live/current report */
+function backToCurrent() {
+  cloud.active = { kind: "current", id: null, name: null };
+  subscribeActive();
+  setView("report");
+  updateReportsButton();
+}
+/* open a past (archived) report — editors only */
+function openArchived(id, name) {
+  if (!isEditor()) { alert("Sign in as an authorized editor to open past reports."); return; }
+  cloud.active = { kind: "archived", id: id, name: name || "" };
+  subscribeActive();
+  setView("report");
+  updateReportsButton();
 }
 function cloudPush(changes) {
   if (!cloud.on || !cloud.user) return;
-  cloud.db.doc(DOC_PATH).set({
+  var path = reportPath();
+  cloud.db.doc(path).set({
+    reportName: state.reportName || defaultPeriodName(),
     jobs: deepCopy(state.jobs),
     meta: deepCopy(state.meta || META_DEFAULTS),
     ai: state.ai ? deepCopy(state.ai) : null,
     updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
     updatedBy: cloud.user.email
-  }).then(function () {
+  }, { merge: true }).then(function () {   /* merge keeps archived docs' createdAt/archivedAt intact */
     if (changes && changes.length) {
-      cloud.db.doc(DOC_PATH).collection("audit").add({
+      cloud.db.doc(path).collection("audit").add({
         at: firebase.firestore.FieldValue.serverTimestamp(),
         by: cloud.user.email,
         changes: changes.slice(0, 40)
@@ -489,9 +632,15 @@ function cloudPush(changes) {
     }
   }).catch(function (e) {
     var code = e && e.code || "";
-    cloudStatusMsg(code === "permission-denied"
-      ? "⚠ This Google account isn’t authorized to edit — changes kept in this browser only"
-      : "⚠ Cloud save failed (" + code + ") — changes kept in this browser");
+    if (code === "permission-denied") {
+      /* the server is the source of truth: this account is NOT an authorized editor —
+         lock the edit UI back down so it can't keep making changes that won't save */
+      cloud.denied = true;
+      cloudStatusMsg("⚠ This Google account isn’t authorized to edit — editing has been turned off");
+      if (document.body.dataset.view === "edit") setView("report"); else renderReport();
+    } else {
+      cloudStatusMsg("⚠ Cloud save failed (" + code + ") — changes kept in this browser");
+    }
   });
 }
 function cloudSignIn(then) {
@@ -501,6 +650,7 @@ function cloudSignIn(then) {
     .then(function () { then(); })
     .catch(function (e) {
       var code = e && e.code || "";
+      pendingEdit = false;                       /* sign-in didn't complete — cancel the edit intent */
       if (code === "auth/operation-not-allowed")
         cloudStatusMsg("⚠ Google sign-in is not enabled yet in the Firebase console");
       else if (code === "auth/popup-closed-by-user") cloudStatusMsg("Sign-in cancelled");
@@ -564,21 +714,38 @@ function computeAll() {
 }
 
 /* ---------- report rendering ---------- */
+/* Editing is allowed ONLY for an authorized, signed-in Google account.
+   The Firestore rules enforce the same allowlist server-side on every write. */
+function isEditor() { return !!(cloud.user && !cloud.denied && isAuthorizedEmail(cloud.user.email)); }
+/* wrap any text in an inline-editable span (only when signed in). path forms:
+   meta:<key>, job:<id>:desc, ai:<key>, bid:<jobId>:<bidIndex>:<contractor|notes|amount> */
+function tEdit(path, text, ph) {
+  if (!isEditor()) return esc(text);
+  return '<span class="editable-txt" contenteditable="true" spellcheck="false" data-edit="' +
+    path + '" data-ph="' + esc(ph || "Click to edit") + '" title="Click to edit">' + esc(text) + '</span>';
+}
 function badge(x) { return x.j.bids.length > 1
   ? ' <span class="bids expand" role="button" tabindex="0" title="Show the competing quotes">' +
     x.j.bids.length + " bids</span>" : ""; }
 
-/* rows of one job's quote comparison — shared by Section B and the inline expansions */
+/* rows of one job's quote comparison — shared by Section B and the inline expansions.
+   Contractor / scope note / amount are click-to-edit for signed-in editors. */
 function cmpRows(x) {
+  var ed = isEditor();
+  var jid = x.j.id;
   var r = [];
-  x.c.bids.forEach(function (cb) {
-    if (!(cb.b.contractor || "").trim() && cb.total == null) return;
+  x.c.bids.forEach(function (cb, bi) {
+    if (!ed && !(cb.b.contractor || "").trim() && cb.total == null) return;   /* hide empty rows for viewers only */
+    var cName = tEdit("bid:" + jid + ":" + bi + ":contractor", cb.b.contractor, "Contractor");
+    var cNote = ed ? tEdit("bid:" + jid + ":" + bi + ":notes", cb.b.notes, "Add scope note")
+                   : (esc(cb.b.notes) || "—");
     if (cb.total == null) {
-      r.push('<tr class="pend"><td>' + esc(cb.b.contractor) + "</td><td>" + (esc(cb.b.notes) || "—") +
-             '</td><td class="money">Quote pending</td><td></td></tr>');
+      var amtP = ed ? tEdit("bid:" + jid + ":" + bi + ":amount", "", "Enter amount") : "Quote pending";
+      r.push('<tr class="pend"><td>' + cName + "</td><td>" + cNote +
+             '</td><td class="money">' + amtP + "</td><td></td></tr>");
     } else {
-      r.push("<tr><td>" + esc(cb.b.contractor) + "</td><td>" + (esc(cb.b.notes) || "—") +
-             '</td><td class="money">' + money(cb.total) + "</td><td>" +
+      r.push("<tr><td>" + cName + "</td><td>" + cNote +
+             '</td><td class="money">' + tEdit("bid:" + jid + ":" + bi + ":amount", money(cb.total), "Amount") + "</td><td>" +
              (cb.lowest ? '<span class="low">✓ Lowest</span>' : "") + "</td></tr>");
     }
   });
@@ -600,16 +767,38 @@ function renderReport() {
   var M = state.meta || META_DEFAULTS;
   document.title = M.condoName + " — Contractor Quote Tracker";
   var bn = document.getElementById("brandName"); if (bn) bn.textContent = M.condoName;
-  var EDITOR = false;   /* inline heading editing on once the PIN is unlocked this session */
-  try { EDITOR = sessionStorage.getItem(UNLOCK_KEY) === "1"; } catch (e) {}
+  var EDITOR = isEditor();   /* inline editing on only for an authorized signed-in editor */
+  /* banner shown when an editor is viewing/editing a PAST (archived) report */
+  if (cloud.active && cloud.active.kind === "archived") {
+    h.push('<div class="archbanner">📁 You’re viewing a past report — <strong>' + esc(cloud.active.name || "") + '</strong>. ' +
+      (EDITOR ? 'Edits here change this archived report only, not the current one. ' : '') +
+      '<button class="btn small archback" type="button">← Back to current report</button></div>');
+  }
+  /* attribute helper for an inline-editable HEADING (data-edit="meta:<k>") */
   function hA(k) { return EDITOR
-    ? ' class="editable-head" contenteditable="true" spellcheck="false" data-headkey="' + k + '" title="Click to rename this heading"'
+    ? ' class="editable-head" contenteditable="true" spellcheck="false" data-edit="meta:' + k + '" title="Click to rename this heading"'
     : ''; }
+  var tE = tEdit;   /* inline-editable prose span (module-level helper) */
+  /* Section A/C main-table cells. Single-bid jobs are editable right in the table;
+     multi-bid jobs show the derived (carried/lowest) values — edit those in the “N bids” expansion. */
+  function cCell(x, names) {
+    return (EDITOR && x.j.bids.length === 1)
+      ? tE("bid:" + x.j.id + ":0:contractor", x.j.bids[0].contractor, "Contractor") + badge(x)
+      : esc(names.join(" + ") || "—") + badge(x);
+  }
+  function aCell(x) {
+    if (EDITOR && x.j.bids.length === 1)
+      return tE("bid:" + x.j.id + ":0:amount", x.c.cost ? money(x.c.cost) : "", x.c.cost ? "Amount" : "Enter amount");
+    return x.c.cost ? money(x.c.cost) : '<span class="pendchip">Pending</span>';
+  }
   h.push('<header class="hero"><img class="hero-img" src="' + ASSET_PHOTO + '" alt="">');
   h.push('<div class="hero-content"><div>');
-  h.push('<div class="herokick">' + esc(M.condoName) + " · " + esc(M.regNo) + " · Board of Directors</div>");
-  h.push("<h1>" + esc(M.title) + "</h1>");
-  h.push('<div class="herometa">' + esc(M.buildings) + " · Managed by " + esc(M.manager) + " · " +
+  h.push('<div class="herokick">' + tE("meta:condoName", M.condoName, "Condominium name") +
+         " · " + tE("meta:regNo", M.regNo, "Reg. no.") + " · Board of Directors</div>");
+  h.push("<h1" + (EDITOR ? ' class="editable-head" contenteditable="true" spellcheck="false" data-edit="meta:title" title="Click to edit the report title"' : "") +
+         ">" + esc(M.title) + "</h1>");
+  h.push('<div class="herometa">' + tE("meta:buildings", M.buildings, "Buildings") + " · Managed by " +
+         tE("meta:manager", M.manager, "Manager") + " · " +
          d.jobs.length + " jobs · " + nContractors + " contractors · Prepared " + esc(todayStr()) + "</div>");
   h.push('</div><div class="logochip"><img src="' + ASSET_LOGO + '" alt="' + esc(M.manager) + '"></div></div></header>');
   h.push('<nav class="secnav"><a href="#secSum">' + esc(shortLabel(M.headSum)) + "</a>" +
@@ -619,11 +808,11 @@ function renderReport() {
     '<a href="#secD">D · ' + esc(shortLabel(M.headD)) + "</a>" +
     '<a href="#secE">E · ' + esc(shortLabel(M.headE)) + "</a></nav>");
   if (EDITOR)
-    h.push('<div class="edithint-inline">✎ You’re signed in as an editor — click any section heading below to rename it. The buttons above update automatically.</div>');
+    h.push('<div class="edithint-inline">✎ You’re signed in as an editor — click almost anything to edit it right here (look for the dashed underline on hover): headings, descriptions, job names, contractor names, scope notes, and dollar amounts. Amounts you type are treated as the <strong>HST-included total</strong>; type an amount over “Enter amount” to turn a pending bid into a quote. Totals, the lowest-bid flag, and the charts recalculate automatically. Use the <strong>Edit</strong> tab to add or remove jobs and bids or toggle priority.</div>');
 
   h.push('<section id="secSum"><h2' + hA("headSum") + ">" + esc(M.headSum) + "</h2>");
   if (state.ai && state.ai.summary)
-    h.push('<p class="seclede ainarr">' + esc(state.ai.summary) + "</p>");
+    h.push('<p class="seclede ainarr">' + tE("ai:summary", state.ai.summary, "AI summary") + "</p>");
   h.push('<p class="seclede">' + d.jobs.length + " repair and maintenance jobs have been quoted, " +
     d.hp.length + " flagged high priority" +
     (d.pendingCount ? "; " + d.pendingCount + " invited bid" + (d.pendingCount > 1 ? "s are" : " is") +
@@ -640,17 +829,16 @@ function renderReport() {
 
   /* Section A */
   h.push('<section id="secA"><div class="kicker">Section A</div><h2' + hA("headA") + ">" + esc(M.headA) + "</h2>");
-  h.push('<p class="seclede">Jobs flagged high priority. Where a job carries a “bids” badge, competing quotes were obtained — see Section B; the carried (lowest) amount is shown here.</p>');
+  h.push('<p class="seclede">' + tE("meta:ledeA", M.ledeA, "Section description") + "</p>");
   h.push('<div class="tablewrap"><table><thead><tr><th>#</th><th>Job</th><th>Contractor</th><th class="money">Total (incl. HST)</th></tr></thead><tbody>');
   d.hp.forEach(function (x) {
     var names = []; x.c.carriedBids.forEach(function (cb) {
       if (names.indexOf(cb.b.contractor) < 0) names.push(cb.b.contractor); });
     var notes = []; x.c.carriedBids.forEach(function (cb) {
       if (cb.b.notes && notes.indexOf(cb.b.notes) < 0) notes.push(cb.b.notes); });
-    h.push("<tr><td class=\"num\">" + esc(x.j.no) + "</td><td>" + esc(x.j.desc) +
+    h.push("<tr><td class=\"num\">" + esc(x.j.no) + "</td><td>" + tE("job:" + x.j.id + ":desc", x.j.desc, "Job description") +
       (notes.length ? '<span class="fn">' + esc(notes.join(" · ")) + "</span>" : "") + "</td><td>" +
-      esc(names.join(" + ") || "—") + badge(x) + '</td><td class="money">' +
-      (x.c.cost ? money(x.c.cost) : '<span class="pendchip">Pending</span>') + "</td></tr>");
+      cCell(x, names) + '</td><td class="money">' + aCell(x) + "</td></tr>");
     h.push(bidRowHTML(x, 4));
   });
   h.push('<tr class="subtotal"><td></td><td colspan="2">High-priority subtotal</td><td class="money">' +
@@ -659,46 +847,36 @@ function renderReport() {
   /* Section B */
   var multi = d.jobs.filter(function (x) { return x.j.bids.length > 1; });
   h.push('<section id="secB"><div class="kicker">Section B</div><h2' + hA("headB") + ">" + esc(M.headB) + "</h2>");
-  h.push('<p class="seclede">Jobs where more than one contractor was invited to quote. The lowest received bid is flagged; invited contractors who have not yet returned a quote show as pending.</p>');
+  h.push('<p class="seclede">' + tE("meta:ledeB", M.ledeB, "Section description") + "</p>");
   if (!multi.length) h.push('<p class="seclede">No jobs currently have more than one bid.</p>');
   multi.forEach(function (x) {
     h.push('<div class="card"><div class="cardhead"><span class="jobno">Job ' + esc(x.j.no) + "</span> <strong>" +
-      esc(x.j.desc) + "</strong>" + (x.j.priority ? ' <span class="prio">High priority</span>' : "") + "</div>");
+      tE("job:" + x.j.id + ":desc", x.j.desc, "Job description") + "</strong>" + (x.j.priority ? ' <span class="prio">High priority</span>' : "") + "</div>");
     h.push('<table class="cmp"><thead><tr><th>Contractor</th><th>Scope note</th><th class="money">Total (incl. HST)</th><th></th></tr></thead><tbody>');
     h.push(cmpRows(x));
     h.push("</tbody></table></div>");
   });
   h.push("</section>");
 
-  /* Section C */
-  var groups = {};
-  d.nhp.forEach(function (x) {
-    var nm = x.c.carriedBids.length ? x.c.carriedBids[0].b.contractor
-           : (x.j.bids[0] && x.j.bids[0].contractor) || "Unassigned";
-    (groups[nm] = groups[nm] || []).push(x);
-  });
-  var gnames = Object.keys(groups).sort(function (a, b) {
-    var s = function (g) { return groups[g].reduce(function (s2, x) { return s2 + x.c.cost; }, 0); };
-    return s(b) - s(a); });
+  /* Section C — standard-priority jobs in the board's chosen order (numbers continue from Section A) */
   h.push('<section id="secC"><div class="kicker">Section C</div><h2' + hA("headC") + ">" + esc(M.headC) + "</h2>");
-  h.push('<p class="seclede">All remaining jobs, grouped under the contractor whose quote is carried in the totals, largest program first.</p>');
-  gnames.forEach(function (nm) {
-    var js = groups[nm], sub = js.reduce(function (s, x) { return s + x.c.cost; }, 0);
-    h.push('<div class="group"><div class="grouphead"><span>' + esc(nm) + '</span><span class="money">' +
-      js.length + " job" + (js.length > 1 ? "s" : "") + " · " + money(sub) + "</span></div>");
-    h.push('<table class="sched"><tbody>');
-    js.sort(function (a, b) { return (a.j.no || 0) - (b.j.no || 0); }).forEach(function (x) {
-      var notes = []; x.c.carriedBids.forEach(function (cb) {
-        if (cb.b.notes && notes.indexOf(cb.b.notes) < 0) notes.push(cb.b.notes); });
-      h.push('<tr><td class="num">' + esc(x.j.no) + "</td><td>" + esc(x.j.desc) +
-        (notes.length ? '<span class="fn">' + esc(notes.join(" · ")) + "</span>" : "") + badge(x) +
-        '</td><td class="money">' + (x.c.cost ? money(x.c.cost) : '<span class="pendchip">Pending</span>') +
-        "</td></tr>");
-      h.push(bidRowHTML(x, 3));
-    });
-    h.push("</tbody></table></div>");
+  h.push('<p class="seclede">' + tE("meta:ledeC", M.ledeC, "Section description") + "</p>");
+  h.push('<div class="tablewrap"><table><thead><tr><th>#</th><th>Job</th><th>Contractor</th><th class="money">Total (incl. HST)</th></tr></thead><tbody>');
+  var nhpTotal = 0;
+  d.nhp.forEach(function (x) {
+    var names = []; x.c.carriedBids.forEach(function (cb) {
+      if (names.indexOf(cb.b.contractor) < 0) names.push(cb.b.contractor); });
+    if (!names.length && x.j.bids[0]) names.push(x.j.bids[0].contractor);
+    var notes = []; x.c.carriedBids.forEach(function (cb) {
+      if (cb.b.notes && notes.indexOf(cb.b.notes) < 0) notes.push(cb.b.notes); });
+    nhpTotal += x.c.cost;
+    h.push('<tr><td class="num">' + esc(x.j.no) + "</td><td>" + tE("job:" + x.j.id + ":desc", x.j.desc, "Job description") +
+      (notes.length ? '<span class="fn">' + esc(notes.join(" · ")) + "</span>" : "") + "</td><td>" +
+      cCell(x, names) + '</td><td class="money">' + aCell(x) + "</td></tr>");
+    h.push(bidRowHTML(x, 4));
   });
-  h.push("</section>");
+  h.push('<tr class="subtotal"><td></td><td colspan="2">Standard-priority subtotal</td><td class="money">' + money(nhpTotal) + "</td></tr>");
+  h.push("</tbody></table></div></section>");
 
   /* Section D */
   var rollArr = Object.keys(d.roll).map(function (nm) { return { nm: nm, v: d.roll[nm] }; })
@@ -706,8 +884,8 @@ function renderReport() {
   var mx = rollArr.length ? rollArr[0].v.tot : 1;
   h.push('<section id="secD"><div class="kicker">Section D</div><h2' + hA("headD") + ">" + esc(M.headD) + "</h2>");
   if (state.ai && state.ai.spendNote)
-    h.push('<p class="seclede ainarr">' + esc(state.ai.spendNote) + "</p>");
-  h.push('<p class="seclede">Value of carried quotes per contractor (job count after each amount).</p><div class="chart">');
+    h.push('<p class="seclede ainarr">' + tE("ai:spendNote", state.ai.spendNote, "AI note") + "</p>");
+  h.push('<p class="seclede">' + tE("meta:ledeD", M.ledeD, "Section description") + '</p><div class="chart">');
   rollArr.forEach(function (r) {
     h.push('<div class="brow"><div class="blabel">' + esc(r.nm) + '</div><div class="btrack">' +
       '<div class="bar" style="width:' + (r.v.tot / mx * 100).toFixed(1) + '%"></div></div>' +
@@ -722,7 +900,9 @@ function renderReport() {
   d.jobs.forEach(function (x) { if (!biggest || x.c.cost > biggest.c.cost) biggest = x; });
   h.push('<section id="secE"><div class="kicker">Section E</div><h2' + hA("headE") + ">" + esc(M.headE) + "</h2>");
   if (state.ai && state.ai.openNote)
-    h.push('<p class="seclede ainarr">' + esc(state.ai.openNote) + "</p>");
+    h.push('<p class="seclede ainarr">' + tE("ai:openNote", state.ai.openNote, "AI note") + "</p>");
+  if (EDITOR || M.ledeE)
+    h.push('<p class="seclede">' + tE("meta:ledeE", M.ledeE, "Add a description (optional)") + "</p>");
   h.push('<ul class="notes">');
   pend.forEach(function (x) {
     h.push("<li>Job " + esc(x.j.no) + " (" + esc(x.j.desc) + "): awaiting quotes from " +
@@ -755,6 +935,7 @@ function renderReport() {
 
   document.getElementById("report").innerHTML = h.join("");
   updateLastUpd();
+  updateReportsButton();
   setupScrollSpy();
 }
 
@@ -797,9 +978,9 @@ function renderEditor() {
   var h = [];
   h.push('<header class="rep"><div class="kicker">Edit mode</div><h1>Jobs &amp; bids</h1>' +
     '<div class="meta">Changes save automatically in this browser. Switch back to “Report” to see the result.</div></header>');
-  h.push('<p class="edithint">To record a bid you were waiting for, type the amount into its row — the report ' +
-    "recalculates the lowest bid and every total by itself. Leave the amount empty to keep a bid as “Pending”. " +
-    "Use <strong>Backup (JSON)</strong> before big changes.</p>");
+  h.push('<p class="edithint">Record a waiting bid by typing its amount — totals and the lowest-bid flag recalc themselves; leave it empty to keep it “Pending”. ' +
+    "<strong>Job numbers are automatic:</strong> high-priority jobs come first, then standard jobs, numbered top to bottom. " +
+    "To reorder, <strong>drag a job by the ⠿ handle</strong> or use the ▲▼ buttons — the number follows its position.</p>");
   var M = state.meta || META_DEFAULTS;
   h.push('<div class="ecard esettings"><div class="ehead"><strong>Report settings</strong>' +
     '<span style="font-size:12.5px;color:var(--ink2)">— names shown on the report header and footer</span></div><div class="ebids">');
@@ -814,9 +995,12 @@ function renderEditor() {
   h.push('<p><button class="btn primary" id="btnAddJob" type="button">+ Add job</button></p>');
   state.jobs.forEach(function (j, ji) {
     var c = jobCalc(j);
-    h.push('<div class="ecard' + (j.priority ? " isprio" : "") + '" data-ji="' + ji + '">');
+    h.push('<div class="ecard' + (j.priority ? " isprio" : "") + '" data-ji="' + ji + '" data-jid="' + esc(j.id) + '">');
     h.push('<div class="ehead">' +
-      '<input class="jn" type="number" min="1" value="' + esc(j.no) + '" data-f="no" title="Job number">' +
+      '<span class="draghandle" draggable="true" title="Drag to reorder">⠿</span>' +
+      '<span class="movebtns"><button class="mvbtn" data-act="moveup" title="Move up">▲</button>' +
+      '<button class="mvbtn" data-act="movedn" title="Move down">▼</button></span>' +
+      '<span class="jnbadge" title="Job number (set by position)">' + esc(j.no) + "</span>" +
       '<label class="echk"><input type="checkbox" data-f="priority"' + (j.priority ? " checked" : "") + "> High priority</label>" +
       '<input class="desc" type="text" value="' + esc(j.desc) + '" data-f="desc" placeholder="Job description">' +
       '<button class="xbtn" data-act="deljob" title="Delete job">✕ job</button></div>');
@@ -971,23 +1155,12 @@ document.getElementById("editor").addEventListener("change", function (e) {
   var j = state.jobs[+card.dataset.ji]; if (!j) return;
   var f = e.target.dataset.f; if (!f) return;
   var row = e.target.closest(".ebrow");
-  if (f === "no") {
-    var ji = +card.dataset.ji;
-    if (e.target.value === "") { renderEditor(); return; }   /* ignore blanks; restore the number */
-    var n = state.jobs.length, dest = Math.round(Number(e.target.value));
-    if (!isFinite(dest)) { renderEditor(); return; }
-    if (dest < 1) dest = 1; if (dest > n) dest = n;
-    if (dest === ji + 1) { renderEditor(); return; }          /* no move needed */
-    var moved = state.jobs.splice(ji, 1)[0];
-    state.jobs.splice(dest - 1, 0, moved);
-    state.jobs.forEach(function (jj, i) { jj.no = i + 1; });   /* renumber 1..n, ascending */
-    persist(null, ['Moved “' + (moved.desc || "job") + '” to position ' + dest + " (jobs renumbered)"]);
-    renderEditor(); renderReport();
-    var card = document.querySelector('#editor .ecard[data-ji="' + (dest - 1) + '"]');
-    if (card) card.scrollIntoView({ block: "center" });
+  if (f === "priority") {
+    j.priority = e.target.checked;
+    orderJobs(state.jobs);   /* priority jobs move to the front, renumber */
+    persist(); renderEditor(); renderReport();
     return;
   }
-  if (f === "priority") j.priority = e.target.checked;
   else if (f === "desc") j.desc = e.target.value;
   else if (row) {
     var b = j.bids[+row.dataset.bi]; if (!b) return;
@@ -999,14 +1172,28 @@ document.getElementById("editor").addEventListener("change", function (e) {
 });
 document.getElementById("editor").addEventListener("click", function (e) {
   if (e.target.id === "btnAddJob") {
-    var maxNo = 0;
-    state.jobs.forEach(function (j) { var n = Number(j.no); if (isFinite(n) && n > maxNo) maxNo = n; });
-    state.jobs.push({ id: genId(), no: maxNo + 1, priority: false, desc: "",
-      bids: [{ contractor: "", qno: "", amount: null, hst: false, notes: "" }] });
+    var nj = { id: genId(), no: 0, priority: false, desc: "",
+      bids: [{ contractor: "", qno: "", amount: null, hst: false, notes: "" }] };
+    state.jobs.push(nj);
+    orderJobs(state.jobs);   /* lands at the end of the standard jobs */
     persist(); renderEditor(); renderReport();
-    var cards = document.querySelectorAll("#editor .ecard[data-ji]");
-    var last = cards[cards.length - 1];
-    if (last) { last.scrollIntoView({ block: "center" }); var di = last.querySelector(".desc"); if (di) di.focus(); }
+    var added = document.querySelector('#editor .ecard[data-jid="' + nj.id + '"]');
+    if (added) { added.scrollIntoView({ block: "center" }); var di = added.querySelector(".desc"); if (di) di.focus(); }
+    return;
+  }
+  /* move a job up or down within its priority group */
+  if (e.target.dataset.act === "moveup" || e.target.dataset.act === "movedn") {
+    var mc = e.target.closest(".ecard"); if (!mc) return;
+    var mi = +mc.dataset.ji, mj = state.jobs[mi];
+    var dir = e.target.dataset.act === "moveup" ? -1 : 1;
+    var nb = state.jobs[mi + dir];
+    if (!nb || !!nb.priority !== !!mj.priority) return;   /* stay within the same group */
+    state.jobs[mi] = nb; state.jobs[mi + dir] = mj;
+    orderJobs(state.jobs);
+    persist(null, ['Moved “' + (mj.desc || "job") + '” ' + (dir < 0 ? "up" : "down")]);
+    renderEditor(); renderReport();
+    var moved = document.querySelector('#editor .ecard[data-jid="' + mj.id + '"]');
+    if (moved) moved.scrollIntoView({ block: "nearest" });
     return;
   }
   var act = e.target.dataset.act; if (!act) return;
@@ -1034,54 +1221,50 @@ document.getElementById("editor").addEventListener("click", function (e) {
       return;
     }
     state.jobs.splice(ji, 1);
+    orderJobs(state.jobs);
   }
   persist(); renderEditor(); renderReport();
 });
 
-/* ---------- PIN gate ---------- */
-var PIN_HASH = "d76b56c1";           /* FNV-1a of the PIN; not the PIN itself */
-var UNLOCK_KEY = "nnscc-qt-unlocked";
-function fnv1a(s) {
-  var h = 0x811c9dc5;
-  for (var i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
-  return ("0000000" + h.toString(16)).slice(-8);
-}
-var pinCb = null;
-function askPin(opts, cb) {
-  /* opts: {title, msg, warn, always} — `always` ignores the session unlock */
-  if (!opts.always) {
-    try { if (sessionStorage.getItem(UNLOCK_KEY) === "1") { cb(); return; } } catch (e) {}
-  }
-  pinCb = { cb: cb, always: !!opts.always };
-  document.getElementById("pinTitle").textContent = opts.title || "Enter PIN";
-  var m = document.getElementById("pinMsg");
-  m.textContent = opts.msg || ""; m.className = opts.warn ? "warn" : "";
-  document.getElementById("pinErr").textContent = "";
-  document.getElementById("pinInput").value = "";
-  document.getElementById("pinOverlay").classList.add("open");
-  setTimeout(function(){ document.getElementById("pinInput").focus(); }, 50);
-}
-function pinClose() { document.getElementById("pinOverlay").classList.remove("open"); pinCb = null; }
-function pinTry() {
-  var v = document.getElementById("pinInput").value;
-  if (fnv1a(v) === PIN_HASH) {
-    if (pinCb && !pinCb.always) { try { sessionStorage.setItem(UNLOCK_KEY, "1"); } catch (e) {} }
-    var f = pinCb && pinCb.cb; pinClose(); if (f) f();
-    if (document.body.dataset.view === "report") renderReport();   /* light up inline heading editing */
-  } else {
-    document.getElementById("pinErr").textContent = "Wrong PIN — try again.";
-    document.getElementById("pinInput").value = "";
-    document.getElementById("pinInput").focus();
-  }
-}
-document.getElementById("pinOk").onclick = pinTry;
-document.getElementById("pinCancel").onclick = pinClose;
-document.getElementById("pinInput").addEventListener("keydown", function (e) {
-  if (e.key === "Enter") pinTry();
-  if (e.key === "Escape") pinClose();
+/* ---------- drag-and-drop reordering (edit view) ---------- */
+var dragId = null;
+document.getElementById("editor").addEventListener("dragstart", function (e) {
+  var handle = e.target.closest(".draghandle"); if (!handle) return;
+  var card = handle.closest(".ecard"); if (!card || !card.dataset.jid) return;
+  dragId = card.dataset.jid;
+  card.classList.add("dragging");
+  try { e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", dragId); } catch (er) {}
 });
-document.getElementById("pinOverlay").addEventListener("click", function (e) {
-  if (e.target === this) pinClose();
+document.getElementById("editor").addEventListener("dragend", function () {
+  dragId = null;
+  var d = document.querySelector("#editor .ecard.dragging"); if (d) d.classList.remove("dragging");
+  var o = document.querySelector("#editor .ecard.dragover"); if (o) o.classList.remove("dragover");
+});
+document.getElementById("editor").addEventListener("dragover", function (e) {
+  if (!dragId) return;
+  var card = e.target.closest(".ecard[data-jid]"); if (!card) return;
+  e.preventDefault();
+  var prev = document.querySelector("#editor .ecard.dragover");
+  if (prev && prev !== card) prev.classList.remove("dragover");
+  if (card.dataset.jid !== dragId) card.classList.add("dragover");
+});
+document.getElementById("editor").addEventListener("drop", function (e) {
+  if (!dragId) return;
+  var card = e.target.closest(".ecard[data-jid]"); if (!card) return;
+  e.preventDefault();
+  var targetId = card.dataset.jid;
+  if (targetId === dragId) return;
+  var from = -1, to = -1;
+  state.jobs.forEach(function (j, i) { if (j.id === dragId) from = i; if (j.id === targetId) to = i; });
+  if (from < 0 || to < 0) return;
+  var moved = state.jobs.splice(from, 1)[0];
+  if (from < to) to--;                        /* account for the removed element */
+  state.jobs.splice(to, 0, moved);
+  orderJobs(state.jobs);                       /* re-sort priority-first + renumber */
+  persist(null, ['Moved “' + (moved.desc || "job") + '” to position ' + moved.no]);
+  renderEditor(); renderReport();
+  var m = document.querySelector('#editor .ecard[data-jid="' + moved.id + '"]');
+  if (m) m.scrollIntoView({ block: "nearest" });
 });
 
 /* ---------- toolbar ---------- */
@@ -1093,13 +1276,21 @@ function setView(v) {
   window.scrollTo(0, 0);
 }
 document.getElementById("btnViewReport").onclick = function () { setView("report"); };
+var pendingEdit = false;   /* set when "Edit data" is clicked before sign-in completes */
+function notAuthorizedNotice(email) {
+  alert("The account " + email + " is signed in but is not on the authorized-editor list, " +
+        "so it can view the report but cannot edit it.\n\n" +
+        "To be added, contact the condo super (mvinobaje@gmail.com).");
+}
 document.getElementById("btnViewEdit").onclick = function () {
-  askPin({ title: "Edit mode", msg: "Enter the PIN to edit jobs and bids." },
-         function () { cloudSignIn(function () { setView("edit"); }); });
+  if (!cloud.on) { cloudStatusMsg("Editing is only available on the live site (needs Google sign-in)."); return; }
+  if (isEditor()) { setView("edit"); return; }              /* already an authorized editor */
+  if (cloud.user) { notAuthorizedNotice(cloud.user.email); return; }   /* signed in, not allowed */
+  pendingEdit = true;                                        /* not signed in → sign in, then onAuthStateChanged continues */
+  cloudSignIn(function () {});
 };
 document.getElementById("btnSignOut").onclick = function () {
-  if (cloud.on) firebase.auth().signOut();
-  try { sessionStorage.removeItem(UNLOCK_KEY); } catch (e) {}   /* re-lock inline editing */
+  if (cloud.on) firebase.auth().signOut();                  /* onAuthStateChanged re-renders (edit UI disappears) */
   setView("report");
 };
 document.getElementById("btnPrint").onclick = function () { setView("report"); setTimeout(function(){ window.print(); }, 60); };
@@ -1115,6 +1306,192 @@ document.addEventListener("click", function (e) {
 });
 moreMenu.querySelector(".dropdown").addEventListener("click", function () {
   moreMenu.classList.remove("open");
+});
+
+/* ---------- reports library (save periods, open past reports) ---------- */
+function activeReportName() {
+  return cloud.active.kind === "archived"
+    ? (cloud.active.name || "past report")
+    : (state.reportName || defaultPeriodName());
+}
+function updateReportsButton() {
+  var lbl = document.getElementById("reportNameLabel");
+  if (lbl) lbl.textContent = activeReportName();
+  var btn = document.getElementById("btnReports");
+  if (btn) btn.classList.toggle("viewing-archived", cloud.active.kind === "archived");
+}
+function closeReportsOverlay() { document.getElementById("reportsOverlay").classList.remove("open"); }
+function openReportsOverlay() {
+  var ov = document.getElementById("reportsOverlay");
+  var ed = isEditor();
+  var archived = cloud.active.kind === "archived";
+  var curHtml;
+  if (archived) {
+    curHtml = "📁 Viewing past report: <strong>" + esc(activeReportName()) + "</strong>" +
+      ' <button class="btn small" id="repBack" type="button">← Back to current</button>';
+  } else {
+    curHtml = "● Current report: <strong>" + esc(activeReportName()) + "</strong>" +
+      (ed ? ' <button class="btn small" id="repRename" type="button">Rename</button>' : "");
+  }
+  document.getElementById("repCurrent").innerHTML = curHtml;
+  document.getElementById("repEditorTools").style.display = ed ? "" : "none";
+  document.getElementById("repViewerNote").style.display = ed ? "none" : "";
+  /* starting a new period only makes sense from the current report */
+  document.getElementById("repNewForm").style.display = (ed && !archived) ? "" : "none";
+  document.getElementById("repNewName").value = nextPeriodName();
+  ov.classList.add("open");
+  var rn = document.getElementById("repRename"); if (rn) rn.onclick = renameActive;
+  var rb = document.getElementById("repBack"); if (rb) rb.onclick = function () { closeReportsOverlay(); backToCurrent(); };
+  if (ed) loadReportsList();
+}
+function loadReportsList() {
+  var el = document.getElementById("repList");
+  if (!cloud.on) { el.innerHTML = '<p class="histempty">The report library lives on the live site.</p>'; return; }
+  el.innerHTML = '<p class="histempty">Loading…</p>';
+  cloud.db.collection(REPORTS_COLL).orderBy("archivedAt", "desc").limit(100).get()
+    .then(function (qs) {
+      if (qs.empty) { el.innerHTML = '<p class="histempty">No saved reports yet. Start a new period to save the current one here.</p>'; return; }
+      var h = [];
+      qs.forEach(function (docSnap) {
+        var r = docSnap.data();
+        var when = r.archivedAt && r.archivedAt.toDate ? r.archivedAt.toDate().toLocaleDateString("en-CA") : "";
+        var n = (r.jobs || []).length;
+        var isOpen = cloud.active.kind === "archived" && cloud.active.id === docSnap.id;
+        var id = esc(docSnap.id), nm = esc(r.reportName || "");
+        h.push('<div class="repitem' + (isOpen ? " on" : "") + '"><div class="repmeta"><strong>' +
+          esc(r.reportName || "(untitled)") + '</strong><span class="repwhen"> · saved ' + esc(when) +
+          " · " + n + " job" + (n === 1 ? "" : "s") + (isOpen ? " · viewing" : "") + "</span></div>" +
+          '<div class="repactions">' +
+          '<button class="btn small" data-openrep="' + id + '" data-repname="' + nm + '">Open</button>' +
+          '<button class="btn small" data-makecur="' + id + '" data-repname="' + nm + '">Make current</button>' +
+          '<button class="btn small ddanger" data-delrep="' + id + '" data-repname="' + nm + '">Delete</button>' +
+          "</div></div>");
+      });
+      el.innerHTML = h.join("");
+    })
+    .catch(function (err) {
+      el.innerHTML = '<p class="histempty">Could not load reports (' + esc(err && err.code || "error") + ").</p>";
+    });
+}
+/* Promote a saved report to be the live/current one, swapping the present current into the library. */
+function makeCurrentReport(id, name) {
+  if (!isEditor()) { alert("Sign in as an authorized editor first."); return; }
+  if (!confirm('Make “' + name + '” the current report?\n\nThe report that is live right now will be moved into the library (you can delete it after if you don’t want it).')) return;
+  cloudStatusMsg("Switching the current report…");
+  var archRef = cloud.db.doc(REPORTS_COLL + "/" + id);
+  var mainRef = cloud.db.doc(CURRENT_PATH);
+  Promise.all([archRef.get(), mainRef.get()]).then(function (res) {
+    var incoming = res[0].exists ? res[0].data() : null;          /* the report being promoted */
+    var curMain  = res[1].exists ? res[1].data() : null;          /* the present current report */
+    if (!incoming) { alert("That report no longer exists."); cloudStatusMsg(cloudLine()); return; }
+    var curName = (curMain && curMain.reportName) || defaultPeriodName();
+    var ts = firebase.firestore.FieldValue.serverTimestamp();
+    /* 1) move the present current into the archived slot (a swap, so nothing is lost) */
+    return archRef.set({
+      reportName: curName,
+      jobs: (curMain && curMain.jobs) || [],
+      meta: (curMain && curMain.meta) || META_DEFAULTS,
+      ai: (curMain && curMain.ai) || null,
+      archivedAt: ts, createdAt: (incoming.createdAt || ts), updatedBy: cloud.user.email
+    }).then(function () {
+      /* 2) the promoted report becomes the live/current report */
+      return mainRef.set({
+        reportName: incoming.reportName || name,
+        jobs: incoming.jobs || [], meta: incoming.meta || META_DEFAULTS, ai: incoming.ai || null,
+        updatedAt: ts, updatedBy: cloud.user.email
+      });
+    }).then(function () {
+      mainRef.collection("audit").add({ at: ts, by: cloud.user.email,
+        changes: ['Made “' + (incoming.reportName || name) + '” the current report; “' + curName + '” moved to the library.'] }).catch(function () {});
+      cloud.active = { kind: "current", id: null, name: null };
+      subscribeActive();                                          /* re-subscribe to main → loads the promoted report */
+      setView("report");
+      updateReportsButton();
+      openReportsOverlay();
+      cloudStatusMsg(cloudLine());
+    });
+  }).catch(function (e) {
+    alert("Could not switch the current report (" + (e && e.code || "error") + ").");
+    cloudStatusMsg(cloudLine());
+  });
+}
+/* Permanently delete a saved report from the library. */
+function deleteArchivedReport(id, name) {
+  if (!isEditor()) { alert("Sign in as an authorized editor first."); return; }
+  if (!confirm('Delete the saved report “' + name + '”?\n\nThis permanently removes it from the library and cannot be undone. (Your current report is not affected.)')) return;
+  cloud.db.doc(REPORTS_COLL + "/" + id).delete().then(function () {
+    if (cloud.active.kind === "archived" && cloud.active.id === id) backToCurrent();
+    openReportsOverlay();
+    cloudStatusMsg(cloudLine());
+  }).catch(function (e) {
+    alert("Could not delete the report (" + (e && e.code || "error") + ").");
+  });
+}
+function renameActive() {
+  if (!isEditor()) return;
+  var nn = prompt("Name this report:", activeReportName());
+  if (nn == null) return;
+  nn = nn.replace(/\s+/g, " ").trim();
+  if (!nn || nn === activeReportName()) return;
+  state.reportName = nn;
+  if (cloud.active.kind === "archived") cloud.active.name = nn;
+  persist("Renamed report to “" + nn + "”");
+  updateReportsButton();
+  openReportsOverlay();
+}
+function startNewReport(mode) {
+  if (!isEditor()) { alert("Sign in as an authorized editor first."); return; }
+  if (cloud.active.kind !== "current") { alert("Go back to the current report before starting a new one."); return; }
+  var name = (document.getElementById("repNewName").value || "").replace(/\s+/g, " ").trim();
+  if (!name) { alert("Please name the new report first (e.g. “August 2026”)."); return; }
+  var cur = deepCopy(state);
+  var curName = state.reportName || defaultPeriodName();
+  var id = genId();
+  cloudStatusMsg("Saving “" + curName + "” to the library…");
+  cloud.db.doc(REPORTS_COLL + "/" + id).set({
+    reportName: curName,
+    jobs: cur.jobs,
+    meta: cur.meta,
+    ai: cur.ai || null,
+    archivedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+    updatedBy: cloud.user.email
+  }).then(function () {
+    var ns = (mode === "copy")
+      ? { reportName: name, jobs: deepCopy(cur.jobs), meta: deepCopy(cur.meta), ai: cur.ai ? deepCopy(cur.ai) : null }
+      : { reportName: name, jobs: [], meta: deepCopy(cur.meta), ai: null };
+    state = normState(ns);
+    lastSaved = deepCopy(state);
+    persist("Started new report “" + name + "”", ["Started a new report period “" + name +
+      "”; the previous period was saved to the library as “" + curName + "”."]);
+    renderReport();
+    if (document.body.dataset.view === "edit") renderEditor();
+    updateReportsButton();
+    openReportsOverlay();
+    cloudStatusMsg(cloudLine());
+  }).catch(function (e) {
+    alert("Could not save the current report to the library (" + (e && e.code || "error") +
+          "). Nothing was changed.");
+    cloudStatusMsg(cloudLine());
+  });
+}
+document.getElementById("btnReports").onclick = openReportsOverlay;
+document.getElementById("repClose").onclick = closeReportsOverlay;
+document.getElementById("repNewBlank").onclick = function () { startNewReport("blank"); };
+document.getElementById("repNewCopy").onclick = function () { startNewReport("copy"); };
+document.getElementById("repList").addEventListener("click", function (e) {
+  var o = e.target.closest("[data-openrep]");
+  var m = e.target.closest("[data-makecur]");
+  var d = e.target.closest("[data-delrep]");
+  if (o) { closeReportsOverlay(); openArchived(o.getAttribute("data-openrep"), o.getAttribute("data-repname")); }
+  else if (m) { makeCurrentReport(m.getAttribute("data-makecur"), m.getAttribute("data-repname")); }
+  else if (d) { deleteArchivedReport(d.getAttribute("data-delrep"), d.getAttribute("data-repname")); }
+});
+document.getElementById("reportsOverlay").addEventListener("click", function (e) {
+  if (e.target === this) closeReportsOverlay();
+});
+document.getElementById("report").addEventListener("click", function (e) {
+  if (e.target.closest(".archback")) backToCurrent();
 });
 
 /* ---------- inline bid expansion (click a “N bids” badge) ---------- */
@@ -1135,26 +1512,78 @@ document.getElementById("report").addEventListener("keydown", function (e) {
   if (b) { e.preventDefault(); toggleBidRow(b); }
 });
 
-/* ---------- inline heading editing (signed-in editors) ---------- */
+/* ---------- inline editing of any [data-edit] element (signed-in editors) ---------- */
+/* path forms: meta:<key> (headings, branding, section descriptions),
+   job:<id>:desc (job name), ai:<key> (AI narrative override),
+   bid:<jobId>:<bidIndex>:<contractor|notes|amount> (per-quote fields) */
+function findJob(id) {
+  for (var i = 0; i < state.jobs.length; i++) if (state.jobs[i].id === id) return state.jobs[i];
+  return null;
+}
+/* parse a typed currency value → Number, or null if blank/unparseable (i.e. still pending) */
+function parseMoney(s) {
+  s = String(s == null ? "" : s).replace(/[^0-9.]/g, "");
+  if (s === "" || s === ".") return null;
+  var n = Number(s);
+  return isNaN(n) ? null : Math.round(n * 100) / 100;
+}
+function commitEdit(el) {
+  var path = el.dataset.edit; if (!path) return;
+  var val = (el.textContent || "").replace(/\s+/g, " ").trim();
+  var p = path.split(":");
+  if (p[0] === "meta") {
+    var key = p[1];
+    if (!val && META_DEFAULTS[key]) val = META_DEFAULTS[key];   /* restore default if cleared (blank-able ledes stay blank) */
+    state.meta = state.meta || Object.assign({}, META_DEFAULTS);
+    if ((state.meta[key] || "") === val) { el.textContent = val; return; }
+    state.meta[key] = val;
+  } else if (p[0] === "job") {
+    var j = findJob(p[1]);
+    if (!j) return;
+    if (!val) val = j.desc;                                     /* never allow an empty job name */
+    if ((j.desc || "") === val) { el.textContent = val; return; }
+    j.desc = val;
+  } else if (p[0] === "ai") {
+    if (!state.ai) return;
+    var akey = p[1];
+    if ((state.ai[akey] || "") === val) { el.textContent = val; return; }
+    state.ai[akey] = val;
+  } else if (p[0] === "bid") {
+    var jb = findJob(p[1]); if (!jb) return;
+    var b = jb.bids[+p[2]]; if (!b) return;
+    var f = p[3];
+    if (f === "amount") {
+      var num = parseMoney(val);
+      var cur = bidTotal(b);   /* value currently shown in the column (HST-included), or null if pending */
+      if (num === cur || (num == null && cur == null)) { renderReport(); return; }   /* no real change → just reformat */
+      /* the amount column IS the HST-included total, so store the typed value as-is with hst=true */
+      if (num == null) b.amount = null;                 /* cleared → back to pending */
+      else { b.amount = num; b.hst = true; }
+    } else if (f === "contractor") {
+      if (!val && b.amount == null) { el.textContent = b.contractor || ""; return; }  /* don't let a pending row vanish */
+      if ((b.contractor || "") === val) { el.textContent = val; return; }
+      b.contractor = val;
+    } else if (f === "notes") {
+      if ((b.notes || "") === val) { el.textContent = val; return; }
+      b.notes = val;
+    } else return;
+  } else return;
+  persist();
+  renderReport();
+}
 document.getElementById("report").addEventListener("keydown", function (e) {
-  var el = e.target.closest("[data-headkey]"); if (!el) return;
+  var el = e.target.closest("[data-edit]"); if (!el) return;
   if (e.key === "Enter" || e.key === "Escape") { e.preventDefault(); el.blur(); }
 });
 document.getElementById("report").addEventListener("paste", function (e) {
-  var el = e.target.closest("[data-headkey]"); if (!el) return;
+  var el = e.target.closest("[data-edit]"); if (!el) return;
   e.preventDefault();
   var t = ((e.clipboardData || window.clipboardData).getData("text") || "").replace(/\s+/g, " ").trim();
   document.execCommand("insertText", false, t);
 });
 document.getElementById("report").addEventListener("focusout", function (e) {
-  var el = e.target.closest("[data-headkey]"); if (!el) return;
-  var key = el.dataset.headkey;
-  var val = (el.textContent || "").replace(/\s+/g, " ").trim() || META_DEFAULTS[key];
-  state.meta = state.meta || Object.assign({}, META_DEFAULTS);
-  if ((state.meta[key] || "") === val) { el.textContent = val; return; }
-  state.meta[key] = val;
-  persist();
-  renderReport();
+  var el = e.target.closest("[data-edit]"); if (!el) return;
+  commitEdit(el);
 });
 
 /* ---------- change-history panel ---------- */
@@ -1166,7 +1595,7 @@ document.getElementById("btnHistory").onclick = function () {
     return;
   }
   list.innerHTML = '<p class="histempty">Loading…</p>';
-  cloud.db.doc(DOC_PATH).collection("audit").orderBy("at", "desc").limit(50).get()
+  cloud.db.doc(reportPath()).collection("audit").orderBy("at", "desc").limit(50).get()
     .then(function (qs) {
       if (qs.empty) { list.innerHTML = '<p class="histempty">No changes recorded yet.</p>'; return; }
       var h = [];
@@ -1211,8 +1640,8 @@ document.getElementById("btnBackup").onclick = function () {
             JSON.stringify(state, null, 1));
 };
 document.getElementById("btnRestore").onclick = function () {
-  askPin({ title: "Restore backup", msg: "Enter the PIN to replace the current data with a backup file." },
-         function () { document.getElementById("fileRestore").click(); });
+  if (!isEditor()) { alert("Sign in with an authorized editor account first (click “Edit data”)."); return; }
+  document.getElementById("fileRestore").click();
 };
 document.getElementById("fileRestore").addEventListener("change", function () {
   var f = this.files[0]; this.value = ""; if (!f) return;
@@ -1227,9 +1656,9 @@ document.getElementById("fileRestore").addEventListener("change", function () {
   r.readAsText(f);
 });
 document.getElementById("btnReset").onclick = function () {
-  askPin({ title: "Reset to original", always: true, warn: true,
-           msg: "This permanently discards EVERY change saved in this browser and restores the original data. Enter the PIN to continue." },
-         function () { state = normState(null); persist("Reset to original data"); renderReport(); renderEditor(); });
+  if (!isEditor()) { alert("Sign in with an authorized editor account first (click “Edit data”)."); return; }
+  if (!confirm("This permanently discards EVERY change and restores the original data for everyone. Continue?")) return;
+  state = normState(null); persist("Reset to original data"); renderReport(); renderEditor();
 };
 var portableBtn = document.getElementById("btnPortable");
 if (window.claude && window.claude.downloads) {
@@ -1248,5 +1677,3 @@ cloudInit();
 setView("report");
 })();
 </script>
-
-</body></html>

@@ -1,5 +1,5 @@
 <meta charset="utf-8">
-<title>Waterview Condominium — Contractor Quote Tracker</title>
+<title>Waterview Condominium — Quote Tracker (BETA PREVIEW)</title>
 <style>
 :root {
   --paper:#F7F8F9; --card:#FFFFFF; --ink:#1E2833; --ink2:#4A5866; --muted:#7A8794;
@@ -270,6 +270,45 @@ input:focus, select:focus { outline:2px solid var(--accent); outline-offset:-1px
 .archbanner .btn.small { background:#fff; }
 #reportNameLabel { font-weight:600; }
 
+/* ---- BETA feature styles ---- */
+.betachip { background:#B7791F; color:#fff; font-size:10.5px; font-weight:800; letter-spacing:.06em;
+  padding:2px 7px; border-radius:4px; margin-left:8px; }
+.stchip { display:inline-block; font-size:10.5px; font-weight:700; border-radius:4px; padding:1px 7px;
+  margin-left:7px; border:1px solid transparent; white-space:nowrap; }
+.st-approved { background:#E6F4EA; color:#137333; border-color:#b7dfc2; }
+.st-rejected { background:#FCE8E6; color:#C5221F; border-color:#f0b9b6; }
+.st-deferred { background:#FEF7E0; color:#8a6d00; border-color:#eeda9a; }
+.st-scheduled { background:#E8F0FE; color:#1a56b8; border-color:#bcd2f7; }
+.st-inprogress { background:#E4F7FB; color:#0b7285; border-color:#a8e3ef; }
+.st-completed { background:#EDEDED; color:#444; border-color:#ccc; }
+#editor .ebrow.extra { display:flex !important; flex-wrap:wrap; gap:10px; align-items:center;
+  background:var(--paper); border-radius:5px; padding:5px 9px; margin:-3px 0 7px; font-size:12.5px; }
+#editor .ebrow.extra label { font-size:11.5px; color:var(--muted); display:flex; align-items:center; gap:5px; }
+#editor .ebrow.extra input[type=date] { padding:3px 6px; font-size:12.5px; }
+#editor .ebrow.extra input[type=number] { width:58px; padding:3px 6px; font-size:12.5px; }
+.filechip { display:inline-flex; align-items:center; gap:5px; background:var(--accent-soft);
+  border-radius:4px; padding:2px 8px; font-size:12px; }
+.filechip a { text-decoration:none; }
+.filechip .fx { cursor:pointer; color:var(--prio); font-weight:700; }
+.expired { color:var(--prio); font-weight:700; }
+.strow { display:flex; gap:8px; align-items:center; flex-wrap:wrap; padding:6px 10px;
+  background:var(--paper); border-radius:5px; margin:0 0 8px; font-size:13px; }
+.strow select, .strow input { padding:4px 7px; font-size:12.5px; }
+.strow input[type=text] { flex:1; min-width:160px; }
+.dashbox { width:min(720px,94vw); }
+.dashtable { width:100%; border-collapse:collapse; font-size:13px; margin:8px 0 14px; }
+.dashtable th, .dashtable td { padding:6px 8px; border-bottom:1px solid var(--line-soft); text-align:left; }
+.dashtable td.money, .dashtable th.money { text-align:right; font-variant-numeric:tabular-nums; }
+.memobox { width:min(640px,94vw); }
+.memobox textarea { width:100%; box-sizing:border-box; font:13.5px/1.55 ui-monospace,Menlo,monospace;
+  padding:10px; min-height:280px; letter-spacing:normal; text-align:left; }
+.budgetwrap { margin:14px 0 0; max-width:560px; }
+.budgetwrap .blabel { width:auto; margin-right:10px; }
+.pipelineline { margin-top:12px; font-size:13px; color:var(--ink2); }
+.dirgrid { display:grid; grid-template-columns:1.2fr 1fr 1.4fr auto auto auto; gap:6px; align-items:center; }
+.dirgrid input { padding:5px 7px; font-size:12.5px; }
+.dirhdr { font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; }
+
 @media print {
   :root { --paper:#fff; --card:#fff; }
   body { padding:0; font-size:12.5px; }
@@ -305,11 +344,12 @@ input:focus, select:focus { outline:2px solid var(--accent); outline-offset:-1px
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-functions-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-storage-compat.js"></script>
 
 <script id="seed" type="application/json">{"jobs": [{"no": 1, "priority": true, "desc": "Sump pump repair investigation", "bids": [{"contractor": "MC Mechanical", "qno": "", "amount": 1500.0, "hst": false, "notes": ""}]}, {"no": 2, "priority": true, "desc": "Second sump pump installation", "bids": [{"contractor": "MC Mechanical", "qno": "", "amount": 11500.0, "hst": false, "notes": ""}]}, {"no": 3, "priority": true, "desc": "Lower sprinkler head 560-905", "bids": [{"contractor": "ENEK Electrical", "qno": "", "amount": 1475.0, "hst": false, "notes": ""}]}, {"no": 4, "priority": true, "desc": "Install CO2 Alarms in all common area hallways", "bids": [{"contractor": "ENEK Electrical", "qno": "", "amount": 7360.0, "hst": false, "notes": ""}]}, {"no": 5, "priority": true, "desc": "Commercial units", "bids": [{"contractor": "Joint Seal", "qno": "20668", "amount": 28698.0, "hst": false, "notes": ""}]}, {"no": 6, "priority": true, "desc": "550-209 balcony waterproofing", "bids": [{"contractor": "Joint Seal", "qno": "21229", "amount": 2400.0, "hst": false, "notes": ""}]}, {"no": 7, "priority": true, "desc": "550-1503 2 pieces 6mm clear tempered glass to railing", "bids": [{"contractor": "Niagara Glass", "qno": "12914", "amount": 1132.54, "hst": true, "notes": ""}]}, {"no": 8, "priority": true, "desc": "Amenities fire doors (gym & electrical room)", "bids": [{"contractor": "ABC Locksmith", "qno": "126", "amount": 2169.6, "hst": true, "notes": "Amenities gym fire door"}, {"contractor": "ACB Locksmith", "qno": "125", "amount": 2169.6, "hst": true, "notes": "Amenities Electrical room fire door"}, {"contractor": "Lockhut", "qno": "62737", "amount": 6522.36, "hst": true, "notes": "Amenities gym & electrical room fire doors"}]}, {"no": 9, "priority": true, "desc": "Repairs units 550-418", "bids": [{"contractor": "Maple Trust", "qno": "", "amount": 3020.91, "hst": false, "notes": ""}, {"contractor": "Discount Reno", "qno": "", "amount": null, "hst": false, "notes": ""}, {"contractor": "DMD Renovations", "qno": "", "amount": null, "hst": false, "notes": ""}]}, {"no": 10, "priority": true, "desc": "Repairs unit 550-318", "bids": [{"contractor": "Maple Trust", "qno": "", "amount": 2553.8, "hst": false, "notes": ""}, {"contractor": "Discount Reno", "qno": "", "amount": null, "hst": false, "notes": ""}, {"contractor": "DMD Renovations", "qno": "", "amount": null, "hst": false, "notes": ""}]}, {"no": 11, "priority": true, "desc": "Repairs unit 550-218", "bids": [{"contractor": "Maple Trust", "qno": "", "amount": 2503.2, "hst": false, "notes": ""}, {"contractor": "Discount Reno", "qno": "", "amount": null, "hst": false, "notes": ""}, {"contractor": "DMD Renovations", "qno": "", "amount": null, "hst": false, "notes": ""}]}, {"no": 12, "priority": false, "desc": "Domestic hot water tank replacement", "bids": [{"contractor": "MC Mechanical", "qno": "", "amount": 10639.67, "hst": false, "notes": ""}]}, {"no": 13, "priority": false, "desc": "Install Mitsubishi 3 ton ductless A/C", "bids": [{"contractor": "MC Mechanical", "qno": "", "amount": 15000.0, "hst": false, "notes": ""}]}, {"no": 14, "priority": false, "desc": "Hot water tank inspection", "bids": [{"contractor": "Hydrastone", "qno": "", "amount": 4378.0, "hst": false, "notes": "2 tanks 550"}]}, {"no": 15, "priority": false, "desc": "52 anchor rope tie-offs", "bids": [{"contractor": "Clear Ontario", "qno": "", "amount": 11000.0, "hst": false, "notes": ""}]}, {"no": 16, "priority": false, "desc": "Overloaded circuit P1", "bids": [{"contractor": "Jans Electrical", "qno": "", "amount": 3705.0, "hst": false, "notes": ""}]}, {"no": 17, "priority": false, "desc": "Connect amenities building to 560 generator", "bids": [{"contractor": "Jans Electrical", "qno": "", "amount": 2395.0, "hst": false, "notes": ""}]}, {"no": 18, "priority": false, "desc": "Sub electrical room install circuit receptacle", "bids": [{"contractor": "Jans Electrical", "qno": "", "amount": 2225.0, "hst": false, "notes": ""}]}, {"no": 19, "priority": false, "desc": "2 4ft LED light fixtures P1 elevator entrance", "bids": [{"contractor": "Jans Electrical", "qno": "", "amount": 760.0, "hst": false, "notes": ""}]}, {"no": 20, "priority": false, "desc": "Install amenities emergency lighting battery pack", "bids": [{"contractor": "Jans Electrical", "qno": "", "amount": 845.0, "hst": false, "notes": ""}]}, {"no": 21, "priority": false, "desc": "Light pole conduit damaged", "bids": [{"contractor": "Jans Electrical", "qno": "", "amount": 1175.0, "hst": false, "notes": ""}]}, {"no": 22, "priority": false, "desc": "2nd floor riser leak 550", "bids": [{"contractor": "Complete Plumbing", "qno": "", "amount": 3400.0, "hst": false, "notes": ""}]}, {"no": 23, "priority": false, "desc": "Fire extinguishers in generator room 550", "bids": [{"contractor": "Northern Generator", "qno": "9752", "amount": 867.28, "hst": true, "notes": ""}]}, {"no": 24, "priority": false, "desc": "Block heater replacement 550", "bids": [{"contractor": "Northern Generator", "qno": "8890", "amount": 1373.15, "hst": true, "notes": ""}]}, {"no": 25, "priority": false, "desc": "Battery charger replacement 550", "bids": [{"contractor": "Northern Generator", "qno": "5651", "amount": 2093.89, "hst": true, "notes": ""}]}, {"no": 26, "priority": false, "desc": "Fire extinguishers in generator room 560", "bids": [{"contractor": "Northern Generator", "qno": "9739", "amount": 604.55, "hst": true, "notes": ""}, {"contractor": "ENEK Electrical", "qno": "", "amount": null, "hst": false, "notes": ""}]}, {"no": 27, "priority": false, "desc": "Emergency lighting generator and ATS area 560", "bids": [{"contractor": "Northern Generator", "qno": "9740", "amount": 1171.25, "hst": true, "notes": ""}]}, {"no": 28, "priority": false, "desc": "Battery terminal replacement 560", "bids": [{"contractor": "Northern Generator", "qno": "9733", "amount": 1374.65, "hst": true, "notes": ""}]}, {"no": 29, "priority": false, "desc": "Generator cleaning bird infestation 560", "bids": [{"contractor": "Northern Generator", "qno": "9761", "amount": 1614.77, "hst": true, "notes": ""}]}, {"no": 30, "priority": false, "desc": "Block heater & terminal block replacement 560", "bids": [{"contractor": "Northern Generator", "qno": "8480", "amount": 1616.1, "hst": true, "notes": "Block heater has already been replaced by ACE Generator"}]}, {"no": 31, "priority": false, "desc": "Garbage chute door repair roof cap", "bids": [{"contractor": "Metro Compactor", "qno": "112602", "amount": 1982.31, "hst": false, "notes": ""}]}, {"no": 32, "priority": false, "desc": "38 yards black mulch", "bids": [{"contractor": "The Gardener", "qno": "", "amount": 7980.0, "hst": false, "notes": ""}]}, {"no": 33, "priority": false, "desc": "Apply adhesive Mulch glue", "bids": [{"contractor": "The Gardener", "qno": "", "amount": 1535.0, "hst": false, "notes": ""}]}, {"no": 34, "priority": false, "desc": "Power sweep parking lot", "bids": [{"contractor": "The Gardener", "qno": "", "amount": 1725.0, "hst": false, "notes": ""}]}, {"no": 35, "priority": false, "desc": "Supply and install 341 square feet of artificial turf", "bids": [{"contractor": "The Gardener", "qno": "", "amount": 7175.0, "hst": false, "notes": ""}]}, {"no": 36, "priority": false, "desc": "Excavate area 4\" depth install filter cloth and fill 5' pea gravel", "bids": [{"contractor": "The Gardener", "qno": "", "amount": 3167.0, "hst": false, "notes": ""}]}, {"no": 37, "priority": false, "desc": "Replace canopy sprinklers", "bids": [{"contractor": "ENEK Electrical", "qno": "", "amount": 11995.0, "hst": false, "notes": ""}]}, {"no": 38, "priority": false, "desc": "Spot 31 Crack", "bids": [{"contractor": "Joint Seal", "qno": "20212", "amount": 560.0, "hst": false, "notes": ""}]}, {"no": 39, "priority": false, "desc": "Gate area ceiling crack", "bids": [{"contractor": "Joint Seal", "qno": "20212", "amount": 942.0, "hst": false, "notes": ""}]}, {"no": 40, "priority": false, "desc": "Ramp crack repair", "bids": [{"contractor": "Joint Seal", "qno": "20212", "amount": 51274.0, "hst": false, "notes": ""}, {"contractor": "Registon Building Restoration Ltd", "qno": "", "amount": 66800.0, "hst": false, "notes": ""}]}, {"no": 41, "priority": false, "desc": "Storage below ramp crack", "bids": [{"contractor": "Joint Seal", "qno": "20212", "amount": 5760.0, "hst": false, "notes": ""}]}, {"no": 42, "priority": false, "desc": "Spot 58 wall crack", "bids": [{"contractor": "Joint Seal", "qno": "20212", "amount": 2364.0, "hst": false, "notes": ""}]}, {"no": 43, "priority": false, "desc": "Spot 110-113 control joint", "bids": [{"contractor": "Joint Seal", "qno": "20212", "amount": 1680.0, "hst": false, "notes": ""}]}, {"no": 44, "priority": false, "desc": "Electrical conduit repair", "bids": [{"contractor": "Joint Seal", "qno": "20212", "amount": 1772.0, "hst": false, "notes": ""}]}, {"no": 45, "priority": false, "desc": "Control joint waterproofing", "bids": [{"contractor": "Joint Seal", "qno": "20212", "amount": 3088.0, "hst": false, "notes": ""}]}, {"no": 46, "priority": false, "desc": "Spot 101-102 Crack", "bids": [{"contractor": "Joint Seal", "qno": "20212", "amount": 1922.0, "hst": false, "notes": ""}, {"contractor": "Registon Building Restoration Ltd", "qno": "", "amount": 1500.0, "hst": false, "notes": ""}]}, {"no": 47, "priority": false, "desc": "Spot 293 wall crack", "bids": [{"contractor": "Joint Seal", "qno": "20212", "amount": 1341.0, "hst": false, "notes": ""}]}, {"no": 48, "priority": false, "desc": "Spot 231 electrical cage waterproofing", "bids": [{"contractor": "Joint Seal", "qno": "20212", "amount": 1600.0, "hst": false, "notes": ""}]}, {"no": 49, "priority": false, "desc": "Spot 168 ceiling ledge beam crack", "bids": [{"contractor": "Joint Seal", "qno": "20212", "amount": 3840.0, "hst": false, "notes": ""}]}, {"no": 50, "priority": false, "desc": "Driveway near spot 15 ceiling crack", "bids": [{"contractor": "Joint Seal", "qno": "20212", "amount": 2080.0, "hst": false, "notes": ""}]}, {"no": 51, "priority": false, "desc": "Parking spot 45 penetration point", "bids": [{"contractor": "Joint Seal", "qno": "20212", "amount": 150.0, "hst": false, "notes": ""}]}, {"no": 52, "priority": false, "desc": "Spot 65 multiple wall crack", "bids": [{"contractor": "Joint Seal", "qno": "20212", "amount": 2543.0, "hst": false, "notes": ""}]}, {"no": 53, "priority": false, "desc": "Spot 72 multiple ceiling/wall cracks", "bids": [{"contractor": "Joint Seal", "qno": "20212", "amount": 2600.0, "hst": false, "notes": ""}]}, {"no": 54, "priority": false, "desc": "Spot 122 ceiling crack", "bids": [{"contractor": "Joint Seal", "qno": "20212", "amount": 728.0, "hst": false, "notes": ""}]}, {"no": 55, "priority": false, "desc": "Room under ramp multiple cracks", "bids": [{"contractor": "Joint Seal", "qno": "20212", "amount": 4160.0, "hst": false, "notes": ""}]}, {"no": 56, "priority": false, "desc": "Joint between P1 and P2", "bids": [{"contractor": "Joint Seal", "qno": "20212", "amount": 152.0, "hst": false, "notes": ""}]}, {"no": 57, "priority": false, "desc": "Terrace bridge resloping and drain installation", "bids": [{"contractor": "Joint Seal", "qno": "20212", "amount": 9390.0, "hst": false, "notes": ""}]}, {"no": 58, "priority": false, "desc": "Bicycle area waterproofing", "bids": [{"contractor": "Joint Seal", "qno": "20212", "amount": 8822.0, "hst": false, "notes": "Partially done, outside waterproofed"}]}, {"no": 59, "priority": false, "desc": "Terrace gym and party room leaks", "bids": [{"contractor": "Joint Seal", "qno": "21229", "amount": 4220.0, "hst": false, "notes": ""}]}, {"no": 60, "priority": false, "desc": "Party room leak", "bids": [{"contractor": "Registon Building Restoration Ltd", "qno": "", "amount": 6950.0, "hst": false, "notes": ""}]}, {"no": 61, "priority": false, "desc": "Yoga room leak", "bids": [{"contractor": "Registon Building Restoration Ltd", "qno": "", "amount": 8250.0, "hst": false, "notes": ""}]}], "meta": {"title": "Contractor Quote Report", "condoName": "Waterview Condominium", "regNo": "NNSCC No. 292", "manager": "CPO Property Management", "buildings": "Buildings 550 & 560"}}</script>
 
 <div class="appbar"><div class="appbar-inner">
-  <span class="appbrand"><img src="data:image/webp;base64,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" alt=""><span id="brandName">Waterview Condominium</span></span>
+  <span class="appbrand"><img src="data:image/webp;base64,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" alt=""><span id="brandName">Waterview Condominium</span><span class="betachip">BETA</span></span>
   <div class="seg">
     <button class="btn on" id="btnViewReport" type="button">Report</button>
     <button class="btn" id="btnViewEdit" type="button">Edit data</button>
@@ -317,6 +357,7 @@ input:focus, select:focus { outline:2px solid var(--accent); outline-offset:-1px
   <button class="btn" id="btnReports" type="button" title="Save this period, start a new one, or open a past report">📁 <span id="reportNameLabel">Report</span> ▾</button>
   <button class="btn" id="btnPrint" type="button">Print / PDF</button>
   <button class="btn" id="btnHistory" type="button">History</button>
+  <button class="btn" id="btnDash" type="button" style="display:none" title="Totals across all report periods">📊 Dashboard</button>
   <div class="spacer"></div>
   <span class="barnote" id="cloudStatus"></span>
   <span class="barnote" id="saveNote"></span>
@@ -324,6 +365,7 @@ input:focus, select:focus { outline:2px solid var(--accent); outline-offset:-1px
   <div class="menu" id="moreMenu">
     <button class="btn" id="btnMore" type="button">More ▾</button>
     <div class="dropdown">
+      <button id="btnMemo" type="button">✨ AI board memo</button>
       <button id="btnBackup" type="button">Backup data (JSON)</button>
       <button id="btnRestore" type="button">Restore a backup…</button>
       <button id="btnPortable" type="button">Download portable copy</button>
@@ -331,6 +373,7 @@ input:focus, select:focus { outline:2px solid var(--accent); outline-offset:-1px
     </div>
   </div>
   <input type="file" id="fileRestore" accept=".json,application/json" style="display:none">
+  <input type="file" id="fileAttach" accept=".pdf,.png,.jpg,.jpeg,.webp,.heic,.doc,.docx,.xls,.xlsx,.eml,.txt" style="display:none">
 </div></div>
 
 <div class="wrap">
@@ -368,6 +411,24 @@ input:focus, select:focus { outline:2px solid var(--accent); outline-offset:-1px
   </div>
 </div>
 
+<div class="overlay" id="dashOverlay" role="dialog" aria-modal="true" aria-label="Dashboard">
+  <div class="pinbox dashbox">
+    <h3>Year-to-date dashboard</h3>
+    <div id="dashBody" class="histlist" style="max-height:min(560px,70vh)"><p class="histempty">Loading…</p></div>
+    <div class="row"><button class="btn ghost" id="dashClose" type="button">Close</button></div>
+  </div>
+</div>
+
+<div class="overlay" id="memoOverlay" role="dialog" aria-modal="true" aria-label="AI board memo">
+  <div class="pinbox memobox">
+    <h3>AI board memo</h3>
+    <p id="memoStatus" class="histempty" style="margin:4px 0 8px"></p>
+    <textarea id="memoText" spellcheck="false" placeholder="The drafted memo will appear here…"></textarea>
+    <div class="row"><button class="btn" id="memoCopy" type="button">Copy to clipboard</button>
+      <button class="btn ghost" id="memoClose" type="button">Close</button></div>
+  </div>
+</div>
+
 <script>
 (function () {
 "use strict";
@@ -399,6 +460,49 @@ function shortLabel(s) {
   var sp = cut.lastIndexOf(" ");
   return (sp > 12 ? cut.slice(0, sp) : cut).trim() + "…";
 }
+/* job lifecycle: quoted → board decision (approved / rejected / deferred) → scheduled → in progress → completed */
+var STATUSES = [["quoted","Quoted"],["approved","Approved"],["rejected","Rejected"],["deferred","Deferred"],
+                ["scheduled","Scheduled"],["inprogress","In progress"],["completed","Completed"]];
+var APPROVED_SET = { approved:1, scheduled:1, inprogress:1, completed:1 };   /* counts as board-approved spend */
+function statusLabel(k) { for (var i=0;i<STATUSES.length;i++) if (STATUSES[i][0]===k) return STATUSES[i][1]; return k; }
+/* status chip for the report — quiet for the default "quoted" state */
+function stChip(j) {
+  if (!j.status || j.status === "quoted") return "";
+  return ' <span class="stchip st-' + esc(j.status) + '">' + esc(statusLabel(j.status)) + "</span>";
+}
+function todayISO() { return new Date().toISOString().slice(0, 10); }
+/* a dated quote goes stale after its validity window (default 60 days) */
+function bidExpired(b) {
+  if (!b.qdate) return false;
+  var days = +b.validDays > 0 ? +b.validDays : 60;
+  var exp = new Date(b.qdate); exp.setDate(exp.getDate() + days);
+  return exp < new Date();
+}
+/* extra per-bid facts for the report: quote date, expiry, attachments */
+function bidMetaHTML(b) {
+  var bits = [];
+  if (b.qdate) bits.push("quoted " + esc(b.qdate) + (bidExpired(b) ? ' <span class="expired">⚠ expired</span>' : ""));
+  (b.files || []).forEach(function (f) {
+    bits.push('<a href="' + esc(f.url) + '" target="_blank" rel="noopener">📎 ' + esc(f.name) + "</a>");
+  });
+  return bits.length ? '<span class="fn">' + bits.join(" · ") + "</span>" : "";
+}
+/* light totals for any raw jobs array (used by the cross-period dashboard) */
+function calcJobsTotals(jobs) {
+  var t = { total: 0, hp: 0, approved: 0, savings: 0, n: (jobs || []).length, roll: {} };
+  (jobs || []).forEach(function (j) {
+    var c = jobCalc(j);
+    t.total += c.cost; t.savings += c.saving;
+    if (j.priority) t.hp++;
+    if (APPROVED_SET[j.status]) t.approved += c.cost;
+    c.carriedBids.forEach(function (cb) {
+      var nm = (cb.b.contractor || "—").trim() || "—";
+      if (!t.roll[nm]) t.roll[nm] = 0;
+      t.roll[nm] += cb.total;
+    });
+  });
+  return t;
+}
 function genId() { return "j" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
 /* Keep jobs in priority-first order (preserving the board's chosen order within each
    class, since Array.sort is stable), then number them 1..N by report position. */
@@ -411,7 +515,12 @@ function normState(s) {
   s.meta = Object.assign({}, META_DEFAULTS, s.meta || {});
   s.ai = (s.ai && s.ai.summary) ? s.ai : null;
   s.reportName = (typeof s.reportName === "string" && s.reportName.trim()) ? s.reportName.trim() : defaultPeriodName();
-  s.jobs.forEach(function (j) { if (!j.id) j.id = genId(); });   /* stable identity for history */
+  s.jobs.forEach(function (j) {
+    if (!j.id) j.id = genId();                       /* stable identity for history */
+    if (!j.status) j.status = "quoted";              /* lifecycle status */
+    j.bids.forEach(function (b) { if (!Array.isArray(b.files)) b.files = []; });
+  });
+  s.meta.budget = Math.max(0, +s.meta.budget || 0);   /* annual budget (0 = not set) */
   orderJobs(s.jobs);
   return s;
 }
@@ -491,8 +600,9 @@ function persist(msg, explicitChanges) {
 /* ---------- Firestore live sync (active when the Firebase SDK loaded) ---------- */
 var cloud = { on: false, db: null, user: null, docExists: null, denied: false,
               active: { kind: "current", id: null, name: null }, unsub: null };
-var CURRENT_PATH = "nnsccQuoteTracker/main";   /* the live/current report — public read */
-var REPORTS_COLL = "nnsccQuoteReports";        /* archived past-period reports — editor-only */
+var CURRENT_PATH = "nnsccQuoteTrackerBeta/main";      /* BETA sandbox — live/current report */
+var REPORTS_COLL = "nnsccQuoteReportsBeta";           /* BETA sandbox — archived reports */
+var CONTRACTORS_PATH = "nnsccQuoteTrackerBeta/contractors";  /* shared contractor directory */
 /* path of the report currently on screen */
 function reportPath() {
   return cloud.active.kind === "current" ? CURRENT_PATH : (REPORTS_COLL + "/" + cloud.active.id);
@@ -529,11 +639,18 @@ function cloudInit() {
     });
     cloud.db = firebase.firestore();
     try { cloud.fns = firebase.app().functions("us-central1"); } catch (e) { cloud.fns = null; }
+    try { cloud.store = (firebase.storage ? firebase.storage() : null); } catch (e) { cloud.store = null; }
     try { cloud.db.enablePersistence({ synchronizeTabs: true }).catch(function(){}); } catch (e) {}
     cloud.on = true;
   } catch (e) { cloudStatusMsg("Offline copy — saves to this browser only"); return; }
 
   subscribeActive();
+
+  /* shared contractor directory (its own doc — survives report periods) */
+  cloud.db.doc(CONTRACTORS_PATH).onSnapshot(function (snap) {
+    dirState = (snap.exists && Array.isArray(snap.data().list)) ? snap.data() : { list: [] };
+    if (document.body.dataset.view === "edit") renderEditor();
+  }, function () {});
 
   firebase.auth().onAuthStateChanged(function (u) {
     cloud.user = u || null;
@@ -709,8 +826,16 @@ function computeAll() {
     if (!roll[nm]) roll[nm] = { n: 0, tot: 0 };
     roll[nm].n++; roll[nm].tot += cb.total;
   }); });
+  var approvedTotal = 0, stCounts = {}, staleBids = 0;
+  jobs.forEach(function (x) {
+    var st = x.j.status || "quoted";
+    stCounts[st] = (stCounts[st] || 0) + 1;
+    if (APPROVED_SET[st]) approvedTotal += x.c.cost;
+    x.j.bids.forEach(function (b) { if (bidExpired(b)) staleBids++; });
+  });
   return { jobs: jobs, hp: hp, nhp: nhp, total: total, hpTotal: hpTotal,
-           savings: savings, pendingCount: pendingCount, roll: roll };
+           savings: savings, pendingCount: pendingCount, roll: roll,
+           approvedTotal: approvedTotal, stCounts: stCounts, staleBids: staleBids };
 }
 
 /* ---------- report rendering ---------- */
@@ -739,6 +864,7 @@ function cmpRows(x) {
     var cName = tEdit("bid:" + jid + ":" + bi + ":contractor", cb.b.contractor, "Contractor");
     var cNote = ed ? tEdit("bid:" + jid + ":" + bi + ":notes", cb.b.notes, "Add scope note")
                    : (esc(cb.b.notes) || "—");
+    cNote += bidMetaHTML(cb.b);
     if (cb.total == null) {
       var amtP = ed ? tEdit("bid:" + jid + ":" + bi + ":amount", "", "Enter amount") : "Quote pending";
       r.push('<tr class="pend"><td>' + cName + "</td><td>" + cNote +
@@ -765,7 +891,7 @@ function renderReport() {
   var nContractors = Object.keys(d.roll).length;
 
   var M = state.meta || META_DEFAULTS;
-  document.title = M.condoName + " — Contractor Quote Tracker";
+  document.title = M.condoName + " — Quote Tracker · BETA PREVIEW";
   var bn = document.getElementById("brandName"); if (bn) bn.textContent = M.condoName;
   var EDITOR = isEditor();   /* inline editing on only for an authorized signed-in editor */
   /* banner shown when an editor is viewing/editing a PAST (archived) report */
@@ -824,8 +950,28 @@ function renderReport() {
   h.push('<div class="tile hp"><div class="v">' + money(d.hpTotal) + '</div><div class="l">High priority (' + d.hp.length + ' jobs)</div></div>');
   h.push('<div class="tile"><div class="v">' + money(d.total - d.hpTotal) + '</div><div class="l">Standard (' + d.nhp.length + ' jobs)</div></div>');
   h.push('<div class="tile sv"><div class="v">' + money(d.savings) + '</div><div class="l">Saved via competing bids</div></div>');
+  h.push('<div class="tile" style="border-top-color:#137333"><div class="v" style="color:#137333">' + money(d.approvedTotal) + '</div><div class="l">Board approved</div></div>');
   h.push('<div class="tile pd"><div class="v">' + d.pendingCount + '</div><div class="l">Bids pending</div></div>');
-  h.push("</div></section>");
+  h.push("</div>");
+  /* pipeline: where every job sits in the lifecycle */
+  var pl = [];
+  STATUSES.forEach(function (st) {
+    if (d.stCounts[st[0]]) pl.push("<strong>" + d.stCounts[st[0]] + "</strong> " + st[1].toLowerCase());
+  });
+  if (pl.length > 1 || !d.stCounts.quoted)
+    h.push('<p class="pipelineline">Pipeline: ' + pl.join(" · ") +
+      (d.staleBids ? ' · <span class="expired">⚠ ' + d.staleBids + " quote" + (d.staleBids>1?"s":"") + " past validity</span>" : "") + "</p>");
+  else if (d.staleBids)
+    h.push('<p class="pipelineline"><span class="expired">⚠ ' + d.staleBids + " quote" + (d.staleBids>1?"s":"") + " past validity — ask the contractor to re-confirm pricing.</span></p>");
+  /* budget line, when an annual budget is set */
+  if (M.budget > 0) {
+    var pct = Math.min(100, d.total / M.budget * 100);
+    h.push('<div class="budgetwrap"><div class="brow"><div class="blabel">Budget</div><div class="btrack">' +
+      '<div class="bar" style="width:' + pct.toFixed(1) + '%;' + (d.total > M.budget ? "background:#C5221F" : "") + '"></div></div>' +
+      '<div class="bval">' + money(d.total) + " of " + money(M.budget) +
+      (d.total > M.budget ? ' <span class="expired">over</span>' : " · " + Math.round(100 - pct) + "% left") + "</div></div></div>");
+  }
+  h.push("</section>");
 
   /* Section A */
   h.push('<section id="secA"><div class="kicker">Section A</div><h2' + hA("headA") + ">" + esc(M.headA) + "</h2>");
@@ -836,7 +982,7 @@ function renderReport() {
       if (names.indexOf(cb.b.contractor) < 0) names.push(cb.b.contractor); });
     var notes = []; x.c.carriedBids.forEach(function (cb) {
       if (cb.b.notes && notes.indexOf(cb.b.notes) < 0) notes.push(cb.b.notes); });
-    h.push("<tr><td class=\"num\">" + esc(x.j.no) + "</td><td>" + tE("job:" + x.j.id + ":desc", x.j.desc, "Job description") +
+    h.push("<tr><td class=\"num\">" + esc(x.j.no) + "</td><td>" + tE("job:" + x.j.id + ":desc", x.j.desc, "Job description") + stChip(x.j) +
       (notes.length ? '<span class="fn">' + esc(notes.join(" · ")) + "</span>" : "") + "</td><td>" +
       cCell(x, names) + '</td><td class="money">' + aCell(x) + "</td></tr>");
     h.push(bidRowHTML(x, 4));
@@ -851,7 +997,7 @@ function renderReport() {
   if (!multi.length) h.push('<p class="seclede">No jobs currently have more than one bid.</p>');
   multi.forEach(function (x) {
     h.push('<div class="card"><div class="cardhead"><span class="jobno">Job ' + esc(x.j.no) + "</span> <strong>" +
-      tE("job:" + x.j.id + ":desc", x.j.desc, "Job description") + "</strong>" + (x.j.priority ? ' <span class="prio">High priority</span>' : "") + "</div>");
+      tE("job:" + x.j.id + ":desc", x.j.desc, "Job description") + "</strong>" + (x.j.priority ? ' <span class="prio">High priority</span>' : "") + stChip(x.j) + "</div>");
     h.push('<table class="cmp"><thead><tr><th>Contractor</th><th>Scope note</th><th class="money">Total (incl. HST)</th><th></th></tr></thead><tbody>');
     h.push(cmpRows(x));
     h.push("</tbody></table></div>");
@@ -870,7 +1016,7 @@ function renderReport() {
     var notes = []; x.c.carriedBids.forEach(function (cb) {
       if (cb.b.notes && notes.indexOf(cb.b.notes) < 0) notes.push(cb.b.notes); });
     nhpTotal += x.c.cost;
-    h.push('<tr><td class="num">' + esc(x.j.no) + "</td><td>" + tE("job:" + x.j.id + ":desc", x.j.desc, "Job description") +
+    h.push('<tr><td class="num">' + esc(x.j.no) + "</td><td>" + tE("job:" + x.j.id + ":desc", x.j.desc, "Job description") + stChip(x.j) +
       (notes.length ? '<span class="fn">' + esc(notes.join(" · ")) + "</span>" : "") + "</td><td>" +
       cCell(x, names) + '</td><td class="money">' + aCell(x) + "</td></tr>");
     h.push(bidRowHTML(x, 4));
@@ -913,6 +1059,17 @@ function renderReport() {
            money(biggest.c.cost) + ".</li>");
   if (!pend.length) h.push("<li>No bids outstanding — every invited contractor has quoted.</li>");
   h.push("</ul>");
+  var decided = d.jobs.filter(function (x) { return x.j.statusDate || (x.j.status && x.j.status !== "quoted"); })
+    .sort(function (a, b) { return String(b.j.statusDate || "").localeCompare(String(a.j.statusDate || "")); });
+  if (decided.length) {
+    h.push('<h2 style="margin-top:22px">Status &amp; board decisions</h2><ul class="notes">');
+    decided.slice(0, 15).forEach(function (x) {
+      h.push("<li>Job " + esc(x.j.no) + " (" + esc(x.j.desc) + "): <strong>" + esc(statusLabel(x.j.status)) + "</strong>" +
+        (x.j.statusDate ? " on " + esc(x.j.statusDate) : "") +
+        (x.j.statusNote ? " — " + esc(x.j.statusNote) : "") + "</li>");
+    });
+    h.push("</ul>");
+  }
   if (savers.length) {
     h.push('<h2 style="margin-top:22px">Savings identified through competing bids</h2><ul class="notes">');
     savers.forEach(function (x) {
@@ -989,9 +1146,13 @@ function renderEditor() {
     h.push('<div class="esrow"><label>' + f[1] + '</label>' +
       '<input type="text" value="' + esc(M[f[0]]) + '" data-mf="' + f[0] + '"></div>');
   });
+  h.push('<div class="esrow"><label>Annual budget (CAD)</label>' +
+    '<input type="number" step="100" min="0" value="' + (M.budget ? esc(M.budget) : "") + '" data-mf="budget" placeholder="leave empty for no budget line"></div>');
   h.push('<p class="edithint" style="margin:6px 0 0;font-size:12.5px">Section headings are now edited right in the report — open the <strong>Report</strong> tab and click any section heading to rename it. The floating buttons update automatically.</p>');
   h.push("</div></div>");
   h.push(aiCardHTML());
+  h.push(intakeCardHTML());
+  h.push(dirCardHTML());
   h.push('<p><button class="btn primary" id="btnAddJob" type="button">+ Add job</button></p>');
   state.jobs.forEach(function (j, ji) {
     var c = jobCalc(j);
@@ -1004,6 +1165,12 @@ function renderEditor() {
       '<label class="echk"><input type="checkbox" data-f="priority"' + (j.priority ? " checked" : "") + "> High priority</label>" +
       '<input class="desc" type="text" value="' + esc(j.desc) + '" data-f="desc" placeholder="Job description">' +
       '<button class="xbtn" data-act="deljob" title="Delete job">✕ job</button></div>');
+    var sopts = STATUSES.map(function (st) {
+      return '<option value="' + st[0] + '"' + ((j.status || "quoted") === st[0] ? " selected" : "") + ">" + st[1] + "</option>";
+    }).join("");
+    h.push('<div class="strow"><label>Status <select data-f="status">' + sopts + "</select></label>" +
+      '<label>Decision date <input type="date" value="' + esc(j.statusDate || "") + '" data-f="statusDate"></label>' +
+      '<input type="text" value="' + esc(j.statusNote || "") + '" data-f="statusNote" placeholder="decision / progress note (shows in Section E)"></div>');
     h.push('<div class="ebids"><div class="ebrow hdr"><div>Contractor</div><div>Quote #</div><div>Amount</div><div>HST</div><div>Notes</div><div>Status</div><div></div></div>');
     j.bids.forEach(function (b, bi) {
       var t = bidTotal(b);
@@ -1019,6 +1186,15 @@ function renderEditor() {
         '<input type="text" value="' + esc(b.notes) + '" data-f="notes">' +
         "<div>" + st + "</div>" +
         '<button class="xbtn" data-act="delbid" title="Remove this bid">✕</button></div>');
+      var fchips = (b.files || []).map(function (f, fi) {
+        return '<span class="filechip"><a href="' + esc(f.url) + '" target="_blank" rel="noopener">📎 ' + esc(f.name) +
+          '</a><span class="fx" data-act="delfile" data-fi="' + fi + '" title="Remove attachment">✕</span></span>';
+      }).join("");
+      h.push('<div class="ebrow extra" data-bi="' + bi + '">' +
+        '<label>Quote date <input type="date" value="' + esc(b.qdate || "") + '" data-f="qdate"></label>' +
+        '<label>Valid <input type="number" min="1" value="' + esc(b.validDays || 60) + '" data-f="validDays"> days' +
+        (bidExpired(b) ? ' <span class="expired">⚠ expired</span>' : "") + "</label>" +
+        '<button class="btn small" data-act="attach" type="button">📎 Attach quote…</button>' + fchips + "</div>");
     });
     h.push('<button class="addbid" data-act="addbid" type="button">+ Add a bid to this job</button></div></div>');
   });
@@ -1148,8 +1324,14 @@ document.getElementById("editor").addEventListener("change", function (e) {
   var mf = e.target.dataset.mf;
   if (mf) {
     state.meta = state.meta || Object.assign({}, META_DEFAULTS);
-    state.meta[mf] = e.target.value;
+    state.meta[mf] = (mf === "budget") ? Math.max(0, +e.target.value || 0) : e.target.value;
     persist(); renderReport(); return;
+  }
+  var dirf = e.target.dataset.dirf;
+  if (dirf != null) {                                  /* contractor-directory field */
+    var drow = dirState.list[+e.target.dataset.di];
+    if (drow) { drow[dirf] = e.target.value; dirSave(); }
+    return;
   }
   var card = e.target.closest(".ecard"); if (!card) return;
   var j = state.jobs[+card.dataset.ji]; if (!j) return;
@@ -1162,10 +1344,19 @@ document.getElementById("editor").addEventListener("change", function (e) {
     return;
   }
   else if (f === "desc") j.desc = e.target.value;
+  else if (f === "status") {
+    j.status = e.target.value;
+    if (!j.statusDate && j.status !== "quoted") j.statusDate = todayISO();
+    persist(null, ['Job ' + j.no + ' (' + (j.desc || "job") + ') marked ' + statusLabel(j.status)]);
+    renderEditor(); renderReport(); return;
+  }
+  else if (f === "statusDate") j.statusDate = e.target.value;
+  else if (f === "statusNote") j.statusNote = e.target.value;
   else if (row) {
     var b = j.bids[+row.dataset.bi]; if (!b) return;
     if (f === "amount") b.amount = e.target.value === "" ? null : Number(e.target.value);
     else if (f === "hst") b.hst = e.target.value === "yes";
+    else if (f === "validDays") b.validDays = Math.max(1, +e.target.value || 60);
     else b[f] = e.target.value;
   }
   persist(); renderEditor(); renderReport();
@@ -1203,9 +1394,32 @@ document.getElementById("editor").addEventListener("click", function (e) {
   if (act === "ai-remove") {
     state.ai = null; persist(); renderEditor(); renderReport(); return;
   }
+  if (act === "intake-run") { aiIntakeRun(); return; }
+  if (act === "dir-add") {
+    dirState.list.push({ name: "", phone: "", email: "", insuranceExp: "", wsibExp: "" });
+    dirSave(); renderEditor(); return;
+  }
+  if (act === "dir-del") {
+    dirState.list.splice(+e.target.dataset.di, 1);
+    dirSave(); renderEditor(); return;
+  }
+  if (act === "attach") {
+    var ac = e.target.closest(".ecard"), ar = e.target.closest(".ebrow");
+    if (ac && ar) startAttach(+ac.dataset.ji, +ar.dataset.bi);
+    return;
+  }
+  if (act === "delfile") {
+    var fc = e.target.closest(".ecard"), fr = e.target.closest(".ebrow");
+    if (!fc || !fr) return;
+    var fj = state.jobs[+fc.dataset.ji]; if (!fj) return;
+    var fb = fj.bids[+fr.dataset.bi]; if (!fb || !fb.files) return;
+    var rm = fb.files.splice(+e.target.dataset.fi, 1)[0];
+    if (rm && rm.path && cloud.store) { try { cloud.store.ref(rm.path).delete().catch(function(){}); } catch (er) {} }
+    persist(); renderEditor(); renderReport(); return;
+  }
   var card = e.target.closest(".ecard"); if (!card) return;
   var ji = +card.dataset.ji, j = state.jobs[ji];
-  if (act === "addbid") j.bids.push({ contractor: "", qno: "", amount: null, hst: false, notes: "" });
+  if (act === "addbid") j.bids.push({ contractor: "", qno: "", amount: null, hst: false, notes: "", files: [] });
   else if (act === "delbid") {
     var row = e.target.closest(".ebrow");
     j.bids.splice(+row.dataset.bi, 1);
@@ -1267,6 +1481,192 @@ document.getElementById("editor").addEventListener("drop", function (e) {
   if (m) m.scrollIntoView({ block: "nearest" });
 });
 
+/* ---------- contractor directory (beta) ---------- */
+var dirState = { list: [] };
+function dirSave() {
+  if (!cloud.on || !isEditor()) return;
+  cloud.db.doc(CONTRACTORS_PATH).set({ list: dirState.list.map(function (r) { return {
+    name: r.name || "", phone: r.phone || "", email: r.email || "",
+    insuranceExp: r.insuranceExp || "", wsibExp: r.wsibExp || "" }; }) })
+    .catch(function () {});
+}
+function dateLapsed(dstr) { return dstr && dstr < todayISO(); }
+function dirCardHTML() {
+  var h = [];
+  h.push('<div class="ecard esettings" id="dirCard"><div class="ehead"><strong>Contractor directory</strong>' +
+    '<span style="font-size:12.5px;color:var(--ink2)">— contacts &amp; insurance/WSIB expiry (not printed on the report)</span></div><div class="ebids">');
+  h.push('<div class="dirgrid"><div class="dirhdr">Contractor</div><div class="dirhdr">Phone</div>' +
+    '<div class="dirhdr">Email</div><div class="dirhdr">Insurance exp.</div><div class="dirhdr">WSIB exp.</div><div></div>');
+  dirState.list.forEach(function (r, di) {
+    h.push('<input type="text" value="' + esc(r.name) + '" data-dirf="name" data-di="' + di + '" placeholder="name">' +
+      '<input type="text" value="' + esc(r.phone) + '" data-dirf="phone" data-di="' + di + '" placeholder="phone">' +
+      '<input type="text" value="' + esc(r.email) + '" data-dirf="email" data-di="' + di + '" placeholder="email">' +
+      '<input type="date" value="' + esc(r.insuranceExp) + '" data-dirf="insuranceExp" data-di="' + di + '"' +
+        (dateLapsed(r.insuranceExp) ? ' class="expired" title="Insurance certificate has lapsed!"' : "") + ">" +
+      '<input type="date" value="' + esc(r.wsibExp) + '" data-dirf="wsibExp" data-di="' + di + '"' +
+        (dateLapsed(r.wsibExp) ? ' class="expired" title="WSIB clearance has lapsed!"' : "") + ">" +
+      '<button class="xbtn" data-act="dir-del" data-di="' + di + '" title="Remove">✕</button>');
+  });
+  h.push("</div>");
+  var lapsed = dirState.list.filter(function (r) { return dateLapsed(r.insuranceExp) || dateLapsed(r.wsibExp); });
+  if (lapsed.length)
+    h.push('<p class="edithint" style="margin:8px 0 0"><span class="expired">⚠ Lapsed coverage:</span> ' +
+      lapsed.map(function (r) { return esc(r.name || "unnamed"); }).join(", ") +
+      " — get updated certificates before new work is awarded.</p>");
+  h.push('<p style="margin:10px 0 0"><button class="btn" data-act="dir-add" type="button">+ Add contractor</button></p>');
+  h.push("</div></div>");
+  return h.join("");
+}
+
+/* ---------- AI quote intake (beta): paste a quote email → prefilled job ---------- */
+function intakeCardHTML() {
+  var h = [];
+  h.push('<div class="ecard esettings" id="intakeCard"><div class="ehead"><strong>AI quote intake</strong>' +
+    '<span style="font-size:12.5px;color:var(--ink2)">— paste a contractor’s quote email; Claude fills in the job for you</span></div><div class="ebids">');
+  if (!cloud.on) h.push('<p class="edithint" style="margin:4px 0">Available on the live site only.</p>');
+  else {
+    h.push('<textarea id="aiIntakeText" rows="4" style="width:100%;box-sizing:border-box" ' +
+      'placeholder="Paste the quote email or text here — e.g. “Hi, for the lobby ceiling repair our price is $4,850 plus HST, valid 30 days …”"></textarea>');
+    h.push('<div style="display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap">' +
+      '<button class="btn primary" data-act="intake-run" type="button">✨ Read quote &amp; add job</button>' +
+      '<span class="savenote" id="intakeStatus"></span></div>');
+  }
+  h.push("</div></div>");
+  return h.join("");
+}
+function intakeStatus(t) { var el = document.getElementById("intakeStatus"); if (el) el.textContent = t; }
+function aiIntakeRun() {
+  var ta = document.getElementById("aiIntakeText");
+  var text = (ta && ta.value || "").trim();
+  if (!text) { intakeStatus("Paste a quote first."); return; }
+  if (!cloud.fns || !cloud.user) { intakeStatus("Sign in first."); return; }
+  intakeStatus("Claude is reading the quote…");
+  cloud.fns.httpsCallable("nnsccTrackerAi")({ parse: true, text: text })
+    .then(function (res) {
+      var d = res.data || {};
+      var nj = { id: genId(), no: 0, priority: !!d.high_priority,
+        desc: d.job_description || "New job (from AI intake)",
+        status: "quoted",
+        bids: [{ contractor: d.contractor || "", qno: d.quote_number || "",
+          amount: (d.amount_cad != null && d.amount_cad !== "") ? +d.amount_cad : null,
+          hst: !!d.hst_included, notes: d.scope_notes || "",
+          qdate: d.quote_date || todayISO(), files: [] }] };
+      state.jobs.push(nj);
+      orderJobs(state.jobs);
+      persist(null, ['AI intake added job “' + nj.desc + '” from a pasted quote']);
+      if (ta) ta.value = "";
+      renderEditor(); renderReport();
+      var added = document.querySelector('#editor .ecard[data-jid="' + nj.id + '"]');
+      if (added) added.scrollIntoView({ block: "center" });
+      intakeStatus("Added as job " + nj.no + " — review the details before the board sees it.");
+    })
+    .catch(function (e) {
+      var code = (e && e.code) || "";
+      intakeStatus(code === "functions/failed-precondition" ? "⚠ " + e.message : "⚠ " + ((e && e.message) || "could not read the quote"));
+    });
+}
+
+/* ---------- quote attachments (beta, Firebase Storage) ---------- */
+var attachTarget = null;
+function startAttach(ji, bi) {
+  if (!isEditor()) return;
+  if (!cloud.store) { alert("File storage is not enabled for this site yet."); return; }
+  attachTarget = { ji: ji, bi: bi };
+  document.getElementById("fileAttach").click();
+}
+document.getElementById("fileAttach").addEventListener("change", function () {
+  var f = this.files[0]; this.value = "";
+  if (!f || !attachTarget) return;
+  if (f.size > 15 * 1024 * 1024) { alert("That file is over 15 MB — please attach a smaller copy."); return; }
+  var j = state.jobs[attachTarget.ji]; if (!j) return;
+  var b = j.bids[attachTarget.bi]; if (!b) return;
+  var path = "quoteAttachments/" + j.id + "/" + Date.now() + "-" + f.name.replace(/[^\w.\-() ]+/g, "_");
+  var note = document.getElementById("saveNote"); if (note) note.textContent = "Uploading " + f.name + "…";
+  cloud.store.ref(path).put(f)
+    .then(function (snap) { return snap.ref.getDownloadURL(); })
+    .then(function (url) {
+      if (!Array.isArray(b.files)) b.files = [];
+      b.files.push({ name: f.name, url: url, path: path, size: f.size });
+      persist(null, ['Attached “' + f.name + '” to a bid on “' + (j.desc || "job") + '”']);
+      renderEditor(); renderReport();
+    })
+    .catch(function (e) { alert("Upload failed (" + ((e && e.code) || "error") + ")."); });
+});
+
+/* ---------- cross-period dashboard (beta) ---------- */
+function openDashboard() {
+  if (!isEditor()) { alert("Sign in as an authorized editor to see the dashboard (it includes past reports)."); return; }
+  document.getElementById("dashOverlay").classList.add("open");
+  var body = document.getElementById("dashBody");
+  body.innerHTML = '<p class="histempty">Adding up all report periods…</p>';
+  cloud.db.collection(REPORTS_COLL).orderBy("archivedAt", "desc").limit(100).get()
+    .then(function (qs) {
+      var periods = [{ name: (state.reportName || "Current") + " (current)", jobs: state.jobs }];
+      qs.forEach(function (doc) { periods.push({ name: doc.data().reportName || doc.id, jobs: doc.data().jobs || [] }); });
+      var h = [], grand = 0, grandApproved = 0, grandSavings = 0, rollAll = {};
+      h.push('<table class="dashtable"><thead><tr><th>Period</th><th class="money">Jobs</th>' +
+        '<th class="money">Committed</th><th class="money">Board approved</th><th class="money">Saved via bids</th></tr></thead><tbody>');
+      periods.forEach(function (pr) {
+        var t = calcJobsTotals(pr.jobs);
+        grand += t.total; grandApproved += t.approved; grandSavings += t.savings;
+        Object.keys(t.roll).forEach(function (nm) { rollAll[nm] = (rollAll[nm] || 0) + t.roll[nm]; });
+        h.push("<tr><td>" + esc(pr.name) + '</td><td class="money">' + t.n + '</td><td class="money">' + money(t.total) +
+          '</td><td class="money">' + money(t.approved) + '</td><td class="money">' + money(t.savings) + "</td></tr>");
+      });
+      h.push('<tr style="font-weight:700"><td>All periods</td><td class="money"></td><td class="money">' + money(grand) +
+        '</td><td class="money">' + money(grandApproved) + '</td><td class="money">' + money(grandSavings) + "</td></tr>");
+      h.push("</tbody></table>");
+      var bud = state.meta && state.meta.budget;
+      if (bud > 0)
+        h.push('<p style="font-size:13px;margin:0 0 10px">Against the ' + money(bud) + " annual budget: <strong>" +
+          money(grand) + "</strong> committed (" + Math.round(grand / bud * 100) + "%)" +
+          (grand > bud ? ' — <span class="expired">over budget</span>' : "") + ".</p>");
+      var names = Object.keys(rollAll).sort(function (a, b) { return rollAll[b] - rollAll[a]; });
+      if (names.length) {
+        var mx = rollAll[names[0]] || 1;
+        h.push('<div class="rephead">Spend by contractor — all periods</div><div class="chart" style="margin-top:6px">');
+        names.slice(0, 12).forEach(function (nm) {
+          h.push('<div class="brow"><div class="blabel">' + esc(nm) + '</div><div class="btrack">' +
+            '<div class="bar" style="width:' + (rollAll[nm] / mx * 100).toFixed(1) + '%"></div></div>' +
+            '<div class="bval">' + money(rollAll[nm]) + "</div></div>");
+        });
+        h.push("</div>");
+      }
+      body.innerHTML = h.join("");
+    })
+    .catch(function (err) {
+      body.innerHTML = '<p class="histempty">Could not load past periods (' + esc(err && err.code || "error") + ").</p>";
+    });
+}
+document.getElementById("btnDash").onclick = openDashboard;
+document.getElementById("dashClose").onclick = function () { document.getElementById("dashOverlay").classList.remove("open"); };
+document.getElementById("dashOverlay").addEventListener("click", function (e) { if (e.target === this) this.classList.remove("open"); });
+
+/* ---------- AI board memo (beta) ---------- */
+function openMemo() {
+  if (!isEditor()) { alert("Sign in as an authorized editor first."); return; }
+  document.getElementById("memoOverlay").classList.add("open");
+  var st = document.getElementById("memoStatus"), ta = document.getElementById("memoText");
+  st.textContent = "Claude is drafting the memo…"; ta.value = "";
+  cloud.fns.httpsCallable("nnsccTrackerAi")({ memo: true, stats: aiBuildStats() })
+    .then(function (res) {
+      ta.value = (res.data && res.data.memo) || "";
+      st.textContent = "Draft ready — edit freely, then copy it into your email to the board.";
+    })
+    .catch(function (e) {
+      st.textContent = "⚠ " + ((e && e.message) || "could not draft the memo");
+    });
+}
+document.getElementById("btnMemo").onclick = openMemo;
+document.getElementById("memoClose").onclick = function () { document.getElementById("memoOverlay").classList.remove("open"); };
+document.getElementById("memoOverlay").addEventListener("click", function (e) { if (e.target === this) this.classList.remove("open"); });
+document.getElementById("memoCopy").onclick = function () {
+  var ta = document.getElementById("memoText");
+  ta.select();
+  try { navigator.clipboard.writeText(ta.value); document.getElementById("memoStatus").textContent = "Copied to clipboard."; }
+  catch (e) { document.execCommand("copy"); }
+};
+
 /* ---------- toolbar ---------- */
 function setView(v) {
   document.body.dataset.view = v;
@@ -1317,6 +1717,8 @@ function activeReportName() {
 function updateReportsButton() {
   var lbl = document.getElementById("reportNameLabel");
   if (lbl) lbl.textContent = activeReportName();
+  var db = document.getElementById("btnDash");
+  if (db) db.style.display = isEditor() ? "" : "none";   /* archived periods are editor-only */
   var btn = document.getElementById("btnReports");
   if (btn) btn.classList.toggle("viewing-archived", cloud.active.kind === "archived");
 }

@@ -1,0 +1,72 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Waterview / NNSCC contractor quote tracker — dedicated project.
+    // Owner + any email in the config doc's editors array may edit.
+    function nnsccEditor() {
+      return request.auth != null
+        && request.auth.token.get('email_verified', false) == true
+        && request.auth.token.email != null
+        && (request.auth.token.email.lower() == 'mvinobaje@gmail.com'
+            || request.auth.token.email.lower() in
+               get(/databases/$(database)/documents/nnsccQuoteTrackerConfig/main).data.get('editors', []));
+    }
+
+    // Config (editor allowlist + Anthropic API key). NO client may read it
+    // (the key is consumed only by the nnsccTrackerAi Cloud Function via the
+    // Admin SDK, which bypasses these rules); only the owner may write.
+    match /nnsccQuoteTrackerConfig/{docId} {
+      allow read: if false;
+      allow write: if request.auth != null
+        && request.auth.token.get('email_verified', false) == true
+        && request.auth.token.email != null
+        && request.auth.token.email.lower() == 'mvinobaje@gmail.com';
+    }
+
+    // Current/live report — public read, editor write. Immutable audit trail.
+    match /nnsccQuoteTracker/{docId} {
+      allow read: if true;
+      allow write: if nnsccEditor();
+      match /audit/{entryId} {
+        allow read: if true;
+        allow create: if nnsccEditor();
+        allow update, delete: if false;
+      }
+    }
+
+    // Report library — past/period reports. EDITOR-ONLY (public sees only the current report).
+    match /nnsccQuoteReports/{reportId} {
+      allow read: if nnsccEditor();
+      allow write: if nnsccEditor();
+      match /audit/{entryId} {
+        allow read: if nnsccEditor();
+        allow create: if nnsccEditor();
+        allow update, delete: if false;
+      }
+    }
+
+    // ---- BETA PREVIEW sandbox (quote-report-beta.web.app) ----
+    // Same permission model as production, separate data so testing never
+    // touches the real report.
+    match /nnsccQuoteTrackerBeta/{docId} {
+      allow read: if docId == "main" || nnsccEditor();   // contractors doc is editor-only
+      allow write: if nnsccEditor();
+      match /audit/{entryId} {
+        allow read: if true;
+        allow create: if nnsccEditor();
+        allow update, delete: if false;
+      }
+    }
+    match /nnsccQuoteReportsBeta/{reportId} {
+      allow read, write: if nnsccEditor();
+      match /audit/{entryId} {
+        allow read, create: if nnsccEditor();
+        allow update, delete: if false;
+      }
+    }
+
+    // Everything else denied.
+    match /{document=**} { allow read, write: if false; }
+  }
+}
