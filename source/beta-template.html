@@ -165,6 +165,8 @@ tr.pend td { color:var(--muted); font-style:italic; }
 .bar { height:100%; background:var(--bar); border-radius:0 4px 4px 0; min-width:2px; }
 .bval { font-size:13px; font-variant-numeric:tabular-nums; white-space:nowrap; }
 .bjobs { color:var(--muted); }
+.browlink { cursor:pointer; border-radius:6px; }
+.browlink:hover, .browlink:focus-visible { background:rgba(22,39,63,.06); outline:none; }
 @media (max-width:640px) { .brow { grid-template-columns:120px 1fr 120px; } }
 
 ul.notes { margin:8px 0 0; padding-left:20px; color:var(--ink2); font-size:14px; }
@@ -406,6 +408,7 @@ input:focus, select:focus { outline:2px solid var(--accent); outline-offset:-1px
   </div>
   <input type="file" id="fileRestore" accept=".json,application/json" style="display:none">
   <input type="file" id="fileAttach" accept=".pdf,.png,.jpg,.jpeg,.webp,.heic,.doc,.docx,.xls,.xlsx,.eml,.txt" style="display:none">
+  <input type="file" id="aiIntakeFile" accept=".pdf,.docx" style="display:none">
 </div></div>
 
 <div class="wrap">
@@ -448,6 +451,25 @@ input:focus, select:focus { outline:2px solid var(--accent); outline-offset:-1px
     <h3>Year-to-date dashboard</h3>
     <div id="dashBody" class="histlist" style="max-height:min(560px,70vh)"><p class="histempty">Loading…</p></div>
     <div class="row"><button class="btn ghost" id="dashClose" type="button">Close</button></div>
+  </div>
+</div>
+
+<div class="overlay" id="contractorOverlay" role="dialog" aria-modal="true" aria-label="Contractor quotes">
+  <div class="pinbox dashbox">
+    <h3 id="contractorTitle">Contractor quotes</h3>
+    <div id="contractorBody" class="histlist" style="max-height:min(560px,70vh)"></div>
+    <div class="row"><button class="btn ghost" id="contractorClose" type="button">Close</button></div>
+  </div>
+</div>
+
+<div class="overlay" id="viewGateOverlay" role="dialog" aria-modal="true" aria-label="Enter passcode">
+  <div class="pinbox" style="max-width:400px">
+    <h3>Protected report</h3>
+    <p class="histempty" style="margin:2px 0 10px">This report is passcode-protected. Enter the passcode to view it, or sign in if you’re a board member or editor.</p>
+    <input id="viewGateInput" type="password" autocomplete="off" placeholder="Passcode" style="width:100%;box-sizing:border-box;font-size:16px;padding:9px">
+    <p id="viewGateMsg" class="savenote" style="min-height:16px;margin:6px 0"></p>
+    <div class="row"><button class="btn primary" id="viewGateBtn" type="button">Unlock</button>
+      <button class="btn ghost" id="viewGateSignin" type="button">Sign in instead</button></div>
   </div>
 </div>
 
@@ -671,6 +693,7 @@ var cloud = { on: false, db: null, user: null, docExists: null, denied: false,
 var CURRENT_PATH = "nnsccQuoteTrackerBeta/main";      /* BETA sandbox — live/current report */
 var REPORTS_COLL = "nnsccQuoteReportsBeta";           /* BETA sandbox — archived reports */
 var CONTRACTORS_PATH = "nnsccQuoteTrackerBeta/contractors";  /* shared contractor directory */
+var VIEW_BETA = CURRENT_PATH.indexOf("Beta") >= 0;   /* which report the passcode gate reads/protects */
 /* path of the report currently on screen */
 function reportPath() {
   return cloud.active.kind === "current" ? CURRENT_PATH : (REPORTS_COLL + "/" + cloud.active.id);
@@ -704,6 +727,7 @@ function cloudInit() {
       apiKey: "AIzaSyDj3v0HtJ6g8UzfMoftCyEl3KPxsaOzrIs",
       authDomain: "quote-tracker-ce2ba.firebaseapp.com",
       projectId: "quote-tracker-ce2ba",
+      storageBucket: "quote-tracker-ce2ba.firebasestorage.app",
       appId: "1:1346683787:web:be618e56f3bb9b3b67a58e"
     });
     cloud.db = firebase.firestore();
@@ -780,6 +804,11 @@ function onReportErr(err) {
   if (code === "permission-denied" && cloud.active.kind === "archived") {
     cloudStatusMsg("You’re not authorized to view that past report.");
     backToCurrent();
+    return;
+  }
+  if (code === "permission-denied" && cloud.active.kind === "current" && !isEditor() && !isBoardMember()) {
+    cloudStatusMsg("● This report is passcode-protected.");
+    showViewGate();
     return;
   }
   cloudStatusMsg("Cloud unavailable — saving to this browser (" + code + ")");
@@ -1107,7 +1136,7 @@ function renderReport() {
     h.push('<p class="seclede ainarr">' + tE("ai:spendNote", state.ai.spendNote, "AI note") + "</p>");
   h.push('<p class="seclede">' + tE("meta:ledeD", M.ledeD, "Section description") + '</p><div class="chart">');
   rollArr.forEach(function (r) {
-    h.push('<div class="brow"><div class="blabel">' + esc(r.nm) + '</div><div class="btrack">' +
+    h.push('<div class="brow browlink" data-cn="' + esc(r.nm) + '" role="button" tabindex="0" title="Show all quotes from ' + esc(r.nm) + '"><div class="blabel">' + esc(r.nm) + '</div><div class="btrack">' +
       '<div class="bar" style="width:' + (r.v.tot / mx * 100).toFixed(1) + '%"></div></div>' +
       '<div class="bval">' + money(r.v.tot) + '<span class="bjobs"> · ' + r.v.n + "</span></div></div>");
   });
@@ -1228,6 +1257,7 @@ function renderEditor() {
   h.push(intakeCardHTML());
   h.push(dirCardHTML());
   h.push(boardCardHTML());
+  h.push(viewPassCardHTML());
   h.push('<p><button class="btn primary" id="btnAddJob" type="button">+ Add job</button></p>');
   state.jobs.forEach(function (j, ji) {
     var c = jobCalc(j);
@@ -1276,6 +1306,7 @@ function renderEditor() {
   });
   document.getElementById("editor").innerHTML = h.join("");
   aiCheckKey();
+  viewPassCheck();
 }
 
 /* ---------- AI narrative (Claude Haiku via the editor's own browser) ---------- */
@@ -1471,6 +1502,10 @@ document.getElementById("editor").addEventListener("click", function (e) {
     state.ai = null; persist(); renderEditor(); renderReport(); return;
   }
   if (act === "intake-run") { aiIntakeRun(); return; }
+  if (act === "intake-file") { aiIntakeStartFile(); return; }
+  if (act === "intake-commit") { aiIntakeCommit(); return; }
+  if (act === "intake-cancel") { aiIntakeCancel(); return; }
+  if (act === "viewpass-set") { viewPassSet(); return; }
   if (act === "dir-add") {
     dirState.list.push({ name: "", phone: "", email: "", insuranceExp: "", wsibExp: "" });
     dirSave(); renderEditor(); return;
@@ -1641,48 +1676,99 @@ function boardSave() {
 function intakeCardHTML() {
   var h = [];
   h.push('<div class="ecard esettings" id="intakeCard"><div class="ehead"><strong>AI quote intake</strong>' +
-    '<span style="font-size:12.5px;color:var(--ink2)">— paste a contractor’s quote email; Claude fills in the job for you</span></div><div class="ebids">');
+    '<span style="font-size:12.5px;color:var(--ink2)">— paste a quote, or upload the quote PDF / Word file; Claude fills in the job and you confirm before it saves</span></div><div class="ebids">');
   if (!cloud.on) h.push('<p class="edithint" style="margin:4px 0">Available on the live site only.</p>');
   else {
     h.push('<textarea id="aiIntakeText" rows="4" style="width:100%;box-sizing:border-box" ' +
       'placeholder="Paste the quote email or text here — e.g. “Hi, for the lobby ceiling repair our price is $4,850 plus HST, valid 30 days …”"></textarea>');
     h.push('<div style="display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap">' +
-      '<button class="btn primary" data-act="intake-run" type="button">✨ Read quote &amp; add job</button>' +
+      '<button class="btn primary" data-act="intake-run" type="button">✨ Read pasted quote</button>' +
+      '<button class="btn" data-act="intake-file" type="button">📄 Upload quote PDF / Word…</button>' +
       '<span class="savenote" id="intakeStatus"></span></div>');
+    h.push('<div id="intakePreview" style="display:none;margin-top:12px"></div>');
   }
   h.push("</div></div>");
   return h.join("");
 }
 function intakeStatus(t) { var el = document.getElementById("intakeStatus"); if (el) el.textContent = t; }
+var intakePending = null;
+function aiIntakeErr(e) {
+  var code = (e && e.code) || "";
+  intakeStatus(code === "functions/failed-precondition" ? "⚠ " + e.message : "⚠ " + ((e && e.message) || "could not read the quote"));
+}
+/* paste path → parse → confirmation preview (nothing saved yet) */
 function aiIntakeRun() {
   var ta = document.getElementById("aiIntakeText");
   var text = (ta && ta.value || "").trim();
-  if (!text) { intakeStatus("Paste a quote first."); return; }
+  if (!text) { intakeStatus("Paste a quote, or use Upload for a PDF / Word file."); return; }
   if (!cloud.fns || !cloud.user) { intakeStatus("Sign in first."); return; }
   intakeStatus("Claude is reading the quote…");
   cloud.fns.httpsCallable("nnsccTrackerAi")({ parse: true, text: text })
-    .then(function (res) {
-      var d = res.data || {};
-      var nj = { id: genId(), no: 0, priority: !!d.high_priority,
-        desc: d.job_description || "New job (from AI intake)",
-        status: "quoted",
-        bids: [{ contractor: d.contractor || "", qno: d.quote_number || "",
-          amount: (d.amount_cad != null && d.amount_cad !== "") ? +d.amount_cad : null,
-          hst: !!d.hst_included, notes: d.scope_notes || "",
-          qdate: d.quote_date || todayISO(), files: [] }] };
-      state.jobs.push(nj);
-      orderJobs(state.jobs);
-      persist(null, ['AI intake added job “' + nj.desc + '” from a pasted quote']);
-      if (ta) ta.value = "";
-      renderEditor(); renderReport();
-      var added = document.querySelector('#editor .ecard[data-jid="' + nj.id + '"]');
-      if (added) added.scrollIntoView({ block: "center" });
-      intakeStatus("Added as job " + nj.no + " — review the details before the board sees it.");
-    })
-    .catch(function (e) {
-      var code = (e && e.code) || "";
-      intakeStatus(code === "functions/failed-precondition" ? "⚠ " + e.message : "⚠ " + ((e && e.message) || "could not read the quote"));
-    });
+    .then(function (res) { aiIntakeShowPreview(res.data || {}); })
+    .catch(aiIntakeErr);
+}
+/* file path → open the picker; the #aiIntakeFile handler reads + parses it */
+function aiIntakeStartFile() {
+  if (!isEditor()) return;
+  if (!cloud.fns || !cloud.user) { intakeStatus("Sign in first."); return; }
+  var el = document.getElementById("aiIntakeFile"); if (el) el.click();
+}
+/* editable confirmation card — nothing is written to Firestore until “Add this job” */
+function aiIntakeShowPreview(d) {
+  intakePending = d || {};
+  var box = document.getElementById("intakePreview");
+  if (!box) return;
+  function v(x) { return esc(x == null ? "" : String(x)); }
+  var amt = (d.amount_cad != null && d.amount_cad !== "") ? d.amount_cad : "";
+  var fs = "font-size:12px;color:var(--ink2)";
+  var inp = "width:100%;box-sizing:border-box;margin-top:2px";
+  box.innerHTML =
+    '<div style="border:1px solid var(--line);border-radius:8px;padding:12px 14px;background:var(--panel,#f7f9fc)">' +
+    '<div style="font-weight:600;margin-bottom:8px">Review before saving — edit anything that’s off, then confirm.</div>' +
+    '<label style="' + fs + '">Job description<input id="ipDesc" style="' + inp + '" value="' + v(d.job_description) + '"></label>' +
+    '<label style="' + fs + ';display:inline-flex;align-items:center;gap:6px;margin:8px 0"><input type="checkbox" id="ipPri"' + (d.high_priority ? " checked" : "") + "> High priority</label>" +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">' +
+      '<label style="' + fs + '">Contractor<input id="ipContractor" style="' + inp + '" value="' + v(d.contractor) + '"></label>' +
+      '<label style="' + fs + '">Quote #<input id="ipQno" style="' + inp + '" value="' + v(d.quote_number) + '"></label>' +
+      '<label style="' + fs + '">Amount (CAD)<input id="ipAmount" type="number" step="0.01" style="' + inp + '" value="' + v(amt) + '"></label>' +
+      '<label style="' + fs + '">Quote date<input id="ipQdate" type="date" style="' + inp + '" value="' + v(d.quote_date || todayISO()) + '"></label>' +
+    "</div>" +
+    '<label style="' + fs + ';display:inline-flex;align-items:center;gap:6px;margin:8px 0"><input type="checkbox" id="ipHst"' + (d.hst_included ? " checked" : "") + "> HST already included in the amount</label>" +
+    '<label style="' + fs + '">Notes<textarea id="ipNotes" rows="2" style="' + inp + '">' + v(d.scope_notes) + "</textarea></label>" +
+    '<div style="display:flex;gap:8px;margin-top:10px">' +
+      '<button class="btn primary" data-act="intake-commit" type="button">✓ Add this job</button>' +
+      '<button class="btn" data-act="intake-cancel" type="button">Cancel</button>' +
+    "</div></div>";
+  box.style.display = "";
+  intakeStatus("Claude filled these in — review and confirm.");
+  box.scrollIntoView({ block: "nearest" });
+}
+function aiIntakeCancel() {
+  intakePending = null;
+  var box = document.getElementById("intakePreview");
+  if (box) { box.innerHTML = ""; box.style.display = "none"; }
+  intakeStatus("");
+}
+function aiIntakeCommit() {
+  if (!isEditor()) return;
+  function gv(id) { var el = document.getElementById(id); return el ? el.value : ""; }
+  function gc(id) { var el = document.getElementById(id); return !!(el && el.checked); }
+  var amtRaw = gv("ipAmount").trim();
+  var nj = { id: genId(), no: 0, priority: gc("ipPri"),
+    desc: gv("ipDesc").trim() || "New job (from AI intake)", status: "quoted",
+    bids: [{ contractor: gv("ipContractor").trim(), qno: gv("ipQno").trim(),
+      amount: amtRaw === "" ? null : +amtRaw,
+      hst: gc("ipHst"), notes: gv("ipNotes").trim(),
+      qdate: gv("ipQdate") || todayISO(), files: [] }] };
+  state.jobs.push(nj);
+  orderJobs(state.jobs);
+  persist(null, ['AI intake added job “' + nj.desc + '” (confirmed by editor)']);
+  var ta = document.getElementById("aiIntakeText"); if (ta) ta.value = "";
+  aiIntakeCancel();
+  renderEditor(); renderReport();
+  var added = document.querySelector('#editor .ecard[data-jid="' + nj.id + '"]');
+  if (added) added.scrollIntoView({ block: "center" });
+  intakeStatus("Added as job " + nj.no + " — the full details are in the list below.");
 }
 
 /* ---------- quote attachments (beta, Firebase Storage) ---------- */
@@ -1710,6 +1796,28 @@ document.getElementById("fileAttach").addEventListener("change", function () {
       renderEditor(); renderReport();
     })
     .catch(function (e) { alert("Upload failed (" + ((e && e.code) || "error") + ")."); });
+});
+/* AI intake: read an uploaded PDF/Word quote → Claude → confirmation preview */
+document.getElementById("aiIntakeFile").addEventListener("change", function () {
+  var f = this.files[0]; this.value = "";
+  if (!f) return;
+  var name = (f.name || "").toLowerCase();
+  var isPdf = f.type === "application/pdf" || /\.pdf$/.test(name);
+  var isDocx = /\.docx$/.test(name) || f.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+  if (!isPdf && !isDocx) { intakeStatus("Choose a PDF or a Word .docx file (old .doc isn’t supported — save it as a PDF)."); return; }
+  if (f.size > 8 * 1024 * 1024) { intakeStatus("That file is over 8 MB — attach a smaller copy or paste the text instead."); return; }
+  intakeStatus("Sending “" + f.name + "” to Claude…");
+  var reader = new FileReader();
+  reader.onload = function () {
+    var b64 = String(reader.result || "").split(",")[1] || "";
+    if (!b64) { intakeStatus("Could not read that file."); return; }
+    cloud.fns.httpsCallable("nnsccTrackerAi")({ parseFile: true, fileB64: b64,
+      mediaType: isPdf ? "application/pdf" : "docx", fileName: f.name })
+      .then(function (res) { aiIntakeShowPreview(res.data || {}); })
+      .catch(aiIntakeErr);
+  };
+  reader.onerror = function () { intakeStatus("Could not read that file."); };
+  reader.readAsDataURL(f);
 });
 
 /* ---------- cross-period dashboard (beta) ---------- */
@@ -1760,6 +1868,137 @@ function openDashboard() {
 document.getElementById("btnDash").onclick = openDashboard;
 document.getElementById("dashClose").onclick = function () { document.getElementById("dashOverlay").classList.remove("open"); };
 document.getElementById("dashOverlay").addEventListener("click", function (e) { if (e.target === this) this.classList.remove("open"); });
+
+/* Section D: click a contractor bar → popup listing all their quotes (read-only) */
+function openContractorOverlay(name) {
+  var key = String(name || "").trim().toLowerCase();
+  if (!key) return;
+  var rows = [];
+  state.jobs.forEach(function (j) {
+    jobCalc(j).bids.forEach(function (x) {
+      if (String(x.b.contractor || "").trim().toLowerCase() === key) rows.push({ j: j, x: x });
+    });
+  });
+  rows.sort(function (a, b) { return (b.x.carried ? 1 : 0) - (a.x.carried ? 1 : 0) || (a.j.no - b.j.no); });
+  var wonTot = 0, won = 0;
+  rows.forEach(function (r) { if (r.x.carried) { wonTot += r.x.total; won++; } });
+  var t = document.getElementById("contractorTitle");
+  if (t) t.textContent = String(name).trim() + " — quotes";
+  var h = [];
+  h.push('<p class="histempty" style="margin:0 0 4px">' + rows.length + " quote" + (rows.length === 1 ? "" : "s") +
+    " on record · " + won + " carried (lowest) · " + money(wonTot) + " counted toward committed spend (incl. HST).</p>");
+  h.push('<p class="histempty" style="margin:0 0 10px;font-size:11.5px;color:var(--muted)">“Carried” = the lowest quote for that job, used in the report totals. It does <em>not</em> mean the board has voted or that the work has been awarded.</p>');
+  if (!rows.length) h.push('<p class="histempty">No quotes found for this contractor.</p>');
+  else {
+    h.push('<table class="dashtable"><thead><tr><th>Job</th><th>Quote #</th><th class="money">Amount (incl. HST)</th><th>In totals</th></tr></thead><tbody>');
+    rows.forEach(function (r) {
+      var amt = r.x.total != null ? money(r.x.total) : (String(r.x.b.contractor || "").trim() ? "pending" : "—");
+      var tag = r.x.carried ? '<span style="color:#16273f;font-weight:600">carried (lowest)</span>' :
+        (r.x.total != null ? '<span style="color:var(--muted)">higher bid</span>' : (r.x.pending ? "awaiting quote" : "—"));
+      var notes = r.x.b.notes ? '<div style="font-size:11.5px;color:var(--muted)">' + esc(r.x.b.notes) + "</div>" : "";
+      var files = (Array.isArray(r.x.b.files) && r.x.b.files.length) ?
+        ' <span style="font-size:11px;color:var(--muted)">📎 ' + r.x.b.files.length + "</span>" : "";
+      h.push("<tr><td><strong>" + esc(r.j.no) + "</strong> · " + esc(r.j.desc || "job") + notes + "</td>" +
+        "<td>" + esc(r.x.b.qno || "—") + "</td>" +
+        '<td class="money">' + amt + files + "</td>" +
+        "<td>" + tag + "</td></tr>");
+    });
+    h.push("</tbody></table>");
+  }
+  document.getElementById("contractorBody").innerHTML = h.join("");
+  document.getElementById("contractorOverlay").classList.add("open");
+}
+document.getElementById("contractorClose").onclick = function () { document.getElementById("contractorOverlay").classList.remove("open"); };
+document.getElementById("contractorOverlay").addEventListener("click", function (e) { if (e.target === this) this.classList.remove("open"); });
+document.addEventListener("click", function (e) {
+  var row = e.target && e.target.closest ? e.target.closest(".browlink") : null;
+  if (row && row.dataset && row.dataset.cn) openContractorOverlay(row.dataset.cn);
+});
+document.addEventListener("keydown", function (e) {
+  if (e.key !== "Enter" && e.key !== " ") return;
+  var row = e.target && e.target.closest ? e.target.closest(".browlink") : null;
+  if (row && row.dataset && row.dataset.cn) { e.preventDefault(); openContractorOverlay(row.dataset.cn); }
+});
+
+/* ---------- shared-passcode view gate (non-editors) ---------- */
+function viewGateMsg(t) { var el = document.getElementById("viewGateMsg"); if (el) el.textContent = t || ""; }
+function showViewGate() {
+  var ov = document.getElementById("viewGateOverlay"); if (!ov) return;
+  /* blank any locally-cached copy so no stale data shows behind the gate */
+  try { state = normState({ jobs: [], meta: (state && state.meta) || null }); renderReport(); } catch (e) {}
+  ov.classList.add("open");
+  var saved = null; try { saved = sessionStorage.getItem("nnsccView"); } catch (e) {}
+  if (saved) submitViewGate(saved, true);
+  var inp = document.getElementById("viewGateInput"); if (inp) inp.focus();
+}
+function submitViewGate(pass, silent) {
+  pass = String(pass || "").trim();
+  if (!pass) { viewGateMsg("Enter the passcode."); return; }
+  if (!cloud.fns) { viewGateMsg("Offline — cannot verify the passcode."); return; }
+  if (!silent) viewGateMsg("Checking…");
+  cloud.fns.httpsCallable("nnsccGate")({ view: true, passcode: pass, beta: VIEW_BETA })
+    .then(function (res) {
+      var r = res.data && res.data.report;
+      if (!r) { viewGateMsg("Could not load the report."); return; }
+      state = normState({ jobs: r.jobs, meta: r.meta, ai: r.ai, reportName: r.reportName });
+      lastSaved = deepCopy(state);
+      try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) {}
+      try { sessionStorage.setItem("nnsccView", pass); } catch (e) {}
+      document.getElementById("viewGateOverlay").classList.remove("open");
+      renderReport();
+      cloudStatusMsg("● Viewing with passcode — data as of now; refresh to update.");
+    })
+    .catch(function (e) {
+      try { sessionStorage.removeItem("nnsccView"); } catch (_) {}
+      var code = (e && e.code) || "";
+      if (silent && code === "functions/permission-denied") { viewGateMsg(""); return; }
+      viewGateMsg(code === "functions/resource-exhausted" ? "Too many tries — wait a minute." :
+        code === "functions/failed-precondition" ? ((e && e.message) || "Viewing isn’t protected yet.") :
+        ((e && e.message) || "That passcode isn’t right."));
+    });
+}
+document.getElementById("viewGateBtn").onclick = function () { submitViewGate(document.getElementById("viewGateInput").value, false); };
+document.getElementById("viewGateInput").addEventListener("keydown", function (e) { if (e.key === "Enter") submitViewGate(this.value, false); });
+document.getElementById("viewGateSignin").onclick = function () { cloudSignIn(function () {}); };
+
+/* editor control: set / change the shared view passcode */
+function viewPassCardHTML() {
+  var h = [];
+  h.push('<div class="ecard esettings" id="viewPassCard"><div class="ehead"><strong>View passcode</strong>' +
+    '<span style="font-size:12.5px;color:var(--ink2)">— require a shared passcode before anyone (except you &amp; board members) can view the report</span></div><div class="ebids">');
+  if (!cloud.on) h.push('<p class="edithint" style="margin:4px 0">Available on the live site only.</p>');
+  else {
+    h.push('<p class="edithint" style="margin:0 0 8px" id="viewPassState">Checking…</p>');
+    h.push('<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">' +
+      '<input id="viewPassInput" type="text" autocomplete="off" placeholder="Set / change passcode (min 6 characters)" style="flex:1;min-width:200px;box-sizing:border-box">' +
+      '<button class="btn primary" data-act="viewpass-set" type="button">Save passcode</button>' +
+      '<span class="savenote" id="viewPassMsg"></span></div>');
+    h.push('<p class="edithint" style="margin:8px 0 0;font-size:12px">You (editors) and board members always view without a passcode. Everyone else must enter it. It’s stored encrypted (scrypt) and never shown again — share it with whoever should see the report.</p>');
+  }
+  h.push("</div></div>");
+  return h.join("");
+}
+function viewPassCheck() {
+  if (!cloud.fns || !cloud.user) return;
+  cloud.fns.httpsCallable("nnsccGate")({ check: true, beta: VIEW_BETA }).then(function (res) {
+    var el = document.getElementById("viewPassState");
+    if (el) el.textContent = (res.data && res.data.set)
+      ? "🔒 A passcode is set — non-editors must enter it to view."
+      : "🔓 No passcode set — non-editors currently cannot view (set one below to let them in).";
+  }).catch(function () {});
+}
+function viewPassSet() {
+  var inp = document.getElementById("viewPassInput");
+  var v = (inp && inp.value || "").trim();
+  var msg = document.getElementById("viewPassMsg");
+  if (v.length < 6) { if (msg) msg.textContent = "Use at least 6 characters."; return; }
+  if (msg) msg.textContent = "Saving…";
+  cloud.fns.httpsCallable("nnsccGate")({ set: true, passcode: v, beta: VIEW_BETA }).then(function () {
+    if (inp) inp.value = "";
+    if (msg) msg.textContent = "Saved — share it with your viewers.";
+    viewPassCheck();
+  }).catch(function (e) { if (msg) msg.textContent = "⚠ " + ((e && e.message) || "could not save"); });
+}
 
 /* ---------- AI board memo (beta) ---------- */
 function openMemo() {
@@ -1829,6 +2068,15 @@ function sha256Hex(str) {
       return ("0" + b.toString(16)).slice(-2);
     }).join("");
   });
+}
+/* RFC 3161 trusted timestamp of a hash, via the nnsccStamp function. Best-effort:
+   resolves to null (never rejects) if the authority is unreachable, so the vote
+   still closes. Returns { ok, tsa, genTime, token } on success. */
+function stampHash(hash) {
+  if (!cloud.fns) return Promise.resolve(null);
+  return cloud.fns.httpsCallable("nnsccStamp")({ hash: hash }).then(function (res) {
+    return res && res.data && res.data.ok ? res.data : null;
+  }).catch(function () { return null; });
 }
 /* canonical snapshot of the job as it stands — this exact string is hashed so
    nobody can claim the numbers changed after the board voted */
@@ -1925,17 +2173,23 @@ function closeVote(voteId, v, ballots) {
       quorumOf(v) + " needed)") + "\n\nOnce closed, board members sign the resolution; ballots can no longer be changed.")) return;
   var resText = resolutionTextOf(v, t);
   sha256Hex(resText).then(function (resHash) {
-    return cloud.db.collection(VOTES_COLL).doc(voteId).set({
-      status: "closed", result: result, quorumMet: quorumMet,
-      tally: { a: t.a, r: t.r, ab: t.ab, cast: t.cast },
-      resText: resText, resHash: resHash,
-      closedBy: cloud.user.email,
-      closedAt: firebase.firestore.FieldValue.serverTimestamp()
-    }, { merge: true }).then(function () {
-      decLog("Vote CLOSED on Job " + v.jobNo + " (“" + v.jobDesc + "”): " + result.toUpperCase() +
-        " — " + t.a + " approve / " + t.r + " reject / " + t.ab + " abstain" +
-        (quorumMet ? "" : " (quorum not met)") + " — resolution hash " + resHash.slice(0, 12), voteId, resHash);
-      loadVotesList();
+    return stampHash(resHash).then(function (ts) {
+      return cloud.db.collection(VOTES_COLL).doc(voteId).set({
+        status: "closed", result: result, quorumMet: quorumMet,
+        tally: { a: t.a, r: t.r, ab: t.ab, cast: t.cast },
+        resText: resText, resHash: resHash,
+        tsToken: ts ? ts.token : null,
+        tsTime: ts ? ts.genTime : null,
+        tsAuthority: ts ? ts.tsa : null,
+        closedBy: cloud.user.email,
+        closedAt: firebase.firestore.FieldValue.serverTimestamp()
+      }, { merge: true }).then(function () {
+        decLog("Vote CLOSED on Job " + v.jobNo + " (“" + v.jobDesc + "”): " + result.toUpperCase() +
+          " — " + t.a + " approve / " + t.r + " reject / " + t.ab + " abstain" +
+          (quorumMet ? "" : " (quorum not met)") + " — resolution hash " + resHash.slice(0, 12) +
+          (ts && ts.genTime ? " — timestamped " + ts.genTime + " (" + ts.tsa + ")" : ""), voteId, resHash);
+        loadVotesList();
+      });
     });
   }).catch(function (e) { alert("Could not close the vote (" + ((e && e.code) || "error") + ")."); });
 }
@@ -2215,6 +2469,7 @@ function printResolution(r) {
     ".vbox{margin-top:22px;border:1px solid #cdd5df;border-radius:7px;padding:12px 15px;background:#fafbfc}" +
     ".vbox h4{margin:0 0 6px;font-size:10pt;letter-spacing:.8px;text-transform:uppercase;color:#16273f}" +
     ".vbox p{margin:5px 0;font-size:9.5pt;color:#48505c}.hash{font:9pt/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;color:#1b2430;word-break:break-all;background:#eef1f5;padding:2px 6px;border-radius:4px}" +
+    ".tsnote{font-size:8.5pt;color:#7a838f;font-style:italic;margin-top:2px}.vbox code{font:8.5pt ui-monospace,Menlo,monospace;background:#eef1f5;padding:1px 4px;border-radius:3px}" +
     ".foot{margin-top:20px;border-top:1px solid #cdd5df;padding-top:8px;font-size:9pt;color:#7a838f;display:flex;justify-content:space-between}" +
     "@media print{.noprint{display:none}body{margin:0}}";
   var h = ['<!doctype html><html><head><meta charset="utf-8"><title>Resolution ' + esc(resolutionNumber(v)) + " — " + esc(M.condoName) + "</title><style>" + css + "</style></head><body>"];
@@ -2273,6 +2528,10 @@ function printResolution(r) {
     "<p>This resolution forms part of a tamper-evident decision log. The fingerprints below bind it to the quoted amounts as they stood when the vote opened and to the exact resolution text approved at close. Any later alteration of the figures or text changes these fingerprints.</p>" +
     '<p>Quoted data at vote time (SHA-256):<br><span class="hash">' + esc(v.snapshotHash || "—") + "</span></p>" +
     '<p>Resolution text (SHA-256):<br><span class="hash">' + esc(v.resHash || "—") + "</span></p>" +
+    (v.tsTime
+      ? '<p>Trusted timestamp (RFC 3161):<br><span class="hash">' + esc(v.tsTime) + "  ·  " + esc(v.tsAuthority || "TSA") + "</span></p>" +
+        '<p class="tsnote">A neutral Time-Stamping Authority has cryptographically attested that the resolution-text fingerprint existed at the stated UTC time. The signed timestamp token is stored with this vote and can be independently verified (e.g. <code>openssl ts&nbsp;-verify</code>) without trusting this system.</p>'
+      : "") +
     "<p>Vote administered by " + esc(v.openedBy || "—") + (v.closedBy ? "; closed by " + esc(v.closedBy) : "") + ".</p></div>");
 
   h.push('<div class="foot"><span>' + esc(M.condoName) + " · Resolution No. " + esc(resolutionNumber(v)) + "</span><span>Generated " + esc(fmtLongDate(new Date())) + "</span></div>");

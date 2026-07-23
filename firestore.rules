@@ -24,12 +24,14 @@ service cloud.firestore {
         && request.auth.token.email.lower() == 'mvinobaje@gmail.com';
     }
 
-    // Current/live report — public read, editor write. Immutable audit trail.
+    // Current/live report — PASSCODE-GATED. Not public: editors and board
+    // members read it directly; everyone else goes through the nnsccGate Cloud
+    // Function with the shared passcode. Editor write. Immutable audit trail.
     match /nnsccQuoteTracker/{docId} {
-      allow read: if true;
+      allow read: if (docId == "board" && request.auth != null) || nnsccEditor() || nnsccBoard();
       allow write: if nnsccEditor();
       match /audit/{entryId} {
-        allow read: if true;
+        allow read: if nnsccEditor() || nnsccBoard();
         allow create: if nnsccEditor();
         allow update, delete: if false;
       }
@@ -46,6 +48,49 @@ service cloud.firestore {
       }
     }
 
+    // Board members: emails allowed to vote and sign resolutions.
+    // The list lives in nnsccQuoteTracker/board {members:[emails]}, managed by editors.
+    function nnsccBoard() {
+      return request.auth != null
+        && request.auth.token.get('email_verified', false) == true
+        && request.auth.token.email != null
+        && request.auth.token.email.lower() in
+           get(/databases/$(database)/documents/nnsccQuoteTracker/board).data.get('members', []);
+    }
+
+    // Board voting. Editors open/close vote sessions; each board member casts ONE
+    // ballot (doc id = their email) while the session is open, and may sign the
+    // resolution once it is closed.
+    match /nnsccBoardVotes/{voteId} {
+      allow read: if nnsccBoard() || nnsccEditor();
+      allow create, update: if nnsccEditor();
+      allow delete: if nnsccEditor();
+      match /ballots/{email} {
+        allow read: if nnsccBoard() || nnsccEditor();
+        allow create, update: if nnsccBoard()
+          && email == request.auth.token.email.lower()
+          && request.resource.data.email == email
+          && get(/databases/$(database)/documents/nnsccBoardVotes/$(voteId)).data.status == "open";
+        allow delete: if nnsccEditor();
+      }
+      match /signatures/{email} {
+        allow read: if nnsccBoard() || nnsccEditor();
+        allow create: if nnsccBoard()
+          && email == request.auth.token.email.lower()
+          && request.resource.data.email == email
+          && get(/databases/$(database)/documents/nnsccBoardVotes/$(voteId)).data.status == "closed";
+        allow update: if false;            // a placed signature can never be altered
+        allow delete: if nnsccEditor();
+      }
+    }
+    // Append-only decision log — tamper-evident record of every vote opened,
+    // closed, and signed. Nothing here can ever be edited or deleted.
+    match /nnsccDecisionLog/{entryId} {
+      allow read: if nnsccBoard() || nnsccEditor();
+      allow create: if nnsccBoard() || nnsccEditor();
+      allow update, delete: if false;
+    }
+
     // ---- BETA PREVIEW sandbox (quote-report-beta.web.app) ----
     // Same permission model as production, separate data so testing never
     // touches the real report.
@@ -60,12 +105,14 @@ service cloud.firestore {
     }
 
     match /nnsccQuoteTrackerBeta/{docId} {
-      // main is public; the board list is visible to any signed-in account
-      // (a board member needs to see they're on it); contractors stays editor-only
-      allow read: if docId == "main" || (docId == "board" && request.auth != null) || nnsccEditor();
+      // Passcode-gated (beta): the report is NOT public. Editors and board
+      // members read it directly; everyone else goes through the nnsccGate
+      // Cloud Function with the shared passcode. The board list stays visible
+      // to any signed-in account; contractors stays editor-only.
+      allow read: if (docId == "board" && request.auth != null) || nnsccEditor() || nnsccBoardBeta();
       allow write: if nnsccEditor();
       match /audit/{entryId} {
-        allow read: if true;
+        allow read: if nnsccEditor() || nnsccBoardBeta();
         allow create: if nnsccEditor();
         allow update, delete: if false;
       }

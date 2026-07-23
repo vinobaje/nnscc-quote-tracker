@@ -165,6 +165,8 @@ tr.pend td { color:var(--muted); font-style:italic; }
 .bar { height:100%; background:var(--bar); border-radius:0 4px 4px 0; min-width:2px; }
 .bval { font-size:13px; font-variant-numeric:tabular-nums; white-space:nowrap; }
 .bjobs { color:var(--muted); }
+.browlink { cursor:pointer; border-radius:6px; }
+.browlink:hover, .browlink:focus-visible { background:rgba(22,39,63,.06); outline:none; }
 @media (max-width:640px) { .brow { grid-template-columns:120px 1fr 120px; } }
 
 ul.notes { margin:8px 0 0; padding-left:20px; color:var(--ink2); font-size:14px; }
@@ -376,7 +378,7 @@ input:focus, select:focus { outline:2px solid var(--accent); outline-offset:-1px
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-functions-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-storage-compat.js"></script>
 
-<script id="seed" type="application/json">{"jobs": [{"no": 1, "priority": true, "desc": "Sump pump repair investigation", "bids": [{"contractor": "MC Mechanical", "qno": "", "amount": 1500.0, "hst": false, "notes": ""}]}, {"no": 2, "priority": true, "desc": "Second sump pump installation", "bids": [{"contractor": "MC Mechanical", "qno": "", "amount": 11500.0, "hst": false, "notes": ""}]}, {"no": 3, "priority": true, "desc": "Lower sprinkler head 560-905", "bids": [{"contractor": "ENEK Electrical", "qno": "", "amount": 1475.0, "hst": false, "notes": ""}]}, {"no": 4, "priority": true, "desc": "Install CO2 Alarms in all common area hallways", "bids": [{"contractor": "ENEK Electrical", "qno": "", "amount": 7360.0, "hst": false, "notes": ""}]}, {"no": 5, "priority": true, "desc": "Commercial units", "bids": [{"contractor": "Joint Seal", "qno": "20668", "amount": 28698.0, "hst": false, "notes": ""}]}, {"no": 6, "priority": true, "desc": "550-209 balcony waterproofing", "bids": [{"contractor": "Joint Seal", "qno": "21229", "amount": 2400.0, "hst": false, "notes": ""}]}, {"no": 7, "priority": true, "desc": "550-1503 2 pieces 6mm clear tempered glass to railing", "bids": [{"contractor": "Niagara Glass", "qno": "12914", "amount": 1132.54, "hst": true, "notes": ""}]}, {"no": 8, "priority": true, "desc": "Amenities fire doors (gym & electrical room)", "bids": [{"contractor": "ABC Locksmith", "qno": "126", "amount": 2169.6, "hst": true, "notes": "Amenities gym fire door"}, {"contractor": "ACB Locksmith", "qno": "125", "amount": 2169.6, "hst": true, "notes": "Amenities Electrical room fire door"}, {"contractor": "Lockhut", "qno": "62737", "amount": 6522.36, "hst": true, "notes": "Amenities gym & electrical room fire doors"}]}, {"no": 9, "priority": true, "desc": "Repairs units 550-418", "bids": [{"contractor": "Maple Trust", "qno": "", "amount": 3020.91, "hst": false, "notes": ""}, {"contractor": "Discount Reno", "qno": "", "amount": null, "hst": false, "notes": ""}, {"contractor": "DMD Renovations", "qno": "", "amount": null, "hst": false, "notes": ""}]}, {"no": 10, "priority": true, "desc": "Repairs unit 550-318", "bids": [{"contractor": "Maple Trust", "qno": "", "amount": 2553.8, "hst": false, "notes": ""}, {"contractor": "Discount Reno", "qno": "", "amount": null, "hst": false, "notes": ""}, {"contractor": "DMD Renovations", "qno": "", "amount": null, "hst": false, "notes": ""}]}, {"no": 11, "priority": true, "desc": "Repairs unit 550-218", "bids": [{"contractor": "Maple Trust", "qno": "", "amount": 2503.2, "hst": false, "notes": ""}, {"contractor": "Discount Reno", "qno": "", "amount": null, "hst": false, "notes": ""}, {"contractor": "DMD Renovations", "qno": "", "amount": null, "hst": false, "notes": ""}]}, {"no": 12, "priority": false, "desc": "Domestic hot water tank replacement", "bids": [{"contractor": "MC Mechanical", "qno": "", "amount": 10639.67, "hst": false, "notes": ""}]}, {"no": 13, "priority": false, "desc": "Install Mitsubishi 3 ton ductless A/C", "bids": [{"contractor": "MC Mechanical", "qno": "", "amount": 15000.0, "hst": false, "notes": ""}]}, {"no": 14, "priority": false, "desc": "Hot water tank inspection", "bids": [{"contractor": "Hydrastone", "qno": "", "amount": 4378.0, "hst": false, "notes": "2 tanks 550"}]}, {"no": 15, "priority": false, "desc": "52 anchor rope tie-offs", "bids": [{"contractor": "Clear Ontario", "qno": "", "amount": 11000.0, "hst": false, "notes": ""}]}, {"no": 16, "priority": false, "desc": "Overloaded circuit P1", "bids": [{"contractor": "Jans Electrical", "qno": "", "amount": 3705.0, "hst": false, "notes": ""}]}, {"no": 17, "priority": false, "desc": "Connect amenities building to 560 generator", "bids": [{"contractor": "Jans Electrical", "qno": "", "amount": 2395.0, "hst": false, "notes": ""}]}, {"no": 18, "priority": false, "desc": "Sub electrical room install circuit receptacle", "bids": [{"contractor": "Jans Electrical", "qno": "", "amount": 2225.0, "hst": false, "notes": ""}]}, {"no": 19, "priority": false, "desc": "2 4ft LED light fixtures P1 elevator entrance", "bids": [{"contractor": "Jans Electrical", "qno": "", "amount": 760.0, "hst": false, "notes": ""}]}, {"no": 20, "priority": false, "desc": "Install amenities emergency lighting battery pack", "bids": [{"contractor": "Jans Electrical", "qno": "", "amount": 845.0, "hst": false, "notes": ""}]}, {"no": 21, "priority": false, "desc": "Light pole conduit damaged", "bids": [{"contractor": "Jans Electrical", "qno": "", "amount": 1175.0, "hst": false, "notes": ""}]}, {"no": 22, "priority": false, "desc": "2nd floor riser leak 550", "bids": [{"contractor": "Complete Plumbing", "qno": "", "amount": 3400.0, "hst": false, "notes": ""}]}, {"no": 23, "priority": false, "desc": "Fire extinguishers in generator room 550", "bids": [{"contractor": "Northern Generator", "qno": "9752", "amount": 867.28, "hst": true, "notes": ""}]}, {"no": 24, "priority": false, "desc": "Block heater replacement 550", "bids": [{"contractor": "Northern Generator", "qno": "8890", "amount": 1373.15, "hst": true, "notes": ""}]}, {"no": 25, "priority": false, "desc": "Battery charger replacement 550", "bids": [{"contractor": "Northern Generator", "qno": "5651", "amount": 2093.89, "hst": true, "notes": ""}]}, {"no": 26, "priority": false, "desc": "Fire extinguishers in generator room 560", "bids": [{"contractor": "Northern Generator", "qno": "9739", "amount": 604.55, "hst": true, "notes": ""}, {"contractor": "ENEK Electrical", "qno": "", "amount": null, "hst": false, "notes": ""}]}, {"no": 27, "priority": false, "desc": "Emergency lighting generator and ATS area 560", "bids": [{"contractor": "Northern Generator", "qno": "9740", "amount": 1171.25, "hst": true, "notes": ""}]}, {"no": 28, "priority": false, "desc": "Battery terminal replacement 560", "bids": [{"contractor": "Northern Generator", "qno": "9733", "amount": 1374.65, "hst": true, "notes": ""}]}, {"no": 29, "priority": false, "desc": "Generator cleaning bird infestation 560", "bids": [{"contractor": "Northern Generator", "qno": "9761", "amount": 1614.77, "hst": true, "notes": ""}]}, {"no": 30, "priority": false, "desc": "Block heater & terminal block replacement 560", "bids": [{"contractor": "Northern Generator", "qno": "8480", "amount": 1616.1, "hst": true, "notes": "Block heater has already been replaced by ACE Generator"}]}, {"no": 31, "priority": false, "desc": "Garbage chute door repair roof cap", "bids": [{"contractor": "Metro Compactor", "qno": "112602", "amount": 1982.31, "hst": false, "notes": ""}]}, {"no": 32, "priority": false, "desc": "38 yards black mulch", "bids": [{"contractor": "The Gardener", "qno": "", "amount": 7980.0, "hst": false, "notes": ""}]}, {"no": 33, "priority": false, "desc": "Apply adhesive Mulch glue", "bids": [{"contractor": "The Gardener", "qno": "", "amount": 1535.0, "hst": false, "notes": ""}]}, {"no": 34, "priority": false, "desc": "Power sweep parking lot", "bids": [{"contractor": "The Gardener", "qno": "", "amount": 1725.0, "hst": false, "notes": ""}]}, {"no": 35, "priority": false, "desc": "Supply and install 341 square feet of artificial turf", "bids": [{"contractor": "The Gardener", "qno": "", "amount": 7175.0, "hst": false, "notes": ""}]}, {"no": 36, "priority": false, "desc": "Excavate area 4\" depth install filter cloth and fill 5' pea gravel", "bids": [{"contractor": "The Gardener", "qno": "", "amount": 3167.0, "hst": false, "notes": ""}]}, {"no": 37, "priority": false, "desc": "Replace canopy sprinklers", "bids": [{"contractor": "ENEK Electrical", "qno": "", "amount": 11995.0, "hst": false, "notes": ""}]}, {"no": 38, "priority": false, "desc": "Spot 31 Crack", "bids": [{"contractor": "Joint Seal", "qno": "20212", "amount": 560.0, "hst": false, "notes": ""}]}, {"no": 39, "priority": false, "desc": "Gate area ceiling crack", "bids": [{"contractor": "Joint Seal", "qno": "20212", "amount": 942.0, "hst": false, "notes": ""}]}, {"no": 40, "priority": false, "desc": "Ramp crack repair", "bids": [{"contractor": "Joint Seal", "qno": "20212", "amount": 51274.0, "hst": false, "notes": ""}, {"contractor": "Registon Building Restoration Ltd", "qno": "", "amount": 66800.0, "hst": false, "notes": ""}]}, {"no": 41, "priority": false, "desc": "Storage below ramp crack", "bids": [{"contractor": "Joint Seal", "qno": "20212", "amount": 5760.0, "hst": false, "notes": ""}]}, {"no": 42, "priority": false, "desc": "Spot 58 wall crack", "bids": [{"contractor": "Joint Seal", "qno": "20212", "amount": 2364.0, "hst": false, "notes": ""}]}, {"no": 43, "priority": false, "desc": "Spot 110-113 control joint", "bids": [{"contractor": "Joint Seal", "qno": "20212", "amount": 1680.0, "hst": false, "notes": ""}]}, {"no": 44, "priority": false, "desc": "Electrical conduit repair", "bids": [{"contractor": "Joint Seal", "qno": "20212", "amount": 1772.0, "hst": false, "notes": ""}]}, {"no": 45, "priority": false, "desc": "Control joint waterproofing", "bids": [{"contractor": "Joint Seal", "qno": "20212", "amount": 3088.0, "hst": false, "notes": ""}]}, {"no": 46, "priority": false, "desc": "Spot 101-102 Crack", "bids": [{"contractor": "Joint Seal", "qno": "20212", "amount": 1922.0, "hst": false, "notes": ""}, {"contractor": "Registon Building Restoration Ltd", "qno": "", "amount": 1500.0, "hst": false, "notes": ""}]}, {"no": 47, "priority": false, "desc": "Spot 293 wall crack", "bids": [{"contractor": "Joint Seal", "qno": "20212", "amount": 1341.0, "hst": false, "notes": ""}]}, {"no": 48, "priority": false, "desc": "Spot 231 electrical cage waterproofing", "bids": [{"contractor": "Joint Seal", "qno": "20212", "amount": 1600.0, "hst": false, "notes": ""}]}, {"no": 49, "priority": false, "desc": "Spot 168 ceiling ledge beam crack", "bids": [{"contractor": "Joint Seal", "qno": "20212", "amount": 3840.0, "hst": false, "notes": ""}]}, {"no": 50, "priority": false, "desc": "Driveway near spot 15 ceiling crack", "bids": [{"contractor": "Joint Seal", "qno": "20212", "amount": 2080.0, "hst": false, "notes": ""}]}, {"no": 51, "priority": false, "desc": "Parking spot 45 penetration point", "bids": [{"contractor": "Joint Seal", "qno": "20212", "amount": 150.0, "hst": false, "notes": ""}]}, {"no": 52, "priority": false, "desc": "Spot 65 multiple wall crack", "bids": [{"contractor": "Joint Seal", "qno": "20212", "amount": 2543.0, "hst": false, "notes": ""}]}, {"no": 53, "priority": false, "desc": "Spot 72 multiple ceiling/wall cracks", "bids": [{"contractor": "Joint Seal", "qno": "20212", "amount": 2600.0, "hst": false, "notes": ""}]}, {"no": 54, "priority": false, "desc": "Spot 122 ceiling crack", "bids": [{"contractor": "Joint Seal", "qno": "20212", "amount": 728.0, "hst": false, "notes": ""}]}, {"no": 55, "priority": false, "desc": "Room under ramp multiple cracks", "bids": [{"contractor": "Joint Seal", "qno": "20212", "amount": 4160.0, "hst": false, "notes": ""}]}, {"no": 56, "priority": false, "desc": "Joint between P1 and P2", "bids": [{"contractor": "Joint Seal", "qno": "20212", "amount": 152.0, "hst": false, "notes": ""}]}, {"no": 57, "priority": false, "desc": "Terrace bridge resloping and drain installation", "bids": [{"contractor": "Joint Seal", "qno": "20212", "amount": 9390.0, "hst": false, "notes": ""}]}, {"no": 58, "priority": false, "desc": "Bicycle area waterproofing", "bids": [{"contractor": "Joint Seal", "qno": "20212", "amount": 8822.0, "hst": false, "notes": "Partially done, outside waterproofed"}]}, {"no": 59, "priority": false, "desc": "Terrace gym and party room leaks", "bids": [{"contractor": "Joint Seal", "qno": "21229", "amount": 4220.0, "hst": false, "notes": ""}]}, {"no": 60, "priority": false, "desc": "Party room leak", "bids": [{"contractor": "Registon Building Restoration Ltd", "qno": "", "amount": 6950.0, "hst": false, "notes": ""}]}, {"no": 61, "priority": false, "desc": "Yoga room leak", "bids": [{"contractor": "Registon Building Restoration Ltd", "qno": "", "amount": 8250.0, "hst": false, "notes": ""}]}], "meta": {"title": "Contractor Quote Report", "condoName": "Waterview Condominium", "regNo": "NNSCC No. 292", "manager": "CPO Property Management", "buildings": "Buildings 550 & 560"}}</script>
+<script id="seed" type="application/json">{"jobs":[],"meta":{"title":"Contractor Quote Report","condoName":"Waterview Condominium","regNo":"NNSCC No. 292","manager":"CPO Property Management","buildings":"Buildings 550 & 560"}}</script>
 
 <div class="appbar"><div class="appbar-inner">
   <span class="appbrand"><img src="data:image/webp;base64,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" alt=""><span id="brandName">Waterview Condominium</span><span class="betachip">BETA</span></span>
@@ -406,6 +408,7 @@ input:focus, select:focus { outline:2px solid var(--accent); outline-offset:-1px
   </div>
   <input type="file" id="fileRestore" accept=".json,application/json" style="display:none">
   <input type="file" id="fileAttach" accept=".pdf,.png,.jpg,.jpeg,.webp,.heic,.doc,.docx,.xls,.xlsx,.eml,.txt" style="display:none">
+  <input type="file" id="aiIntakeFile" accept=".pdf,.docx" style="display:none">
 </div></div>
 
 <div class="wrap">
@@ -448,6 +451,25 @@ input:focus, select:focus { outline:2px solid var(--accent); outline-offset:-1px
     <h3>Year-to-date dashboard</h3>
     <div id="dashBody" class="histlist" style="max-height:min(560px,70vh)"><p class="histempty">Loading…</p></div>
     <div class="row"><button class="btn ghost" id="dashClose" type="button">Close</button></div>
+  </div>
+</div>
+
+<div class="overlay" id="contractorOverlay" role="dialog" aria-modal="true" aria-label="Contractor quotes">
+  <div class="pinbox dashbox">
+    <h3 id="contractorTitle">Contractor quotes</h3>
+    <div id="contractorBody" class="histlist" style="max-height:min(560px,70vh)"></div>
+    <div class="row"><button class="btn ghost" id="contractorClose" type="button">Close</button></div>
+  </div>
+</div>
+
+<div class="overlay" id="viewGateOverlay" role="dialog" aria-modal="true" aria-label="Enter passcode">
+  <div class="pinbox" style="max-width:400px">
+    <h3>Protected report</h3>
+    <p class="histempty" style="margin:2px 0 10px">This report is passcode-protected. Enter the passcode to view it, or sign in if you’re a board member or editor.</p>
+    <input id="viewGateInput" type="password" autocomplete="off" placeholder="Passcode" style="width:100%;box-sizing:border-box;font-size:16px;padding:9px">
+    <p id="viewGateMsg" class="savenote" style="min-height:16px;margin:6px 0"></p>
+    <div class="row"><button class="btn primary" id="viewGateBtn" type="button">Unlock</button>
+      <button class="btn ghost" id="viewGateSignin" type="button">Sign in instead</button></div>
   </div>
 </div>
 
@@ -671,6 +693,7 @@ var cloud = { on: false, db: null, user: null, docExists: null, denied: false,
 var CURRENT_PATH = "nnsccQuoteTrackerBeta/main";      /* BETA sandbox — live/current report */
 var REPORTS_COLL = "nnsccQuoteReportsBeta";           /* BETA sandbox — archived reports */
 var CONTRACTORS_PATH = "nnsccQuoteTrackerBeta/contractors";  /* shared contractor directory */
+var VIEW_BETA = CURRENT_PATH.indexOf("Beta") >= 0;   /* which report the passcode gate reads/protects */
 /* path of the report currently on screen */
 function reportPath() {
   return cloud.active.kind === "current" ? CURRENT_PATH : (REPORTS_COLL + "/" + cloud.active.id);
@@ -704,6 +727,7 @@ function cloudInit() {
       apiKey: "AIzaSyDj3v0HtJ6g8UzfMoftCyEl3KPxsaOzrIs",
       authDomain: "quote-tracker-ce2ba.firebaseapp.com",
       projectId: "quote-tracker-ce2ba",
+      storageBucket: "quote-tracker-ce2ba.firebasestorage.app",
       appId: "1:1346683787:web:be618e56f3bb9b3b67a58e"
     });
     cloud.db = firebase.firestore();
@@ -780,6 +804,11 @@ function onReportErr(err) {
   if (code === "permission-denied" && cloud.active.kind === "archived") {
     cloudStatusMsg("You’re not authorized to view that past report.");
     backToCurrent();
+    return;
+  }
+  if (code === "permission-denied" && cloud.active.kind === "current" && !isEditor() && !isBoardMember()) {
+    cloudStatusMsg("● This report is passcode-protected.");
+    showViewGate();
     return;
   }
   cloudStatusMsg("Cloud unavailable — saving to this browser (" + code + ")");
@@ -1107,7 +1136,7 @@ function renderReport() {
     h.push('<p class="seclede ainarr">' + tE("ai:spendNote", state.ai.spendNote, "AI note") + "</p>");
   h.push('<p class="seclede">' + tE("meta:ledeD", M.ledeD, "Section description") + '</p><div class="chart">');
   rollArr.forEach(function (r) {
-    h.push('<div class="brow"><div class="blabel">' + esc(r.nm) + '</div><div class="btrack">' +
+    h.push('<div class="brow browlink" data-cn="' + esc(r.nm) + '" role="button" tabindex="0" title="Show all quotes from ' + esc(r.nm) + '"><div class="blabel">' + esc(r.nm) + '</div><div class="btrack">' +
       '<div class="bar" style="width:' + (r.v.tot / mx * 100).toFixed(1) + '%"></div></div>' +
       '<div class="bval">' + money(r.v.tot) + '<span class="bjobs"> · ' + r.v.n + "</span></div></div>");
   });
@@ -1228,6 +1257,7 @@ function renderEditor() {
   h.push(intakeCardHTML());
   h.push(dirCardHTML());
   h.push(boardCardHTML());
+  h.push(viewPassCardHTML());
   h.push('<p><button class="btn primary" id="btnAddJob" type="button">+ Add job</button></p>');
   state.jobs.forEach(function (j, ji) {
     var c = jobCalc(j);
@@ -1276,6 +1306,7 @@ function renderEditor() {
   });
   document.getElementById("editor").innerHTML = h.join("");
   aiCheckKey();
+  viewPassCheck();
 }
 
 /* ---------- AI narrative (Claude Haiku via the editor's own browser) ---------- */
@@ -1471,6 +1502,10 @@ document.getElementById("editor").addEventListener("click", function (e) {
     state.ai = null; persist(); renderEditor(); renderReport(); return;
   }
   if (act === "intake-run") { aiIntakeRun(); return; }
+  if (act === "intake-file") { aiIntakeStartFile(); return; }
+  if (act === "intake-commit") { aiIntakeCommit(); return; }
+  if (act === "intake-cancel") { aiIntakeCancel(); return; }
+  if (act === "viewpass-set") { viewPassSet(); return; }
   if (act === "dir-add") {
     dirState.list.push({ name: "", phone: "", email: "", insuranceExp: "", wsibExp: "" });
     dirSave(); renderEditor(); return;
@@ -1641,48 +1676,99 @@ function boardSave() {
 function intakeCardHTML() {
   var h = [];
   h.push('<div class="ecard esettings" id="intakeCard"><div class="ehead"><strong>AI quote intake</strong>' +
-    '<span style="font-size:12.5px;color:var(--ink2)">— paste a contractor’s quote email; Claude fills in the job for you</span></div><div class="ebids">');
+    '<span style="font-size:12.5px;color:var(--ink2)">— paste a quote, or upload the quote PDF / Word file; Claude fills in the job and you confirm before it saves</span></div><div class="ebids">');
   if (!cloud.on) h.push('<p class="edithint" style="margin:4px 0">Available on the live site only.</p>');
   else {
     h.push('<textarea id="aiIntakeText" rows="4" style="width:100%;box-sizing:border-box" ' +
       'placeholder="Paste the quote email or text here — e.g. “Hi, for the lobby ceiling repair our price is $4,850 plus HST, valid 30 days …”"></textarea>');
     h.push('<div style="display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap">' +
-      '<button class="btn primary" data-act="intake-run" type="button">✨ Read quote &amp; add job</button>' +
+      '<button class="btn primary" data-act="intake-run" type="button">✨ Read pasted quote</button>' +
+      '<button class="btn" data-act="intake-file" type="button">📄 Upload quote PDF / Word…</button>' +
       '<span class="savenote" id="intakeStatus"></span></div>');
+    h.push('<div id="intakePreview" style="display:none;margin-top:12px"></div>');
   }
   h.push("</div></div>");
   return h.join("");
 }
 function intakeStatus(t) { var el = document.getElementById("intakeStatus"); if (el) el.textContent = t; }
+var intakePending = null;
+function aiIntakeErr(e) {
+  var code = (e && e.code) || "";
+  intakeStatus(code === "functions/failed-precondition" ? "⚠ " + e.message : "⚠ " + ((e && e.message) || "could not read the quote"));
+}
+/* paste path → parse → confirmation preview (nothing saved yet) */
 function aiIntakeRun() {
   var ta = document.getElementById("aiIntakeText");
   var text = (ta && ta.value || "").trim();
-  if (!text) { intakeStatus("Paste a quote first."); return; }
+  if (!text) { intakeStatus("Paste a quote, or use Upload for a PDF / Word file."); return; }
   if (!cloud.fns || !cloud.user) { intakeStatus("Sign in first."); return; }
   intakeStatus("Claude is reading the quote…");
   cloud.fns.httpsCallable("nnsccTrackerAi")({ parse: true, text: text })
-    .then(function (res) {
-      var d = res.data || {};
-      var nj = { id: genId(), no: 0, priority: !!d.high_priority,
-        desc: d.job_description || "New job (from AI intake)",
-        status: "quoted",
-        bids: [{ contractor: d.contractor || "", qno: d.quote_number || "",
-          amount: (d.amount_cad != null && d.amount_cad !== "") ? +d.amount_cad : null,
-          hst: !!d.hst_included, notes: d.scope_notes || "",
-          qdate: d.quote_date || todayISO(), files: [] }] };
-      state.jobs.push(nj);
-      orderJobs(state.jobs);
-      persist(null, ['AI intake added job “' + nj.desc + '” from a pasted quote']);
-      if (ta) ta.value = "";
-      renderEditor(); renderReport();
-      var added = document.querySelector('#editor .ecard[data-jid="' + nj.id + '"]');
-      if (added) added.scrollIntoView({ block: "center" });
-      intakeStatus("Added as job " + nj.no + " — review the details before the board sees it.");
-    })
-    .catch(function (e) {
-      var code = (e && e.code) || "";
-      intakeStatus(code === "functions/failed-precondition" ? "⚠ " + e.message : "⚠ " + ((e && e.message) || "could not read the quote"));
-    });
+    .then(function (res) { aiIntakeShowPreview(res.data || {}); })
+    .catch(aiIntakeErr);
+}
+/* file path → open the picker; the #aiIntakeFile handler reads + parses it */
+function aiIntakeStartFile() {
+  if (!isEditor()) return;
+  if (!cloud.fns || !cloud.user) { intakeStatus("Sign in first."); return; }
+  var el = document.getElementById("aiIntakeFile"); if (el) el.click();
+}
+/* editable confirmation card — nothing is written to Firestore until “Add this job” */
+function aiIntakeShowPreview(d) {
+  intakePending = d || {};
+  var box = document.getElementById("intakePreview");
+  if (!box) return;
+  function v(x) { return esc(x == null ? "" : String(x)); }
+  var amt = (d.amount_cad != null && d.amount_cad !== "") ? d.amount_cad : "";
+  var fs = "font-size:12px;color:var(--ink2)";
+  var inp = "width:100%;box-sizing:border-box;margin-top:2px";
+  box.innerHTML =
+    '<div style="border:1px solid var(--line);border-radius:8px;padding:12px 14px;background:var(--panel,#f7f9fc)">' +
+    '<div style="font-weight:600;margin-bottom:8px">Review before saving — edit anything that’s off, then confirm.</div>' +
+    '<label style="' + fs + '">Job description<input id="ipDesc" style="' + inp + '" value="' + v(d.job_description) + '"></label>' +
+    '<label style="' + fs + ';display:inline-flex;align-items:center;gap:6px;margin:8px 0"><input type="checkbox" id="ipPri"' + (d.high_priority ? " checked" : "") + "> High priority</label>" +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">' +
+      '<label style="' + fs + '">Contractor<input id="ipContractor" style="' + inp + '" value="' + v(d.contractor) + '"></label>' +
+      '<label style="' + fs + '">Quote #<input id="ipQno" style="' + inp + '" value="' + v(d.quote_number) + '"></label>' +
+      '<label style="' + fs + '">Amount (CAD)<input id="ipAmount" type="number" step="0.01" style="' + inp + '" value="' + v(amt) + '"></label>' +
+      '<label style="' + fs + '">Quote date<input id="ipQdate" type="date" style="' + inp + '" value="' + v(d.quote_date || todayISO()) + '"></label>' +
+    "</div>" +
+    '<label style="' + fs + ';display:inline-flex;align-items:center;gap:6px;margin:8px 0"><input type="checkbox" id="ipHst"' + (d.hst_included ? " checked" : "") + "> HST already included in the amount</label>" +
+    '<label style="' + fs + '">Notes<textarea id="ipNotes" rows="2" style="' + inp + '">' + v(d.scope_notes) + "</textarea></label>" +
+    '<div style="display:flex;gap:8px;margin-top:10px">' +
+      '<button class="btn primary" data-act="intake-commit" type="button">✓ Add this job</button>' +
+      '<button class="btn" data-act="intake-cancel" type="button">Cancel</button>' +
+    "</div></div>";
+  box.style.display = "";
+  intakeStatus("Claude filled these in — review and confirm.");
+  box.scrollIntoView({ block: "nearest" });
+}
+function aiIntakeCancel() {
+  intakePending = null;
+  var box = document.getElementById("intakePreview");
+  if (box) { box.innerHTML = ""; box.style.display = "none"; }
+  intakeStatus("");
+}
+function aiIntakeCommit() {
+  if (!isEditor()) return;
+  function gv(id) { var el = document.getElementById(id); return el ? el.value : ""; }
+  function gc(id) { var el = document.getElementById(id); return !!(el && el.checked); }
+  var amtRaw = gv("ipAmount").trim();
+  var nj = { id: genId(), no: 0, priority: gc("ipPri"),
+    desc: gv("ipDesc").trim() || "New job (from AI intake)", status: "quoted",
+    bids: [{ contractor: gv("ipContractor").trim(), qno: gv("ipQno").trim(),
+      amount: amtRaw === "" ? null : +amtRaw,
+      hst: gc("ipHst"), notes: gv("ipNotes").trim(),
+      qdate: gv("ipQdate") || todayISO(), files: [] }] };
+  state.jobs.push(nj);
+  orderJobs(state.jobs);
+  persist(null, ['AI intake added job “' + nj.desc + '” (confirmed by editor)']);
+  var ta = document.getElementById("aiIntakeText"); if (ta) ta.value = "";
+  aiIntakeCancel();
+  renderEditor(); renderReport();
+  var added = document.querySelector('#editor .ecard[data-jid="' + nj.id + '"]');
+  if (added) added.scrollIntoView({ block: "center" });
+  intakeStatus("Added as job " + nj.no + " — the full details are in the list below.");
 }
 
 /* ---------- quote attachments (beta, Firebase Storage) ---------- */
@@ -1710,6 +1796,28 @@ document.getElementById("fileAttach").addEventListener("change", function () {
       renderEditor(); renderReport();
     })
     .catch(function (e) { alert("Upload failed (" + ((e && e.code) || "error") + ")."); });
+});
+/* AI intake: read an uploaded PDF/Word quote → Claude → confirmation preview */
+document.getElementById("aiIntakeFile").addEventListener("change", function () {
+  var f = this.files[0]; this.value = "";
+  if (!f) return;
+  var name = (f.name || "").toLowerCase();
+  var isPdf = f.type === "application/pdf" || /\.pdf$/.test(name);
+  var isDocx = /\.docx$/.test(name) || f.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+  if (!isPdf && !isDocx) { intakeStatus("Choose a PDF or a Word .docx file (old .doc isn’t supported — save it as a PDF)."); return; }
+  if (f.size > 8 * 1024 * 1024) { intakeStatus("That file is over 8 MB — attach a smaller copy or paste the text instead."); return; }
+  intakeStatus("Sending “" + f.name + "” to Claude…");
+  var reader = new FileReader();
+  reader.onload = function () {
+    var b64 = String(reader.result || "").split(",")[1] || "";
+    if (!b64) { intakeStatus("Could not read that file."); return; }
+    cloud.fns.httpsCallable("nnsccTrackerAi")({ parseFile: true, fileB64: b64,
+      mediaType: isPdf ? "application/pdf" : "docx", fileName: f.name })
+      .then(function (res) { aiIntakeShowPreview(res.data || {}); })
+      .catch(aiIntakeErr);
+  };
+  reader.onerror = function () { intakeStatus("Could not read that file."); };
+  reader.readAsDataURL(f);
 });
 
 /* ---------- cross-period dashboard (beta) ---------- */
@@ -1760,6 +1868,137 @@ function openDashboard() {
 document.getElementById("btnDash").onclick = openDashboard;
 document.getElementById("dashClose").onclick = function () { document.getElementById("dashOverlay").classList.remove("open"); };
 document.getElementById("dashOverlay").addEventListener("click", function (e) { if (e.target === this) this.classList.remove("open"); });
+
+/* Section D: click a contractor bar → popup listing all their quotes (read-only) */
+function openContractorOverlay(name) {
+  var key = String(name || "").trim().toLowerCase();
+  if (!key) return;
+  var rows = [];
+  state.jobs.forEach(function (j) {
+    jobCalc(j).bids.forEach(function (x) {
+      if (String(x.b.contractor || "").trim().toLowerCase() === key) rows.push({ j: j, x: x });
+    });
+  });
+  rows.sort(function (a, b) { return (b.x.carried ? 1 : 0) - (a.x.carried ? 1 : 0) || (a.j.no - b.j.no); });
+  var wonTot = 0, won = 0;
+  rows.forEach(function (r) { if (r.x.carried) { wonTot += r.x.total; won++; } });
+  var t = document.getElementById("contractorTitle");
+  if (t) t.textContent = String(name).trim() + " — quotes";
+  var h = [];
+  h.push('<p class="histempty" style="margin:0 0 4px">' + rows.length + " quote" + (rows.length === 1 ? "" : "s") +
+    " on record · " + won + " carried (lowest) · " + money(wonTot) + " counted toward committed spend (incl. HST).</p>");
+  h.push('<p class="histempty" style="margin:0 0 10px;font-size:11.5px;color:var(--muted)">“Carried” = the lowest quote for that job, used in the report totals. It does <em>not</em> mean the board has voted or that the work has been awarded.</p>');
+  if (!rows.length) h.push('<p class="histempty">No quotes found for this contractor.</p>');
+  else {
+    h.push('<table class="dashtable"><thead><tr><th>Job</th><th>Quote #</th><th class="money">Amount (incl. HST)</th><th>In totals</th></tr></thead><tbody>');
+    rows.forEach(function (r) {
+      var amt = r.x.total != null ? money(r.x.total) : (String(r.x.b.contractor || "").trim() ? "pending" : "—");
+      var tag = r.x.carried ? '<span style="color:#16273f;font-weight:600">carried (lowest)</span>' :
+        (r.x.total != null ? '<span style="color:var(--muted)">higher bid</span>' : (r.x.pending ? "awaiting quote" : "—"));
+      var notes = r.x.b.notes ? '<div style="font-size:11.5px;color:var(--muted)">' + esc(r.x.b.notes) + "</div>" : "";
+      var files = (Array.isArray(r.x.b.files) && r.x.b.files.length) ?
+        ' <span style="font-size:11px;color:var(--muted)">📎 ' + r.x.b.files.length + "</span>" : "";
+      h.push("<tr><td><strong>" + esc(r.j.no) + "</strong> · " + esc(r.j.desc || "job") + notes + "</td>" +
+        "<td>" + esc(r.x.b.qno || "—") + "</td>" +
+        '<td class="money">' + amt + files + "</td>" +
+        "<td>" + tag + "</td></tr>");
+    });
+    h.push("</tbody></table>");
+  }
+  document.getElementById("contractorBody").innerHTML = h.join("");
+  document.getElementById("contractorOverlay").classList.add("open");
+}
+document.getElementById("contractorClose").onclick = function () { document.getElementById("contractorOverlay").classList.remove("open"); };
+document.getElementById("contractorOverlay").addEventListener("click", function (e) { if (e.target === this) this.classList.remove("open"); });
+document.addEventListener("click", function (e) {
+  var row = e.target && e.target.closest ? e.target.closest(".browlink") : null;
+  if (row && row.dataset && row.dataset.cn) openContractorOverlay(row.dataset.cn);
+});
+document.addEventListener("keydown", function (e) {
+  if (e.key !== "Enter" && e.key !== " ") return;
+  var row = e.target && e.target.closest ? e.target.closest(".browlink") : null;
+  if (row && row.dataset && row.dataset.cn) { e.preventDefault(); openContractorOverlay(row.dataset.cn); }
+});
+
+/* ---------- shared-passcode view gate (non-editors) ---------- */
+function viewGateMsg(t) { var el = document.getElementById("viewGateMsg"); if (el) el.textContent = t || ""; }
+function showViewGate() {
+  var ov = document.getElementById("viewGateOverlay"); if (!ov) return;
+  /* blank any locally-cached copy so no stale data shows behind the gate */
+  try { state = normState({ jobs: [], meta: (state && state.meta) || null }); renderReport(); } catch (e) {}
+  ov.classList.add("open");
+  var saved = null; try { saved = sessionStorage.getItem("nnsccView"); } catch (e) {}
+  if (saved) submitViewGate(saved, true);
+  var inp = document.getElementById("viewGateInput"); if (inp) inp.focus();
+}
+function submitViewGate(pass, silent) {
+  pass = String(pass || "").trim();
+  if (!pass) { viewGateMsg("Enter the passcode."); return; }
+  if (!cloud.fns) { viewGateMsg("Offline — cannot verify the passcode."); return; }
+  if (!silent) viewGateMsg("Checking…");
+  cloud.fns.httpsCallable("nnsccGate")({ view: true, passcode: pass, beta: VIEW_BETA })
+    .then(function (res) {
+      var r = res.data && res.data.report;
+      if (!r) { viewGateMsg("Could not load the report."); return; }
+      state = normState({ jobs: r.jobs, meta: r.meta, ai: r.ai, reportName: r.reportName });
+      lastSaved = deepCopy(state);
+      try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) {}
+      try { sessionStorage.setItem("nnsccView", pass); } catch (e) {}
+      document.getElementById("viewGateOverlay").classList.remove("open");
+      renderReport();
+      cloudStatusMsg("● Viewing with passcode — data as of now; refresh to update.");
+    })
+    .catch(function (e) {
+      try { sessionStorage.removeItem("nnsccView"); } catch (_) {}
+      var code = (e && e.code) || "";
+      if (silent && code === "functions/permission-denied") { viewGateMsg(""); return; }
+      viewGateMsg(code === "functions/resource-exhausted" ? "Too many tries — wait a minute." :
+        code === "functions/failed-precondition" ? ((e && e.message) || "Viewing isn’t protected yet.") :
+        ((e && e.message) || "That passcode isn’t right."));
+    });
+}
+document.getElementById("viewGateBtn").onclick = function () { submitViewGate(document.getElementById("viewGateInput").value, false); };
+document.getElementById("viewGateInput").addEventListener("keydown", function (e) { if (e.key === "Enter") submitViewGate(this.value, false); });
+document.getElementById("viewGateSignin").onclick = function () { cloudSignIn(function () {}); };
+
+/* editor control: set / change the shared view passcode */
+function viewPassCardHTML() {
+  var h = [];
+  h.push('<div class="ecard esettings" id="viewPassCard"><div class="ehead"><strong>View passcode</strong>' +
+    '<span style="font-size:12.5px;color:var(--ink2)">— require a shared passcode before anyone (except you &amp; board members) can view the report</span></div><div class="ebids">');
+  if (!cloud.on) h.push('<p class="edithint" style="margin:4px 0">Available on the live site only.</p>');
+  else {
+    h.push('<p class="edithint" style="margin:0 0 8px" id="viewPassState">Checking…</p>');
+    h.push('<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">' +
+      '<input id="viewPassInput" type="text" autocomplete="off" placeholder="Set / change passcode (min 6 characters)" style="flex:1;min-width:200px;box-sizing:border-box">' +
+      '<button class="btn primary" data-act="viewpass-set" type="button">Save passcode</button>' +
+      '<span class="savenote" id="viewPassMsg"></span></div>');
+    h.push('<p class="edithint" style="margin:8px 0 0;font-size:12px">You (editors) and board members always view without a passcode. Everyone else must enter it. It’s stored encrypted (scrypt) and never shown again — share it with whoever should see the report.</p>');
+  }
+  h.push("</div></div>");
+  return h.join("");
+}
+function viewPassCheck() {
+  if (!cloud.fns || !cloud.user) return;
+  cloud.fns.httpsCallable("nnsccGate")({ check: true, beta: VIEW_BETA }).then(function (res) {
+    var el = document.getElementById("viewPassState");
+    if (el) el.textContent = (res.data && res.data.set)
+      ? "🔒 A passcode is set — non-editors must enter it to view."
+      : "🔓 No passcode set — non-editors currently cannot view (set one below to let them in).";
+  }).catch(function () {});
+}
+function viewPassSet() {
+  var inp = document.getElementById("viewPassInput");
+  var v = (inp && inp.value || "").trim();
+  var msg = document.getElementById("viewPassMsg");
+  if (v.length < 6) { if (msg) msg.textContent = "Use at least 6 characters."; return; }
+  if (msg) msg.textContent = "Saving…";
+  cloud.fns.httpsCallable("nnsccGate")({ set: true, passcode: v, beta: VIEW_BETA }).then(function () {
+    if (inp) inp.value = "";
+    if (msg) msg.textContent = "Saved — share it with your viewers.";
+    viewPassCheck();
+  }).catch(function (e) { if (msg) msg.textContent = "⚠ " + ((e && e.message) || "could not save"); });
+}
 
 /* ---------- AI board memo (beta) ---------- */
 function openMemo() {
@@ -1829,6 +2068,15 @@ function sha256Hex(str) {
       return ("0" + b.toString(16)).slice(-2);
     }).join("");
   });
+}
+/* RFC 3161 trusted timestamp of a hash, via the nnsccStamp function. Best-effort:
+   resolves to null (never rejects) if the authority is unreachable, so the vote
+   still closes. Returns { ok, tsa, genTime, token } on success. */
+function stampHash(hash) {
+  if (!cloud.fns) return Promise.resolve(null);
+  return cloud.fns.httpsCallable("nnsccStamp")({ hash: hash }).then(function (res) {
+    return res && res.data && res.data.ok ? res.data : null;
+  }).catch(function () { return null; });
 }
 /* canonical snapshot of the job as it stands — this exact string is hashed so
    nobody can claim the numbers changed after the board voted */
@@ -1925,17 +2173,23 @@ function closeVote(voteId, v, ballots) {
       quorumOf(v) + " needed)") + "\n\nOnce closed, board members sign the resolution; ballots can no longer be changed.")) return;
   var resText = resolutionTextOf(v, t);
   sha256Hex(resText).then(function (resHash) {
-    return cloud.db.collection(VOTES_COLL).doc(voteId).set({
-      status: "closed", result: result, quorumMet: quorumMet,
-      tally: { a: t.a, r: t.r, ab: t.ab, cast: t.cast },
-      resText: resText, resHash: resHash,
-      closedBy: cloud.user.email,
-      closedAt: firebase.firestore.FieldValue.serverTimestamp()
-    }, { merge: true }).then(function () {
-      decLog("Vote CLOSED on Job " + v.jobNo + " (“" + v.jobDesc + "”): " + result.toUpperCase() +
-        " — " + t.a + " approve / " + t.r + " reject / " + t.ab + " abstain" +
-        (quorumMet ? "" : " (quorum not met)") + " — resolution hash " + resHash.slice(0, 12), voteId, resHash);
-      loadVotesList();
+    return stampHash(resHash).then(function (ts) {
+      return cloud.db.collection(VOTES_COLL).doc(voteId).set({
+        status: "closed", result: result, quorumMet: quorumMet,
+        tally: { a: t.a, r: t.r, ab: t.ab, cast: t.cast },
+        resText: resText, resHash: resHash,
+        tsToken: ts ? ts.token : null,
+        tsTime: ts ? ts.genTime : null,
+        tsAuthority: ts ? ts.tsa : null,
+        closedBy: cloud.user.email,
+        closedAt: firebase.firestore.FieldValue.serverTimestamp()
+      }, { merge: true }).then(function () {
+        decLog("Vote CLOSED on Job " + v.jobNo + " (“" + v.jobDesc + "”): " + result.toUpperCase() +
+          " — " + t.a + " approve / " + t.r + " reject / " + t.ab + " abstain" +
+          (quorumMet ? "" : " (quorum not met)") + " — resolution hash " + resHash.slice(0, 12) +
+          (ts && ts.genTime ? " — timestamped " + ts.genTime + " (" + ts.tsa + ")" : ""), voteId, resHash);
+        loadVotesList();
+      });
     });
   }).catch(function (e) { alert("Could not close the vote (" + ((e && e.code) || "error") + ")."); });
 }
@@ -2215,6 +2469,7 @@ function printResolution(r) {
     ".vbox{margin-top:22px;border:1px solid #cdd5df;border-radius:7px;padding:12px 15px;background:#fafbfc}" +
     ".vbox h4{margin:0 0 6px;font-size:10pt;letter-spacing:.8px;text-transform:uppercase;color:#16273f}" +
     ".vbox p{margin:5px 0;font-size:9.5pt;color:#48505c}.hash{font:9pt/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;color:#1b2430;word-break:break-all;background:#eef1f5;padding:2px 6px;border-radius:4px}" +
+    ".tsnote{font-size:8.5pt;color:#7a838f;font-style:italic;margin-top:2px}.vbox code{font:8.5pt ui-monospace,Menlo,monospace;background:#eef1f5;padding:1px 4px;border-radius:3px}" +
     ".foot{margin-top:20px;border-top:1px solid #cdd5df;padding-top:8px;font-size:9pt;color:#7a838f;display:flex;justify-content:space-between}" +
     "@media print{.noprint{display:none}body{margin:0}}";
   var h = ['<!doctype html><html><head><meta charset="utf-8"><title>Resolution ' + esc(resolutionNumber(v)) + " — " + esc(M.condoName) + "</title><style>" + css + "</style></head><body>"];
@@ -2273,6 +2528,10 @@ function printResolution(r) {
     "<p>This resolution forms part of a tamper-evident decision log. The fingerprints below bind it to the quoted amounts as they stood when the vote opened and to the exact resolution text approved at close. Any later alteration of the figures or text changes these fingerprints.</p>" +
     '<p>Quoted data at vote time (SHA-256):<br><span class="hash">' + esc(v.snapshotHash || "—") + "</span></p>" +
     '<p>Resolution text (SHA-256):<br><span class="hash">' + esc(v.resHash || "—") + "</span></p>" +
+    (v.tsTime
+      ? '<p>Trusted timestamp (RFC 3161):<br><span class="hash">' + esc(v.tsTime) + "  ·  " + esc(v.tsAuthority || "TSA") + "</span></p>" +
+        '<p class="tsnote">A neutral Time-Stamping Authority has cryptographically attested that the resolution-text fingerprint existed at the stated UTC time. The signed timestamp token is stored with this vote and can be independently verified (e.g. <code>openssl ts&nbsp;-verify</code>) without trusting this system.</p>'
+      : "") +
     "<p>Vote administered by " + esc(v.openedBy || "—") + (v.closedBy ? "; closed by " + esc(v.closedBy) : "") + ".</p></div>");
 
   h.push('<div class="foot"><span>' + esc(M.condoName) + " · Resolution No. " + esc(resolutionNumber(v)) + "</span><span>Generated " + esc(fmtLongDate(new Date())) + "</span></div>");
