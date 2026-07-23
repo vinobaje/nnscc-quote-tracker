@@ -441,7 +441,7 @@ input:focus, select:focus { outline:2px solid var(--accent); outline-offset:-1px
       <div class="rephead">Saved reports</div>
       <div id="repList" class="histlist"><p class="histempty">Loading…</p></div>
     </div>
-    <p id="repViewerNote" class="histempty" style="display:none">Sign in as an authorized editor to save periods and open past reports.</p>
+    <p id="repViewerNote" class="histempty" style="display:none">Sign in as an authorized property manager to save periods and open past reports.</p>
     <div class="row"><button class="btn ghost" id="repClose" type="button">Close</button></div>
   </div>
 </div>
@@ -465,7 +465,7 @@ input:focus, select:focus { outline:2px solid var(--accent); outline-offset:-1px
 <div class="overlay" id="viewGateOverlay" role="dialog" aria-modal="true" aria-label="Enter passcode">
   <div class="pinbox" style="max-width:400px">
     <h3>Protected report</h3>
-    <p class="histempty" style="margin:2px 0 10px">This report is passcode-protected. Enter the passcode to view it, or sign in if you’re a board member or editor.</p>
+    <p class="histempty" style="margin:2px 0 10px">This report is passcode-protected. Enter the passcode to view it, or sign in if you’re a board member or the property manager.</p>
     <input id="viewGateInput" type="password" autocomplete="off" placeholder="Passcode" style="width:100%;box-sizing:border-box;font-size:16px;padding:9px">
     <p id="viewGateMsg" class="savenote" style="min-height:16px;margin:6px 0"></p>
     <div class="row"><button class="btn primary" id="viewGateBtn" type="button">Unlock</button>
@@ -822,7 +822,7 @@ function backToCurrent() {
 }
 /* open a past (archived) report — editors only */
 function openArchived(id, name) {
-  if (!isEditor()) { alert("Sign in as an authorized editor to open past reports."); return; }
+  if (!isEditor()) { alert("Sign in as an authorized property manager to open past reports."); return; }
   cloud.active = { kind: "archived", id: id, name: name || "" };
   subscribeActive();
   setView("report");
@@ -849,7 +849,7 @@ function cloudPush(changes) {
   }).catch(function (e) {
     var code = e && e.code || "";
     if (code === "permission-denied") {
-      /* the server is the source of truth: this account is NOT an authorized editor —
+      /* the server is the source of truth: this account is NOT an authorized property manager —
          lock the edit UI back down so it can't keep making changes that won't save */
       cloud.denied = true;
       cloudStatusMsg("⚠ This Google account isn’t authorized to edit — editing has been turned off");
@@ -1037,7 +1037,7 @@ function renderReport() {
       (votesCache.open > 1 ? "s are" : " is") + ' open — your review is requested. ' +
       '<button class="btn small" id="voteBannerBtn" type="button">Review &amp; vote</button></div>');
   if (EDITOR)
-    h.push('<div class="edithint-inline">✎ You’re signed in as an editor — click almost anything to edit it right here (look for the dashed underline on hover): headings, descriptions, job names, contractor names, scope notes, and dollar amounts. Amounts you type are treated as the <strong>HST-included total</strong>; type an amount over “Enter amount” to turn a pending bid into a quote. Totals, the lowest-bid flag, and the charts recalculate automatically. Use the <strong>Edit</strong> tab to add or remove jobs and bids or toggle priority.</div>');
+    h.push('<div class="edithint-inline">✎ You’re signed in as the property manager — click almost anything to edit it right here (look for the dashed underline on hover): headings, descriptions, job names, contractor names, scope notes, and dollar amounts. Amounts you type are treated as the <strong>HST-included total</strong>; type an amount over “Enter amount” to turn a pending bid into a quote. Totals, the lowest-bid flag, and the charts recalculate automatically. Use the <strong>Edit</strong> tab to add or remove jobs and bids or toggle priority.</div>');
 
   h.push('<section id="secSum"><h2' + hA("headSum") + ">" + esc(M.headSum) + "</h2>");
   if (state.ai && state.ai.summary)
@@ -1190,7 +1190,7 @@ function renderReport() {
     ") · Property manager: " + esc(M.manager) + ".</p>" +
     (state.ai && state.ai.summary
       ? "<p>Narrative text drafted with AI (Claude) on " +
-        esc((state.ai.generatedAt || "").slice(0, 10)) + " and reviewed by the editor.</p>" : "") +
+        esc((state.ai.generatedAt || "").slice(0, 10)) + " and reviewed by the property manager.</p>" : "") +
     '<p id="lastUpd"></p></div>');
 
   document.getElementById("report").innerHTML = h.join("");
@@ -1334,7 +1334,7 @@ function aiCardHTML() {
     var keyRow = '<div style="display:flex;gap:8px;margin-top:6px">' +
       '<input type="password" id="aiKeyInput" placeholder="paste the key here (owner only)" style="flex:1" autocomplete="off">' +
       '<button class="btn" data-act="ai-savekey" type="button">Save key</button></div>' +
-      '<div class="savenote" style="margin-top:4px">Stored server-side in Firebase. No browser — not even an editor’s — can read it back; only the AI Cloud Function uses it.</div>';
+      '<div class="savenote" style="margin-top:4px">Stored server-side in Firebase. No browser — not even the property manager’s — can read it back; only the AI Cloud Function uses it.</div>';
     h.push('<div class="esrow"><label>API key</label><div style="flex:1">');
     if (aiKeyState === "set") {
       h.push('<div class="savenote" style="color:var(--good);font-weight:600">✓ A key is saved server-side — nothing to do here.' +
@@ -1403,7 +1403,7 @@ function aiGenerate() {
     .catch(function (e) {
       var code = (e && e.code) || "";
       if (code === "functions/failed-precondition") aiStatus("⚠ " + e.message);
-      else if (code === "functions/permission-denied") aiStatus("⚠ This account is not an editor.");
+      else if (code === "functions/permission-denied") aiStatus("⚠ This account is not the property manager.");
       else if (code === "functions/unauthenticated") aiStatus("Sign in first, then try again.");
       else aiStatus("⚠ " + ((e && e.message) || "generation failed"));
     });
@@ -1822,7 +1822,7 @@ document.getElementById("aiIntakeFile").addEventListener("change", function () {
 
 /* ---------- cross-period dashboard (beta) ---------- */
 function openDashboard() {
-  if (!isEditor()) { alert("Sign in as an authorized editor to see the dashboard (it includes past reports)."); return; }
+  if (!isEditor()) { alert("Sign in as an authorized property manager to see the dashboard (it includes past reports)."); return; }
   document.getElementById("dashOverlay").classList.add("open");
   var body = document.getElementById("dashBody");
   body.innerHTML = '<p class="histempty">Adding up all report periods…</p>';
@@ -1982,7 +1982,7 @@ function viewPassCardHTML() {
       '<input id="viewPassInput" type="text" autocomplete="off" placeholder="Set / change passcode (min 6 characters)" style="flex:1;min-width:200px;box-sizing:border-box">' +
       '<button class="btn primary" data-act="viewpass-set" type="button">Save passcode</button>' +
       '<span class="savenote" id="viewPassMsg"></span></div>');
-    h.push('<p class="edithint" style="margin:8px 0 0;font-size:12px">You (editors) and board members always view without a passcode. Everyone else must enter it. It’s stored encrypted (scrypt) and never shown again — share it with whoever should see the report.</p>');
+    h.push('<p class="edithint" style="margin:8px 0 0;font-size:12px">You (the property manager) and board members always view without a passcode. Everyone else must enter it. It’s stored encrypted (scrypt) and never shown again — share it with whoever should see the report.</p>');
   }
   h.push("</div></div>");
   return h.join("");
@@ -1992,8 +1992,8 @@ function viewPassCheck() {
   cloud.fns.httpsCallable("nnsccGate")({ check: true, beta: VIEW_BETA }).then(function (res) {
     var el = document.getElementById("viewPassState");
     if (el) el.textContent = (res.data && res.data.set)
-      ? "🔒 A passcode is set — non-editors must enter it to view."
-      : "🔓 No passcode set — non-editors currently cannot view (set one below to let them in).";
+      ? "🔒 A passcode is set — everyone else must enter it to view."
+      : "🔓 No passcode set — other viewers currently cannot view (set one below to let them in).";
   }).catch(function () {});
 }
 function viewPassSet() {
@@ -2011,7 +2011,7 @@ function viewPassSet() {
 
 /* ---------- AI board memo (beta) ---------- */
 function openMemo() {
-  if (!isEditor()) { alert("Sign in as an authorized editor first."); return; }
+  if (!isEditor()) { alert("Sign in as an authorized property manager first."); return; }
   document.getElementById("memoOverlay").classList.add("open");
   var st = document.getElementById("memoStatus"), ta = document.getElementById("memoText");
   st.textContent = "Claude is drafting the memo…"; ta.value = "";
@@ -2216,7 +2216,7 @@ function deleteVote(voteId, v) {
 }
 /* ---- votes overlay ---- */
 function openVotesOverlay() {
-  if (!canVoteView()) { alert("Sign in with a board-member or editor account to see board votes."); return; }
+  if (!canVoteView()) { alert("Sign in with a board-member or property-manager account to see board votes."); return; }
   document.getElementById("votesOverlay").classList.add("open");
   var st = document.getElementById("voteStart");
   if (isEditor() && cloud.active.kind === "current") {
@@ -2551,7 +2551,7 @@ function printResolution(r) {
 }
 /* ---- decision log ---- */
 function openDecLog() {
-  if (!canVoteView()) { alert("Sign in with a board-member or editor account first."); return; }
+  if (!canVoteView()) { alert("Sign in with a board-member or property-manager account first."); return; }
   document.getElementById("decLogOverlay").classList.add("open");
   var el = document.getElementById("decLogList");
   el.innerHTML = '<p class="histempty">Loading…</p>';
@@ -2584,13 +2584,13 @@ function setView(v) {
 document.getElementById("btnViewReport").onclick = function () { setView("report"); };
 var pendingEdit = false;   /* set when "Edit data" is clicked before sign-in completes */
 function notAuthorizedNotice(email) {
-  alert("The account " + email + " is signed in but is not on the authorized-editor list, " +
+  alert("The account " + email + " is signed in but is not on the authorized property-manager list, " +
         "so it can view the report but cannot edit it.\n\n" +
         "To be added, contact the condo super (mvinobaje@gmail.com).");
 }
 document.getElementById("btnViewEdit").onclick = function () {
   if (!cloud.on) { cloudStatusMsg("Editing is only available on the live site (needs Google sign-in)."); return; }
-  if (isEditor()) { setView("edit"); return; }              /* already an authorized editor */
+  if (isEditor()) { setView("edit"); return; }              /* already an authorized property manager */
   if (cloud.user) { notAuthorizedNotice(cloud.user.email); return; }   /* signed in, not allowed */
   pendingEdit = true;                                        /* not signed in → sign in, then onAuthStateChanged continues */
   cloudSignIn(function () {});
@@ -2698,7 +2698,7 @@ function loadReportsList() {
 }
 /* Promote a saved report to be the live/current one, swapping the present current into the library. */
 function makeCurrentReport(id, name) {
-  if (!isEditor()) { alert("Sign in as an authorized editor first."); return; }
+  if (!isEditor()) { alert("Sign in as an authorized property manager first."); return; }
   if (!confirm('Make “' + name + '” the current report?\n\nThe report that is live right now will be moved into the library (you can delete it after if you don’t want it).')) return;
   cloudStatusMsg("Switching the current report…");
   var archRef = cloud.db.doc(REPORTS_COLL + "/" + id);
@@ -2740,7 +2740,7 @@ function makeCurrentReport(id, name) {
 }
 /* Permanently delete a saved report from the library. */
 function deleteArchivedReport(id, name) {
-  if (!isEditor()) { alert("Sign in as an authorized editor first."); return; }
+  if (!isEditor()) { alert("Sign in as an authorized property manager first."); return; }
   if (!confirm('Delete the saved report “' + name + '”?\n\nThis permanently removes it from the library and cannot be undone. (Your current report is not affected.)')) return;
   cloud.db.doc(REPORTS_COLL + "/" + id).delete().then(function () {
     if (cloud.active.kind === "archived" && cloud.active.id === id) backToCurrent();
@@ -2763,7 +2763,7 @@ function renameActive() {
   openReportsOverlay();
 }
 function startNewReport(mode) {
-  if (!isEditor()) { alert("Sign in as an authorized editor first."); return; }
+  if (!isEditor()) { alert("Sign in as an authorized property manager first."); return; }
   if (cloud.active.kind !== "current") { alert("Go back to the current report before starting a new one."); return; }
   var name = (document.getElementById("repNewName").value || "").replace(/\s+/g, " ").trim();
   if (!name) { alert("Please name the new report first (e.g. “August 2026”)."); return; }
@@ -2964,7 +2964,7 @@ document.getElementById("btnBackup").onclick = function () {
             JSON.stringify(state, null, 1));
 };
 document.getElementById("btnRestore").onclick = function () {
-  if (!isEditor()) { alert("Sign in with an authorized editor account first (click “Edit data”)."); return; }
+  if (!isEditor()) { alert("Sign in with an authorized property manager account first (click “Edit data”)."); return; }
   document.getElementById("fileRestore").click();
 };
 document.getElementById("fileRestore").addEventListener("change", function () {
@@ -2980,7 +2980,7 @@ document.getElementById("fileRestore").addEventListener("change", function () {
   r.readAsText(f);
 });
 document.getElementById("btnReset").onclick = function () {
-  if (!isEditor()) { alert("Sign in with an authorized editor account first (click “Edit data”)."); return; }
+  if (!isEditor()) { alert("Sign in with an authorized property manager account first (click “Edit data”)."); return; }
   if (!confirm("This permanently discards EVERY change and restores the original data for everyone. Continue?")) return;
   state = normState(null); persist("Reset to original data"); renderReport(); renderEditor();
 };

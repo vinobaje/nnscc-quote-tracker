@@ -78,7 +78,7 @@ exports.nnsccTrackerAi = onCall(
     const cfg = cfgSnap.exists ? cfgSnap.data() : {};
     const editors = (cfg.editors || []).map((e) => String(e).toLowerCase());
     if (email !== OWNER && !editors.includes(email)) {
-      throw new HttpsError("permission-denied", "This account is not an editor.");
+      throw new HttpsError("permission-denied", "This account is not the property manager.");
     }
     // Key-status probe: tells editors whether a key exists, never the key itself.
     if (request.data && request.data.check === true) {
@@ -251,7 +251,7 @@ exports.nnsccStamp = onCall(
     const cfgSnap = await admin.firestore().doc("nnsccQuoteTrackerConfig/main").get();
     const editors = ((cfgSnap.exists ? cfgSnap.data().editors : []) || []).map((e) => String(e).toLowerCase());
     if (email !== OWNER && !editors.includes(email)) {
-      throw new HttpsError("permission-denied", "Only an editor can timestamp a resolution.");
+      throw new HttpsError("permission-denied", "Only the property manager can timestamp a resolution.");
     }
     const hash = String((request.data && request.data.hash) || "").toLowerCase();
     if (!/^[0-9a-f]{64}$/.test(hash)) {
@@ -319,14 +319,14 @@ exports.nnsccGate = onCall(
     if (data.set === true || data.check === true) {
       const auth = request.auth;
       if (!auth || !auth.token || auth.token.email_verified !== true || !auth.token.email) {
-        throw new HttpsError("unauthenticated", "Sign in as an editor.");
+        throw new HttpsError("unauthenticated", "Sign in as the property manager.");
       }
       const email = auth.token.email.toLowerCase();
       const cfgSnap = await cfgRef.get();
       const cfg = cfgSnap.exists ? cfgSnap.data() : {};
       const editors = (cfg.editors || []).map((e) => String(e).toLowerCase());
       if (email !== OWNER && !editors.includes(email)) {
-        throw new HttpsError("permission-denied", "Only an editor can set the view passcode.");
+        throw new HttpsError("permission-denied", "Only the property manager can set the view passcode.");
       }
       if (data.check === true) return { set: !!cfg[f.hash] };
       const pass = String(data.passcode || "");
