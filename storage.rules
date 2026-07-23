@@ -1,6 +1,64 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
+
+    // CondoQuote SaaS — per-building hero photos, isolated per tenant.
+    // Path: saasBuildingPhotos/{orgId}/{buildingId}/<file>. Public read (the
+    // photo is not sensitive; report data is gated separately in Firestore).
+    // Write/delete: the platform operator, an org owner/admin, or this
+    // building's manager/editor. Each firestore.get() is guarded by exists()
+    // so a missing membership/access doc denies cleanly instead of erroring.
+    match /saasBuildingPhotos/{orgId}/{buildingId}/{allPaths=**} {
+      function saasStorageSignedIn() {
+        return request.auth != null
+          && request.auth.token.get('email_verified', false) == true
+          && request.auth.token.email != null;
+      }
+      function saasStorageIsOperator() {
+        return request.auth.token.email.lower() == 'mvinobaje@gmail.com';
+      }
+      function saasStorageIsOrgAdmin() {
+        return firestore.exists(/databases/(default)/documents/saasOrgs/$(orgId)/members/$(request.auth.uid))
+          && firestore.get(/databases/(default)/documents/saasOrgs/$(orgId)/members/$(request.auth.uid)).data.role in ['owner', 'admin'];
+      }
+      function saasStorageIsBldgEditor() {
+        return firestore.exists(/databases/(default)/documents/saasOrgs/$(orgId)/buildings/$(buildingId)/access/$(request.auth.uid))
+          && firestore.get(/databases/(default)/documents/saasOrgs/$(orgId)/buildings/$(buildingId)/access/$(request.auth.uid)).data.role in ['manager', 'editor'];
+      }
+      function saasStorageMayWrite() {
+        return saasStorageSignedIn()
+          && (saasStorageIsOperator() || saasStorageIsOrgAdmin() || saasStorageIsBldgEditor());
+      }
+      allow read: if true;
+      allow create, update: if saasStorageMayWrite()
+        && request.resource.size < 8 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+      allow delete: if saasStorageMayWrite();
+    }
+
+    // CondoQuote SaaS — the property-management company's logo, one per org,
+    // shown on every building's report. Public read (a brand asset on shareable
+    // reports). Write/delete: the platform operator or an org owner/admin only
+    // (building editors set a per-building fallback logo under saasBuildingPhotos).
+    match /saasOrgLogos/{orgId}/{allPaths=**} {
+      function orgLogoSignedIn() {
+        return request.auth != null
+          && request.auth.token.get('email_verified', false) == true
+          && request.auth.token.email != null;
+      }
+      function orgLogoMayWrite() {
+        return orgLogoSignedIn()
+          && ( request.auth.token.email.lower() == 'mvinobaje@gmail.com'
+            || ( firestore.exists(/databases/(default)/documents/saasOrgs/$(orgId)/members/$(request.auth.uid))
+                 && firestore.get(/databases/(default)/documents/saasOrgs/$(orgId)/members/$(request.auth.uid)).data.role in ['owner', 'admin'] ) );
+      }
+      allow read: if true;
+      allow create, update: if orgLogoMayWrite()
+        && request.resource.size < 4 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+      allow delete: if orgLogoMayWrite();
+    }
+
     match /quoteAttachments/{allPaths=**} {
       allow read: if true;
       allow create, update: if request.auth != null

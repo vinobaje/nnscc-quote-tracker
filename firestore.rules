@@ -193,6 +193,17 @@ service cloud.firestore {
                     && request.resource.data.get('stripeSubId', '') == resource.data.get('stripeSubId', '');
       allow delete: if saasMember(orgId) && saasRole(orgId) == 'owner';
 
+      // Org-level public branding (the property-management company's logo shown
+      // on every building's report). Read is PUBLIC by design: building-scoped
+      // staff who are not org members must still render the org logo on their
+      // building's report, and the logo is a public brand asset (reports are
+      // shareable). Store ONLY non-sensitive branding here — never tenant data.
+      // Writable by org owner/admin (and the operator, via the override above).
+      match /config/{docId} {
+        allow read:  if true;
+        allow write: if saasIsAdmin(orgId);
+      }
+
       match /members/{uid} {
         // Members of an org can see the roster; nobody outside can.
         allow read: if saasMember(orgId)
@@ -260,6 +271,17 @@ service cloud.firestore {
         }
 
         match /reports/{reportId} {
+          allow read:   if saasMember(orgId) || saasBldgAccess(orgId, buildingId);
+          allow create, update, delete: if saasIsAdmin(orgId) || saasBldgEditor(orgId, buildingId);
+        }
+
+        // Per-building report branding / configuration: editable report title,
+        // section headings & ledes, budget, and the hero photo's Storage URL.
+        // Any org member or this building's staff may read; org admins and this
+        // building's managers/editors may write. Kept separate from the building
+        // doc (which stays admin-only) so a building editor can brand their
+        // building without being able to rename it or touch org-level fields.
+        match /config/{docId} {
           allow read:   if saasMember(orgId) || saasBldgAccess(orgId, buildingId);
           allow create, update, delete: if saasIsAdmin(orgId) || saasBldgEditor(orgId, buildingId);
         }
