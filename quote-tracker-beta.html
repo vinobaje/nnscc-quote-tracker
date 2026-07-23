@@ -394,14 +394,14 @@ input:focus, select:focus { outline:2px solid var(--accent); outline-offset:-1px
   <span class="barnote" id="saveNote"></span>
   <button class="btn" id="btnSignOut" type="button" style="display:none">Sign out</button>
   <div class="menu" id="moreMenu">
-    <button class="btn" id="btnMore" type="button">More ▾</button>
+    <button class="btn" id="btnMore" type="button" style="display:none">More ▾</button>
     <div class="dropdown">
-      <button id="btnMemo" type="button">✨ AI board memo</button>
-      <button id="btnDecLog" type="button">📜 Decision log</button>
-      <button id="btnBackup" type="button">Backup data (JSON)</button>
-      <button id="btnRestore" type="button">Restore a backup…</button>
-      <button id="btnPortable" type="button">Download portable copy</button>
-      <button id="btnReset" type="button" class="ddanger">Reset to original…</button>
+      <button id="btnMemo" type="button" style="display:none">✨ AI board memo</button>
+      <button id="btnDecLog" type="button" style="display:none">📜 Decision log</button>
+      <button id="btnBackup" type="button" style="display:none">Backup data (JSON)</button>
+      <button id="btnRestore" type="button" style="display:none">Restore a backup…</button>
+      <button id="btnPortable" type="button" style="display:none">Download portable copy</button>
+      <button id="btnReset" type="button" class="ddanger" style="display:none">Reset to original…</button>
     </div>
   </div>
   <input type="file" id="fileRestore" accept=".json,application/json" style="display:none">
@@ -2140,43 +2140,143 @@ document.getElementById("sigSave").onclick = function () {
   });
 };
 /* ---- printable resolution ---- */
+function resolutionNumber(v) {
+  var months = { january: "01", february: "02", march: "03", april: "04", may: "05", june: "06",
+    july: "07", august: "08", september: "09", october: "10", november: "11", december: "12" };
+  var rn = String(v.reportName || ""); var ym = "";
+  var ymatch = rn.match(/\b(19|20)\d{2}\b/); var mmatch = rn.toLowerCase().match(/[a-z]+/);
+  if (ymatch) { ym = ymatch[0] + (mmatch && months[mmatch[0]] ? "-" + months[mmatch[0]] : ""); }
+  else { ym = String(new Date().getFullYear()); }
+  var jn = String(v.jobNo || "").replace(/[^0-9]/g, ""); if (jn.length < 2) jn = ("0" + jn).slice(-2);
+  return ym + "-J" + jn;
+}
+function fmtLongDate(d) {
+  try { return d.toLocaleDateString("en-CA", { year: "numeric", month: "long", day: "numeric" }); }
+  catch (e) { return d.toDateString(); }
+}
 function printResolution(r) {
   var v = r.v, t = v.tally || tallyOf(r.ballots);
   var M = state.meta || META_DEFAULTS;
+  var sigs = r.sigs || [], ballots = r.ballots || [];
+  var quorum = quorumOf(v), size = v.boardSize || boardState.members.length || 0;
+  var met = (v.quorumMet === false) ? false : (t.cast >= quorum);
+  var res = String(v.result || (t.a > t.r ? "approved" : (t.r > t.a ? "rejected" : "tied"))).toLowerCase();
+  var carried = res.indexOf("approv") === 0 || res === "carried";
+  var defeated = res.indexOf("reject") === 0 || res === "defeated";
+  var verdict = !met ? "NOT CARRIED — QUORUM NOT MET" : carried ? "CARRIED" : defeated ? "DEFEATED" : "NOT CARRIED (TIED)";
+  /* the resolution date = latest signing/ballot timestamp, else today */
+  var when = null;
+  sigs.concat(ballots).forEach(function (x) { var d = x.at && x.at.toDate ? x.at.toDate() : null; if (d && (!when || d > when)) when = d; });
+  var adopted = when || new Date();
+
+  /* directors: the current board list, else whoever voted/signed */
+  var dirs = (boardState.members && boardState.members.length ? boardState.members.slice()
+    : ballots.map(function (b) { return b.email; }).concat(sigs.map(function (s) { return s.email; })))
+    .map(function (e) { return String(e || "").toLowerCase(); });
+  dirs = dirs.filter(function (e, i) { return e && dirs.indexOf(e) === i; });
+  function sigFor(e) { for (var i = 0; i < sigs.length; i++) if (String(sigs[i].email).toLowerCase() === e) return sigs[i]; return null; }
+  function choiceFor(e) { for (var i = 0; i < ballots.length; i++) if (String(ballots[i].email).toLowerCase() === e) return ballots[i]; return null; }
+  var signedCount = dirs.filter(function (e) { return sigFor(e); }).length;
+
+  var operative = !met
+    ? "the foregoing matter did not achieve the quorum required for a decision of the Board and accordingly <strong>NO RESOLUTION</strong> is passed. The matter is to be brought before the Board again."
+    : carried
+      ? "the foregoing matter is <strong>APPROVED</strong>" + (v.contractor ? ", and the work is awarded to <strong>" + esc(v.contractor) + "</strong>" : "") +
+        (v.amountText ? " in the amount of <strong>" + esc(v.amountText) + "</strong>" : "") + "."
+      : defeated
+        ? "the foregoing matter is <strong>DEFEATED</strong> and is not approved."
+        : "the vote is <strong>TIED</strong>; the motion is not carried and the matter stands.";
+
   var w = window.open("", "_blank");
   if (!w) { alert("Allow pop-ups to view the printable resolution."); return; }
-  var h = ['<!doctype html><html><head><meta charset="utf-8"><title>Resolution — Job ' + esc(v.jobNo) + "</title>",
-    "<style>body{font:14px/1.6 Georgia,serif;color:#1E2833;max-width:680px;margin:40px auto;padding:0 20px}",
-    "h1{font-size:19px;text-align:center;letter-spacing:.5px}h2{font-size:15px;text-align:center;font-weight:400;margin-top:-8px}",
-    "hr{border:none;border-top:1px solid #999;margin:18px 0}.meta{font-size:12.5px;color:#555}",
-    ".hash{font:11px monospace;background:#f0f0f0;padding:2px 6px;border-radius:4px;word-break:break-all}",
-    ".sigs{display:flex;gap:30px;flex-wrap:wrap;margin-top:34px}.sig{text-align:center;font-size:12px}",
-    ".sig img{height:52px;display:block;margin:0 auto 2px}.sig .nm{border-top:1px solid #333;padding-top:3px;font-weight:700;min-width:180px}",
-    "@media print{.noprint{display:none}}</style></head><body>"];
-  h.push("<h1>RESOLUTION OF THE BOARD OF DIRECTORS</h1>");
-  h.push("<h2>" + esc(M.condoName) + " — " + esc(M.regNo) + "</h2><hr>");
-  h.push('<p class="meta">Report period: ' + esc(v.reportName || "—") + " · Vote opened by " + esc(v.openedBy || "") +
-    (v.closedBy ? " · closed by " + esc(v.closedBy) : "") + "</p>");
-  h.push("<p><strong>WHEREAS</strong> the following matter was put to the Board for decision:</p>");
-  h.push("<p style='margin-left:20px'><em>" + esc(v.question) + "</em><br>Job " + esc(v.jobNo) + ": " + esc(v.jobDesc) +
-    (v.contractor ? " — contractor: " + esc(v.contractor) : "") + " — " + esc(v.amountText || "") + "</p>");
-  h.push("<p><strong>AND WHEREAS</strong> the votes cast were: " + t.a + " in favour, " + t.r +
-    " opposed, " + t.ab + " abstaining (" + (t.cast || t.a + t.r + t.ab) + " of " + esc(v.boardSize || "—") +
-    " directors" + (v.quorumMet === false ? "; quorum was NOT met" : "") + ");</p>");
-  h.push("<p><strong>BE IT RESOLVED</strong> that the matter is <strong>" +
-    esc(String(v.result || "").toUpperCase()) + "</strong>.</p><hr>");
-  h.push('<p class="meta">Integrity record — quoted data at vote time (SHA-256): <span class="hash">' + esc(v.snapshotHash || "") + "</span><br>" +
-    'Resolution text (SHA-256): <span class="hash">' + esc(v.resHash || "") + "</span></p>");
-  if (r.sigs.length) {
-    h.push('<div class="sigs">');
-    r.sigs.forEach(function (s) {
-      var when = s.at && s.at.toDate ? s.at.toDate().toLocaleDateString("en-CA") : "";
-      h.push('<div class="sig">' + (s.sig ? '<img src="' + esc(s.sig) + '">' : "") +
-        '<div class="nm">' + esc(s.name || "") + "</div>" + esc(s.email) + (when ? "<br>signed " + esc(when) : "") + "</div>");
+  var css =
+    "@page{size:letter;margin:22mm 20mm}" +
+    "*{box-sizing:border-box}" +
+    "html,body{background:#fff}body{font:12.5pt/1.62 Georgia,'Times New Roman',serif;color:#1b2430;max-width:720px;margin:26px auto;padding:0 26px}" +
+    ".lh{display:flex;align-items:center;gap:16px;border-bottom:2.5px solid #16273f;padding-bottom:12px}" +
+    ".lh img{height:52px;width:auto}.lh .corp{flex:1}.lh .cn{font:700 17pt/1.15 Georgia,serif;color:#16273f;letter-spacing:.2px}" +
+    ".lh .cs{font-size:10.5pt;color:#4a5566;margin-top:2px}" +
+    ".doc-title{text-align:center;margin:26px 0 4px}.doc-title h1{font-size:16pt;letter-spacing:1.5px;margin:0;text-transform:uppercase}" +
+    ".resno{text-align:center;font-size:10.5pt;color:#4a5566;letter-spacing:.5px}" +
+    ".rule{border:none;border-top:1px solid #b7c0cc;margin:20px 0}" +
+    "p{margin:12px 0}.recital{margin:10px 0}.recital .w{font-variant:small-caps;font-weight:700;letter-spacing:.5px}" +
+    ".particulars{margin:8px 0 8px 26px;padding:12px 16px;border-left:3px solid #16273f;background:#f6f8fb;font-size:11.5pt}" +
+    ".particulars .q{font-style:italic;margin-bottom:6px}.particulars dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:2px 14px}" +
+    ".particulars dt{color:#5a6472}.particulars dd{margin:0;font-weight:600}" +
+    "table.votes{border-collapse:collapse;margin:6px 0 6px 26px;font-size:11.5pt}table.votes td{padding:2px 18px 2px 0}table.votes .n{font-weight:700}" +
+    ".verdict{text-align:center;margin:18px 0;font-size:12.5pt}.verdict .v{display:inline-block;border:2px solid #16273f;border-radius:6px;padding:6px 20px;font-weight:700;letter-spacing:1px}" +
+    ".verdict .bad{border-color:#b3402f;color:#b3402f}" +
+    ".banner{border:1.5px solid #b3402f;background:#fdf3f1;color:#8a2c20;border-radius:6px;padding:10px 14px;font-size:11pt;margin:14px 0}" +
+    ".cert{font-size:11.5pt;margin-top:22px}.certlead{font-variant:small-caps;font-weight:700;letter-spacing:.6px;color:#16273f}" +
+    ".sigs{display:grid;grid-template-columns:1fr 1fr;gap:26px 40px;margin:26px 0 6px}" +
+    ".sig{font-size:10.5pt;page-break-inside:avoid}.sig .line{border-bottom:1.2px solid #26333f;height:46px;display:flex;align-items:flex-end;justify-content:center}" +
+    ".sig .line img{max-height:44px;max-width:100%}.sig .who{margin-top:4px;font-weight:700}.sig .role{color:#5a6472}.sig .dt{color:#5a6472;font-size:10pt}" +
+    ".esign{font-size:9.5pt;color:#5a6472;margin-top:16px;font-style:italic}" +
+    ".vbox{margin-top:22px;border:1px solid #cdd5df;border-radius:7px;padding:12px 15px;background:#fafbfc}" +
+    ".vbox h4{margin:0 0 6px;font-size:10pt;letter-spacing:.8px;text-transform:uppercase;color:#16273f}" +
+    ".vbox p{margin:5px 0;font-size:9.5pt;color:#48505c}.hash{font:9pt/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;color:#1b2430;word-break:break-all;background:#eef1f5;padding:2px 6px;border-radius:4px}" +
+    ".foot{margin-top:20px;border-top:1px solid #cdd5df;padding-top:8px;font-size:9pt;color:#7a838f;display:flex;justify-content:space-between}" +
+    "@media print{.noprint{display:none}body{margin:0}}";
+  var h = ['<!doctype html><html><head><meta charset="utf-8"><title>Resolution ' + esc(resolutionNumber(v)) + " — " + esc(M.condoName) + "</title><style>" + css + "</style></head><body>"];
+
+  /* letterhead */
+  h.push('<div class="lh">' + (ASSET_LOGO && ASSET_LOGO.indexOf("_LOGO_") < 0 ? '<img src="' + esc(ASSET_LOGO) + '" alt="">' : "") +
+    '<div class="corp"><div class="cn">' + esc(M.condoName) + '</div>' +
+    '<div class="cs">' + esc(M.regNo) + " · " + esc(M.buildings) + " · Managed by " + esc(M.manager) + "</div></div></div>");
+
+  h.push('<div class="doc-title"><h1>Resolution of the Board of Directors</h1></div>');
+  h.push('<div class="resno">Resolution No. ' + esc(resolutionNumber(v)) + " &nbsp;·&nbsp; Adopted " + esc(fmtLongDate(adopted)) + "</div>");
+  h.push('<hr class="rule">');
+
+  h.push('<p class="recital"><span class="w">Whereas</span> the affairs of ' + esc(M.condoName) + " (" + esc(M.regNo) +
+    ") are governed by its Board of Directors pursuant to the <em>Condominium Act, 1998</em> (Ontario) and the by-laws of the Corporation;</p>");
+  h.push('<p class="recital"><span class="w">And whereas</span> the following matter was duly submitted to the Board for decision:</p>');
+  h.push('<div class="particulars"><div class="q">“' + esc(v.question) + '”</div>' +
+    '<dl><dt>Item</dt><dd>Job ' + esc(v.jobNo) + " — " + esc(v.jobDesc) + "</dd>" +
+    (v.contractor ? "<dt>Contractor</dt><dd>" + esc(v.contractor) + "</dd>" : "") +
+    (v.amountText ? "<dt>Amount</dt><dd>" + esc(v.amountText) + "</dd>" : "") +
+    "<dt>Report period</dt><dd>" + esc(v.reportName || "—") + "</dd></dl></div>");
+  h.push('<p class="recital"><span class="w">And whereas</span> a vote of the Board was duly held, at which the votes recorded were:</p>');
+  h.push('<table class="votes"><tr><td>In favour</td><td class="n">' + t.a + "</td></tr>" +
+    "<tr><td>Opposed</td><td class=\"n\">" + t.r + "</td></tr>" +
+    "<tr><td>Abstained</td><td class=\"n\">" + t.ab + "</td></tr>" +
+    '<tr><td>Directors voting</td><td class="n">' + (t.cast || (t.a + t.r + t.ab)) + " of " + (size || "—") + "</td></tr>" +
+    '<tr><td>Quorum (majority)</td><td class="n">' + quorum + " — " + (met ? "met" : "NOT met") + "</td></tr></table>");
+
+  h.push('<p class="recital"><span class="w">Now therefore be it resolved</span> that ' + operative + "</p>");
+  h.push('<div class="verdict"><span class="v' + (met ? "" : " bad") + '">' + verdict + "</span></div>");
+  if (!met) h.push('<div class="banner"><strong>Quorum was not met.</strong> Under the Condominium Act and the Corporation’s by-laws a decision of the Board requires a quorum (a majority of directors). This document records the attempt but does <strong>not</strong> constitute a binding resolution.</div>');
+
+  h.push('<hr class="rule">');
+  h.push('<p class="cert"><span class="certlead">Certification.</span> The undersigned, being ' +
+    (size && signedCount >= size ? "all of the directors" : "the directors") + " of " + esc(M.condoName) + " (" + esc(M.regNo) +
+    "), hereby certify that the foregoing accurately records a decision considered and voted upon by the Board and that this resolution " +
+    (met ? "is in full force and effect" : "did not carry for want of quorum") + ".</p>");
+
+  h.push('<div class="sigs">');
+  if (dirs.length) {
+    dirs.forEach(function (e) {
+      var s = sigFor(e), wdate = s && s.at && s.at.toDate ? s.at.toDate().toLocaleDateString("en-CA") : "";
+      h.push('<div class="sig"><div class="line">' + (s && s.sig ? '<img src="' + esc(s.sig) + '">' : "") + "</div>" +
+        '<div class="who">' + esc((s && s.name) || "") + "</div>" +
+        '<div class="role">Director · ' + esc(e) + "</div>" +
+        '<div class="dt">Date: ' + (wdate ? esc(wdate) : "________________") + "</div></div>");
     });
-    h.push("</div>");
-  } else h.push('<p class="meta">No signatures yet.</p>');
-  h.push('<p class="noprint" style="margin-top:30px"><button onclick="window.print()">Print / save as PDF</button></p>');
+  } else {
+    h.push('<div class="sig"><div class="line"></div><div class="role">Director</div><div class="dt">Date: ________________</div></div>' +
+           '<div class="sig"><div class="line"></div><div class="role">Director</div><div class="dt">Date: ________________</div></div>');
+  }
+  h.push("</div>");
+  h.push('<p class="esign">Electronic signatures affixed above are legally valid and enforceable under the <em>Electronic Commerce Act, 2000</em>, S.O. 2000, c. 17 (Ontario). Each signature is cryptographically bound to the resolution-text fingerprint below.</p>');
+
+  h.push('<div class="vbox"><h4>Document integrity &amp; verification</h4>' +
+    "<p>This resolution forms part of a tamper-evident decision log. The fingerprints below bind it to the quoted amounts as they stood when the vote opened and to the exact resolution text approved at close. Any later alteration of the figures or text changes these fingerprints.</p>" +
+    '<p>Quoted data at vote time (SHA-256):<br><span class="hash">' + esc(v.snapshotHash || "—") + "</span></p>" +
+    '<p>Resolution text (SHA-256):<br><span class="hash">' + esc(v.resHash || "—") + "</span></p>" +
+    "<p>Vote administered by " + esc(v.openedBy || "—") + (v.closedBy ? "; closed by " + esc(v.closedBy) : "") + ".</p></div>");
+
+  h.push('<div class="foot"><span>' + esc(M.condoName) + " · Resolution No. " + esc(resolutionNumber(v)) + "</span><span>Generated " + esc(fmtLongDate(new Date())) + "</span></div>");
+  h.push('<p class="noprint" style="margin-top:22px;text-align:center"><button onclick="window.print()" style="font:14px Georgia,serif;padding:9px 22px;border:1px solid #16273f;background:#16273f;color:#fff;border-radius:8px;cursor:pointer">Print / save as PDF</button></p>');
   h.push("</body></html>");
   w.document.write(h.join(""));
   w.document.close();
@@ -2261,6 +2361,17 @@ function updateReportsButton() {
   if (vb) vb.style.display = canVoteView() ? "" : "none";
   var vl = document.getElementById("votesLabel");
   if (vl) vl.textContent = votesCache.open > 0 ? "Votes (" + votesCache.open + " open)" : "Votes";
+  /* ---- More ▾ menu: hide editor-only tools from viewers/board members ---- */
+  var ed = isEditor(), cv = canVoteView();
+  var inArtifact = !!(window.claude && window.claude.downloads);
+  function setDisp(id, show) { var el = document.getElementById(id); if (el) el.style.display = show ? "" : "none"; }
+  setDisp("btnMemo", ed);        /* AI board memo — editor only */
+  setDisp("btnDecLog", cv);      /* Decision log — board members + editors */
+  setDisp("btnBackup", ed);      /* Backup / Restore / Reset — editor only */
+  setDisp("btnRestore", ed);
+  setDisp("btnPortable", ed && !inArtifact);
+  setDisp("btnReset", ed);
+  setDisp("btnMore", cv);        /* hide the whole menu when nothing inside is available */
   var btn = document.getElementById("btnReports");
   if (btn) btn.classList.toggle("viewing-archived", cloud.active.kind === "archived");
 }
