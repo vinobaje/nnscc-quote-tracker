@@ -1886,14 +1886,14 @@ function openContractorOverlay(name) {
   if (t) t.textContent = String(name).trim() + " — quotes";
   var h = [];
   h.push('<p class="histempty" style="margin:0 0 4px">' + rows.length + " quote" + (rows.length === 1 ? "" : "s") +
-    " on record · " + won + " carried (lowest) · " + money(wonTot) + " counted toward committed spend (incl. HST).</p>");
-  h.push('<p class="histempty" style="margin:0 0 10px;font-size:11.5px;color:var(--muted)">“Carried” = the lowest quote for that job, used in the report totals. It does <em>not</em> mean the board has voted or that the work has been awarded.</p>');
+    " on record · lowest on " + won + " job" + (won === 1 ? "" : "s") + " · " + money(wonTot) + " counted toward committed spend (incl. HST).</p>");
+  h.push('<p class="histempty" style="margin:0 0 10px;font-size:11.5px;color:var(--muted)">“Lowest” = the lowest quote for that job, used in the report totals. It does <em>not</em> mean the board has voted or that the work has been awarded.</p>');
   if (!rows.length) h.push('<p class="histempty">No quotes found for this contractor.</p>');
   else {
     h.push('<table class="dashtable"><thead><tr><th>Job</th><th>Quote #</th><th class="money">Amount (incl. HST)</th><th>In totals</th></tr></thead><tbody>');
     rows.forEach(function (r) {
       var amt = r.x.total != null ? money(r.x.total) : (String(r.x.b.contractor || "").trim() ? "pending" : "—");
-      var tag = r.x.carried ? '<span style="color:#16273f;font-weight:600">carried (lowest)</span>' :
+      var tag = r.x.carried ? '<span style="color:#16273f;font-weight:600">lowest</span>' :
         (r.x.total != null ? '<span style="color:var(--muted)">higher bid</span>' : (r.x.pending ? "awaiting quote" : "—"));
       var notes = r.x.b.notes ? '<div style="font-size:11.5px;color:var(--muted)">' + esc(r.x.b.notes) + "</div>" : "";
       var files = (Array.isArray(r.x.b.files) && r.x.b.files.length) ?
