@@ -253,6 +253,26 @@ input:focus, select:focus { outline:2px solid var(--accent); outline-offset:-1px
   text-align:center; padding:9px; }
 .pinbox .err { color:var(--prio); font-size:13px; min-height:18px; margin:8px 0 2px; }
 .pinbox .row { display:flex; gap:8px; justify-content:flex-end; margin-top:8px; }
+/* progress-update form (opened from a Work-in-progress card) */
+.progbox { width:min(480px, 94vw); max-height:88vh; overflow-y:auto; }
+.progbox .pf { margin:11px 0; }
+.progbox .pf > label { display:block; font-size:12.5px; font-weight:650; color:var(--ink2); margin-bottom:5px; }
+.progbox input[type=date] { width:auto; letter-spacing:normal; text-align:left; font-size:14px; padding:7px 9px; }
+.progbox textarea { width:100%; box-sizing:border-box; font:inherit; font-size:14px; padding:8px 10px;
+  border:1px solid var(--line); border-radius:7px; resize:vertical; }
+.progbox .pslide { display:flex; align-items:center; gap:10px; }
+.progbox .pslide input[type=range] { flex:1; accent-color:var(--pkg); padding:0; }
+.progbox .pslide span { flex:none; width:44px; text-align:right; font-weight:700; color:var(--pkg); font-variant-numeric:tabular-nums; }
+.progbox .progflags { display:flex; flex-direction:column; gap:7px; }
+.progbox .progflags label.pchk { display:flex; align-items:flex-start; gap:8px; font-size:13.5px;
+  font-weight:400; color:var(--ink2); line-height:1.4; margin:0; }
+.progbox label.pchk input { width:auto; margin-top:2px; flex:none; }
+.progmedia { display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; }
+.progmedia .pmchip { display:flex; align-items:center; gap:6px; border:1px solid var(--line); border-radius:8px;
+  padding:4px 8px; font-size:12.5px; max-width:100%; }
+.progmedia .pmchip img { width:34px; height:34px; object-fit:cover; border-radius:5px; }
+.progmedia .pmchip .nm { max-width:150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.progmedia .pmchip .fx { cursor:pointer; color:var(--prio); font-weight:700; padding:0 2px; }
 .histbox { width:min(560px, 92vw); }
 .histlist { max-height:min(420px, 60vh); overflow-y:auto; margin:10px 0 4px; }
 .histentry { border-top:1px solid var(--line-soft); padding:9px 2px; }
@@ -316,6 +336,15 @@ input:focus, select:focus { outline:2px solid var(--accent); outline-offset:-1px
   background:var(--paper); border-radius:5px; margin:0 0 8px; font-size:13px; }
 .strow select, .strow input { padding:4px 7px; font-size:12.5px; }
 .strow input[type=text] { flex:1; min-width:160px; }
+/* editor: dated progress-update rows */
+.eupds { padding:6px 10px 8px; border-bottom:1px dashed var(--line); }
+.eupdhead { font-size:12.5px; font-weight:700; color:var(--ink); margin:2px 0 4px; }
+.eupdhead span { font-weight:400; color:var(--ink2); }
+.eupdrow { display:flex; gap:8px; align-items:center; margin:5px 0; }
+.eupdrow input[type=date] { flex:none; padding:4px 7px; font-size:12.5px; }
+.eupdrow input[type=text] { flex:1; min-width:0; padding:4px 7px; font-size:12.5px; }
+.eupds .addbid { margin-top:2px; }
+@media (max-width:600px){ .eupdrow { flex-wrap:wrap; } .eupdrow input[type=text] { min-width:100%; order:3; } }
 .dashbox { width:min(720px,94vw); }
 .dashtable { width:100%; border-collapse:collapse; font-size:13px; margin:8px 0 14px; }
 .dashtable th, .dashtable td { padding:6px 8px; border-bottom:1px solid var(--line-soft); text-align:left; }
@@ -730,6 +759,72 @@ body:has(#report.tpl-packet) .wrap { max-width:1560px; }
   font-weight:700; padding:1px 7px; border-radius:99px; vertical-align:middle; }
 .tpl-packet .pk-con { vertical-align:middle; }
 
+/* --- Work in progress: per-job pipeline cards --- */
+.tpl-packet .pk-progcard { border:1px solid var(--line); border-radius:9px; padding:14px 16px 12px; margin-bottom:14px; }
+.tpl-packet .pk-proghead { display:flex; justify-content:space-between; align-items:baseline; gap:10px; flex-wrap:wrap; }
+.tpl-packet .pk-progjob { font-size:16px; font-weight:700; color:var(--ink); min-width:0; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.tpl-packet .pk-progjob .pk-cmpno { background:#16283b; color:#fff; }
+.tpl-packet .pk-progamt { flex:none; font-family:"Avenir Next","Segoe UI","Helvetica Neue",Arial,sans-serif;
+  font-weight:700; font-size:17px; color:var(--pkg); white-space:nowrap; font-variant-numeric:tabular-nums; }
+.tpl-packet .pk-progaward { display:flex; align-items:center; gap:8px; font-size:14px; color:var(--ink2); margin:7px 0 2px; }
+.tpl-packet .pk-progaward b { color:var(--ink); }
+.tpl-packet .pk-tvsub { font-size:11px; font-weight:600; color:var(--muted); }
+/* six-stage stepper */
+.tpl-packet .pk-steps { display:flex; align-items:flex-start; margin:13px 0 4px; }
+.tpl-packet .pk-step { flex:1 1 0; min-width:0; text-align:center; }
+.tpl-packet .pk-sdot { width:24px; height:24px; margin:0 auto; border-radius:50%; display:flex; align-items:center;
+  justify-content:center; font-size:12px; font-weight:700; background:#fff; border:2px solid #c9d6ce; color:#9db1a6; }
+.tpl-packet .pk-step.done .pk-sdot { background:var(--pkg); border-color:var(--pkg); color:#fff; }
+.tpl-packet .pk-step.cur .pk-sdot { border-color:var(--pkg); color:var(--pkg); font-size:9px; box-shadow:0 0 0 3px rgba(22,97,58,.16); }
+.tpl-packet .pk-step.stop .pk-sdot { background:#a34040; border-color:#a34040; color:#fff; }
+.tpl-packet .pk-slbl { font-size:12px; font-weight:600; color:var(--ink2); margin-top:6px; line-height:1.25; }
+.tpl-packet .pk-step.done .pk-slbl { color:var(--ink); }
+.tpl-packet .pk-step.cur .pk-slbl { color:var(--pkg); font-weight:700; }
+.tpl-packet .pk-step.stop .pk-slbl { color:#a34040; font-weight:700; }
+.tpl-packet .pk-ssub { font-size:11px; color:var(--muted); font-variant-numeric:tabular-nums; }
+.tpl-packet .pk-sbar { flex:1 1 0; height:3px; margin-top:11px; background:#d7e2db; min-width:6px; border-radius:2px; }
+.tpl-packet .pk-sbar.done { background:var(--pkg); }
+/* % complete bar */
+.tpl-packet .pk-pbar { height:9px; border-radius:99px; background:#e4ece7; overflow:hidden; margin:10px 0 3px; }
+.tpl-packet .pk-pfill { display:block; height:100%; border-radius:99px; background:var(--pkg); }
+.tpl-packet .pk-plbl { font-size:12.5px; color:var(--muted); }
+/* dated update log */
+.tpl-packet .pk-upds { border-top:1px solid var(--line-soft); margin-top:11px; padding-top:9px; }
+.tpl-packet .pk-updhead { font-size:11px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color:var(--muted); margin-bottom:4px; }
+.tpl-packet .pk-updrow { display:flex; gap:10px; margin:5px 0; font-size:14px; }
+.tpl-packet .pk-updd { flex:none; width:88px; color:var(--muted); font-size:12.5px; font-variant-numeric:tabular-nums; padding-top:1px; }
+.tpl-packet .pk-updt { min-width:0; color:var(--ink2); line-height:1.45; }
+.tpl-packet .pk-updmore { display:inline-block; margin-top:6px; font-size:12.5px; font-weight:700; color:var(--pkg); cursor:pointer; }
+.tpl-packet .pk-updmore:hover { text-decoration:underline; }
+/* update-row extras: photos/videos, internal + issue flags, job-health chip */
+.tpl-packet .pk-updmedia { display:flex; flex-wrap:wrap; gap:7px; margin-top:6px; }
+.tpl-packet .pk-updmedia a { display:block; line-height:0; }
+.tpl-packet .pk-updmedia img { height:66px; width:88px; object-fit:cover; border-radius:7px; border:1px solid var(--line); }
+.tpl-packet .pk-updmedia .pk-vid { display:inline-flex; align-items:center; gap:6px; line-height:1.3; height:66px;
+  padding:0 12px; border:1px solid var(--line); border-radius:7px; font-size:12.5px; font-weight:600; color:var(--pkg); }
+.tpl-packet .pk-updrow.issue { background:#fdf4e3; border-radius:8px; padding:6px 8px; margin:5px -8px; }
+.tpl-packet .pk-updrow.issue .pk-updt { color:#7a5210; }
+.tpl-packet .pk-updflag { display:inline-block; font-size:10px; font-weight:700; border-radius:99px; padding:1px 8px;
+  margin-left:6px; vertical-align:middle; }
+.tpl-packet .pk-updflag.int { background:#eceff3; color:#5a6a7a; }
+.tpl-packet .pk-updflag.iss { background:#f6e3c0; color:#7a5210; }
+.tpl-packet .pk-health { display:inline-block; font-size:10.5px; font-weight:700; border-radius:99px; padding:2px 10px; vertical-align:middle; }
+.tpl-packet .pk-health.ok { background:#e3f2e9; color:#1e7a46; }
+.tpl-packet .pk-health.warn { background:#f6e3c0; color:#8a5a10; }
+/* property-manager quick controls on the progress card */
+.tpl-packet .pk-step[data-stage] { cursor:pointer; border-radius:8px; }
+.tpl-packet .pk-step[data-stage]:hover .pk-sdot,
+.tpl-packet .pk-step[data-stage]:focus-visible .pk-sdot { border-color:var(--pkg); color:var(--pkg); box-shadow:0 0 0 3px rgba(22,97,58,.18); }
+.tpl-packet .pk-step[data-stage]:hover .pk-slbl { color:var(--pkg); text-decoration:underline; }
+.tpl-packet .pk-prow { display:flex; align-items:center; gap:10px; margin-top:7px; }
+.tpl-packet .pk-prowlbl { flex:none; font-size:11px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color:var(--muted); }
+.tpl-packet .pk-prange { flex:1; min-width:0; accent-color:var(--pkg); cursor:pointer; }
+.tpl-packet .pk-prangeval { flex:none; width:40px; text-align:right; font-size:12.5px; font-weight:700; color:var(--pkg); font-variant-numeric:tabular-nums; }
+.tpl-packet .pk-addupd { display:inline-block; margin:8px 0 0 12px; font-size:12.5px; font-weight:700; color:var(--pkg);
+  border:1px dashed var(--pkg); border-radius:99px; padding:3px 12px; cursor:pointer; }
+.tpl-packet .pk-addupd:first-child { margin-left:0; }
+.tpl-packet .pk-addupd:hover { background:#eef7f1; }
+
 /* ---- flash/pulse a section when its sidebar item is clicked ---- */
 /* the whole card fills green (double-pulse) + a bright ring, then fades back to white */
 @keyframes pkflash {
@@ -814,6 +909,15 @@ body:has(#report.tpl-packet) .wrap { max-width:1560px; }
   .tpl-packet .cmp td.money { position:absolute; top:8px; right:10px; width:auto; font-weight:700; text-align:right; font-size:14px; white-space:nowrap; }
   .tpl-packet .cmp td:nth-child(2) { color:var(--ink2); font-size:12.5px; margin-top:2px; line-height:1.4; }
   .tpl-packet .cmp td:nth-child(4) { margin-top:3px; }
+  /* work-in-progress stepper → smaller dots/labels so six stages fit a phone */
+  .tpl-packet .pk-sdot { width:20px; height:20px; font-size:10.5px; }
+  .tpl-packet .pk-step.cur .pk-sdot { font-size:8px; }
+  .tpl-packet .pk-slbl { font-size:10px; padding:0 2px; }
+  .tpl-packet .pk-ssub { display:none; }
+  .tpl-packet .pk-sbar { margin-top:9px; min-width:4px; }
+  .tpl-packet .pk-updd { width:74px; font-size:12px; }
+  .tpl-packet .pk-updrow { font-size:13.5px; }
+  .tpl-packet .pk-progcard { padding:12px 12px 10px; }
 }
 @media (max-width:520px){
   /* stat band → clean single-column list so amounts never clip */
@@ -869,12 +973,36 @@ body:has(#report.tpl-packet) .wrap { max-width:1560px; }
   </div>
   <input type="file" id="fileRestore" accept=".json,application/json" style="display:none">
   <input type="file" id="fileAttach" accept=".pdf,.png,.jpg,.jpeg,.webp,.heic,.doc,.docx,.xls,.xlsx,.eml,.txt" style="display:none">
+  <input type="file" id="progMediaFile" accept="image/*,video/*" multiple style="display:none">
   <input type="file" id="aiIntakeFile" accept=".pdf,.docx" style="display:none">
 </div></div>
 
 <div class="wrap">
   <div id="report"></div>
   <div id="editor"></div>
+</div>
+
+<div class="overlay" id="progOverlay" role="dialog" aria-modal="true" aria-label="Add progress update">
+  <div class="pinbox progbox">
+    <h3>Progress update</h3>
+    <p id="progJobName"></p>
+    <div class="pf"><label for="progDate">Update date</label><input type="date" id="progDate"></div>
+    <div class="pf" id="progPctRow"><label for="progPct">Site work</label>
+      <div class="pslide"><input type="range" id="progPct" min="0" max="100" step="5" value="50">
+      <span id="progPctVal">50%</span></div></div>
+    <div class="pf"><label for="progText">What was completed?</label>
+      <textarea id="progText" rows="4" placeholder="e.g. Crew completed excavation for the second sump pit. Basin installed and piping connected."></textarea></div>
+    <div class="pf"><label>Photos / videos</label>
+      <button class="btn small" id="progMediaBtn" type="button">📎 Add photos or videos…</button>
+      <div id="progMediaList" class="progmedia"></div></div>
+    <div class="pf progflags">
+      <label class="pchk"><input type="checkbox" id="progInternal"> Internal only — board members won’t see this update</label>
+      <label class="pchk"><input type="checkbox" id="progIssue"> ⚠ This update includes an issue or delay</label>
+    </div>
+    <div class="err" id="progErr"></div>
+    <div class="row"><button class="btn ghost" id="progCancel" type="button">Cancel</button>
+      <button class="btn primary" id="progSave" type="button">Save update</button></div>
+  </div>
 </div>
 
 <div class="overlay" id="histOverlay" role="dialog" aria-modal="true" aria-label="Change history">
@@ -1070,6 +1198,7 @@ function normState(s) {
   s.jobs.forEach(function (j) {
     if (!j.id) j.id = genId();                       /* stable identity for history */
     if (!j.status) j.status = "quoted";              /* lifecycle status */
+    if (!Array.isArray(j.updates)) j.updates = [];   /* dated progress-update log */
     j.bids.forEach(function (b) { if (!Array.isArray(b.files)) b.files = []; });
   });
   s.meta.budget = Math.max(0, +s.meta.budget || 0);   /* annual budget (0 = not set) */
@@ -1722,6 +1851,7 @@ var PK_ICON = {
   sched: 'M4 6a2 2 0 012-2h12a2 2 0 012 2v13a2 2 0 01-2 2H6a2 2 0 01-2-2zM4 9h16M8 3v3M16 3v3',
   spend: 'M12 3v18M8.5 7.5H14a2 2 0 010 4H9a2 2 0 000 4h6',
   open:  'M4 13l2-8h12l2 8M4 13v6h16v-6M4 13h5l1.2 2h3.6l1.2-2h5',
+  prog:  'M12 3a9 9 0 100 18 9 9 0 000-18M12 7v5l3.5 2',
   arch:  'M3 5a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1zM5 8v11h14V8M10 12h4'
 };
 function pkIcon(k) {
@@ -1826,6 +1956,138 @@ function packetSecC(d, ctx) {
     '<p class="pk-attnote">All amounts include HST. Quotes are valid for 30 days unless otherwise noted.</p>';
 }
 
+/* ---- Work in progress (packet): per-job pipeline + update log ---- */
+/* derive the six pipeline stages from data that mostly already exists:
+   created date, bid count, board status/date, award fields, % complete */
+function jobStages(x) {
+  var j = x.j, st = j.status || "quoted";
+  var quotesIn = x.c.bids.filter(function (b) { return !b.pending; }).length;
+  var stopped = (st === "rejected" || st === "deferred");
+  var approved = !!APPROVED_SET[st];
+  var awarded = !!((j.awardedTo || "").trim() || j.awardDate);
+  var doneJob = st === "completed";
+  var pct = doneJob ? 100 : (j.pct == null ? null : Math.max(0, Math.min(100, +j.pct || 0)));
+  var steps = [
+    { label: "Created",     sub: j.created || "", done: true },
+    { label: "Quotes in",   sub: x.j.bids.length ? quotesIn + " of " + x.j.bids.length : "", done: quotesIn > 0 },
+    { label: stopped ? statusLabel(st) : "Approved", sub: j.statusDate || "", done: approved, stop: stopped },
+    { label: "Awarded",     sub: j.awardDate || "", done: awarded },
+    { label: "In progress", sub: (st === "inprogress" && pct != null) ? pct + "%" : "", done: doneJob },
+    { label: "Complete",    sub: doneJob ? (j.statusDate || "") : "", done: doneJob }
+  ];
+  /* mark the "current" stage: the active work when in progress, else the first gap */
+  if (st === "inprogress") steps[4].cur = true;
+  else if (!stopped && !doneJob) for (var i = 0; i < steps.length; i++) {
+    if (!steps[i].done) { steps[i].cur = true; break; }
+  }
+  /* overall progress — computed automatically: each done stage fills 1/6 of the
+     bar; while work is in progress that stage fills by the manual % (or half
+     if no % was entered). No data entry needed for the bar to move. */
+  var overall = null;
+  if (!stopped) {
+    if (doneJob) overall = 100;
+    else {
+      var doneN = 0; steps.forEach(function (s) { if (s.done) doneN++; });
+      var part = (st === "inprogress") ? ((pct == null ? 50 : pct) / 100) : 0;
+      overall = Math.round(100 * (doneN + part) / steps.length);
+    }
+  }
+  return { steps: steps, pct: pct, stopped: stopped, doneJob: doneJob, overall: overall };
+}
+/* stages the property manager can reach by clicking the dot on the report */
+var PK_STAGE_KEYS = [null, null, "approved", "awarded", "inprogress", "completed"];
+function pkStepper(sg, ED) {
+  var h = ['<div class="pk-steps">'];
+  sg.steps.forEach(function (s, i) {
+    if (i) h.push('<span class="pk-sbar' + (s.done ? " done" : "") + '"></span>');
+    var cls = s.stop ? "stop" : (s.done ? "done" : (s.cur ? "cur" : ""));
+    var dot = s.stop ? "✕" : (s.done ? "✓" : (s.cur ? "●" : ""));
+    var click = ED && !s.done && !s.stop && PK_STAGE_KEYS[i];
+    h.push('<div class="pk-step ' + cls + '"' +
+      (click ? ' data-stage="' + PK_STAGE_KEYS[i] + '" role="button" tabindex="0" title="Click to mark: ' + esc(s.label) + '"' : '') +
+      '><span class="pk-sdot">' + dot + '</span>' +
+      '<div class="pk-slbl">' + esc(s.label) + '</div>' +
+      (s.sub ? '<div class="pk-ssub">' + esc(s.sub) + '</div>' : "") + '</div>');
+  });
+  h.push('</div>');
+  return h.join("");
+}
+function packetProgress(d, ctx) {
+  /* jobs the board has approved (or finished) — the ones with work to track */
+  var act = d.jobs.filter(function (x) { return APPROVED_SET[x.j.status]; });
+  if (!act.length)
+    return '<p class="seclede" style="margin:0">No approved jobs to track yet — once the board approves a job, its progress pipeline appears here.</p>';
+  var cards = [];
+  act.forEach(function (x) {
+    var j = x.j, sg = jobStages(x);
+    /* who won: the explicit award; otherwise show the lowest bidder as "expected" */
+    var winner = (j.awardedTo || "").trim(), isAwarded = !!winner;
+    if (!winner && x.c.carriedBids.length) winner = x.c.carriedBids[0].b.contractor || "";
+    var upds = (j.updates || []).slice().sort(function (a, b) { return String(b.d || "").localeCompare(String(a.d || "")); });
+    /* viewers: hide blank drafts and internal-only notes */
+    if (!ctx.ED) upds = upds.filter(function (u) {
+      return !u.internal && ((u.t || "").trim() || (u.media && u.media.length)); });
+    /* job health — from the newest board-visible update: ⚠ if it reported an issue */
+    var visUpds = upds.filter(function (u) { return !u.internal; });
+    var health = "";
+    if (!sg.doneJob && !sg.stopped) {
+      if (visUpds.length && visUpds[0].issue) health = ' <span class="pk-health warn">⚠ Issue reported</span>';
+      else if (j.status === "inprogress" || j.status === "scheduled") health = ' <span class="pk-health ok">On schedule</span>';
+    }
+    var uh = "";
+    var addBtn = ctx.ED ? '<a class="pk-addupd" role="button" tabindex="0" title="Add a dated progress note (with photos or videos)">+ Add update</a>' : "";
+    if (upds.length) {
+      var rows = upds.map(function (u, ui) {
+        var idx = (j.updates || []).indexOf(u);
+        var flags = (u.issue ? '<span class="pk-updflag iss">⚠ Issue</span>' : "") +
+          (ctx.ED && u.internal ? '<span class="pk-updflag int">Internal</span>' : "");
+        var mh = "";
+        if (u.media && u.media.length) {
+          mh = '<span class="pk-updmedia">' + u.media.map(function (m) {
+            return m.type === "video"
+              ? '<a class="pk-vid" href="' + esc(m.url) + '" target="_blank" rel="noopener">▶ ' + esc(m.name || "video") + '</a>'
+              : '<a href="' + esc(m.url) + '" target="_blank" rel="noopener"><img src="' + esc(m.url) + '" alt="" loading="lazy"></a>';
+          }).join("") + '</span>';
+        }
+        return '<div class="pk-updrow' + (u.issue ? " issue" : "") + '"><span class="pk-updd">' + esc(u.d || "—") + '</span>' +
+          '<span class="pk-updt">' + tEdit("upd:" + j.id + ":" + idx + ":t", u.t, "What happened…") + flags + mh + '</span></div>';
+      });
+      uh = '<div class="pk-upds"><div class="pk-updhead">Updates</div>' + rows.slice(0, 3).join("") +
+        (rows.length > 3
+          ? '<div class="pk-updrest" hidden>' + rows.slice(3).join("") + '</div>' +
+            '<a class="pk-updmore" role="button" tabindex="0" data-more="Show all ' + rows.length + ' updates ↓">Show all ' + rows.length + ' updates ↓</a>'
+          : "") + addBtn + '</div>';
+    } else if (ctx.ED) {
+      uh = '<div class="pk-upds">' + addBtn + '</div>';
+    }
+    /* automatic progress bar — fills from the pipeline stages by itself; a
+       manually entered % only refines the "In progress" portion. No caption:
+       the bar speaks for itself on the board-facing report. */
+    var bar = (sg.overall != null)
+      ? '<div class="pk-pbar" title="' + sg.overall + '% complete"><span class="pk-pfill" style="width:' + sg.overall + '%"></span></div>'
+      : "";
+    /* property manager only: drag to set how far the site work is (in-progress jobs) */
+    if (ctx.ED && j.status === "inprogress" && sg.overall != null) {
+      var doneN = 0; sg.steps.forEach(function (s) { if (s.done) doneN++; });
+      bar += '<div class="pk-prow"><span class="pk-prowlbl">Site work</span>' +
+        '<input type="range" class="pk-prange" min="0" max="100" step="5" value="' + (sg.pct == null ? 50 : sg.pct) +
+        '" data-donen="' + doneN + '" title="Drag to set how far the site work is">' +
+        '<span class="pk-prangeval">' + (sg.pct == null ? "—" : sg.pct + "%") + '</span></div>';
+    }
+    cards.push('<div class="pk-progcard" data-jid="' + esc(j.id) + '"><div class="pk-proghead">' +
+      '<div class="pk-progjob"><span class="pk-cmpno">' + esc(j.no) + '</span> ' +
+      tEdit("job:" + j.id + ":desc", j.desc, "Job description") +
+      (j.priority ? ' <span class="pk-prio">High priority</span>' : "") + stChip(j) + health + '</div>' +
+      '<div class="pk-progamt">' + (x.c.cost ? money(x.c.cost) : '<span class="pendchip">Pending</span>') + '</div></div>' +
+      (winner ? '<div class="pk-progaward">' + pkAvatar(winner) +
+        (isAwarded
+          ? '<span>Awarded to <b>' + esc(winner) + '</b>' + (j.awardDate ? ' · ' + esc(j.awardDate) : "") + '</span>'
+          : '<span>Lowest bid — <b>' + esc(winner) + '</b> <small>(not yet awarded)</small></span>') + '</div>' : "") +
+      pkStepper(sg, ctx.ED) + bar + uh + '</div>');
+  });
+  return cards.join("");
+}
+
 /* ============ Board packet template (Design 4) ============ */
 function renderPacketReport() {
   var d = computeAll(), M = state.meta || META_DEFAULTS, ov = overviewData(d), ctx = tplCtx();
@@ -1846,6 +2108,7 @@ function renderPacketReport() {
     '<a href="#secA">' + pkIcon("hp") + ' High priority jobs</a>' +
     '<a href="#secB">' + pkIcon("bid") + ' Bid comparisons</a>' +
     '<a href="#secC">' + pkIcon("sched") + ' Standard schedule</a>' +
+    '<a href="#secProg">' + pkIcon("prog") + ' Work in progress</a>' +
     '<a href="#secD">' + pkIcon("spend") + ' Contractor spend</a>' +
     '<a href="#secE">' + pkIcon("open") + ' Open items</a>' +
     '<a href="#" data-arch="1">' + pkIcon("arch") + ' Reports archive</a></nav>');
@@ -1894,6 +2157,15 @@ function renderPacketReport() {
       '<div class="pk-totalcard"><div class="tl">Total (incl. HST)</div><div class="tv">' + money(cRows.total) + '</div></div>') +
     packetSecC(d, ctx) + '</section>');
   h.push('</div>');
+  /* work-in-progress pipeline: one card per approved job (stepper + % + updates) */
+  var nAct = d.jobs.filter(function (x) { return APPROVED_SET[x.j.status]; }).length;
+  var nDone = d.stCounts.completed || 0;
+  h.push('<section id="secProg" class="panel pk-detailcard">' +
+    pkSecHead("D", "Work in progress",
+      "Every approved job from creation to completion — quotes received, board approval, contract award, work progress and dated site updates.",
+      nAct ? '<div class="pk-totalcard"><div class="tl">Active jobs</div><div class="tv">' + (nAct - nDone) +
+        (nDone ? '<small class="pk-tvsub"> +' + nDone + ' done</small>' : '') + '</div></div>' : '') +
+    packetProgress(d, ctx) + '</section>');
   /* bottom 2-up: schedule | open items (kept last) */
   h.push('<div class="pk-grid2">');
   var tl = sched.length
@@ -2252,6 +2524,27 @@ function renderEditor() {
       '<label>Decision date <input type="date" value="' + esc(j.statusDate || "") + '" data-f="statusDate"></label>' +
       '<input type="text" value="' + esc(j.statusNote || "") + '" data-f="statusNote" placeholder="decision / progress note (shows in Section E)">' +
       '<button class="btn small" data-act="openvote" type="button" title="Put this job to a board vote">🗳 Board vote</button></div>');
+    /* progress row: contract award + % complete (feeds the Work-in-progress pipeline) */
+    var awNames = []; j.bids.forEach(function (b) {
+      var nm = (b.contractor || "").trim(); if (nm && awNames.indexOf(nm) < 0) awNames.push(nm); });
+    var awOpts = '<option value=""' + (!(j.awardedTo || "").trim() ? " selected" : "") + '>— not awarded —</option>' +
+      awNames.map(function (nm) {
+        return '<option value="' + esc(nm) + '"' + ((j.awardedTo || "") === nm ? " selected" : "") + '>' + esc(nm) + '</option>';
+      }).join("");
+    h.push('<div class="strow"><label>Awarded to <select data-f="awardedTo">' + awOpts + '</select></label>' +
+      '<label>Award date <input type="date" value="' + esc(j.awardDate || "") + '" data-f="awardDate"></label>' +
+      '<label>% complete <input type="number" min="0" max="100" step="5" style="width:64px" value="' +
+      (j.pct == null ? "" : esc(j.pct)) + '" data-f="pct" placeholder="—"></label>' +
+      '<span class="savenote" style="font-size:12px">optional — the progress bar fills automatically from the stages; a % here fine-tunes the “In progress” part</span></div>');
+    /* dated progress updates (newest first on the report) */
+    h.push('<div class="eupds"><div class="eupdhead">Progress updates <span>— dated site notes shown on the report’s Work-in-progress card</span></div>');
+    (j.updates || []).forEach(function (u, ui) {
+      h.push('<div class="eupdrow" data-ui="' + ui + '">' +
+        '<input type="date" value="' + esc(u.d || "") + '" data-f="upd-d">' +
+        '<input type="text" value="' + esc(u.t || "") + '" data-f="upd-t" placeholder="what happened on site…">' +
+        '<button class="xbtn" data-act="delupd" title="Remove this update">✕</button></div>');
+    });
+    h.push('<button class="addbid" data-act="addupd" type="button">+ Add progress update</button></div>');
     h.push('<div class="ebids"><div class="ebrow hdr"><div>Contractor</div><div>Quote #</div><div>Amount</div><div>HST</div><div>Notes</div><div>Status</div><div></div></div>');
     j.bids.forEach(function (b, bi) {
       var t = bidTotal(b);
@@ -2429,11 +2722,30 @@ document.getElementById("editor").addEventListener("change", function (e) {
   else if (f === "status") {
     j.status = e.target.value;
     if (!j.statusDate && j.status !== "quoted") j.statusDate = todayISO();
+    if (j.status === "completed") j.pct = 100;   /* finished work is 100% by definition */
     persist(null, ['Job ' + j.no + ' (' + (j.desc || "job") + ') marked ' + statusLabel(j.status)]);
     renderEditor(); renderReport(); return;
   }
   else if (f === "statusDate") j.statusDate = e.target.value;
   else if (f === "statusNote") j.statusNote = e.target.value;
+  else if (f === "awardedTo") {
+    j.awardedTo = e.target.value;
+    if (j.awardedTo && !j.awardDate) j.awardDate = todayISO();
+    persist(null, [j.awardedTo
+      ? 'Job ' + j.no + ' (' + (j.desc || "job") + ') awarded to ' + j.awardedTo
+      : 'Job ' + j.no + ' (' + (j.desc || "job") + ') award cleared']);
+    renderEditor(); renderReport(); return;
+  }
+  else if (f === "awardDate") j.awardDate = e.target.value;
+  else if (f === "pct") {
+    j.pct = e.target.value === "" ? null : Math.max(0, Math.min(100, Math.round(+e.target.value || 0)));
+  }
+  else if (f === "upd-d" || f === "upd-t") {
+    var ur = e.target.closest(".eupdrow"); if (!ur) return;
+    var u = (j.updates || [])[+ur.dataset.ui]; if (!u) return;
+    if (f === "upd-d") u.d = e.target.value; else u.t = e.target.value;
+    persist(); renderReport(); return;   /* keep the editor DOM (and focus) as-is */
+  }
   else if (row) {
     var b = j.bids[+row.dataset.bi]; if (!b) return;
     if (f === "amount") b.amount = e.target.value === "" ? null : Number(e.target.value);
@@ -2445,7 +2757,7 @@ document.getElementById("editor").addEventListener("change", function (e) {
 });
 document.getElementById("editor").addEventListener("click", function (e) {
   if (e.target.id === "btnAddJob") {
-    var nj = { id: genId(), no: 0, priority: false, desc: "",
+    var nj = { id: genId(), no: 0, priority: false, desc: "", created: todayISO(), updates: [],
       bids: [{ contractor: "", qno: "", amount: null, hst: false, notes: "" }] };
     state.jobs.push(nj);
     orderJobs(state.jobs);   /* lands at the end of the standard jobs */
@@ -2499,6 +2811,23 @@ document.getElementById("editor").addEventListener("click", function (e) {
     var vj = state.jobs[+vc.dataset.ji];
     if (vj) openVoteFor(vj);
     return;
+  }
+  if (act === "addupd") {
+    var auc = e.target.closest(".ecard"); if (!auc) return;
+    var auj = state.jobs[+auc.dataset.ji]; if (!auj) return;
+    auj.updates = auj.updates || [];
+    auj.updates.push({ d: todayISO(), t: "" });
+    persist(); renderEditor(); renderReport();
+    var nc = document.querySelector('#editor .ecard[data-jid="' + auj.id + '"] .eupdrow:last-of-type input[data-f="upd-t"]');
+    if (nc) nc.focus();
+    return;
+  }
+  if (act === "delupd") {
+    var duc = e.target.closest(".ecard"), dur = e.target.closest(".eupdrow");
+    if (!duc || !dur) return;
+    var duj = state.jobs[+duc.dataset.ji]; if (!duj || !duj.updates) return;
+    duj.updates.splice(+dur.dataset.ui, 1);
+    persist(); renderEditor(); renderReport(); return;
   }
   if (act === "board-add") {
     var be = document.getElementById("boardNewEmail");
@@ -2748,6 +3077,104 @@ function aiIntakeCommit() {
 
 /* ---------- quote attachments (beta, Firebase Storage) ---------- */
 var attachTarget = null;
+/* ---------- "Add progress update" form (opened from a Work-in-progress card) ---------- */
+var progTarget = null;     /* the job being updated */
+var progMedia = [];        /* pending File objects picked but not yet uploaded */
+function openProgressModal(j) {
+  if (!isEditor()) return;
+  progTarget = j; progMedia = [];
+  document.getElementById("progJobName").textContent = "Job " + j.no + " — " + (j.desc || "");
+  document.getElementById("progDate").value = todayISO();
+  var isIP = j.status === "inprogress";
+  document.getElementById("progPctRow").style.display = isIP ? "" : "none";
+  var pr = document.getElementById("progPct");
+  pr.value = (j.pct == null ? 50 : j.pct);
+  document.getElementById("progPctVal").textContent = pr.value + "%";
+  document.getElementById("progText").value = "";
+  document.getElementById("progInternal").checked = false;
+  document.getElementById("progIssue").checked = false;
+  document.getElementById("progErr").textContent = "";
+  var sb = document.getElementById("progSave"); sb.disabled = false; sb.textContent = "Save update";
+  progMediaRender();
+  document.getElementById("progOverlay").classList.add("open");
+  setTimeout(function () { document.getElementById("progText").focus(); }, 60);
+}
+function progMediaRender() {
+  var el = document.getElementById("progMediaList");
+  el.innerHTML = progMedia.map(function (f, i) {
+    var img = /^image\//.test(f.type) ? '<img src="' + URL.createObjectURL(f) + '" alt="">' : '🎬';
+    return '<span class="pmchip">' + img + '<span class="nm">' + esc(f.name) + '</span>' +
+      '<span class="fx" data-pmi="' + i + '" title="Remove">✕</span></span>';
+  }).join("");
+}
+document.getElementById("progPct").addEventListener("input", function () {
+  document.getElementById("progPctVal").textContent = this.value + "%";
+});
+document.getElementById("progMediaBtn").onclick = function () { document.getElementById("progMediaFile").click(); };
+document.getElementById("progMediaFile").addEventListener("change", function () {
+  for (var i = 0; i < this.files.length; i++) {
+    var f = this.files[i];
+    if (f.size > 15 * 1024 * 1024) { alert("“" + f.name + "” is over 15 MB — please pick a smaller file."); continue; }
+    progMedia.push(f);
+  }
+  this.value = "";
+  progMediaRender();
+});
+document.getElementById("progMediaList").addEventListener("click", function (e) {
+  if (e.target.dataset.pmi != null) { progMedia.splice(+e.target.dataset.pmi, 1); progMediaRender(); }
+});
+document.getElementById("progCancel").onclick = function () {
+  document.getElementById("progOverlay").classList.remove("open");
+  progTarget = null; progMedia = [];
+};
+document.getElementById("progSave").onclick = function () {
+  var j = progTarget; if (!j) return;
+  var txt = document.getElementById("progText").value.replace(/\s+/g, " ").trim();
+  var errEl = document.getElementById("progErr");
+  if (!txt && !progMedia.length) { errEl.textContent = "Type what happened, or attach a photo."; return; }
+  if (progMedia.length && !cloud.store) { errEl.textContent = "Photo/video upload needs the cloud site — save the text and retry the media online."; return; }
+  var btn = this; btn.disabled = true; errEl.textContent = "";
+  /* upload the media one by one (each ≤15 MB, same storage rules as bid attachments) */
+  var media = [], idx = 0;
+  function next() {
+    if (idx >= progMedia.length) return done();
+    var f = progMedia[idx++];
+    btn.textContent = "Uploading " + idx + " of " + progMedia.length + "…";
+    var path = "quoteAttachments/progress/" + j.id + "/" + Date.now() + "-" + f.name.replace(/[^\w.\-() ]+/g, "_");
+    cloud.store.ref(path).put(f)
+      .then(function (snap) { return snap.ref.getDownloadURL(); })
+      .then(function (url) {
+        media.push({ name: f.name, url: url, path: path, size: f.size,
+                     type: /^video\//.test(f.type) ? "video" : "image" });
+        next();
+      })
+      .catch(function (e) {
+        btn.disabled = false; btn.textContent = "Save update";
+        errEl.textContent = "Upload of “" + f.name + "” failed (" + ((e && e.code) || "error") + ") — nothing was saved yet.";
+      });
+  }
+  function done() {
+    var u = { d: document.getElementById("progDate").value || todayISO(), t: txt };
+    if (media.length) u.media = media;
+    if (document.getElementById("progInternal").checked) u.internal = true;
+    if (document.getElementById("progIssue").checked) u.issue = true;
+    j.updates = j.updates || [];
+    j.updates.push(u);
+    var msgs = ['Progress update on job ' + j.no + ' (' + (j.desc || "job") + ')' +
+      (u.issue ? " — issue/delay reported" : "") + (media.length ? " with " + media.length + " file(s)" : "")];
+    if (j.status === "inprogress") {
+      var np = Math.max(0, Math.min(100, Math.round(+document.getElementById("progPct").value || 0)));
+      if (np !== j.pct) { j.pct = np; msgs.push('Job ' + j.no + ' site work set to ' + np + '%'); }
+    }
+    persist(null, msgs);
+    document.getElementById("progOverlay").classList.remove("open");
+    progTarget = null; progMedia = [];
+    renderReport();
+    if (document.body.dataset.view === "edit") renderEditor();
+  }
+  next();
+};
+
 function startAttach(ji, bi) {
   if (!isEditor()) return;
   if (!cloud.store) { alert("File storage is not enabled for this site yet."); return; }
@@ -3874,11 +4301,77 @@ function toggleBidRow(b) {
 }
 document.getElementById("report").addEventListener("click", function (e) {
   var b = e.target.closest(".bids.expand"); if (b) toggleBidRow(b);
+  var um = e.target.closest(".pk-updmore");
+  if (um) {                                     /* show/hide the older progress updates */
+    var rest = um.parentElement.querySelector(".pk-updrest");
+    if (rest) {
+      rest.hidden = !rest.hidden;
+      um.textContent = rest.hidden ? um.dataset.more : "Show fewer updates ↑";
+    }
+  }
+  /* property manager: click a pipeline stage dot to mark it reached */
+  var stp = e.target.closest(".pk-step[data-stage]");
+  if (stp && isEditor()) { pkStageClick(stp); return; }
+  /* property manager: open the progress-update form for this card's job */
+  var au = e.target.closest(".pk-addupd");
+  if (au && isEditor()) {
+    var ac = au.closest(".pk-progcard"); var aj = ac && findJob(ac.dataset.jid);
+    if (aj) openProgressModal(aj);
+    return;
+  }
+});
+/* apply a clicked pipeline stage (report-side quick editing, with a confirm) */
+function pkStageClick(stp) {
+  var card = stp.closest(".pk-progcard"); var j = card && findJob(card.dataset.jid); if (!j) return;
+  var stage = stp.dataset.stage, name = j.desc || "this job";
+  if (stage === "approved") {
+    if (!confirm('Mark “' + name + '” as board-approved?')) return;
+    j.status = "approved"; if (!j.statusDate) j.statusDate = todayISO();
+    persist(null, ['Job ' + j.no + ' (' + name + ') marked Approved']);
+  } else if (stage === "awarded") {
+    var win = (j.awardedTo || "").trim();
+    if (!win) { var c = jobCalc(j); win = c.carriedBids.length ? (c.carriedBids[0].b.contractor || "").trim() : ""; }
+    if (!confirm(win ? 'Award “' + name + '” to ' + win + '?' : 'Mark “' + name + '” as awarded?')) return;
+    if (win) j.awardedTo = win;
+    if (!j.awardDate) j.awardDate = todayISO();
+    if (!APPROVED_SET[j.status]) { j.status = "approved"; if (!j.statusDate) j.statusDate = todayISO(); }
+    persist(null, ['Job ' + j.no + ' (' + name + ') awarded' + (win ? ' to ' + win : '')]);
+  } else if (stage === "inprogress") {
+    if (!confirm('Mark work on “' + name + '” as started (in progress)?')) return;
+    j.status = "inprogress"; if (!j.statusDate) j.statusDate = todayISO();
+    persist(null, ['Job ' + j.no + ' (' + name + ') marked In progress']);
+  } else if (stage === "completed") {
+    if (!confirm('Mark “' + name + '” as completed?')) return;
+    j.status = "completed"; j.pct = 100; j.statusDate = todayISO();
+    persist(null, ['Job ' + j.no + ' (' + name + ') marked Completed']);
+  } else return;
+  renderReport();
+  if (document.body.dataset.view === "edit") renderEditor();
+}
+/* the site-work slider: live-preview while dragging, save on release */
+document.getElementById("report").addEventListener("input", function (e) {
+  if (!e.target.classList.contains("pk-prange")) return;
+  var card = e.target.closest(".pk-progcard"), v = +e.target.value;
+  var doneN = +e.target.dataset.donen || 4;
+  var fill = card.querySelector(".pk-pfill");
+  if (fill) fill.style.width = Math.round(100 * (doneN + v / 100) / 6) + "%";
+  var out = card.querySelector(".pk-prangeval"); if (out) out.textContent = v + "%";
+});
+document.getElementById("report").addEventListener("change", function (e) {
+  if (!e.target.classList.contains("pk-prange") || !isEditor()) return;
+  var card = e.target.closest(".pk-progcard"); var j = card && findJob(card.dataset.jid); if (!j) return;
+  j.pct = Math.max(0, Math.min(100, Math.round(+e.target.value || 0)));
+  persist(null, ['Job ' + j.no + ' (' + (j.desc || "job") + ') site work set to ' + j.pct + '%']);
+  renderReport();
 });
 document.getElementById("report").addEventListener("keydown", function (e) {
   if (e.key !== "Enter" && e.key !== " ") return;
   var b = e.target.closest(".bids.expand");
-  if (b) { e.preventDefault(); toggleBidRow(b); }
+  if (b) { e.preventDefault(); toggleBidRow(b); return; }
+  var stp = e.target.closest(".pk-step[data-stage]");
+  if (stp && isEditor()) { e.preventDefault(); pkStageClick(stp); return; }
+  var au = e.target.closest(".pk-addupd");
+  if (au) { e.preventDefault(); au.click(); }
 });
 
 /* ---------- inline editing of any [data-edit] element (signed-in editors) ---------- */
@@ -3936,6 +4429,11 @@ function commitEdit(el) {
       if ((b.notes || "") === val) { el.textContent = val; return; }
       b.notes = val;
     } else return;
+  } else if (p[0] === "upd") {                                  /* progress-update text */
+    var ju = findJob(p[1]); if (!ju || !ju.updates) return;
+    var u = ju.updates[+p[2]]; if (!u) return;
+    if ((u.t || "") === val) { el.textContent = val; return; }
+    u.t = val;
   } else return;
   persist();
   renderReport();
