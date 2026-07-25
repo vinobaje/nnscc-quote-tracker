@@ -1,4 +1,5 @@
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Waterview Condominium — Quote Tracker (BETA PREVIEW)</title>
 <style>
 :root {
@@ -42,6 +43,9 @@ html { scroll-behavior:smooth; }
   box-shadow:0 2px 12px rgba(15,22,31,.35); margin:0 -20px; }
 .appbar-inner { max-width:960px; margin:0 auto; padding:9px 20px; display:flex; gap:8px;
   align-items:center; flex-wrap:wrap; }
+/* slim variant (Board Packet): thinner bar, smaller controls */
+.appbar.slim .appbar-inner { padding:5px 20px; max-width:none; }
+.appbar.slim .btn { padding:4px 10px; font-size:12.5px; }
 .appbrand { display:flex; align-items:center; gap:9px; font-family:Georgia,serif; font-size:15.5px;
   font-weight:600; color:#fff; margin-right:10px; white-space:nowrap; }
 .appbrand img { height:24px; display:block; }
@@ -207,6 +211,21 @@ input:focus, select:focus { outline:2px solid var(--accent); outline-offset:-1px
 .ebrow { display:grid; grid-template-columns:minmax(150px,1.4fr) 90px 120px 110px minmax(120px,1.6fr) 96px 30px;
   gap:8px; align-items:center; padding:5px 0; min-width:740px; }
 .ebrow.hdr { font-size:10.5px; text-transform:uppercase; letter-spacing:.07em; color:var(--muted); font-weight:600; }
+/* each field is wrapped in a .ef cell; its label (.efl) is hidden on desktop (the hdr row labels the columns) */
+.ebrow .ef { min-width:0; }
+.ebrow .ef > input, .ebrow .ef > select { width:100%; box-sizing:border-box; }
+.ebrow .ef .efl { display:none; }
+/* phones: stack the bid fields vertically with their labels so nothing runs off-screen */
+@media (max-width:600px) {
+  #editor .ebids { overflow-x:visible; }
+  #editor .ebrow.hdr { display:none; }
+  #editor .ebrow { display:block; min-width:0; padding:4px 0; }
+  #editor .ebrow .ef { display:block; margin-bottom:9px; }
+  #editor .ebrow .ef .efl { display:block; font-size:11px; text-transform:uppercase; letter-spacing:.04em;
+    color:var(--muted); font-weight:600; margin-bottom:3px; }
+  #editor .ebrow > .xbtn { display:inline-block; font-size:13px; }
+  #editor .ebrow > .xbtn::after { content:" Remove bid"; font-size:12.5px; }
+}
 .ebrow .st { font-size:12px; font-weight:650; white-space:nowrap; }
 .st.rec { color:var(--good); } .st.pen { color:var(--amber); font-style:italic; }
 .xbtn { border:none; background:none; color:var(--prio); font-size:16px; cursor:pointer; line-height:1; padding:2px 6px; }
@@ -370,6 +389,440 @@ input:focus, select:focus { outline:2px solid var(--accent); outline-offset:-1px
   .herometa { color:var(--ink2); }
   .tile:hover { transform:none; }
 }
+
+/* ===================================================================
+   ALTERNATE REPORT TEMPLATES (selectable by the property manager)
+   Classic = the original layout (unscoped rules above).
+   #report.tpl-dashboard = "Executive dashboard"
+   #report.tpl-packet    = "Board packet"
+   Both reuse the shared tokens, tables, .brow bars and .stchip chips.
+   =================================================================== */
+
+/* the picker in the app bar (editor only) */
+.tplpick { display:inline-flex; align-items:center; gap:6px; color:#DCE6F2; font-size:12px; font-weight:600; }
+.tplpick select { font:inherit; font-size:12.5px; color:#12324f; background:#EAF1F8; border:1px solid #6f88a6;
+  border-radius:6px; padding:5px 8px; font-weight:600; cursor:pointer; }
+
+/* give the two dashboard-y layouts more room than the 960px classic column */
+/* wide, but capped so content stays dense and the text reads large (not stretched
+   thin across a huge monitor) */
+body:has(#report.tpl-dashboard) .wrap { max-width:1400px; }
+body:has(#report.tpl-packet) .wrap { max-width:1560px; }
+
+/* shared panel card used by both new templates */
+.tpl-dashboard .panel, .tpl-packet .panel { background:var(--card); border:1px solid var(--line); border-radius:10px;
+  padding:18px 20px; box-shadow:0 1px 3px rgba(30,40,51,.06); margin:0; }
+.tpl-dashboard .panel > h3, .tpl-packet .panel > h3 { font-family:inherit; font-size:15px; font-weight:700; letter-spacing:.01em;
+  margin:0 0 12px; color:var(--ink); display:flex; align-items:center; gap:8px; }
+.tpl-dashboard section, .tpl-packet section { margin:0; }
+.tpl-dashboard .panel table, .tpl-packet .panel table { margin-top:2px; }
+/* table inside a panel: drop its own frame so it blends into the panel */
+.tpl-dashboard .panel .tablewrap, .tpl-packet .panel .tablewrap { border:none; box-shadow:none; border-radius:0; }
+
+/* stat-card grid shared shell */
+.statgrid { display:grid; grid-template-columns:repeat(6,1fr); gap:12px; }
+@media (max-width:1080px){ .statgrid { grid-template-columns:repeat(3,1fr); } }
+@media (max-width:560px){ .statgrid { grid-template-columns:repeat(2,1fr); } }
+.statcard { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:13px 14px;
+  box-shadow:0 1px 3px rgba(30,40,51,.06); }
+.statcard .sv-body { min-width:0; }
+.statcard .sv-ic { font-size:17px; line-height:1; }
+.statcard .sv-v { font-size:20px; font-weight:700; font-variant-numeric:tabular-nums; letter-spacing:-.01em; margin-top:7px; }
+.statcard .sv-l { font-size:12.5px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-top:2px; }
+.statcard .sv-s { font-size:13px; color:var(--ink2); margin-top:1px; }
+.statcard.hp .sv-v { color:var(--prio); } .statcard.hp { border-top:3px solid var(--prio); }
+.statcard.sd { border-top:3px solid var(--accent); }
+.statcard.sv .sv-v { color:var(--good); } .statcard.sv { border-top:3px solid var(--good); }
+.statcard.pd .sv-v { color:var(--amber); } .statcard.pd { border-top:3px solid var(--amber); }
+.statcard.ap .sv-v { color:var(--good); } .statcard.ap { border-top:3px solid var(--good); }
+.statcard.tt { border-top:3px solid var(--ink); }
+
+/* donut + legend */
+.ov-donut { display:flex; gap:18px; align-items:center; flex-wrap:wrap; }
+.donut .dn-top { font:700 20px Georgia,serif; fill:var(--ink); }
+.donut .dn-bot { font:600 9px -apple-system,sans-serif; fill:var(--muted); text-transform:uppercase; letter-spacing:.08em; }
+.ov-legend { list-style:none; margin:0; padding:0; font-size:13px; color:var(--ink2); }
+.ov-legend li { display:flex; align-items:center; gap:8px; padding:3px 0; }
+.ov-legend .sw { width:11px; height:11px; border-radius:3px; flex:none; }
+.ov-legend b { color:var(--ink); font-variant-numeric:tabular-nums; }
+
+/* top-savings cards */
+.savegrid { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; }
+@media (max-width:820px){ .savegrid { grid-template-columns:repeat(2,1fr); } }
+.savecard { background:var(--good-soft); border:1px solid #bfe0cc; border-radius:10px; padding:13px 15px; }
+.savecard .sc-job { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--good); }
+.savecard .sc-desc { font-size:13px; color:var(--ink); margin:3px 0 8px; line-height:1.35; }
+.savecard .sc-lab { font-size:11px; color:var(--ink2); }
+.savecard .sc-amt { font-size:20px; font-weight:700; color:var(--good); font-variant-numeric:tabular-nums; }
+.savecard .sc-amt.big { font-size:26px; }
+.savecard .sc-sub { font-size:11px; color:var(--muted); }
+.savecard.total { background:#16613a; border-color:#16613a; color:#eafaf0; text-align:center; display:flex;
+  flex-direction:column; justify-content:center; }
+.savecard.total .sc-lab, .savecard.total .sc-sub { color:#cdebd8; }
+.savecard.total .sc-amt { color:#fff; }
+
+/* ---------- Executive dashboard (dark left rail) ---------- */
+.tpl-dashboard .dash-shell { display:grid; grid-template-columns:216px 1fr; gap:22px; align-items:start; }
+@media (max-width:820px){ .tpl-dashboard .dash-shell { grid-template-columns:1fr; } }
+.tpl-dashboard .dash-side { background:linear-gradient(180deg,#1B2634 0%,#22354d 100%); border-radius:12px;
+  padding:18px 14px; color:#cdd8e6; position:sticky; top:calc(var(--abh,48px) + 12px); align-self:start; }
+@media (max-width:820px){ .tpl-dashboard .dash-side { position:static; } }
+.tpl-dashboard .ds-brand { display:flex; align-items:center; gap:10px; padding:0 4px 14px; margin-bottom:12px;
+  border-bottom:1px solid rgba(255,255,255,.12); }
+.tpl-dashboard .ds-brand img { height:30px; background:#fff; border-radius:6px; padding:3px; }
+.tpl-dashboard .ds-brand span { font-size:13.5px; font-weight:700; color:#fff; line-height:1.25; }
+.tpl-dashboard .dash-nav { position:static; display:flex; flex-direction:column; gap:2px; background:none;
+  border:none; padding:0; box-shadow:none; }
+.tpl-dashboard .dash-nav a { display:block; font-size:13px; font-weight:600; color:#b7c4d4; text-decoration:none;
+  padding:8px 11px; border-radius:7px; border:none; }
+.tpl-dashboard .dash-nav a:hover { background:rgba(255,255,255,.08); color:#fff; }
+.tpl-dashboard .dash-nav a.active { background:var(--accent); color:#fff; }
+.tpl-dashboard .ds-foot { display:flex; align-items:center; gap:9px; margin-top:16px; padding-top:13px;
+  border-top:1px solid rgba(255,255,255,.12); font-size:12px; }
+.tpl-dashboard .ds-foot .av { width:26px; height:26px; border-radius:50%; background:#3a577c;
+  display:flex; align-items:center; justify-content:center; font-size:13px; }
+.tpl-dashboard .ds-foot b { color:#fff; display:block; font-size:12.5px; }
+.tpl-dashboard .ds-foot small { color:#8ea1b7; }
+.tpl-dashboard .dash-main { display:flex; flex-direction:column; gap:18px; min-width:0; }
+.tpl-dashboard .dash-top { display:flex; justify-content:space-between; align-items:flex-start; gap:16px; flex-wrap:wrap; }
+.tpl-dashboard .dash-top h1 { font-family:-apple-system,"Segoe UI",Roboto,sans-serif; font-size:24px; font-weight:750;
+  margin:0; letter-spacing:-.01em; }
+.tpl-dashboard .dash-top .dt-sub { color:var(--ink2); font-size:13.5px; margin-top:3px; }
+.tpl-dashboard .dash-top .dt-date { color:var(--muted); font-size:12.5px; margin-top:1px; }
+.tpl-dashboard .dash-2col { display:grid; grid-template-columns:1fr 1fr; gap:16px; align-items:start; }
+@media (max-width:820px){ .tpl-dashboard .dash-2col { grid-template-columns:1fr; } }
+.tpl-dashboard .ov-summary { font-size:13px; color:var(--ink2); line-height:1.5; margin:12px 0 0;
+  border-top:1px solid var(--line-soft); padding-top:11px; }
+.tpl-dashboard .brow { grid-template-columns:150px 1fr 130px; }
+.tpl-dashboard .btn-print { font:inherit; font-size:12.5px; font-weight:600; color:#12324f; background:#EAF1F8;
+  border:1px solid #b9cbe0; border-radius:7px; padding:8px 13px; cursor:pointer; }
+
+/* ---------- Board packet (Design 4: dark rail + serif header + 4-up) ---------- */
+.tpl-packet { --pkg:#16613a; }
+.tpl-packet .pk-shell { display:grid; grid-template-columns:216px 1fr; background:var(--card);
+  border:1px solid var(--line); border-radius:12px; box-shadow:0 1px 3px rgba(30,40,51,.07); }
+@media (max-width:900px){ .tpl-packet .pk-shell { grid-template-columns:1fr; } }
+/* left dark-navy rail — high-contrast, bright labels; corners rounded on the child
+   (parent no longer clips, so the sticky panel below can track the scroll) */
+.tpl-packet .pk-side { background:linear-gradient(180deg,#18222e 0%,#121a24 100%); color:#eef2f7;
+  padding:18px 13px; border-radius:12px 0 0 12px; }
+/* sticky panel: nav stays put while the report scrolls */
+.tpl-packet .pk-side-inner { position:sticky; top:calc(var(--abh,48px) + 14px); display:flex; flex-direction:column;
+  height:calc(100vh - var(--abh,48px) - 28px); overflow-y:auto; }
+@media (max-width:900px){ .tpl-packet .pk-side { border-radius:12px 12px 0 0; }
+  .tpl-packet .pk-side-inner { position:static; height:auto; overflow:visible; } }
+.tpl-packet .pk-brand { display:flex; flex-direction:row; align-items:center; text-align:left; gap:11px;
+  padding:2px 4px 16px; margin-bottom:13px; border-bottom:1px solid rgba(255,255,255,.14); }
+.tpl-packet .pk-brand .ic { flex:none; }
+.tpl-packet .pk-brand .ic svg { display:block; width:36px; height:36px; }
+.tpl-packet .pk-brand b { color:#fff; font-family:Georgia,serif; font-size:13px; line-height:1.25; letter-spacing:.05em; display:block; }
+.tpl-packet .pk-brand small { color:#aebccb; font-size:10px; letter-spacing:.06em; }
+/* reset the light styling inherited from the global .secnav (this nav lives on the dark rail) */
+.tpl-packet .pk-nav { display:flex; flex-direction:column; gap:4px; position:static; background:none;
+  margin:0; padding:0; box-shadow:none; }
+.tpl-packet .pk-nav a { display:flex; align-items:center; gap:12px; font-size:14.5px; font-weight:600; color:#ffffff;
+  background:transparent; text-decoration:none; padding:9px 11px; border-radius:9px; border:1px solid transparent; }
+.tpl-packet .pk-nav a .ni { flex:none; width:27px; height:27px; border-radius:8px; background:rgba(226,192,122,.14);
+  display:flex; align-items:center; justify-content:center; }
+.tpl-packet .pk-nav a .ni svg { width:16px; height:16px; display:block; }
+.tpl-packet .pk-nav a:hover { background:rgba(255,255,255,.09); color:#fff; }
+.tpl-packet .pk-nav a.active { background:linear-gradient(90deg,#2a8a5c 0%,#1f7350 100%); color:#fff;
+  border-color:rgba(150,220,185,.55); box-shadow:0 2px 8px rgba(0,0,0,.28); }
+.tpl-packet .pk-nav a.active .ni { background:rgba(255,255,255,.22); }
+.tpl-packet .pk-side-foot { margin-top:auto; margin-bottom:2px; padding:11px 12px; border:1px solid rgba(255,255,255,.16);
+  border-radius:11px; background:rgba(255,255,255,.05); display:flex; align-items:center; gap:11px; font-size:12px; }
+.tpl-packet .pk-side-foot .av { width:32px; height:32px; border-radius:50%; background:#2f5d4a; flex:none;
+  border:2px solid #e2c07a; display:flex; align-items:center; justify-content:center; font-size:14px; overflow:hidden; }
+.tpl-packet .pk-side-foot .av img { width:100%; height:100%; object-fit:cover; }
+.tpl-packet .pk-side-foot b { color:#fff; display:block; font-size:12.5px; }
+.tpl-packet .pk-side-foot .so { color:#b6c3d1; text-decoration:none; cursor:pointer; }
+.tpl-packet .pk-side-foot .so:hover { color:#fff; text-decoration:underline; }
+/* main column */
+.tpl-packet .pk-main { padding:18px 20px; min-width:0; display:flex; flex-direction:column; gap:16px; background:var(--paper); border-radius:0 12px 12px 0; }
+@media (max-width:900px){ .tpl-packet .pk-main { border-radius:0 0 12px 12px; } }
+/* top card: a header row (title left, photo right) with the stat band full-width below */
+.tpl-packet .pk-top { background:var(--card); border:1px solid var(--line); border-radius:12px; overflow:hidden; }
+.tpl-packet .pk-hdrow { display:grid; grid-template-columns:1fr 300px; }
+@media (max-width:1000px){ .tpl-packet .pk-hdrow { grid-template-columns:1fr; } }
+.tpl-packet .pk-top-left { padding:18px 22px; min-width:0; }
+.tpl-packet .pk-hd { display:flex; justify-content:space-between; align-items:flex-start; gap:16px; }
+.tpl-packet .pk-title-row { display:flex; align-items:baseline; gap:16px; flex-wrap:wrap; }
+.tpl-packet .pk-title-row h1 { font-family:Georgia,"Times New Roman",serif; font-size:26px; color:var(--pkg);
+  margin:0; letter-spacing:.02em; }
+.tpl-packet .pk-forb { font-size:10.5px; font-weight:700; letter-spacing:.14em; color:var(--muted); text-transform:uppercase; }
+.tpl-packet .pk-hd-meta { font-size:12px; color:var(--ink2); margin-top:8px; }
+.tpl-packet .pk-hd-meta b { color:var(--ink); }
+.tpl-packet .btn-print { flex:none; font:inherit; font-size:12px; font-weight:600; color:#fff; background:var(--pkg);
+  border:none; border-radius:7px; padding:8px 13px; cursor:pointer; box-shadow:0 1px 4px rgba(0,0,0,.2); }
+.tpl-packet .pk-gold { height:2px; background:linear-gradient(90deg,#c9a24b,#e7cf8f 60%,transparent); border-radius:2px; margin:13px 0 0; }
+/* photo spans the header row (top-right); curved gold-accented left edge */
+.tpl-packet .pk-top-photo { position:relative; min-height:150px; }
+.tpl-packet .pk-top-photo img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
+.tpl-packet .pk-top-photo::before { content:""; position:absolute; top:0; bottom:0; left:-16px; width:32px; z-index:1;
+  background:var(--card); border-radius:0 100% 100% 0 / 0 50% 50% 0; }
+.tpl-packet .pk-top-photo::after { content:""; position:absolute; top:8%; bottom:8%; left:-2px; width:3px; z-index:2;
+  border-radius:3px; background:linear-gradient(180deg,#c9a24b,#e7cf8f); }
+@media (max-width:1000px){ .tpl-packet .pk-top-photo { min-height:130px; } .tpl-packet .pk-top-photo::before, .tpl-packet .pk-top-photo::after { display:none; } }
+/* stat band: full-width below the header, borderless with thin vertical dividers */
+.tpl-packet .pk-stats { padding:8px 22px 18px; border-top:1px solid var(--line-soft); }
+.tpl-packet .pk-stats .statgrid { grid-template-columns:repeat(6,1fr); gap:0; }
+@media (max-width:1000px){ .tpl-packet .pk-stats .statgrid { grid-template-columns:repeat(3,1fr); row-gap:10px; } }
+@media (max-width:520px){ .tpl-packet .pk-stats .statgrid { grid-template-columns:repeat(2,1fr); } }
+.tpl-packet .pk-stats .statgrid { align-items:start; }
+/* min-width:0 keeps the 6 equal columns inside the grid (otherwise the wide
+   $ values force the tracks wider than the container and the last card slides
+   under the photo) */
+.tpl-packet .pk-stats .statcard { border:none; box-shadow:none; border-radius:0; border-left:1px solid var(--line-soft);
+  display:flex; align-items:flex-start; gap:9px; padding:4px 11px; min-width:0; }
+.tpl-packet .pk-stats .statcard:first-child { border-left:none; padding-left:0; }
+/* amount and description in their own rows so every amount aligns on one baseline */
+.tpl-packet .pk-stats .statcard .sv-ic { margin-top:1px; }
+.tpl-packet .pk-stats .statcard .sv-body { display:flex; flex-direction:column; }
+.tpl-packet .pk-stats .statcard .sv-v { line-height:1.15; min-height:1.15em; }
+.tpl-packet .pk-stats .statcard .sv-l { margin-top:4px; }
+/* panels */
+.tpl-packet .panel { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:15px 16px; }
+.tpl-packet .panel > h3 { font-family:-apple-system,"Segoe UI",sans-serif; font-size:14px; font-weight:700;
+  text-transform:uppercase; letter-spacing:.06em; color:var(--ink2); border-bottom:1px solid var(--line-soft);
+  padding-bottom:8px; margin:0 0 12px; display:block; }
+/* stat cards (icon-left) */
+.tpl-packet .statcard { display:flex; align-items:center; gap:11px; border-top:none; border-radius:9px; padding:13px 14px; }
+.tpl-packet .statcard .sv-ic { font-size:21px; margin:0; }
+/* amounts: modern geometric sans (Avenir Next → Segoe UI fallback) */
+.tpl-packet .statcard .sv-v, .tpl-packet .savecard .sc-amt {
+  font-family:"Avenir Next","Avenir","Segoe UI","Helvetica Neue",Arial,sans-serif;
+  font-weight:700; letter-spacing:-.015em; font-feature-settings:"tnum"; }
+.tpl-packet .statcard .sv-v { font-size:24px; margin:0; }
+.tpl-packet .statcard .sv-l { margin-top:1px; }
+/* value colours to match the mockup: green Total/Saved/Approved, navy Standard, dark Pending */
+.tpl-packet .statcard.tt .sv-v { color:var(--good); }
+.tpl-packet .statcard.sd .sv-v { color:var(--accent); }
+.tpl-packet .statcard.pd .sv-v { color:var(--ink); }
+/* dense 4-up + bottom 2-up */
+.tpl-packet .pk-grid4 { display:grid; grid-template-columns:1fr 1fr 1.5fr 1fr; gap:14px; align-items:start; }
+@media (max-width:1180px){ .tpl-packet .pk-grid4 { grid-template-columns:1fr 1fr; } }
+@media (max-width:680px){ .tpl-packet .pk-grid4 { grid-template-columns:1fr; } }
+.tpl-packet .pk-grid2 { display:grid; grid-template-columns:1fr 1fr; gap:14px; align-items:start; }
+@media (max-width:860px){ .tpl-packet .pk-grid2 { grid-template-columns:1fr; } }
+/* grid items must be allowed to shrink so their content wraps instead of
+   overflowing (pk-shell clips overflow to keep the rounded corners) */
+.tpl-packet .pk-grid4 > *, .tpl-packet .pk-grid2 > *, .tpl-packet .pk-detail > * { min-width:0; }
+.tpl-packet .brow { grid-template-columns:76px 1fr 82px; gap:7px; padding:2.5px 0; }
+.tpl-packet .blabel { font-size:14px; } .tpl-packet .bval { font-size:14px; }
+.tpl-packet .bjobs { display:none; }               /* drop the "· N" job count to save width */
+.tpl-packet .btrack { height:13px; } .tpl-packet .bar { background:var(--pkg); }
+.tpl-packet .ov-donut { flex-direction:column; gap:10px; align-items:center; text-align:center; }
+.tpl-packet .ov-legend { align-self:stretch; }
+.tpl-packet .pk-note { margin-top:12px; background:var(--amber-soft); border:1px solid #ecd9b3; border-radius:8px;
+  padding:9px 11px; font-size:11.5px; color:#7a5a12; line-height:1.4; }
+/* compact high-priority table — fixed layout so every column stays visible */
+.tpl-packet .pk-hptable table { font-size:13.5px; table-layout:fixed; width:100%; }
+.tpl-packet .pk-hptable th { letter-spacing:0; font-size:12px; padding:6px 5px 5px; }
+.tpl-packet .pk-hptable th, .tpl-packet .pk-hptable td { vertical-align:top; overflow-wrap:anywhere; }
+.tpl-packet .pk-hptable td { padding:5px 5px; }
+.tpl-packet .pk-hptable td.ctr, .tpl-packet .pk-hptable th.ctr { text-align:center; }
+.tpl-packet .pk-hptable td.money, .tpl-packet .pk-hptable th.money { white-space:normal; }
+.tpl-packet .hi-flag { color:var(--prio); font-weight:700; font-size:11px; }
+/* dark-green "view all" button (matches the mockup CTA) */
+.tpl-packet .pk-viewall { display:block; text-align:center; margin-top:10px; font-size:11.5px; font-weight:700;
+  color:#fff; background:var(--pkg); border-radius:7px; padding:9px 12px; text-decoration:none; cursor:pointer;
+  text-transform:uppercase; letter-spacing:.04em; }
+.tpl-packet .pk-viewall:hover { background:#124f2f; }
+.tpl-packet .pk-hptable:not(.hp-all) .pk-hp-extra { display:none; }
+/* "view full contractor spend report" link under the bars */
+.tpl-packet .pk-spendmore { display:block; text-align:center; margin-top:12px; padding-top:11px;
+  border-top:1px solid var(--line-soft); font-size:12px; font-weight:600; color:var(--pkg); text-decoration:none; }
+.tpl-packet .pk-spendmore:hover { text-decoration:underline; }
+/* open items: two columns like the mockup */
+.tpl-packet #secE .notes { column-count:2; column-gap:26px; }
+.tpl-packet #secE .notes li { break-inside:avoid; }
+.tpl-packet #secE h3 { column-span:all; }
+/* top savings list */
+.tpl-packet .pk-saves { display:flex; flex-direction:column; gap:8px; }
+.tpl-packet .pk-saverow { display:flex; justify-content:space-between; align-items:center; gap:10px;
+  padding:8px 11px; border:1px solid var(--line-soft); border-radius:8px; font-size:12.5px; }
+.tpl-packet .pk-saverow .sr-job { flex:1 1 auto; min-width:0; }
+.tpl-packet .pk-saverow .sr-job b { color:var(--pkg); } .tpl-packet .pk-saverow b { font-weight:700; }
+.tpl-packet .pk-saverow .amt { flex:none; font-weight:700; color:var(--pkg); font-variant-numeric:tabular-nums; white-space:nowrap; }
+.tpl-packet .savecard.total { border-radius:9px; padding:14px; }
+/* schedule timeline */
+.tpl-packet .pk-timeline { display:flex; gap:6px; align-items:flex-start; overflow-x:auto; padding:8px 0 2px; }
+.tpl-packet .pk-tl { flex:1; min-width:78px; text-align:center; position:relative; padding-top:22px; }
+.tpl-packet .pk-tl::before { content:""; position:absolute; top:7px; left:0; right:0; height:2px; background:#cfe0d5; }
+.tpl-packet .pk-tl .dot { position:absolute; top:1px; left:50%; transform:translateX(-50%); width:13px; height:13px;
+  border-radius:50%; background:var(--pkg); border:2px solid #fff; box-shadow:0 0 0 1px #cfe0d5; }
+.tpl-packet .pk-tl .m { font-size:12px; font-weight:700; color:var(--ink); }
+.tpl-packet .pk-tl .n { font-size:11px; color:var(--ink2); }
+.tpl-packet .notes { margin:0; padding-left:18px; } .tpl-packet .notes li { margin:5px 0; font-size:13px; }
+/* the detail sections (comparisons / standard schedule) span full width below */
+.tpl-packet .pk-detail { display:flex; flex-direction:column; gap:16px; }
+.tpl-packet .pk-detail2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; align-items:start; }
+@media (max-width:1100px){ .tpl-packet .pk-detail2 { grid-template-columns:1fr; } }
+.tpl-packet .pk-detail2 > * { min-width:0; }
+.tpl-packet .pk-detailcard { padding:18px 20px; }
+
+/* --- lettered section header (B / C) --- */
+.tpl-packet .pk-sechead { display:flex; justify-content:space-between; align-items:flex-start; gap:14px; margin-bottom:14px; }
+.tpl-packet .pk-sechead-l { display:flex; gap:12px; align-items:flex-start; min-width:0; }
+.tpl-packet .pk-badge { flex:none; width:30px; height:30px; border-radius:7px; background:#16283b; color:#fff;
+  font-family:Georgia,serif; font-weight:700; font-size:16px; display:flex; align-items:center; justify-content:center; }
+.tpl-packet .pk-sectitle { font-family:Georgia,"Times New Roman",serif; font-size:22px; font-weight:600; color:#16283b; line-height:1.15; }
+.tpl-packet .pk-secsub { font-size:14px; color:var(--ink2); margin-top:5px; max-width:80ch; line-height:1.5; }
+.tpl-packet .pk-totalcard { flex:none; border:1px solid var(--line); border-radius:9px; padding:8px 14px; text-align:center; }
+.tpl-packet .pk-totalcard .tl { font-size:9.5px; text-transform:uppercase; letter-spacing:.07em; color:var(--muted); }
+.tpl-packet .pk-totalcard .tv { font-family:"Avenir Next","Segoe UI","Helvetica Neue",Arial,sans-serif;
+  font-weight:700; font-size:18px; color:var(--pkg); letter-spacing:-.01em; }
+
+/* --- avatar badge shared by B & C --- */
+.tpl-packet .pk-av { flex:none; width:26px; height:26px; border-radius:6px; color:#fff; font-size:9.5px; font-weight:700;
+  letter-spacing:.02em; display:inline-flex; align-items:center; justify-content:center; }
+.tpl-packet .pk-cn { color:var(--ink); font-weight:600; font-size:15px; }
+
+/* --- Section B: comparison chips + cards --- */
+.tpl-packet .pk-chips { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:16px; }
+@media (max-width:520px){ .tpl-packet .pk-chips { grid-template-columns:1fr; } }
+.tpl-packet .pk-chip { display:flex; align-items:center; gap:10px; border:1px solid var(--line); border-radius:9px; padding:9px 12px; }
+.tpl-packet .pk-chip-ic { flex:none; width:28px; height:28px; border-radius:7px; display:flex; align-items:center; justify-content:center; font-size:14px; }
+.tpl-packet .pk-chip b { display:block; font-size:19px; color:var(--ink); font-weight:700; line-height:1.1; }
+.tpl-packet .pk-chip span { font-size:11px; color:var(--ink2); }
+.tpl-packet .pk-cmpcard { border:1px solid var(--line); border-radius:9px; overflow:hidden; margin-bottom:14px; }
+.tpl-packet .pk-cmphead { background:#16283b; color:#fff; padding:9px 12px; font-size:13px; font-weight:600; display:flex; align-items:center; gap:9px; flex-wrap:wrap; }
+.tpl-packet .pk-cmpno { flex:none; width:20px; height:20px; border-radius:5px; background:rgba(255,255,255,.16); font-size:11px; font-weight:700; display:flex; align-items:center; justify-content:center; }
+.tpl-packet .pk-prio { background:#f7ecec; color:var(--prio); font-size:10px; font-weight:700; padding:2px 8px; border-radius:99px; }
+.tpl-packet .pk-cmptable { width:100%; border-collapse:collapse; table-layout:fixed; }
+.tpl-packet .pk-cmptable th { font-size:12px; letter-spacing:.03em; text-transform:uppercase; color:var(--muted);
+  font-weight:600; text-align:left; padding:8px 10px 6px; border-bottom:1px solid var(--line-soft); }
+.tpl-packet .pk-cmptable td { padding:10px 10px; border-bottom:1px solid var(--line-soft); vertical-align:top; font-size:15px; }
+.tpl-packet .pk-cmptable tbody tr:last-child td { border-bottom:none; }
+/* keep the contractor cell a real table-cell (so it respects its column width);
+   the avatar+name flex lives on an inner wrapper to avoid text spilling over */
+.tpl-packet .pk-cflex { display:flex; gap:8px; align-items:flex-start; min-width:0; }
+.tpl-packet .pk-cflex-mid { align-items:center; }
+.tpl-packet .pk-cwrap { min-width:0; } .tpl-packet .pk-cwrap .pk-cn { display:block; }
+.tpl-packet .pk-att { display:block; font-size:10.5px; color:var(--muted); margin-top:2px; }
+.tpl-packet .pk-c-scope { color:var(--ink2); overflow-wrap:anywhere; }
+.tpl-packet .pk-c-date { color:var(--ink2); white-space:nowrap; font-variant-numeric:tabular-nums; }
+.tpl-packet th.pk-c-amt, .tpl-packet td.pk-c-amt { text-align:right; white-space:nowrap; font-variant-numeric:tabular-nums; }
+.tpl-packet td.pk-c-amt { font-weight:700; color:var(--ink); }
+.tpl-packet .pk-cmptable col.w-con { width:34%; }
+.tpl-packet tr.pk-low { background:#eef7f1; }
+.tpl-packet tr.pk-low td.pk-c-amt { color:var(--good); }
+.tpl-packet .pk-lowflag { display:block; font-size:10.5px; font-weight:700; color:var(--good); margin-top:1px; }
+.tpl-packet tr.pk-pend td { color:var(--muted); }
+.tpl-packet tr.pk-pend .pk-av { opacity:.5; }
+.tpl-packet tr.pk-pend .pk-cn { color:var(--muted); font-weight:600; }
+.tpl-packet .pk-attnote { font-size:12.5px; color:var(--muted); margin:12px 0 0; }
+
+/* --- Section C: schedule with contractor timeline --- */
+.tpl-packet .pk-schedtable { width:100%; border-collapse:collapse; table-layout:fixed; }
+.tpl-packet .pk-schedtable th { font-size:12px; letter-spacing:.03em; text-transform:uppercase; color:var(--muted);
+  font-weight:600; text-align:left; padding:6px 8px; border-bottom:1px solid var(--line); }
+.tpl-packet .pk-schedtable th.pk-ord-h { width:52px; }
+.tpl-packet .pk-schedtable td { padding:10px 8px; border-bottom:1px solid var(--line-soft); vertical-align:top; font-size:15px; }
+.tpl-packet .pk-schedtable tbody tr:last-child td { border-bottom:none; }
+.tpl-packet td.pk-ord { position:relative; width:52px; text-align:center; padding-top:9px; }
+.tpl-packet .pk-oline { position:absolute; left:50%; transform:translateX(-50%); top:0; bottom:0; width:3px; opacity:.85; }
+.tpl-packet .pk-odot { position:relative; z-index:1; display:inline-flex; width:23px; height:23px; border-radius:50%;
+  background:var(--card); border:2px solid; font-size:10.5px; font-weight:700; align-items:center; justify-content:center; }
+.tpl-packet .pk-job { color:var(--ink); }
+.tpl-packet .pk-jobnote { display:block; font-size:13px; color:var(--muted); margin-top:2px; }
+.tpl-packet .pk-bidschip { display:inline-block; background:var(--accent-soft); color:var(--accent-ink); font-size:10px;
+  font-weight:700; padding:1px 7px; border-radius:99px; vertical-align:middle; }
+.tpl-packet .pk-con { vertical-align:middle; }
+
+/* ---- flash/pulse a section when its sidebar item is clicked ---- */
+/* the whole card fills green (double-pulse) + a bright ring, then fades back to white */
+@keyframes pkflash {
+  0%   { background-color:#93d3ba; box-shadow:0 0 0 5px #23785f, 0 0 30px 8px rgba(41,133,96,.65); }
+  28%  { background-color:#d3efe2; box-shadow:0 0 0 2px rgba(41,133,96,.4), 0 0 12px 2px rgba(41,133,96,.25); }
+  55%  { background-color:#a1d9c4; box-shadow:0 0 0 5px #23785f, 0 0 30px 8px rgba(41,133,96,.6); }
+  100% { background-color:#ffffff; box-shadow:0 0 0 0 rgba(41,133,96,0); }
+}
+#report .pk-flash { animation:pkflash 1.5s ease-out; border-radius:12px; position:relative; z-index:5; }
+
+/* ---- phone layout: collapse the dark sidebars to a brand strip ---- */
+@media (max-width:700px){
+  /* let the tall wrapped top bar scroll away instead of pinning to the top */
+  .appbar { position:static; }
+  /* keep the "More ▾" menu from being wider than the phone; JS clamps its position */
+  .dropdown { max-width:calc(100vw - 16px); }
+  .tpl-packet .pk-side, .tpl-dashboard .dash-side { padding:12px 16px; }
+  .tpl-packet .pk-nav, .tpl-packet .pk-side-foot,
+  .tpl-dashboard .dash-nav, .tpl-dashboard .ds-foot { display:none; }
+  .tpl-packet .pk-brand { border-bottom:none; margin:0; padding:0; }
+  .tpl-dashboard .ds-brand { border-bottom:none; margin:0; padding:0; }
+  .tpl-packet .pk-main, .tpl-dashboard .dash-main { padding:14px; }
+  .tpl-packet .pk-top-left { padding:14px 16px; }
+  .tpl-packet .pk-stats { padding-right:0; }
+  .tpl-packet .pk-detailcard { padding:14px; }
+}
+.tpl-packet .pk-lbl { display:none; }   /* "Quoted" label — only shown in the phone card */
+@media (max-width:600px){
+  /* comparison table → stacked cards on phones. A 3–4 column table is too narrow,
+     so text broke onto many lines; here each bid is a readable full-width block:
+     contractor + amount on top, then the scope and quote date underneath. */
+  .tpl-packet .pk-cmptable, .tpl-packet .pk-cmptable tbody,
+  .tpl-packet .pk-cmptable tr, .tpl-packet .pk-cmptable td { display:block; width:auto; }
+  .tpl-packet .pk-cmptable thead, .tpl-packet .pk-cmptable colgroup { display:none; }
+  .tpl-packet .pk-cmptable tr { position:relative; padding:13px 2px; border-bottom:1px solid var(--line-soft); }
+  .tpl-packet .pk-cmptable tbody tr:last-child { border-bottom:none; }
+  .tpl-packet .pk-cmptable td { border:none; padding:0; }
+  .tpl-packet .pk-cmptable .pk-c-con { margin-bottom:6px; padding-right:108px; }
+  .tpl-packet .pk-cmptable .pk-cn { font-size:16px; }
+  .tpl-packet .pk-cmptable .pk-c-amt { position:absolute; top:13px; right:2px; width:auto; font-size:16px; }
+  .tpl-packet .pk-cmptable .pk-c-scope { font-size:14.5px; color:var(--ink2); line-height:1.4; }
+  .tpl-packet .pk-cmptable .pk-c-date { font-size:12.5px; color:var(--muted); margin-top:3px; }
+  .tpl-packet .pk-cmptable .pk-c-date.pk-nodate { display:none; }
+  .tpl-packet .pk-cmptable .pk-lbl { display:inline; }
+  /* schedule → keep the timeline on the left, stack job + contractor + amount on the right */
+  .tpl-packet .pk-schedtable, .tpl-packet .pk-schedtable tbody { display:block; }
+  .tpl-packet .pk-schedtable thead { display:none; }
+  .tpl-packet .pk-schedtable tr { display:grid; grid-template-columns:42px 1fr; position:relative;
+    padding:11px 0; border-bottom:1px solid var(--line-soft); }
+  .tpl-packet .pk-schedtable tbody tr:last-child { border-bottom:none; }
+  .tpl-packet .pk-schedtable td { display:block; border:none; padding:0; }
+  .tpl-packet .pk-schedtable .pk-ord { grid-column:1; grid-row:1 / span 2; height:100%; }
+  .tpl-packet .pk-schedtable .pk-job { grid-column:2; padding-right:96px; font-size:15px; }
+  .tpl-packet .pk-schedtable .pk-con { grid-column:2; margin-top:5px; }
+  .tpl-packet .pk-schedtable .pk-c-amt { position:absolute; top:11px; right:2px; width:auto; font-weight:700; font-size:15px; }
+  /* high-priority table → cards: job + amount on top, contractor, then bids · High */
+  .tpl-packet .pk-hptable table, .tpl-packet .pk-hptable tbody,
+  .tpl-packet .pk-hptable tr, .tpl-packet .pk-hptable td { display:block; width:auto; }
+  .tpl-packet .pk-hptable thead, .tpl-packet .pk-hptable colgroup, .tpl-packet .pk-hptable td.num { display:none; }
+  .tpl-packet .pk-hptable tbody tr { position:relative; padding:12px 2px; border-bottom:1px solid var(--line-soft); }
+  .tpl-packet .pk-hptable td { border:none; padding:0; }
+  .tpl-packet .pk-hptable .pk-hp-job { font-size:15px; padding-right:100px; }
+  .tpl-packet .pk-hptable td.money { position:absolute; top:12px; right:2px; width:auto; text-align:right; font-weight:700; font-size:15px; white-space:nowrap; }
+  .tpl-packet .pk-hptable .pk-hp-con { color:var(--ink2); font-size:13.5px; margin-top:3px; }
+  .tpl-packet .pk-hptable .ctr { display:inline; font-size:12.5px; color:var(--muted); }
+  .tpl-packet .pk-hptable .ctr::after { content:" bids · "; }
+  .tpl-packet .pk-hptable .pk-hp-stat { display:inline; }
+  .tpl-packet .pk-hptable tr.subtotal { background:var(--accent-soft); padding:10px 8px; margin-top:4px; }
+  .tpl-packet .pk-hptable tr.subtotal .pk-hp-job { font-weight:700; padding-right:100px; }
+  .tpl-packet .pk-hptable tr.subtotal .ctr::after, .tpl-packet .pk-hptable tr.subtotal .pk-hp-con { display:none; content:none; }
+  /* expanded "N bids" detail (in the schedule) → full-width, and its inner
+     comparison table becomes cards too, instead of a squished overlapping table */
+  .tpl-packet .pk-schedtable tr.bidrow { display:block; padding:0; grid-template-columns:none; }
+  .tpl-packet .pk-schedtable tr.bidrow > td { display:block; padding:0; }
+  .tpl-packet .bidrow-inner { padding:6px 8px 10px; }
+  .tpl-packet .cmp, .tpl-packet .cmp tbody, .tpl-packet .cmp tr, .tpl-packet .cmp td { display:block; width:auto; }
+  .tpl-packet .cmp thead { display:none; }
+  .tpl-packet .cmp tr { position:relative; padding:8px 10px; border-bottom:1px solid var(--line-soft); }
+  .tpl-packet .cmp tr:last-child { border-bottom:none; }
+  .tpl-packet .cmp td { border:none; padding:0; }
+  .tpl-packet .cmp td:first-child { font-weight:600; padding-right:92px; font-size:14px; }
+  .tpl-packet .cmp td.money { position:absolute; top:8px; right:10px; width:auto; font-weight:700; text-align:right; font-size:14px; white-space:nowrap; }
+  .tpl-packet .cmp td:nth-child(2) { color:var(--ink2); font-size:12.5px; margin-top:2px; line-height:1.4; }
+  .tpl-packet .cmp td:nth-child(4) { margin-top:3px; }
+}
+@media (max-width:520px){
+  /* stat band → clean single-column list so amounts never clip */
+  .tpl-packet .pk-stats .statgrid { grid-template-columns:1fr; }
+  .tpl-packet .pk-stats .statcard { border-left:none; padding:8px 0;
+    border-bottom:1px solid var(--line-soft); }
+  .tpl-packet .pk-stats .statcard:last-child { border-bottom:none; }
+  .tpl-packet .pk-title-row h1 { font-size:22px; }
+}
 </style>
 
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
@@ -388,6 +841,14 @@ input:focus, select:focus { outline:2px solid var(--accent); outline-offset:-1px
   </div>
   <button class="btn" id="btnReports" type="button" title="Save this period, start a new one, or open a past report">📁 <span id="reportNameLabel">Report</span> ▾</button>
   <button class="btn" id="btnPrint" type="button">Print / PDF</button>
+  <label class="tplpick" id="tplPick" style="display:none" title="Choose the report design — this is what everyone sees">
+    <span>Design</span>
+    <select id="tplSelect">
+      <option value="classic">Classic report</option>
+      <option value="dashboard">Executive dashboard</option>
+      <option value="packet">Board packet</option>
+    </select>
+  </label>
   <button class="btn" id="btnHistory" type="button">History</button>
   <button class="btn" id="btnDash" type="button" style="display:none" title="Totals across all report periods">📊 Dashboard</button>
   <button class="btn" id="btnVotes" type="button" style="display:none" title="Board voting on quoted jobs">🗳 <span id="votesLabel">Votes</span></button>
@@ -531,6 +992,7 @@ var ASSET_PHOTO = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4QAqRXhpZg
 var seed = JSON.parse(document.getElementById("seed").textContent);
 var META_DEFAULTS = { title: "Contractor Quote Report", condoName: "Waterview Condominium",
   regNo: "NNSCC No. 292", manager: "CPO Property Management", buildings: "Buildings 550 & 560",
+  template: "classic",
   headSum: "Executive summary",
   headA: "High-priority jobs — approval requested",
   headB: "Competitive bid comparisons",
@@ -938,6 +1400,515 @@ function computeAll() {
 }
 
 /* ---------- report rendering ---------- */
+/* The property manager can choose one of three report designs. The choice is
+   stored in meta.template and shared with everyone (board members / viewers).
+   Classic = renderClassicReport (original). The two alternates reuse the same
+   data (computeAll) and the shared section builders below. */
+function renderReport() {
+  var t = (state.meta && state.meta.template) || "classic";
+  if (t !== "dashboard" && t !== "packet") t = "classic";
+  var rep = document.getElementById("report");
+  if (rep) rep.className = "tpl-" + t;
+  if (t === "dashboard") return renderDashboardReport();
+  if (t === "packet") return renderPacketReport();
+  return renderClassicReport();
+}
+
+/* editor-cell helpers shared by all three templates (closures over EDITOR) */
+function tplCtx() {
+  var EDITOR = isEditor();
+  return {
+    ED: EDITOR,
+    hA: function (k) { return EDITOR
+      ? ' class="editable-head" contenteditable="true" spellcheck="false" data-edit="meta:' + k + '" title="Click to rename this heading"'
+      : ''; },
+    cCell: function (x, names) {
+      return (EDITOR && x.j.bids.length === 1)
+        ? tEdit("bid:" + x.j.id + ":0:contractor", x.j.bids[0].contractor, "Contractor") + badge(x)
+        : esc(names.join(" + ") || "—") + badge(x);
+    },
+    aCell: function (x) {
+      if (EDITOR && x.j.bids.length === 1)
+        return tEdit("bid:" + x.j.id + ":0:amount", x.c.cost ? money(x.c.cost) : "", x.c.cost ? "Amount" : "Enter amount");
+      return x.c.cost ? money(x.c.cost) : '<span class="pendchip">Pending</span>';
+    }
+  };
+}
+/* common editor/board banners (archived notice, open-vote prompt, edit hint) */
+function tplBanners(EDITOR) {
+  var h = [];
+  if (cloud.active && cloud.active.kind === "archived")
+    h.push('<div class="archbanner">📁 You’re viewing a past report — <strong>' + esc(cloud.active.name || "") + '</strong>. ' +
+      (EDITOR ? 'Edits here change this archived report only, not the current one. ' : '') +
+      '<button class="btn small archback" type="button">← Back to current report</button></div>');
+  if (canVoteView() && votesCache.open > 0)
+    h.push('<div class="votebanner">🗳 <strong>' + votesCache.open + '</strong> board vote' +
+      (votesCache.open > 1 ? "s are" : " is") + ' open — your review is requested. ' +
+      '<button class="btn small" id="voteBannerBtn" type="button">Review &amp; vote</button></div>');
+  if (EDITOR)
+    h.push('<div class="edithint-inline">✎ You’re signed in as the property manager — click almost anything to edit it right here (headings, descriptions, contractor names and dollar amounts). Amounts are treated as the <strong>HST-included total</strong>. Use the <strong>Design</strong> menu in the top bar to switch report layouts, and the <strong>Edit</strong> tab to add or remove jobs.</div>');
+  return h.join("");
+}
+/* Section A rows (high-priority table body) — shared */
+function secARows(d, ctx) {
+  var h = [];
+  d.hp.forEach(function (x) {
+    var names = []; x.c.carriedBids.forEach(function (cb) {
+      if (names.indexOf(cb.b.contractor) < 0) names.push(cb.b.contractor); });
+    var notes = []; x.c.carriedBids.forEach(function (cb) {
+      if (cb.b.notes && notes.indexOf(cb.b.notes) < 0) notes.push(cb.b.notes); });
+    h.push("<tr><td class=\"num\">" + esc(x.j.no) + "</td><td>" + tEdit("job:" + x.j.id + ":desc", x.j.desc, "Job description") + stChip(x.j) +
+      (notes.length ? '<span class="fn">' + esc(notes.join(" · ")) + "</span>" : "") + "</td><td>" +
+      ctx.cCell(x, names) + '</td><td class="money">' + ctx.aCell(x) + "</td></tr>");
+    h.push(bidRowHTML(x, 4));
+  });
+  return h.join("");
+}
+/* Section C rows (standard-priority table body) — shared; returns {html,total} */
+function secCRows(d, ctx) {
+  var h = [], nhpTotal = 0;
+  d.nhp.forEach(function (x) {
+    var names = []; x.c.carriedBids.forEach(function (cb) {
+      if (names.indexOf(cb.b.contractor) < 0) names.push(cb.b.contractor); });
+    if (!names.length && x.j.bids[0]) names.push(x.j.bids[0].contractor);
+    var notes = []; x.c.carriedBids.forEach(function (cb) {
+      if (cb.b.notes && notes.indexOf(cb.b.notes) < 0) notes.push(cb.b.notes); });
+    nhpTotal += x.c.cost;
+    h.push('<tr><td class="num">' + esc(x.j.no) + "</td><td>" + tEdit("job:" + x.j.id + ":desc", x.j.desc, "Job description") + stChip(x.j) +
+      (notes.length ? '<span class="fn">' + esc(notes.join(" · ")) + "</span>" : "") + "</td><td>" +
+      ctx.cCell(x, names) + '</td><td class="money">' + ctx.aCell(x) + "</td></tr>");
+    h.push(bidRowHTML(x, 4));
+  });
+  return { html: h.join(""), total: nhpTotal };
+}
+/* Section B cards (bid comparisons) — shared */
+function secBCards(d, ctx) {
+  var multi = d.jobs.filter(function (x) { return x.j.bids.length > 1; });
+  if (!multi.length) return '<p class="seclede">No jobs currently have more than one bid.</p>';
+  var h = [];
+  multi.forEach(function (x) {
+    h.push('<div class="card"><div class="cardhead"><span class="jobno">Job ' + esc(x.j.no) + "</span> <strong>" +
+      tEdit("job:" + x.j.id + ":desc", x.j.desc, "Job description") + "</strong>" + (x.j.priority ? ' <span class="prio">High priority</span>' : "") + stChip(x.j) + "</div>");
+    h.push('<table class="cmp"><thead><tr><th>Contractor</th><th>Scope note</th><th class="money">Total (incl. HST)</th><th></th></tr></thead><tbody>');
+    h.push(cmpRows(x));
+    h.push("</tbody></table></div>");
+  });
+  return h.join("");
+}
+/* Section E lists (open items, decisions, savings) — shared */
+function secEBlocks(d, M, EDITOR) {
+  var h = [];
+  var pend = d.jobs.filter(function (x) { return x.c.pendingNames.length; });
+  var savers = d.jobs.filter(function (x) { return x.c.saving > 0; });
+  var biggest = null;
+  d.jobs.forEach(function (x) { if (!biggest || x.c.cost > biggest.c.cost) biggest = x; });
+  if (state.ai && state.ai.openNote)
+    h.push('<p class="seclede ainarr">' + tEdit("ai:openNote", state.ai.openNote, "AI note") + "</p>");
+  h.push('<ul class="notes">');
+  pend.forEach(function (x) {
+    h.push("<li>Job " + esc(x.j.no) + " (" + esc(x.j.desc) + "): awaiting quotes from " +
+           esc(x.c.pendingNames.join(", ")) + ".</li>");
+  });
+  if (biggest && biggest.c.cost > 0)
+    h.push("<li>Largest single item: Job " + esc(biggest.j.no) + " (" + esc(biggest.j.desc) + ") at " +
+           money(biggest.c.cost) + ".</li>");
+  if (!pend.length) h.push("<li>No bids outstanding — every invited contractor has quoted.</li>");
+  h.push("</ul>");
+  var decided = d.jobs.filter(function (x) { return x.j.statusDate || (x.j.status && x.j.status !== "quoted"); })
+    .sort(function (a, b) { return String(b.j.statusDate || "").localeCompare(String(a.j.statusDate || "")); });
+  if (decided.length) {
+    h.push('<h3 style="margin-top:16px">Status &amp; board decisions</h3><ul class="notes">');
+    decided.slice(0, 15).forEach(function (x) {
+      h.push("<li>Job " + esc(x.j.no) + " (" + esc(x.j.desc) + "): <strong>" + esc(statusLabel(x.j.status)) + "</strong>" +
+        (x.j.statusDate ? " on " + esc(x.j.statusDate) : "") +
+        (x.j.statusNote ? " — " + esc(x.j.statusNote) : "") + "</li>");
+    });
+    h.push("</ul>");
+  }
+  return h.join("");
+}
+/* contractor-spend bars (Section D body) — shared; reuses the .browlink popup */
+function spendBars(d) {
+  var rollArr = Object.keys(d.roll).map(function (nm) { return { nm: nm, v: d.roll[nm] }; })
+    .sort(function (a, b) { return b.v.tot - a.v.tot; });
+  var mx = rollArr.length ? rollArr[0].v.tot : 1;
+  var h = [];
+  rollArr.forEach(function (r) {
+    h.push('<div class="brow browlink" data-cn="' + esc(r.nm) + '" role="button" tabindex="0" title="Show all quotes from ' + esc(r.nm) + '"><div class="blabel">' + esc(r.nm) + '</div><div class="btrack">' +
+      '<div class="bar" style="width:' + (r.v.tot / mx * 100).toFixed(1) + '%"></div></div>' +
+      '<div class="bval">' + money(r.v.tot) + '<span class="bjobs"> · ' + r.v.n + "</span></div></div>");
+  });
+  return h.join("") || '<p class="seclede">No committed spend yet.</p>';
+}
+/* overview slices/savers shared by both alternate templates */
+function overviewData(d) {
+  var awaiting = d.jobs.filter(function (x) { return x.c.priced === 0; }).length;
+  var highQ = d.hp.filter(function (x) { return x.c.priced > 0; }).length;
+  var stdQ = d.nhp.filter(function (x) { return x.c.priced > 0; }).length;
+  var savers = d.jobs.filter(function (x) { return x.c.saving > 0; })
+    .sort(function (a, b) { return b.c.saving - a.c.saving; });
+  return { awaiting: awaiting, highQ: highQ, stdQ: stdQ, savers: savers };
+}
+/* SVG donut from [{label,value,color}] with a two-line centre label */
+function donutSVG(slices, top, bot) {
+  var total = slices.reduce(function (s, x) { return s + x.value; }, 0) || 1;
+  var r = 54, circ = 2 * Math.PI * r, off = 0, segs = "";
+  slices.forEach(function (sl) {
+    var len = (sl.value / total) * circ;
+    segs += '<circle cx="70" cy="70" r="' + r + '" fill="none" stroke="' + sl.color + '" stroke-width="20" ' +
+      'stroke-dasharray="' + len.toFixed(2) + ' ' + (circ - len).toFixed(2) + '" ' +
+      'stroke-dashoffset="' + (-off).toFixed(2) + '" transform="rotate(-90 70 70)"></circle>';
+    off += len;
+  });
+  return '<svg class="donut" viewBox="0 0 140 140" width="140" height="140" aria-hidden="true">' + segs +
+    '<text x="70" y="66" text-anchor="middle" class="dn-top">' + esc(top) + '</text>' +
+    '<text x="70" y="84" text-anchor="middle" class="dn-bot">' + esc(bot) + '</text></svg>';
+}
+/* six headline stat cards (markup shared; parent class styles the look) */
+function statCards(d) {
+  var cards = [
+    { c: "tt", ic: "💵", v: money(d.total), l: "Total, all jobs", s: "" },
+    { c: "hp", ic: "🚩", v: money(d.hpTotal), l: "High priority", s: d.hp.length + " jobs" },
+    { c: "sd", ic: "📁", v: money(d.total - d.hpTotal), l: "Standard priority", s: d.nhp.length + " jobs" },
+    { c: "sv", ic: "📈", v: money(d.savings), l: "Saved via bids", s: "vs. highest bids" },
+    { c: "pd", ic: "⏳", v: String(d.pendingCount), l: "Bids pending", s: "open for quotes" },
+    { c: "ap", ic: "✅", v: money(d.approvedTotal), l: "Board approved", s: "approved spend" }
+  ];
+  return '<div class="statgrid">' + cards.map(function (k) {
+    return '<div class="statcard ' + k.c + '"><div class="sv-ic">' + k.ic + '</div><div class="sv-body">' +
+      '<div class="sv-v">' + k.v + '</div><div class="sv-l">' + k.l + '</div>' +
+      (k.s ? '<div class="sv-s">' + k.s + '</div>' : '') + '</div></div>';
+  }).join("") + '</div>';
+}
+/* compact high-priority table rows for the board-packet 4-up panel
+   (#/Job/Contractor/Bids/Lowest/Status). Single-bid cells stay inline-editable. */
+function hpCompactRows(d, ctx) {
+  var h = [];
+  d.hp.forEach(function (x, i) {
+    var names = []; x.c.carriedBids.forEach(function (cb) {
+      if (names.indexOf(cb.b.contractor) < 0) names.push(cb.b.contractor); });
+    if (!names.length && x.j.bids[0]) names.push(x.j.bids[0].contractor);
+    var contractor = (ctx.ED && x.j.bids.length === 1)
+      ? tEdit("bid:" + x.j.id + ":0:contractor", x.j.bids[0].contractor, "Contractor")
+      : (esc(names.join(", ")) || "—");
+    var amt = (ctx.ED && x.j.bids.length === 1)
+      ? tEdit("bid:" + x.j.id + ":0:amount", x.c.cost ? money(x.c.cost) : "", x.c.cost ? "Amount" : "Enter amount")
+      : (x.c.cost ? money(x.c.cost) : '<span class="pendchip">Pending</span>');
+    h.push('<tr' + (i >= 5 ? ' class="pk-hp-extra"' : '') + '><td class="num">' + esc(x.j.no) + '</td><td class="pk-hp-job">' +
+      tEdit("job:" + x.j.id + ":desc", x.j.desc, "Job description") +
+      '</td><td class="pk-hp-con">' + contractor + '</td><td class="ctr">' + x.j.bids.length + '</td><td class="money">' + amt +
+      '</td><td class="pk-hp-stat"><span class="hi-flag">High</span></td></tr>');
+  });
+  if (!d.hp.length) h.push('<tr><td colspan="6" style="color:var(--muted)">No high-priority jobs.</td></tr>');
+  return h.join("");
+}
+/* top-savings as a vertical list + total card (board-packet panel) */
+function topSavingsList(d, ov) {
+  var h = ['<div class="pk-saves">'];
+  ov.savers.slice(0, 3).forEach(function (x) {
+    h.push('<div class="pk-saverow"><div class="sr-job"><b>Job ' + esc(x.j.no) + '</b> ' + esc(x.j.desc) +
+      '</div><div class="amt">' + money(x.c.saving) + '</div></div>');
+  });
+  if (!ov.savers.length) h.push('<div class="pk-saverow"><div class="sr-job">No competing-bid savings yet.</div></div>');
+  h.push('<div class="savecard total"><div class="sc-lab">Total savings identified</div><div class="sc-amt big">' +
+    money(d.savings) + '</div><div class="sc-sub">vs. highest bids</div></div>');
+  h.push("</div>");
+  return h.join("");
+}
+/* jobs-by-priority donut panel (donut + legend).
+   Mutually-exclusive partition of all jobs so the slices sum to the total:
+   high-priority (quoted) · standard (quoted) · awaiting quotes (any, unpriced). */
+function priorityDonut(d, ov) {
+  var slices = [
+    { label: "High priority", value: ov.highQ, color: "#A03636" },
+    { label: "Standard priority", value: ov.stdQ, color: "#2D567F" }
+  ];
+  if (ov.awaiting) slices.push({ label: "Open / pending", value: ov.awaiting, color: "#E0A422" });
+  var leg = slices.map(function (s) {
+    return '<li><span class="sw" style="background:' + s.color + '"></span>' + esc(s.label) + ' <b>(' + s.value + ')</b></li>';
+  }).join("");
+  return '<div class="ov-donut">' + donutSVG(slices, String(d.jobs.length), "Total jobs") +
+    '<ul class="ov-legend">' + leg + "</ul></div>";
+}
+/* top-savings cards + total */
+function topSavings(d, ov) {
+  var h = ['<div class="savegrid">'];
+  ov.savers.slice(0, 3).forEach(function (x) {
+    h.push('<div class="savecard"><div class="sc-job">Job ' + esc(x.j.no) + '</div><div class="sc-desc">' + esc(x.j.desc) +
+      '</div><div class="sc-lab">You save</div><div class="sc-amt">' + money(x.c.saving) + '</div><div class="sc-sub">vs. next bid</div></div>');
+  });
+  h.push('<div class="savecard total"><div class="sc-lab">Total savings identified</div><div class="sc-amt big">' +
+    money(d.savings) + '</div><div class="sc-sub">vs. highest bids</div></div>');
+  h.push("</div>");
+  return h.join("");
+}
+/* schedule-at-a-glance buckets from real statusDate months (packet) */
+function scheduleBuckets(d) {
+  var m = {};
+  d.jobs.forEach(function (x) {
+    var dt = x.j.statusDate;
+    if (dt && /^\d{4}-\d{2}/.test(dt)) { var k = dt.slice(0, 7); m[k] = (m[k] || 0) + 1; }
+  });
+  return Object.keys(m).sort().map(function (k) {
+    var parts = k.split("-");
+    var label = new Date(+parts[0], +parts[1] - 1, 1).toLocaleDateString("en-CA", { month: "short", year: "numeric" });
+    return { label: label, n: m[k] };
+  });
+}
+
+/* ============ Executive dashboard template ============ */
+function renderDashboardReport() {
+  var d = computeAll(), M = state.meta || META_DEFAULTS, ov = overviewData(d), ctx = tplCtx();
+  document.title = M.condoName + " — Quote Tracker · BETA PREVIEW";
+  var bn = document.getElementById("brandName"); if (bn) bn.textContent = M.condoName;
+  var cRows = secCRows(d, ctx);
+  var h = [];
+  h.push('<div class="dash-shell"><aside class="dash-side">');
+  h.push('<div class="ds-brand"><img src="' + ASSET_LOGO + '" alt=""><span>' + esc(M.condoName) + '<br><small style="font-weight:600;color:#8ea1b7;font-size:11px">' + esc(M.regNo) + '</small></span></div>');
+  h.push('<nav class="secnav dash-nav">' +
+    '<a href="#secSum">Overview</a>' +
+    '<a href="#secA">High priority jobs</a>' +
+    '<a href="#secB">Bid comparisons</a>' +
+    '<a href="#secC">Standard schedule</a>' +
+    '<a href="#secD">Contractor spend</a>' +
+    '<a href="#secE">Open items</a></nav>');
+  h.push('<div class="ds-foot"><span class="av">' + (ctx.ED ? "🛠" : (isBoardMember() ? "🗳" : "👤")) + '</span><span><b>' +
+    (ctx.ED ? "Property manager" : (isBoardMember() ? "Board member" : "Board viewer")) + '</b><small>' + esc(M.manager) + '</small></span></div>');
+  h.push('</aside><main class="dash-main">');
+  h.push('<div class="dash-top"><div><h1>' + esc(M.title) + '</h1>' +
+    '<div class="dt-sub">' + esc(M.condoName) + ' · ' + esc(M.regNo) + ' — Prepared for the Board of Directors</div>' +
+    '<div class="dt-date">' + esc(M.buildings) + ' · Prepared ' + esc(todayStr()) + '</div></div>' +
+    '<button class="btn-print js-print" type="button">⬇ Print / PDF</button></div>');
+  h.push(tplBanners(ctx.ED));
+  /* stat cards */
+  h.push('<section id="secSum">' + statCards(d) + '</section>');
+  /* contractor spend + donut/summary */
+  h.push('<div class="dash-2col">');
+  h.push('<section id="secD" class="panel"><h3>Committed spend by contractor</h3>' + spendBars(d) + '</section>');
+  h.push('<section class="panel"><h3>Jobs by priority</h3>' + priorityDonut(d, ov));
+  var sumTxt = (state.ai && state.ai.summary ? esc(state.ai.summary) + " " : "") +
+    d.jobs.length + " repair and maintenance jobs have been quoted, " + d.hp.length + " flagged high priority" +
+    (d.pendingCount ? "; " + d.pendingCount + " invited bid" + (d.pendingCount > 1 ? "s are" : " is") + " still outstanding" : "") +
+    ". Where a job received more than one priced quote, the lowest bid is used in all totals. All amounts include 13% HST.";
+  h.push('<p class="ov-summary">' + sumTxt + '</p></section></div>');
+  /* high priority table */
+  h.push('<section id="secA" class="panel"><h3>' + esc(M.headA) + '</h3>' +
+    '<div class="tablewrap"><table><thead><tr><th>#</th><th>Job</th><th>Contractor</th><th class="money">Lowest quote (incl. HST)</th></tr></thead><tbody>' +
+    secARows(d, ctx) +
+    '<tr class="subtotal"><td></td><td colspan="2">High-priority subtotal</td><td class="money">' + money(d.hpTotal) + '</td></tr>' +
+    '</tbody></table></div></section>');
+  /* top savings */
+  h.push('<section class="panel"><h3>Top savings from competitive bids</h3>' + topSavings(d, ov) + '</section>');
+  /* bid comparisons */
+  h.push('<section id="secB" class="panel"><h3>' + esc(M.headB) + '</h3>' + secBCards(d, ctx) + '</section>');
+  /* standard schedule */
+  h.push('<section id="secC" class="panel"><h3>' + esc(M.headC) + '</h3>' +
+    '<div class="tablewrap"><table><thead><tr><th>#</th><th>Job</th><th>Contractor</th><th class="money">Total (incl. HST)</th></tr></thead><tbody>' +
+    cRows.html +
+    '<tr class="subtotal"><td></td><td colspan="2">Standard-priority subtotal</td><td class="money">' + money(cRows.total) + '</td></tr>' +
+    '</tbody></table></div></section>');
+  /* open items */
+  h.push('<section id="secE" class="panel"><h3>' + esc(M.headE) + '</h3>' + secEBlocks(d, M, ctx.ED) + '</section>');
+  h.push('</main></div>');
+  document.getElementById("report").innerHTML = h.join("");
+  updateLastUpd(); updateReportsButton(); setupScrollSpy();
+}
+
+/* gold line icons for the board-packet sidebar (monochrome, stroke #d9b878) */
+var PK_ICON = {
+  sum:   'M4 20h16M7 20v-6M12 20V8M17 20v-9',
+  hp:    'M6 21V4M6 4h11l-2 4 2 4H6',
+  bid:   'M12 4v15M6 9l6-4 6 4M5 9l-2.2 5h4.4zM19 9l-2.2 5h4.4z',
+  sched: 'M4 6a2 2 0 012-2h12a2 2 0 012 2v13a2 2 0 01-2 2H6a2 2 0 01-2-2zM4 9h16M8 3v3M16 3v3',
+  spend: 'M12 3v18M8.5 7.5H14a2 2 0 010 4H9a2 2 0 000 4h6',
+  open:  'M4 13l2-8h12l2 8M4 13v6h16v-6M4 13h5l1.2 2h3.6l1.2-2h5',
+  arch:  'M3 5a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1zM5 8v11h14V8M10 12h4'
+};
+function pkIcon(k) {
+  return '<span class="ni"><svg viewBox="0 0 24 24" fill="none" stroke="#eac986" stroke-width="1.7" ' +
+    'stroke-linecap="round" stroke-linejoin="round"><path d="' + PK_ICON[k] + '"/></svg></span>';
+}
+
+/* contractor avatar badges + timeline colours for the packet B/C sections */
+var PK_PALETTE = ["#2f6f83", "#b07d2b", "#3a6d3a", "#5a4a8a", "#8a3f5a", "#2b6ca3", "#7a5c2e", "#3f7a6a", "#9a5a2b", "#455a94"];
+function pkColor(name) {
+  var s = String(name || ""), h = 0;
+  for (var i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return PK_PALETTE[h % PK_PALETTE.length];
+}
+function pkInitials(name) {
+  name = String(name || "").trim(); if (!name) return "—";
+  var w = name.split(/\s+/).filter(Boolean);
+  if (w[0] && w[0].length <= 4 && w[0] === w[0].toUpperCase() && /[A-Z]/.test(w[0])) return w[0].slice(0, 3);
+  if (w.length >= 2) return (w[0][0] + w[1][0]).toUpperCase();
+  return name.slice(0, 2).toUpperCase();
+}
+function pkAvatar(name) {
+  return '<span class="pk-av" style="background:' + pkColor(name) + '">' + esc(pkInitials(name)) + '</span>';
+}
+/* section header with the lettered badge, serif title, subtitle and optional right block */
+function pkSecHead(letter, title, sub, right) {
+  return '<div class="pk-sechead"><div class="pk-sechead-l"><span class="pk-badge">' + esc(letter) + '</span>' +
+    '<div><div class="pk-sectitle">' + esc(title) + '</div>' +
+    (sub ? '<div class="pk-secsub">' + esc(sub) + '</div>' : '') + '</div></div>' + (right || '') + '</div>';
+}
+
+/* ---- Section B (packet): competitive bid comparisons ---- */
+function packetSecB(d, ctx) {
+  var multi = d.jobs.filter(function (x) { return x.j.bids.length > 1; });
+  var pend = 0;
+  multi.forEach(function (x) { x.c.bids.forEach(function (b) { if (b.pending) pend++; }); });
+  var chips = '<div class="pk-chips">' +
+    '<div class="pk-chip"><span class="pk-chip-ic" style="background:#eaf0f6;color:#2b6ca3">🗂</span><div><b>' + multi.length + '</b><span>Compared jobs</span></div></div>' +
+    '<div class="pk-chip"><span class="pk-chip-ic" style="background:#f4ecdc;color:#a8791f">⏱</span><div><b>' + pend + '</b><span>Pending quotes</span></div></div>' +
+    '<div class="pk-chip"><span class="pk-chip-ic" style="background:#e7f3ec;color:#1e7a46">✓</span><div><b style="font-size:12.5px;font-weight:600">Lowest bids</b><span>highlighted</span></div></div>' +
+    '</div>';
+  if (!multi.length) return chips + '<p class="seclede">No jobs currently have more than one bid.</p>';
+  var cards = [];
+  multi.forEach(function (x, idx) {
+    var rows = [];
+    x.c.bids.forEach(function (cb, bi) {
+      if (!ctx.ED && !(cb.b.contractor || "").trim() && cb.total == null) return;
+      var name = cb.b.contractor || "—", jid = x.j.id;
+      /* contractor / scope / amount are click-to-edit for the signed-in property manager */
+      var cName = tEdit("bid:" + jid + ":" + bi + ":contractor", cb.b.contractor, "Contractor");
+      var att = (cb.b.files && cb.b.files.length)
+        ? '<span class="pk-att">📎 ' + cb.b.files.length + ' attachment' + (cb.b.files.length > 1 ? "s" : "") + "</span>" : "";
+      var con = '<td class="pk-c-con"><div class="pk-cflex">' + pkAvatar(name) + '<span class="pk-cwrap"><span class="pk-cn">' + cName + "</span>" + att + "</span></div></td>";
+      var scope = ctx.ED ? tEdit("bid:" + jid + ":" + bi + ":notes", cb.b.notes, "Add scope note") : (esc(cb.b.notes) || "—");
+      var dateCell = '<td class="pk-c-date' + (cb.b.qdate ? '' : ' pk-nodate') + '"><span class="pk-lbl">Quoted </span>' +
+        (cb.b.qdate ? esc(cb.b.qdate) : "—") + "</td>";
+      if (cb.total == null) {
+        var amtP = ctx.ED ? tEdit("bid:" + jid + ":" + bi + ":amount", "", "Enter amount") : '<em>Quote pending</em>';
+        rows.push('<tr class="pk-pend">' + con + '<td class="pk-c-scope">' + (ctx.ED ? scope : '<em>Quote pending</em>') +
+          "</td>" + dateCell + '<td class="pk-c-amt">' + amtP + "</td></tr>");
+      } else {
+        var amt = tEdit("bid:" + jid + ":" + bi + ":amount", money(cb.total), "Amount");
+        rows.push('<tr' + (cb.carried ? ' class="pk-low"' : "") + ">" + con +
+          '<td class="pk-c-scope">' + scope + "</td>" + dateCell +
+          '<td class="pk-c-amt">' + amt + (cb.lowest ? '<span class="pk-lowflag">✓ Lowest</span>' : "") + "</td></tr>");
+      }
+    });
+    cards.push('<div class="pk-cmpcard"><div class="pk-cmphead"><span class="pk-cmpno">' + (idx + 1) + "</span> " +
+      esc(x.j.desc) + (x.j.priority ? ' <span class="pk-prio">High priority</span>' : "") + "</div>" +
+      '<table class="pk-cmptable"><colgroup><col style="width:27%"><col><col style="width:16%"><col style="width:21%"></colgroup>' +
+      '<thead><tr><th>Contractor</th><th>Scope summary</th><th>Quote date</th>' +
+      '<th class="pk-c-amt">Total (incl. HST)</th></tr></thead><tbody>' + rows.join("") + "</tbody></table></div>");
+  });
+  return chips + cards.join("") + '<p class="pk-attnote">📎 = Attachments available</p>';
+}
+
+/* ---- Section C (packet): standard-priority schedule with a contractor timeline ---- */
+function packetSecC(d, ctx) {
+  var rows = [];
+  d.nhp.forEach(function (x, i) {
+    var names = []; x.c.carriedBids.forEach(function (cb) {
+      if (names.indexOf(cb.b.contractor) < 0) names.push(cb.b.contractor); });
+    if (!names.length && x.j.bids[0]) names.push(x.j.bids[0].contractor);
+    var primary = names[0] || "—", color = pkColor(primary);
+    var notes = []; x.c.carriedBids.forEach(function (cb) {
+      if (cb.b.notes && notes.indexOf(cb.b.notes) < 0) notes.push(cb.b.notes); });
+    var note = notes.length ? '<span class="pk-jobnote">' + esc(notes.join(" · ")) + "</span>" : "";
+    var bidsChip = x.j.bids.length > 1
+      ? ' <span class="bids expand" role="button" tabindex="0" title="Show the competing quotes">' + x.j.bids.length + " bids</span>"
+      : "";
+    var amt = x.c.cost ? money(x.c.cost) : '<span class="pendchip">Pending</span>';
+    rows.push('<tr><td class="pk-ord"><span class="pk-oline" style="background:' + color + '"></span>' +
+      '<span class="pk-odot" style="border-color:' + color + ';color:' + color + '">' + (i + 1) + "</span></td>" +
+      '<td class="pk-job">' + tEdit("job:" + x.j.id + ":desc", x.j.desc, "Job description") + bidsChip + note + "</td>" +
+      '<td class="pk-con"><div class="pk-cflex pk-cflex-mid">' + pkAvatar(primary) + '<span class="pk-cn">' + esc(names.join(", ") || "—") + "</span></div></td>" +
+      '<td class="pk-c-amt">' + amt + "</td></tr>");
+    rows.push(bidRowHTML(x, 4));   /* hidden competing-quotes row, toggled by the "N bids" chip */
+  });
+  if (!rows.length) rows.push('<tr><td colspan="4" style="color:var(--muted)">No standard-priority jobs.</td></tr>');
+  return '<table class="pk-schedtable"><thead><tr><th class="pk-ord-h">Order</th><th>Job</th><th>Contractor</th>' +
+    '<th class="pk-c-amt">Total (incl. HST)</th></tr></thead><tbody>' + rows.join("") + "</tbody></table>" +
+    '<p class="pk-attnote">All amounts include HST. Quotes are valid for 30 days unless otherwise noted.</p>';
+}
+
+/* ============ Board packet template (Design 4) ============ */
+function renderPacketReport() {
+  var d = computeAll(), M = state.meta || META_DEFAULTS, ov = overviewData(d), ctx = tplCtx();
+  document.title = M.condoName + " — Quote Tracker · BETA PREVIEW";
+  var bn = document.getElementById("brandName"); if (bn) bn.textContent = M.condoName;
+  var cRows = secCRows(d, ctx);
+  var sched = scheduleBuckets(d);
+  var role = ctx.ED ? "Property manager" : (isBoardMember() ? "Board member" : "Board viewer");
+  var h = [];
+  var goldBuilding = '<svg viewBox="0 0 24 24" fill="none" stroke="#e7cf8f" stroke-width="1.4" stroke-linejoin="round">' +
+    '<path d="M3 21h18M5 21V9l4-2v14M13 21V4l6 3v14M8 12h1M8 15h1M8 18h1M15.5 9h1M15.5 12h1M15.5 15h1M15.5 18h1"/></svg>';
+  h.push('<div class="pk-shell">');
+  /* ---- left teal rail with gold line icons (sticky) ---- */
+  h.push('<aside class="pk-side"><div class="pk-side-inner"><div class="pk-brand"><span class="ic">' + goldBuilding + '</span>' +
+    '<span class="bt"><b>' + esc(M.condoName) + '</b><small>' + esc(M.regNo) + '</small></span></div>');
+  h.push('<nav class="pk-nav secnav">' +
+    '<a href="#secSum">' + pkIcon("sum") + ' Executive summary</a>' +
+    '<a href="#secA">' + pkIcon("hp") + ' High priority jobs</a>' +
+    '<a href="#secB">' + pkIcon("bid") + ' Bid comparisons</a>' +
+    '<a href="#secC">' + pkIcon("sched") + ' Standard schedule</a>' +
+    '<a href="#secD">' + pkIcon("spend") + ' Contractor spend</a>' +
+    '<a href="#secE">' + pkIcon("open") + ' Open items</a>' +
+    '<a href="#" data-arch="1">' + pkIcon("arch") + ' Reports archive</a></nav>');
+  h.push('<div class="pk-side-foot"><span class="av">' + (ctx.ED ? "🛠" : (isBoardMember() ? "🗳" : "👤")) +
+    '</span><span><b>' + role + '</b>' +
+    (cloud.user ? '<a class="so js-signout">Sign out</a>' : '<small>' + esc(M.manager) + '</small>') +
+    '</span></div>');
+  h.push('</div></aside>');
+  /* ---- main column ---- */
+  h.push('<main class="pk-main">');
+  /* top card: header + gold rule + stat band (left) · tall building photo (right) */
+  h.push('<div class="pk-top"><div class="pk-hdrow"><div class="pk-top-left">' +
+    '<header class="pk-hd"><div><div class="pk-title-row"><h1>' + esc(M.title).toUpperCase() +
+    '</h1><span class="pk-forb">Prepared for the Board of Directors</span></div>' +
+    '<div class="pk-hd-meta">📅 <b>' + esc(activeReportName()) + '</b> &nbsp;|&nbsp; Prepared ' + esc(todayStr()) +
+    ' &nbsp;·&nbsp; ' + esc(M.buildings) + '</div></div>' +
+    '<button class="btn-print js-print" type="button">⬇ Print / PDF</button></header>' +
+    '<div class="pk-gold"></div></div>' +
+    '<div class="pk-top-photo"><img src="' + ASSET_PHOTO + '" alt=""></div></div>' +
+    '<section id="secSum" class="pk-stats">' + statCards(d) + '</section></div>');
+  h.push(tplBanners(ctx.ED));
+  /* dense 4-up: spend | donut | high-priority | top savings */
+  h.push('<div class="pk-grid4">');
+  h.push('<section id="secD" class="panel"><h3>Committed spend by contractor</h3>' + spendBars(d) +
+    '<a class="pk-spendmore" href="#secC">View full contractor spend breakdown →</a></section>');
+  h.push('<section class="panel"><h3>Jobs by priority</h3>' + priorityDonut(d, ov) +
+    '<div class="pk-note">🔒 High-priority jobs require board approval. The lowest received quote for each is shown in the High Priority Jobs table.</div></section>');
+  h.push('<section id="secA" class="panel pk-hptable"><h3>High priority jobs — approval requested</h3>' +
+    '<div class="tablewrap"><table><colgroup><col style="width:22px"><col><col style="width:82px">' +
+    '<col style="width:32px"><col style="width:70px"><col style="width:42px"></colgroup>' +
+    '<thead><tr><th>#</th><th>Job</th><th>Contractor</th><th class="ctr">Bids</th>' +
+    '<th class="money">Lowest</th><th>Status</th></tr></thead><tbody>' + hpCompactRows(d, ctx) +
+    '<tr class="subtotal"><td></td><td class="pk-hp-job">High-priority subtotal</td><td class="pk-hp-con"></td><td class="ctr"></td>' +
+    '<td class="money">' + money(d.hpTotal) + '</td><td class="pk-hp-stat"></td></tr></tbody></table></div>' +
+    (d.hp.length > 5 ? '<a class="pk-viewall" data-hpmore="' + d.hp.length + '">View all ' + d.hp.length + ' high-priority jobs ↓</a>' : '') +
+    '</section>');
+  h.push('<section class="panel"><h3>Top savings from competitive bids</h3>' + topSavingsList(d, ov) + '</section>');
+  h.push('</div>');
+  /* detail: competitive bid comparisons (B) + standard-priority schedule (C), side by side */
+  h.push('<div class="pk-detail2">');
+  h.push('<section id="secB" class="panel pk-detailcard">' +
+    pkSecHead("B", M.headB, "Jobs where more than one contractor was invited to quote. Lowest bids are highlighted. Invited contractors who have not yet returned a quote are shown as pending.") +
+    packetSecB(d, ctx) + '</section>');
+  h.push('<section id="secC" class="panel pk-detailcard">' +
+    pkSecHead("C", M.headC, "All standard-priority jobs, in the board’s chosen order. Per-contractor totals are in Section D.",
+      '<div class="pk-totalcard"><div class="tl">Total (incl. HST)</div><div class="tv">' + money(cRows.total) + '</div></div>') +
+    packetSecC(d, ctx) + '</section>');
+  h.push('</div>');
+  /* bottom 2-up: schedule | open items (kept last) */
+  h.push('<div class="pk-grid2">');
+  var tl = sched.length
+    ? sched.map(function (b) { return '<div class="pk-tl"><span class="dot"></span><div class="m">' + esc(b.label) + '</div><div class="n">' + b.n + ' job' + (b.n === 1 ? "" : "s") + '</div></div>'; }).join("")
+    : '';
+  h.push('<section class="panel"><h3>Schedule at a glance</h3>' +
+    (tl ? '<div class="pk-timeline">' + tl + '</div>' : '<p class="seclede" style="margin:0">No scheduled dates recorded yet — set a status date on jobs to build the timeline.</p>') +
+    '</section>');
+  h.push('<section id="secE" class="panel"><h3>Open items for the board</h3>' + secEBlocks(d, M, ctx.ED) + '</section>');
+  h.push('</div>');
+  h.push('</main></div>');
+  document.getElementById("report").innerHTML = h.join("");
+  updateLastUpd(); updateReportsButton(); setupScrollSpy();
+}
+
 /* Editing is allowed ONLY for an authorized, signed-in Google account.
    The Firestore rules enforce the same allowlist server-side on every write. */
 function isEditor() { return !!(cloud.user && !cloud.denied && isAuthorizedEmail(cloud.user.email)); }
@@ -984,7 +1955,7 @@ function bidRowHTML(x, colspan) {
     cmpRows(x) + "</tbody></table></div></td></tr>";
 }
 
-function renderReport() {
+function renderClassicReport() {
   var d = computeAll();
   var h = [];
   var nContractors = Object.keys(d.roll).length;
@@ -1215,6 +2186,10 @@ function setupScrollSpy() {
     links[a.getAttribute("href").slice(1)] = a;
   });
   var current = null;
+  /* default the first nav item active so the top section is always highlighted
+     (the observer's thin band can otherwise miss the first section at narrow widths) */
+  var firstLink = document.querySelector(".secnav a");
+  if (firstLink) { firstLink.classList.add("active"); current = firstLink; }
   spyObserver = new IntersectionObserver(function (entries) {
     entries.forEach(function (en) {
       if (en.isIntersecting) {
@@ -1223,7 +2198,7 @@ function setupScrollSpy() {
         if (current) current.classList.add("active");
       }
     });
-  }, { rootMargin: "-35% 0px -55% 0px" });
+  }, { rootMargin: "-12% 0px -80% 0px" });   /* highlight the section nearest the top of the viewport */
   document.querySelectorAll("#report section[id]").forEach(function (s) { spyObserver.observe(s); });
 }
 function updateLastUpd() {
@@ -1284,13 +2259,13 @@ function renderEditor() {
         ? '<span class="st rec">' + money(t) + (c.bids[bi].lowest ? " ✓" : "") + "</span>"
         : ((b.contractor || "").trim() ? '<span class="st pen">Pending</span>' : "");
       h.push('<div class="ebrow" data-bi="' + bi + '">' +
-        '<input type="text" value="' + esc(b.contractor) + '" data-f="contractor" placeholder="Contractor name">' +
-        '<input type="text" value="' + esc(b.qno == null ? "" : b.qno) + '" data-f="qno">' +
-        '<input type="number" step="0.01" min="0" value="' + (b.amount == null ? "" : esc(b.amount)) + '" data-f="amount" placeholder="waiting…">' +
-        '<select data-f="hst"><option value="no"' + (!b.hst ? " selected" : "") + '>Excluded</option>' +
-        '<option value="yes"' + (b.hst ? " selected" : "") + ">Included</option></select>" +
-        '<input type="text" value="' + esc(b.notes) + '" data-f="notes">' +
-        "<div>" + st + "</div>" +
+        '<label class="ef"><span class="efl">Contractor</span><input type="text" value="' + esc(b.contractor) + '" data-f="contractor" placeholder="Contractor name"></label>' +
+        '<label class="ef"><span class="efl">Quote #</span><input type="text" value="' + esc(b.qno == null ? "" : b.qno) + '" data-f="qno"></label>' +
+        '<label class="ef"><span class="efl">Amount</span><input type="number" step="0.01" min="0" value="' + (b.amount == null ? "" : esc(b.amount)) + '" data-f="amount" placeholder="waiting…"></label>' +
+        '<label class="ef"><span class="efl">HST</span><select data-f="hst"><option value="no"' + (!b.hst ? " selected" : "") + '>Excluded</option>' +
+        '<option value="yes"' + (b.hst ? " selected" : "") + ">Included</option></select></label>" +
+        '<label class="ef"><span class="efl">Notes</span><input type="text" value="' + esc(b.notes) + '" data-f="notes"></label>' +
+        '<div class="ef"><span class="efl">Status</span>' + st + "</div>" +
         '<button class="xbtn" data-act="delbid" title="Remove this bid">✕</button></div>');
       var fchips = (b.files || []).map(function (f, fi) {
         return '<span class="filechip"><a href="' + esc(f.url) + '" target="_blank" rel="noopener">📎 ' + esc(f.name) +
@@ -1928,6 +2903,56 @@ document.addEventListener("keydown", function (e) {
   var row = e.target && e.target.closest ? e.target.closest(".browlink") : null;
   if (row && row.dataset && row.dataset.cn) { e.preventDefault(); openContractorOverlay(row.dataset.cn, row.dataset.scope === "dash" ? dashAllJobs : null); }
 });
+/* sidebar nav → flash the target section so it's obvious which one you jumped to
+   (the layout has sections side-by-side now, so a plain anchor jump is easy to miss) */
+function flashSection(id) {
+  var sec = document.getElementById(id);
+  if (!sec) return;
+  sec.classList.remove("pk-flash");
+  void sec.offsetWidth;   /* reflow so a repeat click restarts the animation */
+  sec.classList.add("pk-flash");
+  setTimeout(function () { sec.classList.remove("pk-flash"); }, 1500);
+}
+document.addEventListener("click", function (e) {
+  var a = e.target && e.target.closest ? e.target.closest(".secnav a[href^='#']") : null;
+  if (a) {
+    var href = a.getAttribute("href");
+    if (href && href.length > 1) setTimeout(function () { flashSection(href.slice(1)); }, 60);
+  }
+});
+/* in-report Print / PDF buttons (dashboard & packet headers) */
+document.addEventListener("click", function (e) {
+  if (!e.target || !e.target.closest) return;
+  if (e.target.closest(".js-print")) { window.print(); return; }
+  /* board-packet footer "Sign out" → reuse the app-bar sign-out */
+  if (e.target.closest(".js-signout")) { e.preventDefault(); var so = document.getElementById("btnSignOut"); if (so) so.click(); return; }
+  /* board-packet sidebar "Reports archive" → open the report library overlay */
+  var arch = e.target.closest("[data-arch]");
+  if (arch) { e.preventDefault(); openReportsOverlay(); return; }
+  /* board-packet "View all high-priority jobs" → reveal the hidden rows */
+  var more = e.target.closest("[data-hpmore]");
+  if (more) {
+    e.preventDefault();
+    var panel = more.closest(".pk-hptable");
+    if (panel) {
+      var open = panel.classList.toggle("hp-all");
+      var n = more.getAttribute("data-hpmore");
+      more.textContent = open ? "Show fewer ↑" : "View all " + n + " high-priority jobs ↓";
+    }
+    return;
+  }
+});
+/* report-design picker (editor only) — persists to meta.template for everyone */
+(function () {
+  var sel = document.getElementById("tplSelect");
+  if (!sel) return;
+  sel.addEventListener("change", function () {
+    if (!state.meta) state.meta = Object.assign({}, META_DEFAULTS);
+    state.meta.template = sel.value;
+    persist("Report design updated");
+    renderReport();
+  });
+})();
 
 /* ---------- shared-passcode view gate (non-editors) ---------- */
 function viewGateMsg(t) { var el = document.getElementById("viewGateMsg"); if (el) el.textContent = t || ""; }
@@ -2606,6 +3631,16 @@ var moreMenu = document.getElementById("moreMenu");
 document.getElementById("btnMore").onclick = function (e) {
   e.stopPropagation();
   moreMenu.classList.toggle("open");
+  /* nudge the dropdown horizontally so it never spills off either screen edge
+     (the More button can wrap to the left or right on phones) */
+  var dd = moreMenu.querySelector(".dropdown");
+  dd.style.transform = "";
+  if (moreMenu.classList.contains("open")) {
+    var r = dd.getBoundingClientRect(), vw = document.documentElement.clientWidth, shift = 0;
+    if (r.right > vw - 8) shift = -(r.right - (vw - 8));
+    else if (r.left < 8) shift = 8 - r.left;
+    if (shift) dd.style.transform = "translateX(" + Math.round(shift) + "px)";
+  }
 };
 document.addEventListener("click", function (e) {
   if (!moreMenu.contains(e.target)) moreMenu.classList.remove("open");
@@ -2640,8 +3675,18 @@ function updateReportsButton() {
   setDisp("btnPortable", ed && !inArtifact);
   setDisp("btnReset", ed);
   setDisp("btnMore", cv);        /* hide the whole menu when nothing inside is available */
+  setDisp("tplPick", ed);        /* report-design picker — editor only */
+  var tsel = document.getElementById("tplSelect");
+  if (tsel) tsel.value = (state.meta && state.meta.template) || "classic";
   var btn = document.getElementById("btnReports");
   if (btn) btn.classList.toggle("viewing-archived", cloud.active.kind === "archived");
+  /* ---- slim top bar for the Board Packet: the period picker lives in the sidebar
+     (Reports archive) and Print lives in the report header, so drop them here ---- */
+  var packet = ((state.meta && state.meta.template) || "classic") === "packet";
+  setDisp("btnReports", !packet);
+  setDisp("btnPrint", !packet);
+  var cs = document.getElementById("cloudStatus"); if (cs) cs.style.display = packet ? "none" : "";
+  var ab = document.querySelector(".appbar"); if (ab) ab.classList.toggle("slim", packet);
 }
 function closeReportsOverlay() { document.getElementById("reportsOverlay").classList.remove("open"); }
 function openReportsOverlay() {
