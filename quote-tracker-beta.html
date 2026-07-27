@@ -441,9 +441,8 @@ input:focus, select:focus { outline:2px solid var(--accent); outline-offset:-1px
 /* ===================================================================
    ALTERNATE REPORT TEMPLATES (selectable by the property manager)
    Classic = the original layout (unscoped rules above).
-   #report.tpl-dashboard = "Executive dashboard"
    #report.tpl-packet    = "Board packet"
-   Both reuse the shared tokens, tables, .brow bars and .stchip chips.
+   It reuses the shared tokens, tables, .brow bars and .stchip chips.
    =================================================================== */
 
 /* the picker in the app bar (editor only) */
@@ -451,21 +450,20 @@ input:focus, select:focus { outline:2px solid var(--accent); outline-offset:-1px
 .tplpick select { font:inherit; font-size:12.5px; color:#12324f; background:#EAF1F8; border:1px solid #6f88a6;
   border-radius:6px; padding:5px 8px; font-weight:600; cursor:pointer; }
 
-/* give the two dashboard-y layouts more room than the 960px classic column */
+/* the packet layout gets more room than the 960px classic column */
 /* wide, but capped so content stays dense and the text reads large (not stretched
    thin across a huge monitor) */
-body:has(#report.tpl-dashboard) .wrap { max-width:1400px; }
 body:has(#report.tpl-packet) .wrap { max-width:1560px; }
 
-/* shared panel card used by both new templates */
-.tpl-dashboard .panel, .tpl-packet .panel { background:var(--card); border:1px solid var(--line); border-radius:10px;
+/* panel card used by the packet layout */
+.tpl-packet .panel { background:var(--card); border:1px solid var(--line); border-radius:10px;
   padding:18px 20px; box-shadow:0 1px 3px rgba(30,40,51,.06); margin:0; }
-.tpl-dashboard .panel > h3, .tpl-packet .panel > h3 { font-family:inherit; font-size:15px; font-weight:700; letter-spacing:.01em;
+.tpl-packet .panel > h3 { font-family:inherit; font-size:15px; font-weight:700; letter-spacing:.01em;
   margin:0 0 12px; color:var(--ink); display:flex; align-items:center; gap:8px; }
-.tpl-dashboard section, .tpl-packet section { margin:0; }
-.tpl-dashboard .panel table, .tpl-packet .panel table { margin-top:2px; }
+.tpl-packet section { margin:0; }
+.tpl-packet .panel table { margin-top:2px; }
 /* table inside a panel: drop its own frame so it blends into the panel */
-.tpl-dashboard .panel .tablewrap, .tpl-packet .panel .tablewrap { border:none; box-shadow:none; border-radius:0; }
+.tpl-packet .panel .tablewrap { border:none; box-shadow:none; border-radius:0; }
 
 /* stat-card grid shared shell */
 .statgrid { display:grid; grid-template-columns:repeat(6,1fr); gap:12px; }
@@ -508,42 +506,6 @@ body:has(#report.tpl-packet) .wrap { max-width:1560px; }
   flex-direction:column; justify-content:center; }
 .savecard.total .sc-lab, .savecard.total .sc-sub { color:#cdebd8; }
 .savecard.total .sc-amt { color:#fff; }
-
-/* ---------- Executive dashboard (dark left rail) ---------- */
-.tpl-dashboard .dash-shell { display:grid; grid-template-columns:216px 1fr; gap:22px; align-items:start; }
-@media screen and (max-width:820px){ .tpl-dashboard .dash-shell { grid-template-columns:1fr; } }
-.tpl-dashboard .dash-side { background:linear-gradient(180deg,#1B2634 0%,#22354d 100%); border-radius:12px;
-  padding:18px 14px; color:#cdd8e6; position:sticky; top:calc(var(--abh,48px) + 12px); align-self:start; }
-@media screen and (max-width:820px){ .tpl-dashboard .dash-side { position:static; } }
-.tpl-dashboard .ds-brand { display:flex; align-items:center; gap:10px; padding:0 4px 14px; margin-bottom:12px;
-  border-bottom:1px solid rgba(255,255,255,.12); }
-.tpl-dashboard .ds-brand img { height:30px; background:#fff; border-radius:6px; padding:3px; }
-.tpl-dashboard .ds-brand span { font-size:13.5px; font-weight:700; color:#fff; line-height:1.25; }
-.tpl-dashboard .dash-nav { position:static; display:flex; flex-direction:column; gap:2px; background:none;
-  border:none; padding:0; box-shadow:none; }
-.tpl-dashboard .dash-nav a { display:block; font-size:13px; font-weight:600; color:#b7c4d4; text-decoration:none;
-  padding:8px 11px; border-radius:7px; border:none; }
-.tpl-dashboard .dash-nav a:hover { background:rgba(255,255,255,.08); color:#fff; }
-.tpl-dashboard .dash-nav a.active { background:var(--accent); color:#fff; }
-.tpl-dashboard .ds-foot { display:flex; align-items:center; gap:9px; margin-top:16px; padding-top:13px;
-  border-top:1px solid rgba(255,255,255,.12); font-size:12px; }
-.tpl-dashboard .ds-foot .av { width:26px; height:26px; border-radius:50%; background:#3a577c;
-  display:flex; align-items:center; justify-content:center; font-size:13px; }
-.tpl-dashboard .ds-foot b { color:#fff; display:block; font-size:12.5px; }
-.tpl-dashboard .ds-foot small { color:#8ea1b7; }
-.tpl-dashboard .dash-main { display:flex; flex-direction:column; gap:18px; min-width:0; }
-.tpl-dashboard .dash-top { display:flex; justify-content:space-between; align-items:flex-start; gap:16px; flex-wrap:wrap; }
-.tpl-dashboard .dash-top h1 { font-family:-apple-system,"Segoe UI",Roboto,sans-serif; font-size:24px; font-weight:750;
-  margin:0; letter-spacing:-.01em; }
-.tpl-dashboard .dash-top .dt-sub { color:var(--ink2); font-size:13.5px; margin-top:3px; }
-.tpl-dashboard .dash-top .dt-date { color:var(--muted); font-size:12.5px; margin-top:1px; }
-.tpl-dashboard .dash-2col { display:grid; grid-template-columns:1fr 1fr; gap:16px; align-items:start; }
-@media screen and (max-width:820px){ .tpl-dashboard .dash-2col { grid-template-columns:1fr; } }
-.tpl-dashboard .ov-summary { font-size:13px; color:var(--ink2); line-height:1.5; margin:12px 0 0;
-  border-top:1px solid var(--line-soft); padding-top:11px; }
-.tpl-dashboard .brow { grid-template-columns:150px 1fr 130px; }
-.tpl-dashboard .btn-print { font:inherit; font-size:12.5px; font-weight:600; color:#12324f; background:#EAF1F8;
-  border:1px solid #b9cbe0; border-radius:7px; padding:8px 13px; cursor:pointer; }
 
 /* ---------- Board packet (Design 4: dark rail + serif header + 4-up) ---------- */
 .tpl-packet { --pkg:#16613a; }
@@ -864,12 +826,10 @@ body:has(#report.tpl-packet) .wrap { max-width:1560px; }
   .appbar { position:static; }
   /* keep the "More ▾" menu from being wider than the phone; JS clamps its position */
   .dropdown { max-width:calc(100vw - 16px); }
-  .tpl-packet .pk-side, .tpl-dashboard .dash-side { padding:12px 16px; }
+  .tpl-packet .pk-side { padding:12px 16px; }
   .tpl-packet .pk-nav, .tpl-packet .pk-side-foot,
-  .tpl-dashboard .dash-nav, .tpl-dashboard .ds-foot { display:none; }
   .tpl-packet .pk-brand { border-bottom:none; margin:0; padding:0; }
-  .tpl-dashboard .ds-brand { border-bottom:none; margin:0; padding:0; }
-  .tpl-packet .pk-main, .tpl-dashboard .dash-main { padding:14px; }
+  .tpl-packet .pk-main { padding:14px; }
   .tpl-packet .pk-top-left { padding:14px 16px; }
   .tpl-packet .pk-stats { padding-right:0; }
   .tpl-packet .pk-detailcard { padding:14px; }
@@ -1331,19 +1291,6 @@ body[data-view="edit"] .wrap { max-width:none; }
   .tpl-packet .pk-updmedia .pk-vid { height:54px; }
   .tpl-packet .pk-step[data-stage] { cursor:default; }
 
-  /* ---------- executive dashboard ---------- */
-  .tpl-dashboard .dash-shell { display:block; }
-  .tpl-dashboard .dash-side { position:static; border-radius:0; padding:11px 16px; margin-bottom:14px;
-    break-inside:avoid; break-after:avoid; }
-  .tpl-dashboard .dash-nav, .tpl-dashboard .ds-foot { display:none !important; }
-  .tpl-dashboard .ds-brand { border-bottom:none; margin:0; padding:0; }
-  .tpl-dashboard .dash-main { gap:14px; }
-  .tpl-dashboard .dash-2col { grid-template-columns:1fr 1fr; }
-  .tpl-dashboard .statgrid { grid-template-columns:repeat(3,1fr); }
-  .tpl-dashboard .savegrid { grid-template-columns:repeat(2,1fr); }
-  .tpl-dashboard .panel { break-inside:avoid; box-shadow:none; }
-  .tpl-dashboard .brow { grid-template-columns:150px 1fr 96px; }
-  .tpl-dashboard .blabel { white-space:normal; overflow:visible; text-overflow:clip; }
 
   /* --- last line of defence -------------------------------------------
      If a browser lays the page out at a phone width anyway (printing from
@@ -1393,7 +1340,6 @@ body[data-view="edit"] .wrap { max-width:none; }
     <span>Design</span>
     <select id="tplSelect">
       <option value="classic">Classic report</option>
-      <option value="dashboard">Executive dashboard</option>
       <option value="packet">Board packet</option>
     </select>
   </label>
@@ -1582,7 +1528,7 @@ var ASSET_PHOTO = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4QAqRXhpZg
 var seed = JSON.parse(document.getElementById("seed").textContent);
 var META_DEFAULTS = { title: "Contractor Quote Report", condoName: "Waterview Condominium",
   regNo: "NNSCC No. 292", manager: "CPO Property Management", buildings: "Buildings 550 & 560",
-  template: "classic",
+  template: "packet",
   headSum: "Executive summary",
   headA: "High-priority jobs — approval requested",
   headB: "Competitive bid comparisons",
@@ -2026,12 +1972,12 @@ function computeAll() {
    Classic = renderClassicReport (original). The two alternates reuse the same
    data (computeAll) and the shared section builders below. */
 function renderReport() {
-  var t = (state.meta && state.meta.template) || "classic";
-  if (t !== "dashboard" && t !== "packet") t = "classic";
+  /* Board packet is the default; anything unrecognised (including reports
+     saved under the retired "dashboard" design) falls back to it */
+  var t = (state.meta && state.meta.template) === "classic" ? "classic" : "packet";
   var rep = document.getElementById("report");
   if (rep) rep.className = "tpl-" + t;
   setPrintFooter();
-  if (t === "dashboard") return renderDashboardReport();
   if (t === "packet") return renderPacketReport();
   return renderClassicReport();
 }
@@ -2286,64 +2232,6 @@ function scheduleBuckets(d) {
     var label = new Date(+parts[0], +parts[1] - 1, 1).toLocaleDateString("en-CA", { month: "short", year: "numeric" });
     return { label: label, n: m[k] };
   });
-}
-
-/* ============ Executive dashboard template ============ */
-function renderDashboardReport() {
-  var d = computeAll(), M = state.meta || META_DEFAULTS, ov = overviewData(d), ctx = tplCtx();
-  document.title = M.condoName + " — Quote Tracker · BETA PREVIEW";
-  var bn = document.getElementById("brandName"); if (bn) bn.textContent = M.condoName;
-  var cRows = secCRows(d, ctx);
-  var h = [];
-  h.push('<div class="dash-shell"><aside class="dash-side">');
-  h.push('<div class="ds-brand"><img src="' + ASSET_LOGO + '" alt=""><span>' + esc(M.condoName) + '<br><small style="font-weight:600;color:#8ea1b7;font-size:11px">' + esc(M.regNo) + '</small></span></div>');
-  h.push('<nav class="secnav dash-nav">' +
-    '<a href="#secSum">Overview</a>' +
-    '<a href="#secA">High priority jobs</a>' +
-    '<a href="#secB">Bid comparisons</a>' +
-    '<a href="#secC">Standard schedule</a>' +
-    '<a href="#secD">Contractor spend</a>' +
-    '<a href="#secE">Open items</a></nav>');
-  h.push('<div class="ds-foot"><span class="av">' + (ctx.ED ? "🛠" : (isBoardMember() ? "🗳" : "👤")) + '</span><span><b>' +
-    (ctx.ED ? "Property manager" : (isBoardMember() ? "Board member" : "Board viewer")) + '</b><small>' + esc(M.manager) + '</small></span></div>');
-  h.push('</aside><main class="dash-main">');
-  h.push('<div class="dash-top"><div><h1>' + esc(M.title) + '</h1>' +
-    '<div class="dt-sub">' + esc(M.condoName) + ' · ' + esc(M.regNo) + ' — Prepared for the Board of Directors</div>' +
-    '<div class="dt-date">' + esc(M.buildings) + ' · Prepared ' + esc(todayStr()) + '</div></div>' +
-    '<button class="btn-print js-print" type="button">⬇ Print / PDF</button></div>');
-  h.push(tplBanners(ctx.ED));
-  /* stat cards */
-  h.push('<section id="secSum">' + statCards(d) + '</section>');
-  /* contractor spend + donut/summary */
-  h.push('<div class="dash-2col">');
-  h.push('<section id="secD" class="panel"><h3>Committed spend by contractor</h3>' + spendBars(d) + '</section>');
-  h.push('<section class="panel"><h3>Jobs by priority</h3>' + priorityDonut(d, ov));
-  var sumTxt = (state.ai && state.ai.summary ? esc(state.ai.summary) + " " : "") +
-    d.jobs.length + " repair and maintenance jobs have been quoted, " + d.hp.length + " flagged high priority" +
-    (d.pendingCount ? "; " + d.pendingCount + " invited bid" + (d.pendingCount > 1 ? "s are" : " is") + " still outstanding" : "") +
-    ". Where a job received more than one priced quote, the lowest bid is used in all totals. All amounts include 13% HST.";
-  h.push('<p class="ov-summary">' + sumTxt + '</p></section></div>');
-  /* high priority table */
-  h.push('<section id="secA" class="panel"><h3>' + esc(M.headA) + '</h3>' +
-    '<div class="tablewrap"><table><thead><tr><th>#</th><th>Job</th><th>Contractor</th><th class="money">Lowest quote (incl. HST)</th></tr></thead><tbody>' +
-    secARows(d, ctx) +
-    '<tr class="subtotal"><td></td><td colspan="2">High-priority subtotal</td><td class="money">' + money(d.hpTotal) + '</td></tr>' +
-    '</tbody></table></div></section>');
-  /* top savings */
-  h.push('<section class="panel"><h3>Top savings from competitive bids</h3>' + topSavings(d, ov) + '</section>');
-  /* bid comparisons */
-  h.push('<section id="secB" class="panel"><h3>' + esc(M.headB) + '</h3>' + secBCards(d, ctx) + '</section>');
-  /* standard schedule */
-  h.push('<section id="secC" class="panel"><h3>' + esc(M.headC) + '</h3>' +
-    '<div class="tablewrap"><table><thead><tr><th>#</th><th>Job</th><th>Contractor</th><th class="money">Total (incl. HST)</th></tr></thead><tbody>' +
-    cRows.html +
-    '<tr class="subtotal"><td></td><td colspan="2">Standard-priority subtotal</td><td class="money">' + money(cRows.total) + '</td></tr>' +
-    '</tbody></table></div></section>');
-  /* open items */
-  h.push('<section id="secE" class="panel"><h3>' + esc(M.headE) + '</h3>' + secEBlocks(d, M, ctx.ED) + '</section>');
-  h.push('</main></div>');
-  document.getElementById("report").innerHTML = h.join("");
-  updateLastUpd(); updateReportsButton(); setupScrollSpy();
 }
 
 /* gold line icons for the board-packet sidebar (monochrome, stroke #d9b878) */
@@ -3335,13 +3223,12 @@ function edVotingHTML() {
     '<button class="edbtn" type="button" data-act="edproxy" data-target="btnDecLog">📜 Decision log</button></p></div></div>';
 }
 function edSettingsHTML(M) {
-  var tpl = (M.template === "dashboard" || M.template === "packet") ? M.template : "classic";
+  var tpl = M.template === "classic" ? "classic" : "packet";
   var h = [edSecHead("Settings", "Who can open the report, how it looks, and the data tools.")];
   h.push('<div class="ecard esettings"><div class="ehead"><strong>Report design</strong>' +
     '<span style="font-size:12.5px;color:var(--ink2)">— the layout every reader sees</span></div><div class="ebids">');
   h.push('<div class="esrow"><label>Design</label><select data-mf="template">' +
     '<option value="classic"' + (tpl === "classic" ? " selected" : "") + ">Classic report</option>" +
-    '<option value="dashboard"' + (tpl === "dashboard" ? " selected" : "") + ">Executive dashboard</option>" +
     '<option value="packet"' + (tpl === "packet" ? " selected" : "") + ">Board packet</option></select></div></div></div>");
   h.push(viewPassCardHTML());
   h.push('<div class="ecard esettings"><div class="ehead"><strong>Data</strong>' +
@@ -4436,7 +4323,7 @@ document.addEventListener("click", function (e) {
     if (href && href.length > 1) setTimeout(function () { flashSection(href.slice(1)); }, 60);
   }
 });
-/* in-report Print / PDF buttons (dashboard & packet headers) */
+/* the in-report Print / PDF button (board packet header) */
 document.addEventListener("click", function (e) {
   if (!e.target || !e.target.closest) return;
   if (e.target.closest(".js-print")) { window.print(); return; }
