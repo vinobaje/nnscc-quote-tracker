@@ -1110,6 +1110,13 @@ body[data-view="edit"] .wrap { max-width:none; }
 .ed-rail .qa .edbtn { width:100%; text-align:center; }
 .ed-railempty { font-size:12.5px; color:var(--muted); }
 
+/* Condo Super credit — closes the report on screen and on paper */
+.cscredit { margin:26px 0 6px; padding-top:12px; border-top:1px solid var(--line-soft);
+  text-align:center; font-size:12px; color:var(--muted); letter-spacing:.01em; }
+.cscredit a { color:var(--accent-ink); font-weight:700; text-decoration:none; }
+.cscredit a:hover { text-decoration:underline; }
+.tpl-packet .cscredit { margin-top:4px; }
+
 /* building-photo row in Report settings */
 .photorow { display:flex; gap:14px; align-items:flex-start; flex-wrap:wrap; }
 .photoprev { width:132px; height:84px; object-fit:cover; border-radius:9px; border:1px solid var(--line); flex:none; background:var(--paper); }
@@ -1190,6 +1197,10 @@ body[data-view="edit"] .wrap { max-width:none; }
   .editable-head, .editable-txt { outline:none !important; }
   .editable-txt:empty::before { content:"" !important; }
   a { text-decoration:none; color:inherit; }
+  /* the credit stays legible on paper and is never dropped */
+  .cscredit { display:block !important; color:#5a6a7a !important; break-inside:avoid; }
+  .cscredit a { color:#24466B !important; font-weight:700 !important; }
+  .printfoot .csfoot { color:#5a6a7a; }
   /* attachment links read as plain notes on paper */
   .attlink, .tpl-packet .pk-att.attlink { color:var(--muted); text-decoration:none; }
   /* the "2 bids" chip stays (it is information) but loses its ▾ affordance */
@@ -1981,6 +1992,14 @@ function computeAll() {
            approvedTotal: approvedTotal, stCounts: stCounts, staleBids: staleBids };
 }
 
+/* The Condo Super credit that closes every report. It is part of the document,
+   not the browser's own page furniture, so it survives Print / Save as PDF
+   whatever the reader has set in the print dialog. */
+function creditHTML() {
+  return '<div class="cscredit">Powered by <a href="https://condosuper.app" target="_blank" rel="noopener">' +
+    "Condo&nbsp;Super</a> \u00b7 condosuper.app</div>";
+}
+
 /* ---------- report rendering ---------- */
 /* The property manager can choose one of three report designs. The choice is
    stored in meta.template and shared with everyone (board members / viewers).
@@ -2004,7 +2023,8 @@ function setPrintFooter() {
   if (!el) return;
   var M = state.meta || META_DEFAULTS;
   el.innerHTML = "<b>" + esc(M.condoName) + "</b> · " + esc(M.regNo) + " — " +
-    esc(M.title) + " · " + esc(activeReportName()) + " · prepared " + esc(todayStr());
+    esc(M.title) + " · " + esc(activeReportName()) + " · prepared " + esc(todayStr()) +
+    ' · <span class="csfoot">powered by condosuper.app</span>';
 }
 
 /* editor-cell helpers shared by all three templates (closures over EDITOR) */
@@ -2588,6 +2608,7 @@ function renderPacketReport() {
     '</section>');
   h.push('<section id="secE" class="panel"><h3>Open items for the board</h3>' + secEBlocks(d, M, ctx.ED) + '</section>');
   h.push('</div>');
+  h.push(creditHTML());
   h.push('</main></div>');
   document.getElementById("report").innerHTML = h.join("");
   updateLastUpd(); updateReportsButton(); setupScrollSpy();
@@ -2848,6 +2869,7 @@ function renderClassicReport() {
         esc((state.ai.generatedAt || "").slice(0, 10)) + " and reviewed by the property manager.</p>" : "") +
     '<p id="lastUpd"></p></div>');
 
+  h.push(creditHTML());
   document.getElementById("report").innerHTML = h.join("");
   updateLastUpd();
   updateReportsButton();
