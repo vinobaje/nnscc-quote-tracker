@@ -648,7 +648,9 @@ body:has(#report.tpl-packet) .wrap { max-width:1560px; }
 .tpl-packet .statcard.pd .sv-v { color:var(--ink); }
 /* dense 4-up + bottom 2-up */
 .tpl-packet .pk-grid4 { display:grid; grid-template-columns:1fr 1fr 1.5fr 1fr; gap:14px; align-items:start; }
-@media screen and (max-width:1180px){ .tpl-packet .pk-grid4 { grid-template-columns:1fr 1fr; } }
+/* two of the four panels hold tables — below ~1400px a quarter of the width
+   is not enough for them and the columns start breaking words */
+@media screen and (max-width:1400px){ .tpl-packet .pk-grid4 { grid-template-columns:1fr 1fr; } }
 @media screen and (max-width:680px){ .tpl-packet .pk-grid4 { grid-template-columns:1fr; } }
 .tpl-packet .pk-grid2 { display:grid; grid-template-columns:1fr 1fr; gap:14px; align-items:start; }
 @media screen and (max-width:860px){ .tpl-packet .pk-grid2 { grid-template-columns:1fr; } }
