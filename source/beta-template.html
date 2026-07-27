@@ -33,7 +33,7 @@ header.rep { padding:30px 0 20px; border-top:4px solid var(--accent); border-bot
 .banner { margin:18px 0 0; }
 .banner img { width:100%; height:215px; object-fit:cover; border-radius:8px;
   border:1px solid var(--line); display:block; }
-@media (max-width:640px) { .banner img { height:150px; } .logochip img { height:44px; } }
+@media screen and (max-width:640px) { .banner img { height:150px; } .logochip img { height:44px; } }
 section { margin:34px 0; }
 .seclede { color:var(--ink2); font-size:14px; max-width:64ch; margin:2px 0 14px; }
 
@@ -171,7 +171,7 @@ tr.pend td { color:var(--muted); font-style:italic; }
 .bjobs { color:var(--muted); }
 .browlink { cursor:pointer; border-radius:6px; }
 .browlink:hover, .browlink:focus-visible { background:rgba(22,39,63,.06); outline:none; }
-@media (max-width:640px) { .brow { grid-template-columns:120px 1fr 120px; } }
+@media screen and (max-width:640px) { .brow { grid-template-columns:120px 1fr 120px; } }
 
 ul.notes { margin:8px 0 0; padding-left:20px; color:var(--ink2); font-size:14px; }
 ul.notes li { margin:5px 0; }
@@ -216,7 +216,7 @@ input:focus, select:focus { outline:2px solid var(--accent); outline-offset:-1px
 .ebrow .ef > input, .ebrow .ef > select { width:100%; box-sizing:border-box; }
 .ebrow .ef .efl { display:none; }
 /* phones: stack the bid fields vertically with their labels so nothing runs off-screen */
-@media (max-width:600px) {
+@media screen and (max-width:600px) {
   #editor .ebids { overflow-x:visible; }
   #editor .ebrow.hdr { display:none; }
   #editor .ebrow { display:block; min-width:0; padding:4px 0; }
@@ -238,7 +238,7 @@ input:focus, select:focus { outline:2px solid var(--accent); outline-offset:-1px
   border:1px solid var(--line); border-radius:5px; padding:7px 9px; width:100%; box-sizing:border-box; resize:vertical; }
 .esrow textarea:focus { outline:2px solid var(--accent); outline-offset:-1px; }
 .ainarr { font-style:normal; border-left:3px solid var(--accent); padding-left:12px; }
-@media (max-width:560px) { .esrow { grid-template-columns:1fr; } .esrow label { text-align:left; } }
+@media screen and (max-width:560px) { .esrow { grid-template-columns:1fr; } .esrow label { text-align:left; } }
 
 /* ---------- PIN modal ---------- */
 .overlay { position:fixed; inset:0; background:rgba(20,26,33,.45); z-index:50;
@@ -344,7 +344,53 @@ input:focus, select:focus { outline:2px solid var(--accent); outline-offset:-1px
 .eupdrow input[type=date] { flex:none; padding:4px 7px; font-size:12.5px; }
 .eupdrow input[type=text] { flex:1; min-width:0; padding:4px 7px; font-size:12.5px; }
 .eupds .addbid { margin-top:2px; }
-@media (max-width:600px){ .eupdrow { flex-wrap:wrap; } .eupdrow input[type=text] { min-width:100%; order:3; } }
+@media screen and (max-width:600px){ .eupdrow { flex-wrap:wrap; } .eupdrow input[type=text] { min-width:100%; order:3; } }
+/* ---------- in-page attachment viewer ----------
+   Quotes are read inside the report (no new tab, no lost place in the
+   packet). PDFs render in an iframe with the browser's own PDF viewer;
+   images render directly; anything else offers a download. */
+.filebox { width:min(1080px,96vw); padding:0; overflow:hidden; display:flex; flex-direction:column;
+  height:min(88vh,900px); }
+.fvhead { display:flex; align-items:center; gap:12px; padding:11px 14px 11px 16px;
+  border-bottom:1px solid var(--line); background:var(--paper); flex:none; }
+.fvname { min-width:0; flex:1; }
+.fvname b { display:block; font-size:14px; font-weight:650; color:var(--ink);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.fvname small { display:block; font-size:11.5px; color:var(--muted); margin-top:1px; }
+.fvacts { flex:none; display:flex; align-items:center; gap:7px; }
+.fvacts a, .fvacts button { font:inherit; font-size:12.5px; font-weight:600; color:var(--accent-ink);
+  background:var(--accent-soft); border:1px solid transparent; border-radius:7px; padding:6px 11px;
+  text-decoration:none; cursor:pointer; white-space:nowrap; }
+.fvacts a:hover, .fvacts button:hover { background:var(--accent); color:#fff; }
+.fvacts .fvclose { background:none; color:var(--ink2); font-size:16px; line-height:1; padding:6px 9px; }
+.fvacts .fvclose:hover { background:var(--line-soft); color:var(--ink); }
+.fvtabs { display:flex; gap:6px; flex-wrap:wrap; padding:8px 14px; border-bottom:1px solid var(--line-soft);
+  background:var(--card); flex:none; }
+.fvtab { font-size:12px; font-weight:600; color:var(--ink2); background:var(--paper);
+  border:1px solid var(--line); border-radius:99px; padding:4px 11px; cursor:pointer; max-width:260px;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.fvtab.on { background:var(--accent); border-color:var(--accent); color:#fff; }
+.fvbody { flex:1; min-height:0; background:#525659; display:flex; align-items:flex-start;
+  justify-content:center; overflow:auto; }
+.fvbody iframe { width:100%; height:100%; border:0; display:block; background:#fff; flex:none; }
+/* screenshots of quotes are often tall: fit the width and scroll, rather
+   than shrinking the whole page down to something unreadable */
+.fvbody img { max-width:100%; height:auto; display:block; flex:none; }
+.fvbody video { max-width:100%; max-height:100%; display:block; margin:auto; }
+.fvmsg { color:#e8ecef; font-size:13.5px; text-align:center; padding:30px 24px; line-height:1.6; }
+.fvmsg .fvbig { font-size:34px; display:block; margin-bottom:10px; }
+.fvmsg a { color:#fff; font-weight:700; }
+@media screen and (max-width:600px){
+  .filebox { height:94vh; width:100vw; border-radius:0; }
+  .fvacts .fvlabel { display:none; }
+}
+/* the report's attachment lines are buttons, not decoration */
+.attlink { cursor:pointer; color:var(--accent-ink); text-decoration:underline dotted; text-underline-offset:2px; }
+.attlink:hover { color:var(--accent); text-decoration:underline; }
+.tpl-packet .pk-att.attlink { color:var(--accent-ink); }
+.tpl-packet .pk-att.attlink:hover { color:var(--accent); }
+.pk-updmedia a { cursor:zoom-in; }
+
 .dashbox { width:min(720px,94vw); }
 .dashtable { width:100%; border-collapse:collapse; font-size:13px; margin:8px 0 14px; }
 .dashtable th, .dashtable td { padding:6px 8px; border-bottom:1px solid var(--line-soft); text-align:left; }
@@ -389,35 +435,8 @@ input:focus, select:focus { outline:2px solid var(--accent); outline-offset:-1px
 .sigblock img { height:44px; display:block; margin:0 auto 2px; }
 .sigblock .signm { font-weight:700; border-top:1px solid var(--ink2); padding-top:2px; }
 
-@media print {
-  :root { --paper:#fff; --card:#fff; }
-  body { padding:0; font-size:12.5px; }
-  .appbar, .secnav, .edithint-inline, .archbanner, .votebanner, #editor { display:none !important; }
-  #report { display:block !important; }
-  .editable-head, .editable-txt { outline:none !important; }
-  .editable-txt:empty::before { content:"" !important; }
-  /* Every section begins on a fresh page (summary stays with the letterhead),
-     so a heading can never be orphaned at the bottom of a page. */
-  #report section { break-before:page; margin-top:0; padding-top:8px; }
-  #report section#secSum { break-before:auto; }
-  /* Large containers may flow across pages — rows never split, headers repeat. */
-  .tablewrap, .group { break-inside:auto; border-color:#bbb; box-shadow:none; }
-  tr { break-inside:avoid; }
-  thead { display:table-header-group; }
-  .card,.tile,.chart { break-inside:avoid; border-color:#bbb; box-shadow:none; }
-  h2, section > .kicker, .seclede, .grouphead, .cardhead { break-after:avoid; }
-  .logochip { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
-  header.rep { padding-top:0; margin-top:0; }
-  /* hero prints as a classic letterhead: photo and dark overlay dropped, ink text */
-  .hero { min-height:0; margin-top:0; border-radius:0; overflow:visible; box-shadow:none;
-    border-top:4px solid var(--accent); border-bottom:3px double #bbb; display:block; }
-  .hero-img, .hero::after { display:none !important; }
-  .hero-content { padding:10px 0 14px; }
-  .hero h1 { color:var(--ink); text-shadow:none; }
-  .herokick { color:var(--accent-ink); }
-  .herometa { color:var(--ink2); }
-  .tile:hover { transform:none; }
-}
+/* the print rules live at the end of this stylesheet, after every template,
+   so they can override layout without an !important arms race. */
 
 /* ===================================================================
    ALTERNATE REPORT TEMPLATES (selectable by the property manager)
@@ -450,8 +469,8 @@ body:has(#report.tpl-packet) .wrap { max-width:1560px; }
 
 /* stat-card grid shared shell */
 .statgrid { display:grid; grid-template-columns:repeat(6,1fr); gap:12px; }
-@media (max-width:1080px){ .statgrid { grid-template-columns:repeat(3,1fr); } }
-@media (max-width:560px){ .statgrid { grid-template-columns:repeat(2,1fr); } }
+@media screen and (max-width:1080px){ .statgrid { grid-template-columns:repeat(3,1fr); } }
+@media screen and (max-width:560px){ .statgrid { grid-template-columns:repeat(2,1fr); } }
 .statcard { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:13px 14px;
   box-shadow:0 1px 3px rgba(30,40,51,.06); }
 .statcard .sv-body { min-width:0; }
@@ -477,7 +496,7 @@ body:has(#report.tpl-packet) .wrap { max-width:1560px; }
 
 /* top-savings cards */
 .savegrid { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; }
-@media (max-width:820px){ .savegrid { grid-template-columns:repeat(2,1fr); } }
+@media screen and (max-width:820px){ .savegrid { grid-template-columns:repeat(2,1fr); } }
 .savecard { background:var(--good-soft); border:1px solid #bfe0cc; border-radius:10px; padding:13px 15px; }
 .savecard .sc-job { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--good); }
 .savecard .sc-desc { font-size:13px; color:var(--ink); margin:3px 0 8px; line-height:1.35; }
@@ -492,10 +511,10 @@ body:has(#report.tpl-packet) .wrap { max-width:1560px; }
 
 /* ---------- Executive dashboard (dark left rail) ---------- */
 .tpl-dashboard .dash-shell { display:grid; grid-template-columns:216px 1fr; gap:22px; align-items:start; }
-@media (max-width:820px){ .tpl-dashboard .dash-shell { grid-template-columns:1fr; } }
+@media screen and (max-width:820px){ .tpl-dashboard .dash-shell { grid-template-columns:1fr; } }
 .tpl-dashboard .dash-side { background:linear-gradient(180deg,#1B2634 0%,#22354d 100%); border-radius:12px;
   padding:18px 14px; color:#cdd8e6; position:sticky; top:calc(var(--abh,48px) + 12px); align-self:start; }
-@media (max-width:820px){ .tpl-dashboard .dash-side { position:static; } }
+@media screen and (max-width:820px){ .tpl-dashboard .dash-side { position:static; } }
 .tpl-dashboard .ds-brand { display:flex; align-items:center; gap:10px; padding:0 4px 14px; margin-bottom:12px;
   border-bottom:1px solid rgba(255,255,255,.12); }
 .tpl-dashboard .ds-brand img { height:30px; background:#fff; border-radius:6px; padding:3px; }
@@ -519,7 +538,7 @@ body:has(#report.tpl-packet) .wrap { max-width:1560px; }
 .tpl-dashboard .dash-top .dt-sub { color:var(--ink2); font-size:13.5px; margin-top:3px; }
 .tpl-dashboard .dash-top .dt-date { color:var(--muted); font-size:12.5px; margin-top:1px; }
 .tpl-dashboard .dash-2col { display:grid; grid-template-columns:1fr 1fr; gap:16px; align-items:start; }
-@media (max-width:820px){ .tpl-dashboard .dash-2col { grid-template-columns:1fr; } }
+@media screen and (max-width:820px){ .tpl-dashboard .dash-2col { grid-template-columns:1fr; } }
 .tpl-dashboard .ov-summary { font-size:13px; color:var(--ink2); line-height:1.5; margin:12px 0 0;
   border-top:1px solid var(--line-soft); padding-top:11px; }
 .tpl-dashboard .brow { grid-template-columns:150px 1fr 130px; }
@@ -530,7 +549,7 @@ body:has(#report.tpl-packet) .wrap { max-width:1560px; }
 .tpl-packet { --pkg:#16613a; }
 .tpl-packet .pk-shell { display:grid; grid-template-columns:216px 1fr; background:var(--card);
   border:1px solid var(--line); border-radius:12px; box-shadow:0 1px 3px rgba(30,40,51,.07); }
-@media (max-width:900px){ .tpl-packet .pk-shell { grid-template-columns:1fr; } }
+@media screen and (max-width:900px){ .tpl-packet .pk-shell { grid-template-columns:1fr; } }
 /* left dark-navy rail — high-contrast, bright labels; corners rounded on the child
    (parent no longer clips, so the sticky panel below can track the scroll) */
 .tpl-packet .pk-side { background:linear-gradient(180deg,#18222e 0%,#121a24 100%); color:#eef2f7;
@@ -538,7 +557,7 @@ body:has(#report.tpl-packet) .wrap { max-width:1560px; }
 /* sticky panel: nav stays put while the report scrolls */
 .tpl-packet .pk-side-inner { position:sticky; top:calc(var(--abh,48px) + 14px); display:flex; flex-direction:column;
   height:calc(100vh - var(--abh,48px) - 28px); overflow-y:auto; }
-@media (max-width:900px){ .tpl-packet .pk-side { border-radius:12px 12px 0 0; }
+@media screen and (max-width:900px){ .tpl-packet .pk-side { border-radius:12px 12px 0 0; }
   .tpl-packet .pk-side-inner { position:static; height:auto; overflow:visible; } }
 .tpl-packet .pk-brand { display:flex; flex-direction:row; align-items:center; text-align:left; gap:11px;
   padding:2px 4px 16px; margin-bottom:13px; border-bottom:1px solid rgba(255,255,255,.14); }
@@ -568,11 +587,11 @@ body:has(#report.tpl-packet) .wrap { max-width:1560px; }
 .tpl-packet .pk-side-foot .so:hover { color:#fff; text-decoration:underline; }
 /* main column */
 .tpl-packet .pk-main { padding:18px 20px; min-width:0; display:flex; flex-direction:column; gap:16px; background:var(--paper); border-radius:0 12px 12px 0; }
-@media (max-width:900px){ .tpl-packet .pk-main { border-radius:0 0 12px 12px; } }
+@media screen and (max-width:900px){ .tpl-packet .pk-main { border-radius:0 0 12px 12px; } }
 /* top card: a header row (title left, photo right) with the stat band full-width below */
 .tpl-packet .pk-top { background:var(--card); border:1px solid var(--line); border-radius:12px; overflow:hidden; }
 .tpl-packet .pk-hdrow { display:grid; grid-template-columns:1fr 300px; }
-@media (max-width:1000px){ .tpl-packet .pk-hdrow { grid-template-columns:1fr; } }
+@media screen and (max-width:1000px){ .tpl-packet .pk-hdrow { grid-template-columns:1fr; } }
 .tpl-packet .pk-top-left { padding:18px 22px; min-width:0; }
 .tpl-packet .pk-hd { display:flex; justify-content:space-between; align-items:flex-start; gap:16px; }
 .tpl-packet .pk-title-row { display:flex; align-items:baseline; gap:16px; flex-wrap:wrap; }
@@ -591,12 +610,12 @@ body:has(#report.tpl-packet) .wrap { max-width:1560px; }
   background:var(--card); border-radius:0 100% 100% 0 / 0 50% 50% 0; }
 .tpl-packet .pk-top-photo::after { content:""; position:absolute; top:8%; bottom:8%; left:-2px; width:3px; z-index:2;
   border-radius:3px; background:linear-gradient(180deg,#c9a24b,#e7cf8f); }
-@media (max-width:1000px){ .tpl-packet .pk-top-photo { min-height:130px; } .tpl-packet .pk-top-photo::before, .tpl-packet .pk-top-photo::after { display:none; } }
+@media screen and (max-width:1000px){ .tpl-packet .pk-top-photo { min-height:130px; } .tpl-packet .pk-top-photo::before, .tpl-packet .pk-top-photo::after { display:none; } }
 /* stat band: full-width below the header, borderless with thin vertical dividers */
 .tpl-packet .pk-stats { padding:8px 22px 18px; border-top:1px solid var(--line-soft); }
 .tpl-packet .pk-stats .statgrid { grid-template-columns:repeat(6,1fr); gap:0; }
-@media (max-width:1000px){ .tpl-packet .pk-stats .statgrid { grid-template-columns:repeat(3,1fr); row-gap:10px; } }
-@media (max-width:520px){ .tpl-packet .pk-stats .statgrid { grid-template-columns:repeat(2,1fr); } }
+@media screen and (max-width:1000px){ .tpl-packet .pk-stats .statgrid { grid-template-columns:repeat(3,1fr); row-gap:10px; } }
+@media screen and (max-width:520px){ .tpl-packet .pk-stats .statgrid { grid-template-columns:repeat(2,1fr); } }
 .tpl-packet .pk-stats .statgrid { align-items:start; }
 /* min-width:0 keeps the 6 equal columns inside the grid (otherwise the wide
    $ values force the tracks wider than the container and the last card slides
@@ -629,10 +648,10 @@ body:has(#report.tpl-packet) .wrap { max-width:1560px; }
 .tpl-packet .statcard.pd .sv-v { color:var(--ink); }
 /* dense 4-up + bottom 2-up */
 .tpl-packet .pk-grid4 { display:grid; grid-template-columns:1fr 1fr 1.5fr 1fr; gap:14px; align-items:start; }
-@media (max-width:1180px){ .tpl-packet .pk-grid4 { grid-template-columns:1fr 1fr; } }
-@media (max-width:680px){ .tpl-packet .pk-grid4 { grid-template-columns:1fr; } }
+@media screen and (max-width:1180px){ .tpl-packet .pk-grid4 { grid-template-columns:1fr 1fr; } }
+@media screen and (max-width:680px){ .tpl-packet .pk-grid4 { grid-template-columns:1fr; } }
 .tpl-packet .pk-grid2 { display:grid; grid-template-columns:1fr 1fr; gap:14px; align-items:start; }
-@media (max-width:860px){ .tpl-packet .pk-grid2 { grid-template-columns:1fr; } }
+@media screen and (max-width:860px){ .tpl-packet .pk-grid2 { grid-template-columns:1fr; } }
 /* grid items must be allowed to shrink so their content wraps instead of
    overflowing (pk-shell clips overflow to keep the rounded corners) */
 .tpl-packet .pk-grid4 > *, .tpl-packet .pk-grid2 > *, .tpl-packet .pk-detail > * { min-width:0; }
@@ -686,7 +705,7 @@ body:has(#report.tpl-packet) .wrap { max-width:1560px; }
 /* the detail sections (comparisons / standard schedule) span full width below */
 .tpl-packet .pk-detail { display:flex; flex-direction:column; gap:16px; }
 .tpl-packet .pk-detail2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; align-items:start; }
-@media (max-width:1100px){ .tpl-packet .pk-detail2 { grid-template-columns:1fr; } }
+@media screen and (max-width:1100px){ .tpl-packet .pk-detail2 { grid-template-columns:1fr; } }
 .tpl-packet .pk-detail2 > * { min-width:0; }
 .tpl-packet .pk-detailcard { padding:18px 20px; }
 
@@ -709,7 +728,7 @@ body:has(#report.tpl-packet) .wrap { max-width:1560px; }
 
 /* --- Section B: comparison chips + cards --- */
 .tpl-packet .pk-chips { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:16px; }
-@media (max-width:520px){ .tpl-packet .pk-chips { grid-template-columns:1fr; } }
+@media screen and (max-width:520px){ .tpl-packet .pk-chips { grid-template-columns:1fr; } }
 .tpl-packet .pk-chip { display:flex; align-items:center; gap:10px; border:1px solid var(--line); border-radius:9px; padding:9px 12px; }
 .tpl-packet .pk-chip-ic { flex:none; width:28px; height:28px; border-radius:7px; display:flex; align-items:center; justify-content:center; font-size:14px; }
 .tpl-packet .pk-chip b { display:block; font-size:19px; color:var(--ink); font-weight:700; line-height:1.1; }
@@ -737,6 +756,8 @@ body:has(#report.tpl-packet) .wrap { max-width:1560px; }
 .tpl-packet tr.pk-low { background:#eef7f1; }
 .tpl-packet tr.pk-low td.pk-c-amt { color:var(--good); }
 .tpl-packet .pk-lowflag { display:block; font-size:10.5px; font-weight:700; color:var(--good); margin-top:1px; }
+/* a carried quote that is NOT the lowest — the board should see that plainly */
+.pk-lowflag.isover, .low.isover { color:var(--amber); }
 .tpl-packet tr.pk-pend td { color:var(--muted); }
 .tpl-packet tr.pk-pend .pk-av { opacity:.5; }
 .tpl-packet tr.pk-pend .pk-cn { color:var(--muted); font-weight:600; }
@@ -836,7 +857,7 @@ body:has(#report.tpl-packet) .wrap { max-width:1560px; }
 #report .pk-flash { animation:pkflash 1.5s ease-out; border-radius:12px; position:relative; z-index:5; }
 
 /* ---- phone layout: collapse the dark sidebars to a brand strip ---- */
-@media (max-width:700px){
+@media screen and (max-width:700px){
   /* let the tall wrapped top bar scroll away instead of pinning to the top */
   .appbar { position:static; }
   /* keep the "More ▾" menu from being wider than the phone; JS clamps its position */
@@ -852,7 +873,7 @@ body:has(#report.tpl-packet) .wrap { max-width:1560px; }
   .tpl-packet .pk-detailcard { padding:14px; }
 }
 .tpl-packet .pk-lbl { display:none; }   /* "Quoted" label — only shown in the phone card */
-@media (max-width:600px){
+@media screen and (max-width:600px){
   /* comparison table → stacked cards on phones. A 3–4 column table is too narrow,
      so text broke onto many lines; here each bid is a readable full-width block:
      contractor + amount on top, then the scope and quote date underneath. */
@@ -919,13 +940,434 @@ body:has(#report.tpl-packet) .wrap { max-width:1560px; }
   .tpl-packet .pk-updrow { font-size:13.5px; }
   .tpl-packet .pk-progcard { padding:12px 12px 10px; }
 }
-@media (max-width:520px){
+@media screen and (max-width:520px){
   /* stat band → clean single-column list so amounts never clip */
   .tpl-packet .pk-stats .statgrid { grid-template-columns:1fr; }
   .tpl-packet .pk-stats .statcard { border-left:none; padding:8px 0;
     border-bottom:1px solid var(--line-soft); }
   .tpl-packet .pk-stats .statcard:last-child { border-bottom:none; }
   .tpl-packet .pk-title-row h1 { font-size:22px; }
+}
+
+/* ===================================================================
+   EDIT WORKSPACE (property manager only)
+   The editing side is an app, not a document: a fixed rail of sections
+   on the left, a working column of job cards in the middle, and a
+   summary of the selected job on the right. The report views are
+   untouched by everything in here.
+   =================================================================== */
+/* the workspace ignores the report's reading column and uses the whole window */
+body[data-view="edit"] .wrap { max-width:none; }
+.ed-shell { display:grid; grid-template-columns:232px 1fr; align-items:start; gap:0;
+  background:var(--paper); min-height:calc(100vh - var(--abh,48px)); margin:0 -20px; }
+.ed-side { position:sticky; top:var(--abh,48px); align-self:start; background:var(--card);
+  border-right:1px solid var(--line); padding:16px 12px; display:flex; flex-direction:column;
+  gap:6px; min-height:calc(100vh - var(--abh,48px)); }
+.ed-brand { display:flex; align-items:center; gap:10px; padding:2px 8px 16px; }
+.ed-brand .bi { flex:none; width:32px; height:32px; border-radius:8px; background:#16283b; color:#fff;
+  display:flex; align-items:center; justify-content:center; font-size:15px; }
+.ed-brand b { font-size:14px; font-weight:700; color:var(--ink); line-height:1.2; }
+.ed-nav { display:flex; flex-direction:column; gap:3px; }
+.ed-nav button { display:flex; align-items:center; gap:11px; width:100%; text-align:left; font:inherit;
+  font-size:13.5px; font-weight:600; color:var(--ink2); background:none; border:0; border-radius:9px;
+  padding:9px 11px; cursor:pointer; }
+.ed-nav button:hover { background:var(--paper); color:var(--ink); }
+.ed-nav button.on { background:var(--accent-soft); color:var(--accent-ink); }
+.ed-nav .ni { flex:none; font-size:15px; line-height:1; width:18px; text-align:center; }
+.ed-sidefoot { margin-top:auto; display:flex; flex-direction:column; gap:10px; }
+.ed-help { background:var(--paper); border:1px solid var(--line-soft); border-radius:10px;
+  padding:11px 12px; font-size:12px; color:var(--ink2); line-height:1.45; }
+.ed-help b { display:block; color:var(--ink); font-size:12.5px; margin-bottom:3px; }
+.ed-who { display:flex; align-items:center; gap:9px; border-top:1px solid var(--line-soft); padding-top:11px; }
+.ed-who .av { flex:none; width:30px; height:30px; border-radius:50%; background:var(--accent-soft);
+  color:var(--accent-ink); font-size:11px; font-weight:700; display:flex; align-items:center; justify-content:center; }
+.ed-who b { display:block; font-size:12.5px; color:var(--ink); }
+.ed-who small { display:block; font-size:11px; color:var(--muted); overflow:hidden; text-overflow:ellipsis; }
+
+.ed-main { min-width:0; display:flex; flex-direction:column; }
+.ed-top { position:sticky; top:var(--abh,48px); z-index:12; background:var(--card);
+  border-bottom:1px solid var(--line); padding:14px 22px; display:flex; align-items:flex-start;
+  gap:16px; flex-wrap:wrap; }
+.ed-top-l { min-width:0; flex:1; }
+.ed-title { display:flex; align-items:center; gap:11px; flex-wrap:wrap; }
+.ed-title h1 { font-family:-apple-system,"Segoe UI",Roboto,sans-serif; font-size:22px; font-weight:750;
+  letter-spacing:-.01em; margin:0; color:var(--ink); }
+.ed-saved { font-size:11.5px; font-weight:700; color:var(--good); background:var(--good-soft);
+  border-radius:99px; padding:3px 10px; }
+.ed-saved.dirty { color:var(--amber); background:var(--amber-soft); }
+.ed-meta { display:flex; gap:16px; flex-wrap:wrap; font-size:12.5px; color:var(--ink2); margin-top:5px; }
+.ed-acts { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.edbtn { font:inherit; font-size:13px; font-weight:600; color:var(--ink); background:var(--card);
+  border:1px solid var(--line); border-radius:8px; padding:8px 13px; cursor:pointer; white-space:nowrap; }
+.edbtn:hover { background:var(--paper); border-color:var(--muted); }
+.edbtn.prim { background:var(--accent); border-color:var(--accent); color:#fff; }
+.edbtn.prim:hover { background:var(--accent-ink); }
+.edbtn.dark { background:#16283b; border-color:#16283b; color:#fff; }
+.edbtn.dark:hover { background:#0f1d2c; }
+.edbtn.danger { color:var(--prio); border-color:#e6c9c9; }
+.edbtn.danger:hover { background:var(--prio-soft); border-color:var(--prio); }
+.edbtn[disabled] { opacity:.5; cursor:default; }
+.ed-menu { position:relative; }
+.ed-menu .ed-drop { display:none; position:absolute; right:0; top:calc(100% + 5px); z-index:20;
+  background:var(--card); border:1px solid var(--line); border-radius:10px; min-width:210px;
+  box-shadow:0 10px 30px rgba(20,26,33,.18); padding:5px; }
+.ed-menu.open .ed-drop { display:block; }
+.ed-drop button { display:block; width:100%; text-align:left; font:inherit; font-size:13px; color:var(--ink);
+  background:none; border:0; border-radius:7px; padding:8px 11px; cursor:pointer; }
+.ed-drop button:hover { background:var(--accent-soft); }
+.ed-drop button.ddanger { color:var(--prio); }
+.ed-drop hr { border:0; border-top:1px solid var(--line-soft); margin:4px 6px; }
+
+.ed-body { padding:20px 22px 60px; min-width:0; }
+.ed-cols { display:grid; grid-template-columns:minmax(0,1fr) 312px; gap:18px; align-items:start; }
+@media screen and (max-width:1180px){ .ed-cols { grid-template-columns:1fr; } }
+.ed-listhead { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:12px; }
+.ed-listhead h2 { font-family:-apple-system,"Segoe UI",Roboto,sans-serif; font-size:17px; font-weight:700;
+  margin:0; color:var(--ink); }
+.ed-count { font-size:12px; font-weight:600; color:var(--ink2); background:var(--card);
+  border:1px solid var(--line); border-radius:99px; padding:3px 11px; }
+.ed-listhead .spacer { flex:1; }
+.ed-filters { display:flex; gap:8px; flex-wrap:wrap; background:var(--card); border:1px solid var(--line);
+  border-radius:10px; padding:10px 12px; margin-bottom:12px; }
+.ed-filters input, .ed-filters select { font:inherit; font-size:13px; padding:6px 9px;
+  border:1px solid var(--line); border-radius:7px; background:var(--card); }
+.ed-filters input[type=search] { flex:1; min-width:180px; }
+.ed-filters label { display:flex; align-items:center; gap:6px; font-size:12.5px; color:var(--ink2); }
+
+/* ---- job card ---- */
+#editor .jcard { background:var(--card); border:1px solid var(--line); border-radius:12px;
+  margin:0 0 12px; padding:0; box-shadow:0 1px 2px rgba(30,40,51,.05); }
+#editor .jcard.sel { border-color:var(--accent); box-shadow:0 0 0 3px rgba(45,86,127,.10); }
+#editor .jcard.arch { opacity:.72; }
+.jhead { display:flex; align-items:center; gap:11px; padding:13px 15px; cursor:pointer; }
+.jhead .draghandle { color:var(--muted); cursor:grab; font-size:14px; }
+.jno { flex:none; width:26px; height:26px; border-radius:7px; background:var(--accent); color:#fff;
+  font-size:12.5px; font-weight:700; display:flex; align-items:center; justify-content:center; }
+.jcard.arch .jno { background:var(--muted); }
+/* the title has to keep a usable width no matter how many chips sit beside it */
+.jtitle { flex:1 1 240px; min-width:130px; width:auto; font-size:15px; font-weight:650; color:var(--ink);
+  border:1px solid transparent; background:none; font-family:inherit; border-radius:7px; padding:4px 7px; }
+.jtitle:hover { border-color:var(--line); }
+.jtitle:focus { border-color:var(--accent); background:var(--card); outline:none; }
+.jchip { flex:none; font-size:11px; font-weight:700; border-radius:99px; padding:3px 10px; white-space:nowrap; }
+.jchip.prio { color:var(--prio); background:var(--prio-soft); }
+.jchip.st-quoted { color:var(--accent-ink); background:var(--accent-soft); }
+.jchip.st-approved, .jchip.st-completed { color:var(--good); background:var(--good-soft); }
+.jchip.st-inprogress, .jchip.st-scheduled { color:var(--amber); background:var(--amber-soft); }
+.jchip.st-rejected, .jchip.st-deferred { color:var(--prio); background:var(--prio-soft); }
+.jsum { display:flex; align-items:center; gap:10px; font-size:12.5px; color:var(--ink2); flex:0 1 auto;
+  min-width:0; white-space:nowrap; }
+.jsum .who { overflow:hidden; text-overflow:ellipsis; max-width:140px; }
+.jsum .jbar { width:96px; height:7px; border-radius:99px; background:var(--line-soft); overflow:hidden; }
+.jsum .jbar span { display:block; height:100%; background:var(--good); border-radius:99px; }
+.jtog { flex:none; background:none; border:0; color:var(--muted); font-size:15px; cursor:pointer;
+  padding:4px 6px; border-radius:6px; }
+.jtog:hover { background:var(--paper); color:var(--ink); }
+.jbody { border-top:1px solid var(--line-soft); padding:4px 15px 15px; }
+.jctl { display:flex; gap:14px; flex-wrap:wrap; align-items:flex-end; padding:13px 0 15px;
+  border-bottom:1px solid var(--line-soft); }
+.jctl label { display:block; font-size:11px; font-weight:700; letter-spacing:.04em; text-transform:uppercase;
+  color:var(--muted); margin-bottom:5px; }
+.jctl .f { min-width:0; }
+.jctl select, .jctl input[type=date], .jctl input[type=text] { font:inherit; font-size:13px; padding:7px 9px;
+  border:1px solid var(--line); border-radius:8px; background:var(--card); color:var(--ink); max-width:100%; }
+.jctl .pgrp { display:flex; align-items:center; gap:9px; min-width:190px; }
+.jctl input[type=range] { flex:1; min-width:110px; accent-color:var(--accent); }
+.jctl .pval { font-size:13px; font-weight:700; color:var(--ink); font-variant-numeric:tabular-nums; width:42px; }
+.jsec { padding:14px 0 0; }
+.jsec + .jsec { border-top:1px solid var(--line-soft); margin-top:14px; }
+.jsechead { display:flex; align-items:center; gap:9px; margin-bottom:10px; }
+.jsechead .n { flex:none; width:21px; height:21px; border-radius:50%; background:#16283b; color:#fff;
+  font-size:11px; font-weight:700; display:flex; align-items:center; justify-content:center; }
+.jsechead h4 { font:inherit; font-size:13.5px; font-weight:700; color:var(--ink); margin:0; }
+.jsechead .spacer { flex:1; }
+.jsechead .edbtn { font-size:12px; padding:5px 10px; }
+
+/* updates list */
+.updlist { border:1px solid var(--line-soft); border-radius:9px; overflow:hidden; }
+.updrow { display:flex; align-items:center; gap:10px; padding:7px 10px; border-top:1px solid var(--line-soft); }
+.updrow:first-child { border-top:0; }
+.updrow input[type=date] { flex:none; font:inherit; font-size:12.5px; padding:4px 7px; border:1px solid transparent;
+  border-radius:6px; background:none; color:var(--ink2); }
+.updrow input[type=text] { flex:1; min-width:0; font:inherit; font-size:13px; padding:5px 8px;
+  border:1px solid transparent; border-radius:6px; background:none; color:var(--ink); }
+.updrow input:hover { border-color:var(--line); }
+.updrow input:focus { border-color:var(--accent); background:var(--card); outline:none; }
+.updrow .xbtn { flex:none; }
+.updempty { font-size:12.5px; color:var(--muted); padding:8px 2px; }
+
+/* quotes table */
+.qwrap { border:1px solid var(--line-soft); border-radius:9px; overflow-x:auto; }
+.qtable { width:100%; border-collapse:collapse; font-size:13px; }
+.qtable th { font-size:10.5px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color:var(--muted);
+  text-align:left; padding:8px 9px; background:var(--paper); border-bottom:1px solid var(--line-soft); white-space:nowrap; }
+.qtable td { padding:5px 9px; border-bottom:1px solid var(--line-soft); vertical-align:middle; }
+.qtable tr:last-child td { border-bottom:0; }
+.qtable tr.picked td { background:var(--good-soft); }
+.qtable input[type=text], .qtable input[type=number], .qtable select { font:inherit; font-size:13px; width:100%;
+  min-width:0; padding:5px 7px; border:1px solid transparent; border-radius:6px; background:none; color:var(--ink); }
+.qtable input:hover, .qtable select:hover { border-color:var(--line); }
+.qtable input:focus, .qtable select:focus { border-color:var(--accent); background:var(--card); outline:none; }
+.qtable td.c-pick { width:34px; text-align:center; }
+.qtable td.c-amt input { text-align:right; font-variant-numeric:tabular-nums; font-weight:600; }
+.qtable td.c-act { width:34px; text-align:right; }
+.qtable .qmore { background:none; border:0; color:var(--muted); font-size:15px; cursor:pointer;
+  padding:3px 6px; border-radius:6px; line-height:1; }
+.qtable .qmore:hover { background:var(--paper); color:var(--ink); }
+.qst { font-size:11px; font-weight:700; border-radius:99px; padding:2px 9px; white-space:nowrap; }
+.qst.sel { color:var(--good); background:var(--good-soft); }
+.qst.over { color:var(--amber); background:var(--amber-soft); }
+.qst.pen { color:var(--muted); background:var(--line-soft); }
+.qst.hi { color:var(--ink2); background:var(--paper); }
+.qxtra td { background:var(--paper); }
+.qxtra .xin { display:flex; gap:12px; flex-wrap:wrap; align-items:center; padding:4px 2px 8px; }
+.qxtra label { font-size:12px; color:var(--ink2); display:flex; align-items:center; gap:6px; }
+.qxtra input[type=date], .qxtra input[type=number] { font:inherit; font-size:12.5px; padding:4px 7px;
+  border:1px solid var(--line); border-radius:6px; background:var(--card); width:auto; }
+.qatt { display:flex; gap:5px; flex-wrap:wrap; align-items:center; }
+.qatt .attlink { font-size:12px; }
+.qnone { color:var(--muted); }
+
+/* board actions */
+.bact { display:flex; align-items:center; gap:12px; flex-wrap:wrap; background:var(--paper);
+  border:1px solid var(--line-soft); border-radius:9px; padding:11px 13px; }
+.bact .bl { min-width:0; flex:1; font-size:12.5px; color:var(--ink2); }
+.bact .bl b { color:var(--ink); }
+
+/* right rail */
+.ed-rail { position:sticky; top:calc(var(--abh,48px) + 78px); background:var(--card); border:1px solid var(--line);
+  border-radius:12px; padding:15px 16px; box-shadow:0 1px 2px rgba(30,40,51,.05); }
+.ed-rail h3 { font:inherit; font-size:14px; font-weight:700; color:var(--ink); margin:0 0 12px; }
+.ed-rail .rrow { display:flex; justify-content:space-between; gap:12px; padding:6px 0; font-size:12.5px; }
+.ed-rail .rrow .k { color:var(--ink2); flex:none; }
+.ed-rail .rrow .v { color:var(--ink); font-weight:600; text-align:right; min-width:0; }
+.ed-rail .rsep { border-top:1px solid var(--line-soft); margin:9px 0; }
+.ed-rail .money { font-variant-numeric:tabular-nums; }
+.ed-rail .good { color:var(--good); }
+.ed-rail .qa { display:flex; flex-direction:column; gap:7px; margin-top:4px; }
+.ed-rail .qa .edbtn { width:100%; text-align:center; }
+.ed-railempty { font-size:12.5px; color:var(--muted); }
+
+/* bottom shortcut cards */
+.ed-shorts { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:18px; }
+@media screen and (max-width:760px){ .ed-shorts { grid-template-columns:1fr; } }
+.ed-short { display:flex; align-items:center; gap:12px; background:var(--card); border:1px solid var(--line);
+  border-radius:12px; padding:15px 16px; }
+.ed-short .si { flex:none; width:34px; height:34px; border-radius:9px; background:var(--accent-soft);
+  color:var(--accent-ink); display:flex; align-items:center; justify-content:center; font-size:16px; }
+.ed-short b { display:block; font-size:13.5px; color:var(--ink); }
+.ed-short small { display:block; font-size:12px; color:var(--ink2); margin-top:2px; }
+.ed-short .spacer { flex:1; }
+.ed-sechead { display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; margin:0 0 14px; }
+.ed-sechead h2 { font-family:-apple-system,"Segoe UI",Roboto,sans-serif; font-size:18px; font-weight:700;
+  margin:0; color:var(--ink); }
+.ed-sechead p { margin:0; font-size:13px; color:var(--ink2); }
+@media screen and (max-width:900px){
+  .ed-shell { grid-template-columns:1fr; margin:0 -20px; }
+  .ed-side { position:static; min-height:0; border-right:0; border-bottom:1px solid var(--line);
+    flex-direction:row; align-items:center; flex-wrap:wrap; gap:8px; padding:10px 14px; }
+  .ed-brand { padding:0; margin-right:auto; }
+  .ed-nav { flex-direction:row; flex-wrap:wrap; }
+  .ed-sidefoot, .ed-help { display:none; }
+  .ed-top { position:static; padding:12px 14px; }
+  .ed-body { padding:14px; }
+  .ed-rail { position:static; }
+}
+
+/* ===================================================================
+   PRINT / PDF
+   The PDF is meant to BE the report, not a stripped-down copy of it:
+   same cards, colours, typography and section order as the screen.
+   What changes on paper:
+     · app chrome goes (top bar, nav rail, buttons, editor controls)
+     · anything collapsed behind a "show all" link is fully expanded
+     · the page layout is stated explicitly for a letter sheet, and
+       cards are never sliced in half.
+
+   IMPORTANT — every rule here must stand on its own.
+   The responsive breakpoints above are all `@media screen and (…)`
+   on purpose: Safari does NOT re-evaluate width breakpoints against
+   the paper when it prints (it keeps the window's width), so a print
+   layout that leaned on `max-width:1000px` came out as the full
+   1560px desktop grid squeezed onto letter — columns clipped mid
+   figure, and the sticky `height:100vh` nav rail printed as an
+   entire black page. Nothing below may depend on a breakpoint
+   firing, and `zoom` is out too (Safari scales the boxes but not
+   the text inside them). State the paper layout outright instead.
+   =================================================================== */
+.printfoot { display:none; }
+
+@media print {
+  @page { size:letter portrait; margin:12mm 10mm 15mm; }
+
+  /* a fixed element repeats on every printed page — this is the running
+     footer that identifies the packet on any page pulled out of it */
+  .printfoot { display:block; position:fixed; left:0; right:0; bottom:0;
+    font-size:9px; letter-spacing:.02em; color:#7A8794; text-align:center;
+    border-top:1px solid #E8ECEF; padding-top:4px; background:#fff; }
+  .printfoot b { color:#4A5866; font-weight:600; }
+
+  /* Browsers drop background colours on paper by default and this design
+     IS its colours (dark section headers, green bars, status chips), so
+     opt every element back in. */
+  *, *::before, *::after {
+    -webkit-print-color-adjust:exact !important; print-color-adjust:exact !important;
+  }
+  html, body { background:#fff; }
+  body { padding:0; margin:0; }
+  .wrap { max-width:none; width:auto; margin:0; padding:0; }
+  #report { display:block !important; }
+  #editor, .appbar, .secnav, .edithint-inline, .votebanner, .overlay,
+  .dropdown, .tplpick, .btn, .btn-print, .js-print { display:none !important; }
+  .editable-head, .editable-txt { outline:none !important; }
+  .editable-txt:empty::before { content:"" !important; }
+  a { text-decoration:none; color:inherit; }
+  /* attachment links read as plain notes on paper */
+  .attlink, .tpl-packet .pk-att.attlink { color:var(--muted); text-decoration:none; }
+  /* the "2 bids" chip stays (it is information) but loses its ▾ affordance */
+  .bids.expand::after { content:"" !important; }
+  .tile:hover, .statcard:hover, .pk-progcard:hover { transform:none; box-shadow:none; }
+  /* headings never orphaned, table rows never split, headers repeat */
+  h1, h2, h3, .pk-sechead, .grouphead, .cardhead, section > .kicker, .seclede { break-after:avoid; }
+  h1, h2, h3, .pk-sechead, .grouphead, .cardhead { break-inside:avoid; }
+  p, li { orphans:2; widows:2; }
+  tr, .brow, .pk-saverow, .pk-updrow, .pk-tl { break-inside:avoid; }
+  thead { display:table-header-group; }
+  .card, .tile, .chart { break-inside:avoid; }
+
+  /* ---------- classic template ---------- */
+  /* every section begins a fresh page — a heading can never be stranded
+     at the foot of a page (the summary stays with the letterhead) */
+  .tpl-classic section { break-before:page; margin-top:0; padding-top:8px; }
+  .tpl-classic section#secSum { break-before:auto; }
+  .tpl-classic .tablewrap, .tpl-classic .group { break-inside:auto; }
+  .tpl-classic header.rep { padding-top:0; margin-top:0; }
+  /* hero prints as a classic letterhead: photo and dark overlay dropped */
+  .tpl-classic .hero { min-height:0; margin-top:0; border-radius:0; overflow:visible; box-shadow:none;
+    border-top:4px solid var(--accent); border-bottom:3px double #bbb; display:block; }
+  .tpl-classic .hero-img, .tpl-classic .hero::after { display:none !important; }
+  .tpl-classic .hero-content { padding:10px 0 14px; }
+  .tpl-classic .hero h1 { color:var(--ink); text-shadow:none; }
+  .tpl-classic .herokick { color:var(--accent-ink); }
+  .tpl-classic .herometa { color:var(--ink2); }
+  .tpl-classic .tiles { grid-template-columns:repeat(3,1fr); }
+  .tpl-classic .statgrid { grid-template-columns:repeat(3,1fr); }
+
+  /* ---------- board packet ---------- */
+  /* the shell is a 216px rail + content grid on screen; on paper the rail
+     is not a rail at all, so the whole thing becomes a plain column */
+  .tpl-packet .pk-shell { display:block; border-radius:0; box-shadow:none; border:none; background:#fff; }
+  /* the dark rail becomes a letterhead band: brand only, no nav, no user
+     chip. The height reset matters — on screen the inner panel is a
+     100vh sticky column, which on paper is one whole black page. */
+  .tpl-packet .pk-side { border-radius:0; padding:11px 16px; break-inside:avoid; break-after:avoid; }
+  .tpl-packet .pk-side-inner { position:static; height:auto; min-height:0; overflow:visible; gap:0; }
+  .tpl-packet .pk-side-foot { display:none !important; }
+  .tpl-packet .pk-brand { border-bottom:none; margin:0; padding:0; }
+  .tpl-packet .pk-main { padding:0; background:#fff; border-radius:0; gap:14px; }
+  /* header: title block left, building photo right (narrower than screen) */
+  .tpl-packet .pk-hdrow { grid-template-columns:1fr 218px; }
+  .tpl-packet .pk-top-left { padding:15px 17px; }
+  .tpl-packet .pk-title-row h1 { font-size:23px; }
+  .tpl-packet .pk-top-photo { min-height:150px; }
+  .tpl-packet .pk-top-photo::before, .tpl-packet .pk-top-photo::after { display:none; }
+  .tpl-packet .pk-top, .tpl-packet .pk-progcard, .tpl-packet .pk-cmpcard,
+  .tpl-packet .panel > h3 + *, .tpl-packet .pk-chips { break-inside:avoid; }
+  .tpl-packet .panel { break-inside:avoid; box-shadow:none; padding:14px 15px; }
+  /* …except the two list panels, which grow with the number of contractors
+     and jobs: those flow across pages (their rows stay whole) instead of
+     jumping to the next page and leaving half a sheet blank */
+  .tpl-packet #secD.panel, .tpl-packet #secA.panel { break-inside:auto; }
+  /* the big lettered sections flow like the page does on screen — they are
+     taller than a sheet, so they page-break internally between cards */
+  .tpl-packet .pk-detailcard { break-inside:auto; }
+  .tpl-packet .pk-grid4, .tpl-packet .pk-grid2 { break-inside:auto; }
+
+  /* --- every grid stated for a 7.7in column (no breakpoints on paper) --- */
+  /* six stat tiles across a 1560px screen become two rows of three */
+  .tpl-packet .pk-stats { padding:6px 17px 14px; }
+  .tpl-packet .pk-stats .statgrid { grid-template-columns:repeat(3,1fr); row-gap:9px; }
+  .tpl-packet .statcard .sv-v { font-size:19px; }
+  /* 4-up row prints as: spend | donut, then high-priority, then savings —
+     the two table panels need the full width or their columns hyphenate */
+  .tpl-packet .pk-grid4 { grid-template-columns:1fr 1fr; }
+  .tpl-packet .pk-grid4 > #secA, .tpl-packet .pk-grid4 > :last-child { grid-column:1 / -1; }
+  /* the two detail sections and the closing pair stack, full width each */
+  .tpl-packet .pk-detail2, .tpl-packet .pk-grid2 { grid-template-columns:1fr; }
+  .tpl-packet .savegrid { grid-template-columns:repeat(2,1fr); }
+  /* full contractor names — no ellipsis on paper */
+  .tpl-packet .brow { grid-template-columns:132px 1fr 84px; }
+  .tpl-packet .blabel { white-space:normal; overflow:visible; text-overflow:clip; font-size:12px; }
+  .tpl-packet .bval { font-size:12px; }
+  /* tables: screen sizes are set for a 1560px canvas, paper is half that */
+  .tpl-packet .pk-cmptable td, .tpl-packet .pk-schedtable td { font-size:13px; padding:7px 8px; }
+  .tpl-packet .pk-cn { font-size:13px; }
+  .tpl-packet .pk-progjob { font-size:14.5px; }
+  .tpl-packet .pk-progamt { font-size:15px; }
+  .tpl-packet .pk-updrow { font-size:12.5px; }
+  .tpl-packet .pk-sectitle { font-size:19px; }
+  .tpl-packet .pk-secsub { font-size:12.5px; }
+  .tpl-packet .notes li { font-size:12px; }
+  /* the high-priority table is narrower on paper than on a wide screen:
+     give the money column the few pixels it needs so a total never breaks
+     across two lines ($83,530. / 00), and take them from the contractor */
+  .tpl-packet .pk-hptable col:nth-child(3) { width:136px !important; }
+  .tpl-packet .pk-hptable col:nth-child(4) { width:42px !important; }
+  .tpl-packet .pk-hptable col:nth-child(5) { width:86px !important; }
+  .tpl-packet .pk-hptable col:nth-child(6) { width:48px !important; }
+  .tpl-packet .pk-hptable td, .tpl-packet .pk-hptable th { overflow-wrap:normal; }
+  .tpl-packet .pk-hptable td.money, .tpl-packet .pk-hptable th.money { white-space:nowrap; }
+  /* nothing scrolls on paper */
+  .tablewrap { overflow:visible; }
+  /* everything hidden behind a "show all" control is printed in full */
+  .tpl-packet .pk-hptable .pk-hp-extra { display:table-row !important; }
+  .tpl-packet .pk-updrest[hidden] { display:block !important; }
+  .pk-viewall, .pk-spendmore, .pk-updmore, .pk-addupd, .pk-prow,
+  .tpl-packet .pk-nav, .tpl-packet .bids.expand { display:none !important; }
+  /* progress cards: photos print smaller so a card still fits a page */
+  .tpl-packet .pk-updmedia img { height:54px; width:72px; }
+  .tpl-packet .pk-updmedia .pk-vid { height:54px; }
+  .tpl-packet .pk-step[data-stage] { cursor:default; }
+
+  /* ---------- executive dashboard ---------- */
+  .tpl-dashboard .dash-shell { display:block; }
+  .tpl-dashboard .dash-side { position:static; border-radius:0; padding:11px 16px; margin-bottom:14px;
+    break-inside:avoid; break-after:avoid; }
+  .tpl-dashboard .dash-nav, .tpl-dashboard .ds-foot { display:none !important; }
+  .tpl-dashboard .ds-brand { border-bottom:none; margin:0; padding:0; }
+  .tpl-dashboard .dash-main { gap:14px; }
+  .tpl-dashboard .dash-2col { grid-template-columns:1fr 1fr; }
+  .tpl-dashboard .statgrid { grid-template-columns:repeat(3,1fr); }
+  .tpl-dashboard .savegrid { grid-template-columns:repeat(2,1fr); }
+  .tpl-dashboard .panel { break-inside:avoid; box-shadow:none; }
+  .tpl-dashboard .brow { grid-template-columns:150px 1fr 96px; }
+  .tpl-dashboard .blabel { white-space:normal; overflow:visible; text-overflow:clip; }
+
+  /* --- last line of defence -------------------------------------------
+     If a browser lays the page out at a phone width anyway (printing from
+     an iPad, or a narrow window), the phone rules must not turn the
+     tables into stacked cards with absolutely-positioned amounts. Paper
+     is always wide enough for a table. ------------------------------- */
+  .tpl-packet .pk-cmptable, .tpl-packet .pk-schedtable, .tpl-packet .pk-hptable table,
+  .tpl-packet .cmp { display:table !important; width:100% !important; }
+  .tpl-packet .pk-cmptable thead, .tpl-packet .pk-schedtable thead,
+  .tpl-packet .pk-hptable thead, .tpl-packet .cmp thead { display:table-header-group !important; }
+  .tpl-packet .pk-cmptable tbody, .tpl-packet .pk-schedtable tbody,
+  .tpl-packet .pk-hptable tbody, .tpl-packet .cmp tbody { display:table-row-group !important; }
+  .tpl-packet .pk-cmptable tr, .tpl-packet .pk-schedtable tr,
+  .tpl-packet .pk-hptable tr, .tpl-packet .cmp tr { display:table-row !important; }
+  .tpl-packet .pk-cmptable td, .tpl-packet .pk-cmptable th,
+  .tpl-packet .pk-schedtable td, .tpl-packet .pk-hptable td,
+  .tpl-packet .cmp td { display:table-cell !important; position:static !important; }
+  /* …but the ordinal cell keeps its positioning: the timeline spine is
+     absolutely placed inside it, and a static cell would let the spine
+     escape to the page box and draw a green line down the whole sheet */
+  .tpl-packet .pk-schedtable td.pk-ord { position:relative !important; }
+  .tpl-packet .pk-lbl { display:none !important; }
+  /* the click-to-expand quote rows inside the schedule stay closed — those
+     same quotes are already listed in Section B */
+  tr.bidrow[hidden] { display:none !important; }
+  .tpl-packet .pk-hptable colgroup, .tpl-packet .pk-cmptable colgroup { display:table-column-group !important; }
 }
 </style>
 
@@ -981,6 +1423,9 @@ body:has(#report.tpl-packet) .wrap { max-width:1560px; }
   <div id="report"></div>
   <div id="editor"></div>
 </div>
+
+<!-- printed on every page of the PDF (hidden on screen); filled by renderReport -->
+<div class="printfoot" id="printFoot" aria-hidden="true"></div>
 
 <div class="overlay" id="progOverlay" role="dialog" aria-modal="true" aria-label="Add progress update">
   <div class="pinbox progbox">
@@ -1048,6 +1493,21 @@ body:has(#report.tpl-packet) .wrap { max-width:1560px; }
     <h3 id="contractorTitle">Contractor quotes</h3>
     <div id="contractorBody" class="histlist" style="max-height:min(560px,70vh)"></div>
     <div class="row"><button class="btn ghost" id="contractorClose" type="button">Close</button></div>
+  </div>
+</div>
+
+<div class="overlay" id="fileOverlay" role="dialog" aria-modal="true" aria-label="Attachment">
+  <div class="pinbox filebox">
+    <div class="fvhead">
+      <div class="fvname"><b id="fvName">Attachment</b><small id="fvSub"></small></div>
+      <div class="fvacts">
+        <a id="fvDownload" download>⬇ <span class="fvlabel">Download</span></a>
+        <a id="fvTab" target="_blank" rel="noopener">↗ <span class="fvlabel">New tab</span></a>
+        <button class="fvclose" id="fvClose" type="button" title="Close (Esc)">✕</button>
+      </div>
+    </div>
+    <div class="fvtabs" id="fvTabs" style="display:none"></div>
+    <div class="fvbody" id="fvBody"></div>
   </div>
 </div>
 
@@ -1159,13 +1619,23 @@ function bidExpired(b) {
   return exp < new Date();
 }
 /* extra per-bid facts for the report: quote date, expiry, attachments */
-function bidMetaHTML(b) {
+function bidMetaHTML(b, jid, bi) {
   var bits = [];
   if (b.qdate) bits.push("quoted " + esc(b.qdate) + (bidExpired(b) ? ' <span class="expired">⚠ expired</span>' : ""));
-  (b.files || []).forEach(function (f) {
-    bits.push('<a href="' + esc(f.url) + '" target="_blank" rel="noopener">📎 ' + esc(f.name) + "</a>");
+  (b.files || []).forEach(function (f, fi) {
+    /* href is kept so ⌘-click still opens a tab; a plain click uses the viewer */
+    bits.push('<a class="attlink" href="' + esc(f.url) + '" data-att="' + esc(jid) + ":" + bi + ":" + fi +
+      '" data-attcap="' + esc(b.contractor || "") + '" title="View this attachment">📎 ' + esc(f.name) + "</a>");
   });
   return bits.length ? '<span class="fn">' + bits.join(" · ") + "</span>" : "";
+}
+/* the marker under the amount that says which quote the report is counting.
+   Normally that is the lowest one; when the property manager has carried a
+   different quote the board sees exactly that, so the totals are never a
+   silent departure from "lowest bid wins". */
+function carriedFlag(cb, cls) {
+  if (cb.override) return '<span class="' + cls + ' isover">✓ Selected</span>';
+  return cb.lowest ? '<span class="' + cls + '">✓ Lowest</span>' : "";
 }
 /* light totals for any raw jobs array (used by the cross-period dashboard) */
 function calcJobsTotals(jobs) {
@@ -1187,8 +1657,13 @@ function genId() { return "j" + Date.now().toString(36) + Math.random().toString
 /* Keep jobs in priority-first order (preserving the board's chosen order within each
    class, since Array.sort is stable), then number them 1..N by report position. */
 function orderJobs(arr) {
-  arr.sort(function (a, b) { return (b.priority ? 1 : 0) - (a.priority ? 1 : 0); });
-  arr.forEach(function (j, i) { j.no = i + 1; });
+  /* archived jobs sink to the bottom and are not numbered — the numbers the
+     board quotes in minutes stay tied to the jobs actually on the report */
+  arr.sort(function (a, b) {
+    return (a.archived ? 1 : 0) - (b.archived ? 1 : 0) || (b.priority ? 1 : 0) - (a.priority ? 1 : 0);
+  });
+  var n = 0;
+  arr.forEach(function (j) { j.no = j.archived ? 0 : ++n; });
 }
 function normState(s) {
   if (!s || !Array.isArray(s.jobs)) s = JSON.parse(JSON.stringify(seed));
@@ -1275,6 +1750,8 @@ function persist(msg, explicitChanges) {
   var n = document.getElementById("saveNote");
   n.textContent = msg || ((cloud.user ? "Saved to cloud · " : "Saved in this browser · ") +
                           new Date().toLocaleTimeString());
+  var edc = document.querySelector(".ed-saved");     /* workspace header chip */
+  if (edc) edc.textContent = "✓ Saved " + new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   clearTimeout(persist._t); persist._t = setTimeout(function(){ n.textContent = ""; }, 4000);
 }
 
@@ -1486,10 +1963,20 @@ function jobCalc(j) {
   var bids = j.bids.map(function (b) { return { b: b, total: bidTotal(b) }; });
   var priced = bids.filter(function (x) { return x.total != null; });
   var minT = priced.length ? Math.min.apply(null, priced.map(function (x) { return x.total; })) : null;
-  bids.forEach(function (x) {
+  /* Which quote the report carries. Normally the lowest price wins on its own.
+     j.pick lets the property manager override that when the board awards on
+     something other than price — it holds the index of the chosen bid and is
+     ignored if that bid is gone or has no amount yet. */
+  var pick = (typeof j.pick === "number" && bids[j.pick] && bids[j.pick].total != null) ? j.pick : null;
+  var firstLowest = -1;
+  bids.forEach(function (x, i) { if (firstLowest < 0 && x.total != null && x.total === minT) firstLowest = i; });
+  bids.forEach(function (x, i) {
     x.pending = (x.total == null && (x.b.contractor || "").trim() !== "");
     x.lowest = priced.length > 1 && x.total === minT;
-    x.carried = x.total != null && (priced.length === 1 || x.lowest);
+    /* exactly one bid is carried — with tied lowest quotes the first one counts,
+       so a tie can never double-count in the totals */
+    x.carried = pick != null ? (i === pick) : (x.total != null && i === firstLowest);
+    x.override = (pick != null && i === pick && !x.lowest && priced.length > 1);
   });
   var carriedBids = bids.filter(function (x) { return x.carried; });
   var cost = carriedBids.reduce(function (s, x) { return s + x.total; }, 0);
@@ -1502,8 +1989,11 @@ function jobCalc(j) {
                              .map(function (x) { return x.b.contractor; }) };
 }
 
+/* jobs the board sees — archived ones are parked in the editor and count for
+   nothing on the report (no number, no total, no chart) */
+function liveJobs() { return state.jobs.filter(function (j) { return !j.archived; }); }
 function computeAll() {
-  var jobs = state.jobs.map(function (j) { var c = jobCalc(j); return { j: j, c: c }; });
+  var jobs = liveJobs().map(function (j) { var c = jobCalc(j); return { j: j, c: c }; });
   var hp = jobs.filter(function (x) { return x.j.priority; });
   var nhp = jobs.filter(function (x) { return !x.j.priority; });
   var total = jobs.reduce(function (s, x) { return s + x.c.cost; }, 0);
@@ -1538,9 +2028,20 @@ function renderReport() {
   if (t !== "dashboard" && t !== "packet") t = "classic";
   var rep = document.getElementById("report");
   if (rep) rep.className = "tpl-" + t;
+  setPrintFooter();
   if (t === "dashboard") return renderDashboardReport();
   if (t === "packet") return renderPacketReport();
   return renderClassicReport();
+}
+
+/* running footer for the PDF — repeats on every printed page so a single
+   sheet pulled out of the packet still says what it belongs to */
+function setPrintFooter() {
+  var el = document.getElementById("printFoot");
+  if (!el) return;
+  var M = state.meta || META_DEFAULTS;
+  el.innerHTML = "<b>" + esc(M.condoName) + "</b> · " + esc(M.regNo) + " — " +
+    esc(M.title) + " · " + esc(activeReportName()) + " · prepared " + esc(todayStr());
 }
 
 /* editor-cell helpers shared by all three templates (closures over EDITOR) */
@@ -1902,8 +2403,11 @@ function packetSecB(d, ctx) {
       var name = cb.b.contractor || "—", jid = x.j.id;
       /* contractor / scope / amount are click-to-edit for the signed-in property manager */
       var cName = tEdit("bid:" + jid + ":" + bi + ":contractor", cb.b.contractor, "Contractor");
+      /* click the paperclip line to read the quote in the in-page viewer */
       var att = (cb.b.files && cb.b.files.length)
-        ? '<span class="pk-att">📎 ' + cb.b.files.length + ' attachment' + (cb.b.files.length > 1 ? "s" : "") + "</span>" : "";
+        ? '<span class="pk-att attlink" role="button" tabindex="0" data-att="' + jid + ":" + bi +
+          '" data-attcap="' + esc(name) + '" title="View the attached quote">📎 ' + cb.b.files.length +
+          ' attachment' + (cb.b.files.length > 1 ? "s" : "") + "</span>" : "";
       var con = '<td class="pk-c-con"><div class="pk-cflex">' + pkAvatar(name) + '<span class="pk-cwrap"><span class="pk-cn">' + cName + "</span>" + att + "</span></div></td>";
       var scope = ctx.ED ? tEdit("bid:" + jid + ":" + bi + ":notes", cb.b.notes, "Add scope note") : (esc(cb.b.notes) || "—");
       var dateCell = '<td class="pk-c-date' + (cb.b.qdate ? '' : ' pk-nodate') + '"><span class="pk-lbl">Quoted </span>' +
@@ -1916,7 +2420,7 @@ function packetSecB(d, ctx) {
         var amt = tEdit("bid:" + jid + ":" + bi + ":amount", money(cb.total), "Amount");
         rows.push('<tr' + (cb.carried ? ' class="pk-low"' : "") + ">" + con +
           '<td class="pk-c-scope">' + scope + "</td>" + dateCell +
-          '<td class="pk-c-amt">' + amt + (cb.lowest ? '<span class="pk-lowflag">✓ Lowest</span>' : "") + "</td></tr>");
+          '<td class="pk-c-amt">' + amt + carriedFlag(cb, "pk-lowflag") + "</td></tr>");
       }
     });
     cards.push('<div class="pk-cmpcard"><div class="pk-cmphead"><span class="pk-cmpno">' + (idx + 1) + "</span> " +
@@ -2043,10 +2547,13 @@ function packetProgress(d, ctx) {
           (ctx.ED && u.internal ? '<span class="pk-updflag int">Internal</span>' : "");
         var mh = "";
         if (u.media && u.media.length) {
-          mh = '<span class="pk-updmedia">' + u.media.map(function (m) {
+          /* site photos and clips open in the in-page viewer, same as quotes */
+          var sref = fvStashRef(u.media), scap = esc(u.d || "") + " site update";
+          mh = '<span class="pk-updmedia">' + u.media.map(function (m, mi) {
+            var d = ' data-attstash="' + sref + '" data-atti="' + mi + '" data-attcap="' + scap + '"';
             return m.type === "video"
-              ? '<a class="pk-vid" href="' + esc(m.url) + '" target="_blank" rel="noopener">▶ ' + esc(m.name || "video") + '</a>'
-              : '<a href="' + esc(m.url) + '" target="_blank" rel="noopener"><img src="' + esc(m.url) + '" alt="" loading="lazy"></a>';
+              ? '<a class="pk-vid" href="' + esc(m.url) + '"' + d + ' title="Play this clip">▶ ' + esc(m.name || "video") + '</a>'
+              : '<a href="' + esc(m.url) + '"' + d + ' title="View this photo"><img src="' + esc(m.url) + '" alt="" loading="lazy"></a>';
           }).join("") + '</span>';
         }
         return '<div class="pk-updrow' + (u.issue ? " issue" : "") + '"><span class="pk-updd">' + esc(u.d || "—") + '</span>' +
@@ -2206,7 +2713,7 @@ function cmpRows(x) {
     var cName = tEdit("bid:" + jid + ":" + bi + ":contractor", cb.b.contractor, "Contractor");
     var cNote = ed ? tEdit("bid:" + jid + ":" + bi + ":notes", cb.b.notes, "Add scope note")
                    : (esc(cb.b.notes) || "—");
-    cNote += bidMetaHTML(cb.b);
+    cNote += bidMetaHTML(cb.b, jid, bi);
     if (cb.total == null) {
       var amtP = ed ? tEdit("bid:" + jid + ":" + bi + ":amount", "", "Enter amount") : "Quote pending";
       r.push('<tr class="pend"><td>' + cName + "</td><td>" + cNote +
@@ -2214,7 +2721,7 @@ function cmpRows(x) {
     } else {
       r.push("<tr><td>" + cName + "</td><td>" + cNote +
              '</td><td class="money">' + tEdit("bid:" + jid + ":" + bi + ":amount", money(cb.total), "Amount") + "</td><td>" +
-             (cb.lowest ? '<span class="low">✓ Lowest</span>' : "") + "</td></tr>");
+             carriedFlag(cb, "low") + "</td></tr>");
     }
   });
   return r.join("");
@@ -2481,100 +2988,369 @@ function updateLastUpd() {
 }
 
 /* ---------- editor rendering ---------- */
+/* ===================== EDIT WORKSPACE =====================
+   The property manager's side of the app: a section rail, a column of
+   job cards that expand to show updates / quotes / board actions, and a
+   summary of the selected job. Every field here writes to the same
+   state the report renders from — there is no second copy of the data. */
+var edNav = "jobs";           /* jobs | overview | contractors | board | settings */
+var edOpen = {};              /* jobId -> expanded */
+var edSel = null;             /* jobId shown in the summary rail */
+var edQOpen = {};             /* "jobId:bidIndex" -> quote detail row open */
+var edFilter = { on: false, q: "", st: "", prio: false };
+var edArchOpen = false;
+var edSaved = true;           /* false while an edit is on its way to the cloud */
+
+var ED_SECTIONS = [
+  ["jobs", "💼", "Jobs &amp; Bids"], ["overview", "📊", "Overview"],
+  ["contractors", "👷", "Contractors"], ["board", "🗳", "Board &amp; Voting"],
+  ["settings", "⚙️", "Settings"]
+];
+
 function renderEditor() {
-  var h = [];
-  h.push('<header class="rep"><div class="kicker">Edit mode</div><h1>Jobs &amp; bids</h1>' +
-    '<div class="meta">Changes save automatically in this browser. Switch back to “Report” to see the result.</div></header>');
-  h.push('<p class="edithint">Record a waiting bid by typing its amount — totals and the lowest-bid flag recalc themselves; leave it empty to keep it “Pending”. ' +
-    "<strong>Job numbers are automatic:</strong> high-priority jobs come first, then standard jobs, numbered top to bottom. " +
-    "To reorder, <strong>drag a job by the ⠿ handle</strong> or use the ▲▼ buttons — the number follows its position.</p>");
   var M = state.meta || META_DEFAULTS;
-  h.push('<div class="ecard esettings"><div class="ehead"><strong>Report settings</strong>' +
-    '<span style="font-size:12.5px;color:var(--ink2)">— names shown on the report header and footer</span></div><div class="ebids">');
-  [["title","Report title"],["condoName","Condominium name"],["regNo","Registration number"],
-   ["buildings","Buildings line"],["manager","Management company"]].forEach(function (f) {
-    h.push('<div class="esrow"><label>' + f[1] + '</label>' +
-      '<input type="text" value="' + esc(M[f[0]]) + '" data-mf="' + f[0] + '"></div>');
-  });
-  h.push('<div class="esrow"><label>Annual budget (CAD)</label>' +
-    '<input type="number" step="100" min="0" value="' + (M.budget ? esc(M.budget) : "") + '" data-mf="budget" placeholder="leave empty for no budget line"></div>');
-  h.push('<p class="edithint" style="margin:6px 0 0;font-size:12.5px">Section headings are now edited right in the report — open the <strong>Report</strong> tab and click any section heading to rename it. The floating buttons update automatically.</p>');
-  h.push("</div></div>");
-  h.push(aiCardHTML());
-  h.push(intakeCardHTML());
-  h.push(dirCardHTML());
-  h.push(boardCardHTML());
-  h.push(viewPassCardHTML());
-  h.push('<p><button class="btn primary" id="btnAddJob" type="button">+ Add job</button></p>');
-  state.jobs.forEach(function (j, ji) {
-    var c = jobCalc(j);
-    h.push('<div class="ecard' + (j.priority ? " isprio" : "") + '" data-ji="' + ji + '" data-jid="' + esc(j.id) + '">');
-    h.push('<div class="ehead">' +
-      '<span class="draghandle" draggable="true" title="Drag to reorder">⠿</span>' +
-      '<span class="movebtns"><button class="mvbtn" data-act="moveup" title="Move up">▲</button>' +
-      '<button class="mvbtn" data-act="movedn" title="Move down">▼</button></span>' +
-      '<span class="jnbadge" title="Job number (set by position)">' + esc(j.no) + "</span>" +
-      '<label class="echk"><input type="checkbox" data-f="priority"' + (j.priority ? " checked" : "") + "> High priority</label>" +
-      '<input class="desc" type="text" value="' + esc(j.desc) + '" data-f="desc" placeholder="Job description">' +
-      '<button class="xbtn" data-act="deljob" title="Delete job">✕ job</button></div>');
-    var sopts = STATUSES.map(function (st) {
-      return '<option value="' + st[0] + '"' + ((j.status || "quoted") === st[0] ? " selected" : "") + ">" + st[1] + "</option>";
-    }).join("");
-    h.push('<div class="strow"><label>Status <select data-f="status">' + sopts + "</select></label>" +
-      '<label>Decision date <input type="date" value="' + esc(j.statusDate || "") + '" data-f="statusDate"></label>' +
-      '<input type="text" value="' + esc(j.statusNote || "") + '" data-f="statusNote" placeholder="decision / progress note (shows in Section E)">' +
-      '<button class="btn small" data-act="openvote" type="button" title="Put this job to a board vote">🗳 Board vote</button></div>');
-    /* progress row: contract award + % complete (feeds the Work-in-progress pipeline) */
-    var awNames = []; j.bids.forEach(function (b) {
-      var nm = (b.contractor || "").trim(); if (nm && awNames.indexOf(nm) < 0) awNames.push(nm); });
-    var awOpts = '<option value=""' + (!(j.awardedTo || "").trim() ? " selected" : "") + '>— not awarded —</option>' +
-      awNames.map(function (nm) {
-        return '<option value="' + esc(nm) + '"' + ((j.awardedTo || "") === nm ? " selected" : "") + '>' + esc(nm) + '</option>';
-      }).join("");
-    h.push('<div class="strow"><label>Awarded to <select data-f="awardedTo">' + awOpts + '</select></label>' +
-      '<label>Award date <input type="date" value="' + esc(j.awardDate || "") + '" data-f="awardDate"></label>' +
-      '<label>% complete <input type="number" min="0" max="100" step="5" style="width:64px" value="' +
-      (j.pct == null ? "" : esc(j.pct)) + '" data-f="pct" placeholder="—"></label>' +
-      '<span class="savenote" style="font-size:12px">optional — the progress bar fills automatically from the stages; a % here fine-tunes the “In progress” part</span></div>');
-    /* dated progress updates (newest first on the report) */
-    h.push('<div class="eupds"><div class="eupdhead">Progress updates <span>— dated site notes shown on the report’s Work-in-progress card</span></div>');
-    (j.updates || []).forEach(function (u, ui) {
-      h.push('<div class="eupdrow" data-ui="' + ui + '">' +
-        '<input type="date" value="' + esc(u.d || "") + '" data-f="upd-d">' +
-        '<input type="text" value="' + esc(u.t || "") + '" data-f="upd-t" placeholder="what happened on site…">' +
-        '<button class="xbtn" data-act="delupd" title="Remove this update">✕</button></div>');
-    });
-    h.push('<button class="addbid" data-act="addupd" type="button">+ Add progress update</button></div>');
-    h.push('<div class="ebids"><div class="ebrow hdr"><div>Contractor</div><div>Quote #</div><div>Amount</div><div>HST</div><div>Notes</div><div>Status</div><div></div></div>');
-    j.bids.forEach(function (b, bi) {
-      var t = bidTotal(b);
-      var st = t != null
-        ? '<span class="st rec">' + money(t) + (c.bids[bi].lowest ? " ✓" : "") + "</span>"
-        : ((b.contractor || "").trim() ? '<span class="st pen">Pending</span>' : "");
-      h.push('<div class="ebrow" data-bi="' + bi + '">' +
-        '<label class="ef"><span class="efl">Contractor</span><input type="text" value="' + esc(b.contractor) + '" data-f="contractor" placeholder="Contractor name"></label>' +
-        '<label class="ef"><span class="efl">Quote #</span><input type="text" value="' + esc(b.qno == null ? "" : b.qno) + '" data-f="qno"></label>' +
-        '<label class="ef"><span class="efl">Amount</span><input type="number" step="0.01" min="0" value="' + (b.amount == null ? "" : esc(b.amount)) + '" data-f="amount" placeholder="waiting…"></label>' +
-        '<label class="ef"><span class="efl">HST</span><select data-f="hst"><option value="no"' + (!b.hst ? " selected" : "") + '>Excluded</option>' +
-        '<option value="yes"' + (b.hst ? " selected" : "") + ">Included</option></select></label>" +
-        '<label class="ef"><span class="efl">Notes</span><input type="text" value="' + esc(b.notes) + '" data-f="notes"></label>' +
-        '<div class="ef"><span class="efl">Status</span>' + st + "</div>" +
-        '<button class="xbtn" data-act="delbid" title="Remove this bid">✕</button></div>');
-      var fchips = (b.files || []).map(function (f, fi) {
-        return '<span class="filechip"><a href="' + esc(f.url) + '" target="_blank" rel="noopener">📎 ' + esc(f.name) +
-          '</a><span class="fx" data-act="delfile" data-fi="' + fi + '" title="Remove attachment">✕</span></span>';
-      }).join("");
-      h.push('<div class="ebrow extra" data-bi="' + bi + '">' +
-        '<label>Quote date <input type="date" value="' + esc(b.qdate || "") + '" data-f="qdate"></label>' +
-        '<label>Valid <input type="number" min="1" value="' + esc(b.validDays || 60) + '" data-f="validDays"> days' +
-        (bidExpired(b) ? ' <span class="expired">⚠ expired</span>' : "") + "</label>" +
-        '<button class="btn small" data-act="attach" type="button">📎 Attach quote…</button>' + fchips + "</div>");
-    });
-    h.push('<button class="addbid" data-act="addbid" type="button">+ Add a bid to this job</button></div></div>');
-  });
+  var h = ['<div class="ed-shell">', edSideHTML(M), '<div class="ed-main">', edTopHTML(M), '<div class="ed-body">'];
+  if (edNav === "overview") h.push(edOverviewHTML(M));
+  else if (edNav === "contractors") h.push(edSecHead("Contractors",
+    "Contact details, insurance and WSIB expiry. Expiring cover is flagged on the report’s open-items section.") + dirCardHTML());
+  else if (edNav === "board") h.push(edSecHead("Board &amp; voting",
+    "Who can open the report, vote on a job and sign the resolution.") + boardCardHTML() + edVotingHTML());
+  else if (edNav === "settings") h.push(edSettingsHTML(M));
+  else h.push(edJobsHTML());
+  h.push("</div></div></div>");
   document.getElementById("editor").innerHTML = h.join("");
   aiCheckKey();
   viewPassCheck();
+}
+/* amounts are typed as money ("48,500" / "$48,500.00") and stored as a number */
+function edAmt(n) { return Number(n).toLocaleString("en-CA", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+function edParseAmt(v) {
+  var raw = String(v == null ? "" : v).replace(/[^0-9.\-]/g, "");
+  return raw === "" ? null : Number(raw);
+}
+function edSecHead(t, p) {
+  return '<div class="ed-sechead"><h2>' + t + "</h2><p>" + p + "</p></div>";
+}
+function edSideHTML(M) {
+  var h = ['<aside class="ed-side">'];
+  h.push('<div class="ed-brand"><span class="bi">🏢</span><b>' + esc(M.manager || "Property management") + "</b></div>");
+  h.push('<nav class="ed-nav">');
+  ED_SECTIONS.forEach(function (s) {
+    h.push('<button type="button" data-act="ednav" data-nav="' + s[0] + '"' + (edNav === s[0] ? ' class="on"' : "") +
+      '><span class="ni">' + s[1] + "</span>" + s[2] + "</button>");
+  });
+  h.push("</nav>");
+  var who = (cloud.user && cloud.user.email) || "";
+  h.push('<div class="ed-sidefoot"><div class="ed-help"><b>Everything saves itself</b>' +
+    "Each change is written as you make it — to this browser, and to the cloud when you’re signed in. " +
+    "Use <strong>Preview report</strong> to see what the board sees.<br><br>" +
+    "Job numbers follow the order of the list: high-priority jobs first. Drag a card by its <strong>⠿</strong> " +
+    "handle to move it.</div>");
+  h.push('<div class="ed-who"><span class="av">PM</span><span><b>Property manager</b><small>' +
+    esc(who || "signed out") + "</small></span></div></div>");
+  return h.join("") + "</aside>";
+}
+function edTopHTML(M) {
+  var h = ['<div class="ed-top"><div class="ed-top-l"><div class="ed-title"><h1>' + esc(M.title || "Contractor Quote Report") + "</h1>"];
+  h.push('<span class="ed-saved' + (edSaved ? "" : " dirty") + '">' + (edSaved ? "✓ Saved" : "Saving…") + "</span></div>");
+  h.push('<div class="ed-meta"><span>🏢 ' + esc(M.condoName) + "</span><span>📄 " + esc(M.regNo) +
+    "</span><span>🏗 " + esc(M.buildings) + "</span><span>🗂 " + esc(activeReportName()) + "</span></div></div>");
+  h.push('<div class="ed-acts">' +
+    '<button class="edbtn" type="button" data-act="edpreview">👁 Preview report</button>' +
+    '<div class="ed-menu" id="edMenu"><button class="edbtn" type="button" data-act="edmore">More ▾</button>' +
+    '<div class="ed-drop">' +
+    '<button type="button" data-act="edproxy" data-target="btnHistory">🕘 Change history</button>' +
+    '<button type="button" data-act="edproxy" data-target="btnDecLog">📜 Decision log</button>' +
+    '<button type="button" data-act="edproxy" data-target="btnMemo">✨ AI board memo</button>' +
+    '<button type="button" data-act="edproxy" data-target="btnReports">🗂 Reports archive</button><hr>' +
+    '<button type="button" data-act="edproxy" data-target="btnBackup">⬇ Backup data (JSON)</button>' +
+    '<button type="button" data-act="edproxy" data-target="btnRestore">⬆ Restore a backup…</button>' +
+    '<button type="button" data-act="edproxy" data-target="btnPortable">📦 Download portable copy</button><hr>' +
+    '<button type="button" class="ddanger" data-act="edproxy" data-target="btnReset">Reset to original…</button>' +
+    "</div></div>" +
+    '<button class="edbtn dark" type="button" data-act="edsave">💾 Save</button>' +
+    '<button class="edbtn prim" type="button" id="btnAddJob">+ Add job</button></div></div>');
+  return h.join("");
+}
+
+/* ---------- Jobs & Bids ---------- */
+function edJobMatches(j) {
+  if (edFilter.prio && !j.priority) return false;
+  if (edFilter.st && (j.status || "quoted") !== edFilter.st) return false;
+  var q = edFilter.q.trim().toLowerCase();
+  if (!q) return true;
+  if (String(j.desc || "").toLowerCase().indexOf(q) >= 0) return true;
+  return j.bids.some(function (b) { return String(b.contractor || "").toLowerCase().indexOf(q) >= 0; });
+}
+function edJobsHTML() {
+  var live = [], arch = [];
+  state.jobs.forEach(function (j, ji) { (j.archived ? arch : live).push({ j: j, ji: ji }); });
+  var shown = live.filter(function (r) { return edJobMatches(r.j); });
+  if (!edSel || !state.jobs.some(function (j) { return j.id === edSel; }))
+    edSel = shown.length ? shown[0].j.id : (live.length ? live[0].j.id : null);
+  var anyOpen = shown.some(function (r) { return edOpen[r.j.id]; });
+  var h = ['<div class="ed-cols"><div class="ed-list">'];
+  h.push('<div class="ed-listhead"><h2>Jobs &amp; Bids</h2><span class="ed-count">' + live.length + " job" +
+    (live.length === 1 ? "" : "s") + (shown.length !== live.length ? " · " + shown.length + " shown" : "") + "</span>" +
+    '<button class="edbtn" type="button" data-act="edfilter">⚙ Filter</button><span class="spacer"></span>' +
+    '<button class="edbtn" type="button" data-act="edexpand">' + (anyOpen ? "Collapse all" : "Expand all") + "</button></div>");
+  if (edFilter.on) {
+    var sopt = '<option value="">Any status</option>' + STATUSES.map(function (st) {
+      return '<option value="' + st[0] + '"' + (edFilter.st === st[0] ? " selected" : "") + ">" + st[1] + "</option>";
+    }).join("");
+    h.push('<div class="ed-filters"><input type="search" id="edFilterQ" placeholder="Search job or contractor…" value="' +
+      esc(edFilter.q) + '"><select id="edFilterSt">' + sopt + "</select>" +
+      '<label><input type="checkbox" id="edFilterPrio"' + (edFilter.prio ? " checked" : "") + "> High priority only</label>" +
+      '<button class="edbtn" type="button" data-act="edfilterclear">Clear</button></div>');
+  }
+  if (!shown.length) h.push('<p class="updempty">' + (live.length ? "No jobs match this filter." : "No jobs yet — use “+ Add job”.") + "</p>");
+  shown.forEach(function (r) { h.push(edJobCardHTML(r.j, r.ji)); });
+  if (arch.length) {
+    h.push('<div class="ed-listhead" style="margin-top:18px"><h2>Archived</h2><span class="ed-count">' + arch.length +
+      '</span><span class="spacer"></span><button class="edbtn" type="button" data-act="edarch">' +
+      (edArchOpen ? "Hide" : "Show") + "</button></div>");
+    if (edArchOpen) arch.forEach(function (r) { h.push(edJobCardHTML(r.j, r.ji)); });
+  }
+  h.push("</div>" + edRailHTML() + "</div>");
+  h.push('<div class="ed-shorts">' +
+    '<div class="ed-short"><span class="si">👷</span><span><b>Contractor directory</b>' +
+    "<small>Contacts, insurance &amp; WSIB expiry</small></span><span class=\"spacer\"></span>" +
+    '<button class="edbtn" type="button" data-act="ednav" data-nav="contractors">View all</button></div>' +
+    '<div class="ed-short"><span class="si">🗳</span><span><b>Board members</b>' +
+    "<small>Voting access &amp; signatures</small></span><span class=\"spacer\"></span>" +
+    '<button class="edbtn" type="button" data-act="ednav" data-nav="board">View all</button></div></div>');
+  return h.join("");
+}
+function edJobCardHTML(j, ji) {
+  var c = jobCalc(j), open = !!edOpen[j.id], sg = jobStages({ j: j, c: c });
+  var h = ['<div class="ecard jcard' + (j.priority ? " isprio" : "") + (edSel === j.id ? " sel" : "") +
+    (j.archived ? " arch" : "") + '" data-ji="' + ji + '" data-jid="' + esc(j.id) + '">'];
+  /* ---- header: number, title, state at a glance ---- */
+  h.push('<div class="jhead" data-act="jtoggle">' +
+    '<span class="draghandle" draggable="true" title="Drag to reorder">⠿</span>' +
+    '<span class="jno">' + (j.archived ? "—" : esc(j.no)) + "</span>" +
+    '<input class="jtitle" type="text" value="' + esc(j.desc) + '" data-f="desc" placeholder="Job description">' +
+    (j.priority ? '<span class="jchip prio">↑ High priority</span>' : "") +
+    '<span class="jchip st-' + esc(j.status || "quoted") + '">' + esc(statusLabel(j.status || "quoted")) + "</span>");
+  if (!open) {
+    h.push('<span class="jsum">' + (j.awardedTo ? '<span class="who">' + esc(j.awardedTo) + "</span>" : "") +
+      (sg.overall == null ? "" : '<span class="jbar"><span style="width:' + sg.overall + '%"></span></span><span>' +
+        sg.overall + "%</span>") + "</span>");
+  }
+  h.push('<button class="jtog" type="button" title="' + (open ? "Collapse" : "Expand") + '">' + (open ? "⌃" : "⌄") + "</button></div>");
+  if (!open) return h.join("") + "</div>";
+
+  /* ---- controls ---- */
+  var sopts = STATUSES.map(function (st) {
+    return '<option value="' + st[0] + '"' + ((j.status || "quoted") === st[0] ? " selected" : "") + ">" + st[1] + "</option>";
+  }).join("");
+  var awNames = [];
+  j.bids.forEach(function (b) { var nm = (b.contractor || "").trim(); if (nm && awNames.indexOf(nm) < 0) awNames.push(nm); });
+  var awOpts = '<option value="">— not awarded —</option>' + awNames.map(function (nm) {
+    return '<option value="' + esc(nm) + '"' + ((j.awardedTo || "") === nm ? " selected" : "") + ">" + esc(nm) + "</option>";
+  }).join("");
+  var pv = j.pct == null ? (j.status === "completed" ? 100 : 0) : j.pct;
+  h.push('<div class="jbody"><div class="jctl">' +
+    '<div class="f"><label>Status</label><select data-f="status">' + sopts + "</select></div>" +
+    '<div class="f"><label>Decision date</label><input type="date" value="' + esc(j.statusDate || "") + '" data-f="statusDate"></div>' +
+    '<div class="f"><label>Awarded to</label><select data-f="awardedTo">' + awOpts + "</select></div>" +
+    '<div class="f"><label>Award date</label><input type="date" value="' + esc(j.awardDate || "") + '" data-f="awardDate"></div>' +
+    '<div class="f" style="flex:1;min-width:210px"><label>Site progress</label><div class="pgrp">' +
+    '<input type="range" min="0" max="100" step="5" value="' + pv + '" data-f="pct" data-live="1">' +
+    '<span class="pval">' + pv + "%</span></div></div>" +
+    '<div class="f" style="flex:1;min-width:200px"><label>Decision note (open items)</label>' +
+    '<input type="text" style="width:100%" value="' + esc(j.statusNote || "") + '" data-f="statusNote" placeholder="why it was deferred, what’s outstanding…"></div>' +
+    '<div class="f"><label>Priority</label><label class="echk" style="margin:0"><input type="checkbox" data-f="priority"' +
+    (j.priority ? " checked" : "") + "> High</label></div></div>");
+
+  /* ---- 1. progress updates ---- */
+  h.push('<div class="jsec"><div class="jsechead"><span class="n">1</span><h4>Progress updates</h4>' +
+    '<span class="spacer"></span><button class="edbtn" type="button" data-act="addupd">+ Add update</button></div>');
+  var upds = j.updates || [];
+  if (!upds.length) h.push('<p class="updempty">No site updates yet. Dated notes here appear on the board’s Work-in-progress card.</p>');
+  else {
+    h.push('<div class="updlist">');
+    upds.forEach(function (u, ui) {
+      h.push('<div class="updrow" data-ui="' + ui + '"><input type="date" value="' + esc(u.d || "") + '" data-f="upd-d">' +
+        '<input type="text" value="' + esc(u.t || "") + '" data-f="upd-t" placeholder="what happened on site…">' +
+        (u.issue ? '<span class="qst over">⚠ Issue</span>' : "") +
+        (u.internal ? '<span class="qst hi">Internal</span>' : "") +
+        ((u.media && u.media.length) ? '<span class="qst hi" data-attstash="' + fvStashRef(u.media) +
+          '" data-attcap="' + esc(u.d || "") + ' site update" style="cursor:pointer" title="View the photos on this update">📎 ' +
+          u.media.length + "</span>" : "") +
+        '<button class="xbtn" data-act="delupd" title="Remove this update">✕</button></div>');
+    });
+    h.push("</div>");
+  }
+  h.push("</div>");
+
+  /* ---- 2. quotes ---- */
+  h.push('<div class="jsec"><div class="jsechead"><span class="n">2</span><h4>Quotes</h4>' +
+    '<span class="spacer"></span><button class="edbtn" type="button" data-act="addbid">+ Add quote / bid</button></div>');
+  h.push('<div class="qwrap"><table class="qtable"><colgroup><col style="width:34px"><col style="width:20%">' +
+    '<col style="width:9%"><col style="width:13%"><col style="width:9%"><col style="width:20%">' +
+    '<col style="width:14%"><col style="width:10%"><col style="width:34px"></colgroup>' +
+    '<thead><tr><th></th><th>Contractor</th><th>Quote #</th>' +
+    '<th style="text-align:right">Amount (CAD)</th><th>HST</th><th>Notes</th><th>Attachments</th><th>Status</th><th></th></tr></thead><tbody>');
+  j.bids.forEach(function (b, bi) {
+    var x = c.bids[bi], qk = j.id + ":" + bi, xo = !!edQOpen[qk];
+    var st = x.carried
+      ? '<span class="qst ' + (x.override ? "over" : "sel") + '">' + (x.override ? "Selected ⚑" : "Selected") + "</span>"
+      : (x.total != null ? '<span class="qst hi">Higher bid</span>'
+        : ((b.contractor || "").trim() ? '<span class="qst pen">Pending</span>' : ""));
+    var files = (b.files || []).map(function (f, fi) {
+      return '<a class="attlink" href="' + esc(f.url) + '" data-att="' + esc(j.id) + ":" + bi + ":" + fi +
+        '" data-attcap="' + esc(b.contractor || "") + '" title="View this attachment">📎 ' +
+        esc(f.name.length > 16 ? f.name.slice(0, 15) + "…" : f.name) + "</a>";
+    }).join("");
+    h.push('<tr class="qrow' + (x.carried ? " picked" : "") + '" data-bi="' + bi + '">' +
+      '<td class="c-pick"><input type="radio" name="pick-' + esc(j.id) + '" data-act="pick"' +
+      (x.carried ? " checked" : "") + ' title="Carry this quote in the report totals"></td>' +
+      '<td><input type="text" value="' + esc(b.contractor) + '" data-f="contractor" placeholder="Contractor"></td>' +
+      '<td><input type="text" value="' + esc(b.qno == null ? "" : b.qno) + '" data-f="qno" placeholder="—"></td>' +
+      '<td class="c-amt"><input type="text" inputmode="decimal" value="' + (b.amount == null ? "" : esc(edAmt(b.amount))) +
+      '" data-f="amount" placeholder="waiting…"></td>' +
+      '<td><select data-f="hst"><option value="no"' + (!b.hst ? " selected" : "") + ">Excluded</option>" +
+      '<option value="yes"' + (b.hst ? " selected" : "") + ">Included</option></select></td>" +
+      '<td><input type="text" value="' + esc(b.notes) + '" data-f="notes" placeholder="scope note"></td>' +
+      '<td><div class="qatt">' + (files || '<span class="qnone">—</span>') + "</div></td>" +
+      "<td>" + st + "</td>" +
+      '<td class="c-act"><button class="qmore" type="button" data-act="qmore" title="More for this quote">⋯</button></td></tr>');
+    if (xo) {
+      h.push('<tr class="qrow qxtra" data-bi="' + bi + '"><td colspan="9"><div class="xin">' +
+        '<label>Quote date <input type="date" value="' + esc(b.qdate || "") + '" data-f="qdate"></label>' +
+        '<label>Valid <input type="number" min="1" style="width:64px" value="' + esc(b.validDays || 60) + '" data-f="validDays"> days</label>' +
+        (bidExpired(b) ? ' <span class="expired">⚠ expired</span>' : "") +
+        '<button class="edbtn" type="button" data-act="attach">📎 Attach quote…</button>' +
+        (b.files || []).map(function (f, fi) {
+          return '<span class="filechip"><a href="' + esc(f.url) + '" data-att="' + esc(j.id) + ":" + bi + ":" + fi +
+            '" data-attcap="' + esc(b.contractor || "") + '">📎 ' + esc(f.name) +
+            '</a><span class="fx" data-act="delfile" data-fi="' + fi + '" title="Remove attachment">✕</span></span>';
+        }).join("") +
+        '<span class="spacer" style="flex:1"></span>' +
+        '<button class="edbtn danger" type="button" data-act="delbid">Delete quote</button></div></td></tr>');
+    }
+  });
+  h.push("</tbody></table></div>");
+  if (typeof j.pick === "number" && c.bids[j.pick] && c.bids[j.pick].override) {
+    h.push('<p class="updempty" style="color:var(--amber)">⚑ Carrying ' +
+      esc((j.bids[j.pick].contractor || "this quote").trim() || "this quote") +
+      ' instead of the lowest quote — the board’s copy says “✓ Selected”. ' +
+      '<button class="edbtn" type="button" data-act="pickauto" style="font-size:12px;padding:3px 9px">Use the lowest again</button></p>');
+  }
+  h.push("</div>");
+
+  /* ---- 3. board actions ---- */
+  var voteOpen = !!(votesCache.openJobs && votesCache.openJobs[j.id]);
+  var stk = j.status || "quoted";
+  var bl = APPROVED_SET[stk]
+    ? (j.awardedTo ? "Awarded to <b>" + esc(j.awardedTo) + "</b>" + (j.awardDate ? " on " + esc(j.awardDate) : "") +
+        (stk === "completed" ? " · work complete" : "") : "Approved — no contractor recorded yet")
+    : (stk === "rejected" || stk === "deferred"
+      ? statusLabel(stk) + (j.statusDate ? " on " + esc(j.statusDate) : "") + (j.statusNote ? " — " + esc(j.statusNote) : "")
+      : "Not yet before the board.");
+  h.push('<div class="jsec"><div class="jsechead"><span class="n">3</span><h4>Board actions</h4></div>' +
+    '<div class="bact"><span class="jchip st-' + esc(stk) + '">' +
+    (APPROVED_SET[stk] ? "✓ " : "") + esc(statusLabel(stk)) + "</span>" +
+    '<span class="bl">' + bl + "</span>" +
+    (voteOpen ? '<span class="qst over">🗳 Vote open</span>' : "") +
+    '<button class="edbtn" type="button" data-act="openvote">🗳 Board vote</button></div></div>');
+  return h.join("") + "</div></div>";
+}
+
+/* ---------- summary rail ---------- */
+function edRailHTML() {
+  var j = null;
+  state.jobs.forEach(function (x) { if (x.id === edSel) j = x; });
+  if (!j) return '<aside class="ed-rail"><h3>Job summary</h3><p class="ed-railempty">Select a job to see its summary.</p></aside>';
+  var c = jobCalc(j), sg = jobStages({ j: j, c: c });
+  var priced = c.bids.filter(function (x) { return x.total != null; });
+  var low = priced.length ? Math.min.apply(null, priced.map(function (x) { return x.total; })) : null;
+  var carried = c.carriedBids[0];
+  /* where the job stands = the last stage it has actually reached; what it is
+     waiting for = the first one it hasn't */
+  var stage = "Created", next = "";
+  sg.steps.forEach(function (s) { if (s.done) stage = s.label; });
+  for (var i = 0; i < sg.steps.length; i++) if (!sg.steps[i].done) { next = sg.steps[i].label; break; }
+  if (sg.stopped) { stage = statusLabel(j.status); next = ""; }
+  if (sg.doneJob) { stage = "Complete"; next = ""; }
+  function row(k, v) { return '<div class="rrow"><span class="k">' + k + '</span><span class="v">' + v + "</span></div>"; }
+  var h = ['<aside class="ed-rail"><h3>Job summary</h3>'];
+  h.push('<div style="margin-bottom:10px"><span class="jchip st-' + esc(j.status || "quoted") + '">' +
+    esc(statusLabel(j.status || "quoted")) + "</span></div>");
+  h.push(row("Job", j.archived ? "archived" : "#" + esc(j.no)));
+  h.push(row("Title", esc(j.desc || "—")));
+  h.push('<div class="rsep"></div>');
+  h.push(row("Current stage", esc(stage)));
+  if (next) h.push(row("Waiting on", esc(next)));
+  h.push(row("Decision date", esc(j.statusDate || "—")));
+  h.push(row("Awarded to", esc(j.awardedTo || "—")));
+  h.push('<div class="rsep"></div>');
+  h.push(row("Lowest bid", '<span class="money">' + (low == null ? "—" : money(low)) + "</span>"));
+  h.push(row("Selected quote", '<span class="money' + (carried && carried.override ? "" : " good") + '">' +
+    (carried ? money(carried.total) + (carried.override ? " ⚑" : "") : "—") + "</span>"));
+  h.push(row("Counted in report", '<span class="money good">' + money(c.cost) + "</span>"));
+  if (sg.overall != null)
+    h.push('<div class="rrow"><span class="k">Progress</span><span class="v"><span class="jbar" style="display:inline-block;vertical-align:middle">' +
+      '<span style="width:' + sg.overall + '%"></span></span> ' + sg.overall + "%</span></div>");
+  h.push('<div class="rsep"></div><div class="qa">' +
+    '<button class="edbtn" type="button" data-act="jpreview">👁 Preview this job</button>' +
+    '<button class="edbtn" type="button" data-act="jdup">⧉ Duplicate job</button>' +
+    (j.archived
+      ? '<button class="edbtn" type="button" data-act="jrestore">↩ Restore to the report</button>'
+      : '<button class="edbtn danger" type="button" data-act="jarchive">🗄 Archive job</button>') +
+    '<button class="edbtn danger" type="button" data-act="jdelete">🗑 Delete permanently</button>' +
+    "</div></aside>");
+  return h.join("");
+}
+
+/* ---------- other sections ---------- */
+function edOverviewHTML(M) {
+  var h = [edSecHead("Overview", "The names on the report’s letterhead, the annual budget line, and the AI narrative.")];
+  h.push('<div class="ecard esettings"><div class="ehead"><strong>Report settings</strong>' +
+    '<span style="font-size:12.5px;color:var(--ink2)">— shown on the report header and footer</span></div><div class="ebids">');
+  [["title", "Report title"], ["condoName", "Condominium name"], ["regNo", "Registration number"],
+   ["buildings", "Buildings line"], ["manager", "Management company"]].forEach(function (f) {
+    h.push('<div class="esrow"><label>' + f[1] + '</label><input type="text" value="' + esc(M[f[0]]) +
+      '" data-mf="' + f[0] + '"></div>');
+  });
+  h.push('<div class="esrow"><label>Annual budget (CAD)</label><input type="number" step="100" min="0" value="' +
+    (M.budget ? esc(M.budget) : "") + '" data-mf="budget" placeholder="leave empty for no budget line"></div>');
+  h.push('<p class="edithint" style="margin:6px 0 0;font-size:12.5px">Section headings are edited in the report itself — ' +
+    "open <strong>Preview report</strong> and click any heading to rename it.</p></div></div>");
+  h.push(aiCardHTML());
+  h.push(intakeCardHTML());
+  return h.join("");
+}
+function edVotingHTML() {
+  var open = votesCache.open;
+  return '<div class="ecard esettings"><div class="ehead"><strong>Voting</strong>' +
+    '<span style="font-size:12.5px;color:var(--ink2)">— open a vote from any job card’s “Board actions” row</span></div>' +
+    '<div class="ebids"><p class="edithint" style="margin:4px 0">' +
+    (open ? "<strong>" + open + " vote" + (open > 1 ? "s are" : " is") + " open.</strong> " : "No votes are open right now. ") +
+    'Board members vote and sign in their own browser; every open and close is written to the decision log.</p>' +
+    '<p style="margin:8px 0 0"><button class="edbtn" type="button" data-act="edproxy" data-target="btnVotes">🗳 Open the voting panel</button> ' +
+    '<button class="edbtn" type="button" data-act="edproxy" data-target="btnDecLog">📜 Decision log</button></p></div></div>';
+}
+function edSettingsHTML(M) {
+  var tpl = (M.template === "dashboard" || M.template === "packet") ? M.template : "classic";
+  var h = [edSecHead("Settings", "Who can open the report, how it looks, and the data tools.")];
+  h.push('<div class="ecard esettings"><div class="ehead"><strong>Report design</strong>' +
+    '<span style="font-size:12.5px;color:var(--ink2)">— the layout every reader sees</span></div><div class="ebids">');
+  h.push('<div class="esrow"><label>Design</label><select data-mf="template">' +
+    '<option value="classic"' + (tpl === "classic" ? " selected" : "") + ">Classic report</option>" +
+    '<option value="dashboard"' + (tpl === "dashboard" ? " selected" : "") + ">Executive dashboard</option>" +
+    '<option value="packet"' + (tpl === "packet" ? " selected" : "") + ">Board packet</option></select></div></div></div>");
+  h.push(viewPassCardHTML());
+  h.push('<div class="ecard esettings"><div class="ehead"><strong>Data</strong>' +
+    '<span style="font-size:12.5px;color:var(--ink2)">— backups and the change trail</span></div><div class="ebids">' +
+    '<p style="margin:4px 0 0;display:flex;gap:8px;flex-wrap:wrap">' +
+    '<button class="edbtn" type="button" data-act="edproxy" data-target="btnBackup">⬇ Backup data (JSON)</button>' +
+    '<button class="edbtn" type="button" data-act="edproxy" data-target="btnRestore">⬆ Restore a backup…</button>' +
+    '<button class="edbtn" type="button" data-act="edproxy" data-target="btnPortable">📦 Download portable copy</button>' +
+    '<button class="edbtn" type="button" data-act="edproxy" data-target="btnHistory">🕘 Change history</button>' +
+    '<button class="edbtn danger" type="button" data-act="edproxy" data-target="btnReset">Reset to original…</button></p></div></div>');
+  return h.join("");
 }
 
 /* ---------- AI narrative (Claude Haiku via the editor's own browser) ---------- */
@@ -2711,7 +3487,7 @@ document.getElementById("editor").addEventListener("change", function (e) {
   var card = e.target.closest(".ecard"); if (!card) return;
   var j = state.jobs[+card.dataset.ji]; if (!j) return;
   var f = e.target.dataset.f; if (!f) return;
-  var row = e.target.closest(".ebrow");
+  var row = e.target.closest("[data-bi]");
   if (f === "priority") {
     j.priority = e.target.checked;
     orderJobs(state.jobs);   /* priority jobs move to the front, renumber */
@@ -2741,14 +3517,18 @@ document.getElementById("editor").addEventListener("change", function (e) {
     j.pct = e.target.value === "" ? null : Math.max(0, Math.min(100, Math.round(+e.target.value || 0)));
   }
   else if (f === "upd-d" || f === "upd-t") {
-    var ur = e.target.closest(".eupdrow"); if (!ur) return;
+    var ur = e.target.closest("[data-ui]"); if (!ur) return;
     var u = (j.updates || [])[+ur.dataset.ui]; if (!u) return;
     if (f === "upd-d") u.d = e.target.value; else u.t = e.target.value;
     persist(); renderReport(); return;   /* keep the editor DOM (and focus) as-is */
   }
   else if (row) {
     var b = j.bids[+row.dataset.bi]; if (!b) return;
-    if (f === "amount") b.amount = e.target.value === "" ? null : Number(e.target.value);
+    if (f === "amount") {
+      var parsed = edParseAmt(e.target.value);
+      if (parsed != null && !isFinite(parsed)) return;      /* ignore unparseable typing */
+      b.amount = parsed;
+    }
     else if (f === "hst") b.hst = e.target.value === "yes";
     else if (f === "validDays") b.validDays = Math.max(1, +e.target.value || 60);
     else b[f] = e.target.value;
@@ -2781,7 +3561,18 @@ document.getElementById("editor").addEventListener("click", function (e) {
     if (moved) moved.scrollIntoView({ block: "nearest" });
     return;
   }
-  var act = e.target.dataset.act; if (!act) return;
+  /* the workspace has actions on wrappers (a card header, a table row), so the
+     action is read from the nearest element that declares one */
+  var actEl = e.target.closest("[data-act]");
+  var act = actEl ? actEl.dataset.act : null;
+  /* clicking anywhere in a job card makes it the one the summary rail describes */
+  var selCard = e.target.closest(".jcard");
+  if (selCard && selCard.dataset.jid !== edSel && act !== "jdelete") {
+    edSel = selCard.dataset.jid;
+    if (!act) { renderEditor(); return; }
+  }
+  if (!act) return;
+  if (edWorkspaceAction(act, actEl, e)) return;
   if (act === "ai-savekey") { aiSaveKey(); return; }
   if (act === "ai-replacekey") { aiShowKeyRow = true; renderEditor(); return; }
   if (act === "ai-generate") { aiGenerate(); return; }
@@ -2798,11 +3589,11 @@ document.getElementById("editor").addEventListener("click", function (e) {
     dirSave(); renderEditor(); return;
   }
   if (act === "dir-del") {
-    dirState.list.splice(+e.target.dataset.di, 1);
+    dirState.list.splice(+actEl.dataset.di, 1);
     dirSave(); renderEditor(); return;
   }
   if (act === "attach") {
-    var ac = e.target.closest(".ecard"), ar = e.target.closest(".ebrow");
+    var ac = e.target.closest(".ecard"), ar = e.target.closest("[data-bi]");
     if (ac && ar) startAttach(+ac.dataset.ji, +ar.dataset.bi);
     return;
   }
@@ -2818,12 +3609,12 @@ document.getElementById("editor").addEventListener("click", function (e) {
     auj.updates = auj.updates || [];
     auj.updates.push({ d: todayISO(), t: "" });
     persist(); renderEditor(); renderReport();
-    var nc = document.querySelector('#editor .ecard[data-jid="' + auj.id + '"] .eupdrow:last-of-type input[data-f="upd-t"]');
+    var nc = document.querySelector('#editor .ecard[data-jid="' + auj.id + '"] [data-ui]:last-of-type input[data-f="upd-t"]');
     if (nc) nc.focus();
     return;
   }
   if (act === "delupd") {
-    var duc = e.target.closest(".ecard"), dur = e.target.closest(".eupdrow");
+    var duc = e.target.closest(".ecard"), dur = e.target.closest("[data-ui]");
     if (!duc || !dur) return;
     var duj = state.jobs[+duc.dataset.ji]; if (!duj || !duj.updates) return;
     duj.updates.splice(+dur.dataset.ui, 1);
@@ -2838,15 +3629,15 @@ document.getElementById("editor").addEventListener("click", function (e) {
     boardSave(); renderEditor(); return;
   }
   if (act === "board-del") {
-    boardState.members.splice(+e.target.dataset.mi, 1);
+    boardState.members.splice(+actEl.dataset.mi, 1);
     boardSave(); renderEditor(); return;
   }
   if (act === "delfile") {
-    var fc = e.target.closest(".ecard"), fr = e.target.closest(".ebrow");
+    var fc = e.target.closest(".ecard"), fr = e.target.closest("[data-bi]");
     if (!fc || !fr) return;
     var fj = state.jobs[+fc.dataset.ji]; if (!fj) return;
     var fb = fj.bids[+fr.dataset.bi]; if (!fb || !fb.files) return;
-    var rm = fb.files.splice(+e.target.dataset.fi, 1)[0];
+    var rm = fb.files.splice(+actEl.dataset.fi, 1)[0];
     if (rm && rm.path && cloud.store) { try { cloud.store.ref(rm.path).delete().catch(function(){}); } catch (er) {} }
     persist(); renderEditor(); renderReport(); return;
   }
@@ -2854,8 +3645,14 @@ document.getElementById("editor").addEventListener("click", function (e) {
   var ji = +card.dataset.ji, j = state.jobs[ji];
   if (act === "addbid") j.bids.push({ contractor: "", qno: "", amount: null, hst: false, notes: "", files: [] });
   else if (act === "delbid") {
-    var row = e.target.closest(".ebrow");
-    j.bids.splice(+row.dataset.bi, 1);
+    var row = e.target.closest("[data-bi]");
+    var dbi = +row.dataset.bi;
+    j.bids.splice(dbi, 1);
+    /* keep a manual "carry this quote" choice pointing at the same quote */
+    if (typeof j.pick === "number") {
+      if (j.pick === dbi) delete j.pick;
+      else if (j.pick > dbi) j.pick--;
+    }
   } else if (act === "deljob") {
     /* two-step delete: first click arms the button, second click within 4s deletes */
     if (e.target.dataset.armed !== "1") {
@@ -2871,6 +3668,183 @@ document.getElementById("editor").addEventListener("click", function (e) {
     orderJobs(state.jobs);
   }
   persist(); renderEditor(); renderReport();
+});
+
+/* ---------- workspace actions (navigation, cards, per-job tools) ----------
+   Returns true when it has handled the click, so the job/bid handlers above
+   leave it alone. */
+function edJobById(id) {
+  var out = null;
+  state.jobs.forEach(function (j, i) { if (j.id === id) out = { j: j, i: i }; });
+  return out;
+}
+function edWorkspaceAction(act, el, e) {
+  switch (act) {
+    case "ednav":
+      edNav = el.dataset.nav || "jobs"; renderEditor(); window.scrollTo(0, 0); return true;
+    case "edmore": {
+      var m = document.getElementById("edMenu");
+      if (m) m.classList.toggle("open");
+      e.stopPropagation(); return true;
+    }
+    case "edproxy": {
+      var t = document.getElementById(el.dataset.target);
+      var mm = document.getElementById("edMenu"); if (mm) mm.classList.remove("open");
+      if (t) t.click();
+      return true;
+    }
+    case "edpreview": setView("report"); return true;
+    case "edsave":
+      /* everything is already saved as it is typed — this is the reassurance
+         button, so it re-saves and stamps the header chip (no re-render, or
+         the timestamp would be wiped by the fresh markup) */
+      persist("Saved " + new Date().toLocaleTimeString());
+      edSaved = true; return true;
+    case "edfilter": edFilter.on = !edFilter.on; renderEditor(); return true;
+    case "edfilterclear": edFilter = { on: true, q: "", st: "", prio: false }; renderEditor(); return true;
+    case "edarch": edArchOpen = !edArchOpen; renderEditor(); return true;
+    case "edexpand": {
+      var any = state.jobs.some(function (j) { return edOpen[j.id]; });
+      edOpen = {};
+      if (!any) state.jobs.forEach(function (j) { edOpen[j.id] = true; });
+      renderEditor(); return true;
+    }
+    case "jtoggle": {
+      if (e.target.closest("input,select,textarea,a")) return true;   /* let the field work */
+      var jc = el.closest(".jcard"); if (!jc) return true;
+      var id = jc.dataset.jid;
+      edOpen[id] = !edOpen[id];
+      edSel = id;
+      renderEditor();
+      var back = document.querySelector('#editor .jcard[data-jid="' + id + '"]');
+      if (back && edOpen[id]) back.scrollIntoView({ block: "nearest" });
+      return true;
+    }
+    case "qmore": {
+      var qc = el.closest(".jcard"), qr = el.closest("[data-bi]");
+      if (!qc || !qr) return true;
+      var qk = qc.dataset.jid + ":" + qr.dataset.bi;
+      edQOpen[qk] = !edQOpen[qk];
+      renderEditor(); return true;
+    }
+    /* --- which quote the report carries --- */
+    case "pick": {
+      var pc = el.closest(".jcard"), pr = el.closest("[data-bi]");
+      if (!pc || !pr) return true;
+      var pj = state.jobs[+pc.dataset.ji]; if (!pj) return true;
+      var bi = +pr.dataset.bi, bd = pj.bids[bi];
+      if (!bd || bidTotal(bd) == null) {
+        alert("That quote has no amount yet — enter the amount before carrying it in the totals.");
+        renderEditor(); return true;
+      }
+      /* picking the quote the rules would have chosen anyway = back to automatic */
+      var auto = jobCalcAutoIndex(pj);
+      if (auto === bi) { delete pj.pick; persist(null, ['Job ' + pj.no + ': carrying the lowest quote again']); }
+      else {
+        pj.pick = bi;
+        persist(null, ['Job ' + pj.no + ' (' + (pj.desc || "job") + '): carrying ' +
+          ((bd.contractor || "").trim() || "a higher quote") + " " + money(bidTotal(bd)) +
+          " instead of the lowest quote"]);
+      }
+      renderEditor(); renderReport(); return true;
+    }
+    case "pickauto": {
+      var ac = el.closest(".jcard"); if (!ac) return true;
+      var aj = state.jobs[+ac.dataset.ji]; if (!aj) return true;
+      delete aj.pick;
+      persist(null, ['Job ' + aj.no + ': carrying the lowest quote again']);
+      renderEditor(); renderReport(); return true;
+    }
+    /* --- summary-rail tools --- */
+    case "jpreview": {
+      var pj2 = edJobById(edSel); if (!pj2) return true;
+      setView("report");
+      setTimeout(function () {
+        var t2 = document.querySelector('#report [data-jid="' + pj2.j.id + '"]');
+        if (t2) { t2.scrollIntoView({ block: "center" }); t2.classList.add("pk-flash");
+          setTimeout(function () { t2.classList.remove("pk-flash"); }, 1600); }
+      }, 80);
+      return true;
+    }
+    case "jdup": {
+      var dj = edJobById(edSel); if (!dj) return true;
+      var copy = deepCopy(dj.j);
+      copy.id = genId();
+      copy.desc = (copy.desc || "job") + " (copy)";
+      copy.created = todayISO();
+      copy.status = "quoted";
+      copy.statusDate = ""; copy.awardedTo = ""; copy.awardDate = "";
+      copy.pct = null; copy.updates = []; delete copy.pick;
+      /* the copy starts without the original's attachments — those files belong
+         to the quote they were uploaded against */
+      copy.bids.forEach(function (b) { b.files = []; });
+      state.jobs.splice(dj.i + 1, 0, copy);
+      orderJobs(state.jobs);
+      edSel = copy.id; edOpen[copy.id] = true;
+      persist(null, ['Duplicated “' + (dj.j.desc || "job") + '” as job ' + copy.no]);
+      renderEditor(); renderReport(); return true;
+    }
+    case "jarchive": {
+      var aj2 = edJobById(edSel); if (!aj2) return true;
+      if (!confirm("Archive “" + (aj2.j.desc || "this job") + "”?\n\nIt comes off the report and out of every total. " +
+        "You can restore it from the Archived list at any time.")) return true;
+      aj2.j.archived = true;
+      orderJobs(state.jobs);
+      edArchOpen = true;
+      persist(null, ['Archived “' + (aj2.j.desc || "job") + '” — removed from the report and its totals']);
+      renderEditor(); renderReport(); return true;
+    }
+    case "jrestore": {
+      var rj = edJobById(edSel); if (!rj) return true;
+      delete rj.j.archived;
+      orderJobs(state.jobs);
+      persist(null, ['Restored “' + (rj.j.desc || "job") + '” to the report as job ' + rj.j.no]);
+      renderEditor(); renderReport(); return true;
+    }
+    case "jdelete": {
+      var xj = edJobById(edSel); if (!xj) return true;
+      if (!confirm("Delete “" + (xj.j.desc || "this job") + "” permanently?\n\n" +
+        "This cannot be undone — archive it instead if you may need it later.")) return true;
+      state.jobs.splice(xj.i, 1);
+      orderJobs(state.jobs);
+      edSel = null;
+      persist(null, ['Deleted “' + (xj.j.desc || "job") + '” permanently']);
+      renderEditor(); renderReport(); return true;
+    }
+  }
+  return false;
+}
+/* the bid index the automatic rule would carry (lowest price, first on a tie) */
+function jobCalcAutoIndex(j) {
+  var tot = j.bids.map(bidTotal), min = null, idx = -1;
+  tot.forEach(function (t, i) { if (t != null && (min == null || t < min)) { min = t; idx = i; } });
+  return idx;
+}
+/* live feedback while dragging the progress slider (the value is written on change) */
+document.getElementById("editor").addEventListener("input", function (e) {
+  if (e.target.dataset.f === "pct" && e.target.dataset.live) {
+    var lbl = e.target.parentNode.querySelector(".pval");
+    if (lbl) lbl.textContent = e.target.value + "%";
+    return;
+  }
+  if (e.target.id === "edFilterQ") { edFilter.q = e.target.value; edRefilter(); }
+});
+document.getElementById("editor").addEventListener("change", function (e) {
+  if (e.target.id === "edFilterSt") { edFilter.st = e.target.value; renderEditor(); }
+  else if (e.target.id === "edFilterPrio") { edFilter.prio = e.target.checked; renderEditor(); }
+});
+/* re-render the list on search without losing the caret */
+function edRefilter() {
+  clearTimeout(edRefilter._t);
+  edRefilter._t = setTimeout(function () {
+    renderEditor();
+    var q = document.getElementById("edFilterQ");
+    if (q) { q.focus(); q.setSelectionRange(q.value.length, q.value.length); }
+  }, 220);
+}
+document.addEventListener("click", function (e) {
+  var m = document.getElementById("edMenu");
+  if (m && !m.contains(e.target)) m.classList.remove("open");
 });
 
 /* ---------- drag-and-drop reordering (edit view) ---------- */
@@ -3199,6 +4173,117 @@ document.getElementById("fileAttach").addEventListener("change", function () {
     })
     .catch(function (e) { alert("Upload failed (" + ((e && e.code) || "error") + ")."); });
 });
+/* ---------- in-page attachment viewer ----------
+   Attachments open right here in the report instead of a new tab, so the
+   board never loses its place in the packet. Firebase Storage serves the
+   files as `inline` with their real content-type and sets no framing
+   restrictions, so a PDF renders in an iframe using the browser's own
+   viewer (scroll, zoom, search, print) with no library to ship. */
+var fvFiles = [], fvIdx = 0, fvCap = "";
+function fvSize(n) {
+  if (!n && n !== 0) return "";
+  return n >= 1048576 ? (n / 1048576).toFixed(1) + " MB" : Math.max(1, Math.round(n / 1024)) + " KB";
+}
+function fvKind(f) {
+  if (f && f.type === "video") return "vid";
+  var s = ((f && f.name) || "") + " " + ((f && f.url) || "");
+  if (/\.pdf(\?|$|%3F)/i.test(s)) return "pdf";
+  if (/\.(png|jpe?g|webp|gif|bmp|svg)(\?|$|%3F)/i.test(s)) return "img";
+  if (/\.(mp4|mov|m4v|webm)(\?|$|%3F)/i.test(s)) return "vid";
+  if (/\.(heic|heif)(\?|$|%3F)/i.test(s)) return "heic";
+  return "other";
+}
+/* file lists that don't live on a bid (progress photos, archived periods)
+   are handed to the viewer through this per-render stash */
+var fvStash = [];
+function fvStashRef(files) { fvStash.push(files || []); return fvStash.length - 1; }
+/* the files attached to one bid, addressed as "<jobId>:<bidIndex>" */
+function fvFilesFor(key) {
+  var p = String(key || "").split(":");
+  var j = (state.jobs || []).filter(function (x) { return x.id === p[0]; })[0];
+  var b = j && j.bids ? j.bids[+p[1]] : null;
+  return (b && Array.isArray(b.files)) ? b.files : [];
+}
+function openFileViewer(files, idx, caption) {
+  if (!files || !files.length) return;
+  fvFiles = files; fvIdx = Math.min(Math.max(+idx || 0, 0), files.length - 1); fvCap = caption || "";
+  var tabs = document.getElementById("fvTabs");
+  if (files.length > 1) {
+    tabs.innerHTML = files.map(function (f, i) {
+      return '<span class="fvtab' + (i === fvIdx ? " on" : "") + '" data-fvt="' + i + '" role="button" tabindex="0">' +
+        esc(f.name || "Attachment " + (i + 1)) + "</span>";
+    }).join("");
+    tabs.style.display = "";
+  } else { tabs.innerHTML = ""; tabs.style.display = "none"; }
+  fvShow();
+  document.getElementById("fileOverlay").classList.add("open");
+}
+function fvShow() {
+  var f = fvFiles[fvIdx] || {};
+  var body = document.getElementById("fvBody");
+  var bits = [];
+  if (fvCap) bits.push(fvCap);
+  if (f.size) bits.push(fvSize(f.size));
+  if (fvFiles.length > 1) bits.push("attachment " + (fvIdx + 1) + " of " + fvFiles.length);
+  document.getElementById("fvName").textContent = f.name || "Attachment";
+  document.getElementById("fvSub").textContent = bits.join(" · ");
+  var dl = document.getElementById("fvDownload"), nt = document.getElementById("fvTab");
+  dl.href = f.url || "#"; dl.setAttribute("download", f.name || "attachment");
+  nt.href = f.url || "#";
+  var kind = fvKind(f);
+  if (kind === "pdf") {
+    body.innerHTML = '<iframe src="' + esc(f.url) + '#view=FitH" title="' + esc(f.name || "Attachment") + '"></iframe>';
+  } else if (kind === "img") {
+    body.innerHTML = '<img src="' + esc(f.url) + '" alt="' + esc(f.name || "Attachment") + '">';
+  } else if (kind === "vid") {
+    body.innerHTML = '<video src="' + esc(f.url) + '" controls playsinline></video>';
+  } else {
+    /* HEIC photos and Office documents have no in-browser renderer */
+    body.innerHTML = '<div class="fvmsg"><span class="fvbig">' + (kind === "heic" ? "🖼" : "📄") + "</span>" +
+      esc(f.name || "This file") + "<br>" +
+      (kind === "heic" ? "iPhone HEIC photos can’t be shown in the browser."
+                       : "This file type can’t be previewed in the browser.") +
+      '<br><a href="' + esc(f.url) + '" download="' + esc(f.name || "attachment") + '">Download it</a> to open on your computer.</div>';
+  }
+  Array.prototype.forEach.call(document.querySelectorAll("#fvTabs .fvtab"), function (t) {
+    t.classList.toggle("on", +t.getAttribute("data-fvt") === fvIdx);
+  });
+}
+function closeFileViewer() {
+  document.getElementById("fileOverlay").classList.remove("open");
+  document.getElementById("fvBody").innerHTML = "";   /* stop the PDF plugin */
+}
+document.getElementById("fvClose").onclick = closeFileViewer;
+document.getElementById("fileOverlay").addEventListener("click", function (e) {
+  if (e.target === this) closeFileViewer();
+  var t = e.target.closest ? e.target.closest("[data-fvt]") : null;
+  if (t) { fvIdx = +t.getAttribute("data-fvt"); fvShow(); }
+});
+document.addEventListener("keydown", function (e) {
+  if (e.key !== "Escape") return;
+  var ov = document.getElementById("fileOverlay");
+  if (ov && ov.classList.contains("open")) closeFileViewer();
+});
+/* any "📎 …" in the report, the Edit tab or an overlay opens the viewer */
+document.addEventListener("click", function (e) {
+  if (!e.target || !e.target.closest) return;
+  var el = e.target.closest("[data-att],[data-attstash]");
+  if (!el) return;
+  if (e.metaKey || e.ctrlKey || e.shiftKey || e.button > 0) return;   /* ⌘-click still opens a tab */
+  e.preventDefault();
+  var cap = el.getAttribute("data-attcap") || "";
+  var stash = el.getAttribute("data-attstash");
+  if (stash != null) { openFileViewer(fvStash[+stash], +(el.getAttribute("data-atti") || 0), cap); return; }
+  var p = String(el.getAttribute("data-att")).split(":");
+  openFileViewer(fvFilesFor(p[0] + ":" + p[1]), p.length > 2 ? +p[2] : 0, cap);
+});
+document.addEventListener("keydown", function (e) {
+  if (e.key !== "Enter" && e.key !== " ") return;
+  var el = e.target && e.target.closest ? e.target.closest("[data-att],[data-attstash]") : null;
+  if (!el) return;
+  e.preventDefault(); el.click();
+});
+
 /* AI intake: read an uploaded PDF/Word quote → Claude → confirmation preview */
 document.getElementById("aiIntakeFile").addEventListener("change", function () {
   var f = this.files[0]; this.value = "";
@@ -3307,7 +4392,9 @@ function openContractorOverlay(name, jobsList) {
         (r.x.total != null ? '<span style="color:var(--muted)">higher bid</span>' : (r.x.pending ? "awaiting quote" : "—"));
       var notes = r.x.b.notes ? '<div style="font-size:11.5px;color:var(--muted)">' + esc(r.x.b.notes) + "</div>" : "";
       var files = (Array.isArray(r.x.b.files) && r.x.b.files.length) ?
-        ' <span style="font-size:11px;color:var(--muted)">📎 ' + r.x.b.files.length + "</span>" : "";
+        ' <span class="attlink" role="button" tabindex="0" style="font-size:11px" data-attstash="' +
+        fvStashRef(r.x.b.files) + '" data-attcap="' + esc(name) + '" title="View the attached quote">📎 ' +
+        r.x.b.files.length + "</span>" : "";
       var per = r.j._period ? '<span style="font-size:11px;color:var(--muted)"> · ' + esc(r.j._period) + "</span>" : "";
       h.push("<tr><td><strong>" + esc(r.j.no) + "</strong> · " + esc(r.j.desc || "job") + per + notes + "</td>" +
         "<td>" + esc(r.x.b.qno || "—") + "</td>" +
@@ -3496,7 +4583,7 @@ var VOTES_COLL = "nnsccBoardVotesBeta";
 var DECLOG_COLL = "nnsccDecisionLogBeta";
 var BOARD_PATH = "nnsccQuoteTrackerBeta/board";
 var boardState = { members: [] };
-var votesCache = { open: 0 };
+var votesCache = { open: 0, openJobs: {} };
 function isBoardMember() {
   return !!(cloud.user && boardState.members.indexOf(String(cloud.user.email || "").toLowerCase()) >= 0);
 }
@@ -3519,6 +4606,10 @@ function subscribeBoard(u) {
   votesUnsub = cloud.db.collection(VOTES_COLL).where("status", "==", "open").onSnapshot(function (qs) {
     var was = votesCache.open;
     votesCache.open = qs.size;
+    /* which jobs have a vote in progress — shown on the job card's board row */
+    votesCache.openJobs = {};
+    qs.forEach(function (dv) { var jid = dv.data().jobId; if (jid) votesCache.openJobs[jid] = true; });
+    if (document.body.dataset.view === "edit") renderEditor();
     updateReportsButton();
     if (was !== qs.size && document.body.dataset.view === "report") renderReport();
   }, function () {});
