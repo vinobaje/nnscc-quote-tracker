@@ -982,7 +982,7 @@ body[data-view="edit"] .wrap { max-width:none; }
 
 .ed-body { padding:20px 22px 60px; min-width:0; }
 .ed-cols { display:grid; grid-template-columns:minmax(0,1fr) 312px; gap:18px; align-items:start; }
-@media screen and (max-width:1180px){ .ed-cols { grid-template-columns:1fr; } }
+@media screen and (max-width:1180px){ .ed-cols { grid-template-columns:minmax(0,1fr); } }
 .ed-listhead { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:12px; }
 .ed-listhead h2 { font-family:-apple-system,"Segoe UI",Roboto,sans-serif; font-size:17px; font-weight:700;
   margin:0; color:var(--ink); }
@@ -1137,6 +1137,55 @@ body[data-view="edit"] .wrap { max-width:none; }
 .ed-sechead h2 { font-family:-apple-system,"Segoe UI",Roboto,sans-serif; font-size:18px; font-weight:700;
   margin:0; color:var(--ink); }
 .ed-sechead p { margin:0; font-size:13px; color:var(--ink2); }
+/* ---- phones: the workspace is one column and every row may wrap ---- */
+@media screen and (max-width:700px){
+  .ed-listhead .spacer { flex-basis:100%; height:0; }      /* let the buttons wrap */
+  .ed-listhead h2 { font-size:16px; }
+  /* job header: [handle][no] … [chevron] / title / chips + progress */
+  .jhead { flex-wrap:wrap; row-gap:9px; padding:11px 12px; gap:9px; }
+  .jhead .draghandle, .jno { order:1; }
+  .jtog { order:1; margin-left:auto; }
+  .jtitle { order:2; flex:1 1 100%; min-width:0; font-size:14.5px; }
+  .jchip { order:3; }
+  .jsum { order:4; flex:1 1 100%; }
+  .jsum .who { max-width:none; }
+  .jbody { padding:4px 12px 13px; }
+  .jctl { gap:11px; padding-bottom:13px; }
+  /* the progress and note fields carry inline flex sizing, so the phone
+     layout has to outrank it */
+  .jctl .f { flex:1 1 100% !important; min-width:0 !important; }
+  .jctl select, .jctl input[type=date] { width:100%; }
+  .updrow { flex-wrap:wrap; row-gap:4px; }
+  .updrow input[type=text] { flex:1 1 100%; order:3; }
+  .ed-body { padding:13px 12px 48px; }
+  .ed-top { padding:11px 12px; gap:11px; }
+  .ed-title h1 { font-size:18px; }
+  .ed-acts { width:100%; }
+  .ed-acts .edbtn { flex:1 1 auto; text-align:center; }
+  .ed-rail { padding:13px 14px; }
+  .esrow { grid-template-columns:1fr; }
+  /* quotes: a 9-column table cannot be read on a phone, so each quote
+     becomes a card with its fields labelled */
+  .qwrap { overflow:visible; border:none; }
+  .qtable, .qtable tbody, .qtable tr, .qtable td { display:block; width:auto; }
+  .qtable thead, .qtable colgroup { display:none; }
+  .qtable tr.qrow { position:relative; border:1px solid var(--line); border-radius:9px;
+    padding:10px 40px 10px 11px; margin-bottom:9px; }
+  .qtable tr.picked td { background:none; }
+  .qtable tr.picked { background:var(--good-soft); border-color:#bfe0cd; }
+  .qtable td { border:none; padding:5px 0 0; }
+  .qtable td::before { content:attr(data-l); display:block; font-size:9.5px; font-weight:700;
+    letter-spacing:.05em; text-transform:uppercase; color:var(--muted); margin-bottom:1px; }
+  .qtable td.c-pick, .qtable td.c-act { position:absolute; right:8px; width:auto; padding:0; }
+  .qtable td.c-pick { top:11px; }
+  .qtable td.c-act { top:34px; }
+  .qtable td.c-pick::before, .qtable td.c-act::before { content:none; }
+  .qtable input, .qtable select { border-color:var(--line); background:var(--card); }
+  .qtable td.c-amt input { text-align:left; }
+  .qxtra td { background:none; }
+  .qtable tr.qxtra { padding:0 11px 10px; margin-top:-9px; border-top:none; border-radius:0 0 9px 9px; }
+  .photoprev { width:100%; height:120px; }
+}
 @media screen and (max-width:900px){
   .ed-shell { grid-template-columns:1fr; margin:0 -20px; }
   .ed-side { position:static; min-height:0; border-right:0; border-bottom:1px solid var(--line);
@@ -3147,15 +3196,15 @@ function edJobCardHTML(j, ji) {
     h.push('<tr class="qrow' + (x.carried ? " picked" : "") + '" data-bi="' + bi + '">' +
       '<td class="c-pick"><input type="radio" name="pick-' + esc(j.id) + '" data-act="pick"' +
       (x.carried ? " checked" : "") + ' title="Carry this quote in the report totals"></td>' +
-      '<td><input type="text" value="' + esc(b.contractor) + '" data-f="contractor" placeholder="Contractor"></td>' +
-      '<td><input type="text" value="' + esc(b.qno == null ? "" : b.qno) + '" data-f="qno" placeholder="—"></td>' +
-      '<td class="c-amt"><input type="text" inputmode="decimal" value="' + (b.amount == null ? "" : esc(edAmt(b.amount))) +
+      '<td data-l="Contractor"><input type="text" value="' + esc(b.contractor) + '" data-f="contractor" placeholder="Contractor"></td>' +
+      '<td data-l="Quote #"><input type="text" value="' + esc(b.qno == null ? "" : b.qno) + '" data-f="qno" placeholder="—"></td>' +
+      '<td class="c-amt" data-l="Amount (CAD)"><input type="text" inputmode="decimal" value="' + (b.amount == null ? "" : esc(edAmt(b.amount))) +
       '" data-f="amount" placeholder="waiting…"></td>' +
-      '<td><select data-f="hst"><option value="no"' + (!b.hst ? " selected" : "") + ">Excluded</option>" +
+      '<td data-l="HST"><select data-f="hst"><option value="no"' + (!b.hst ? " selected" : "") + ">Excluded</option>" +
       '<option value="yes"' + (b.hst ? " selected" : "") + ">Included</option></select></td>" +
-      '<td><input type="text" value="' + esc(b.notes) + '" data-f="notes" placeholder="scope note"></td>' +
-      '<td><div class="qatt">' + (files || '<span class="qnone">—</span>') + "</div></td>" +
-      "<td>" + st + "</td>" +
+      '<td data-l="Notes"><input type="text" value="' + esc(b.notes) + '" data-f="notes" placeholder="scope note"></td>' +
+      '<td data-l="Attachments"><div class="qatt">' + (files || '<span class="qnone">—</span>') + "</div></td>" +
+      '<td data-l="Status">' + st + "</td>" +
       '<td class="c-act"><button class="qmore" type="button" data-act="qmore" title="More for this quote">⋯</button></td></tr>');
     if (xo) {
       h.push('<tr class="qrow qxtra" data-bi="' + bi + '"><td colspan="9"><div class="xin">' +
