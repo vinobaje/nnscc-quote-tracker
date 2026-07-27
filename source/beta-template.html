@@ -1110,6 +1110,12 @@ body[data-view="edit"] .wrap { max-width:none; }
 .ed-rail .qa .edbtn { width:100%; text-align:center; }
 .ed-railempty { font-size:12.5px; color:var(--muted); }
 
+/* building-photo row in Report settings */
+.photorow { display:flex; gap:14px; align-items:flex-start; flex-wrap:wrap; }
+.photoprev { width:132px; height:84px; object-fit:cover; border-radius:9px; border:1px solid var(--line); flex:none; background:var(--paper); }
+.photoacts { display:flex; flex-direction:column; gap:7px; align-items:flex-start; min-width:0; }
+.photoacts .savenote { font-size:12px; color:var(--ink2); }
+
 /* bottom shortcut cards */
 .ed-shorts { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:18px; }
 @media screen and (max-width:760px){ .ed-shorts { grid-template-columns:1fr; } }
@@ -1362,6 +1368,7 @@ body[data-view="edit"] .wrap { max-width:none; }
     </div>
   </div>
   <input type="file" id="fileRestore" accept=".json,application/json" style="display:none">
+  <input type="file" id="filePhoto" accept="image/png,image/jpeg,image/webp" style="display:none">
   <input type="file" id="fileAttach" accept=".pdf,.png,.jpg,.jpeg,.webp,.heic,.doc,.docx,.xls,.xlsx,.eml,.txt" style="display:none">
   <input type="file" id="progMediaFile" accept="image/*,video/*" multiple style="display:none">
   <input type="file" id="aiIntakeFile" accept=".pdf,.docx" style="display:none">
@@ -1523,6 +1530,14 @@ var STORE_KEY = "nnscc-quote-tracker-v1";
 var HST = 0.13;
 var ASSET_LOGO = "__LOGO_SRC__";
 var ASSET_PHOTO = "__PHOTO_SRC__";
+/* The building photo on the report header. The property manager can replace it
+   with their own building's picture; meta.photoUrl then points at the file in
+   this project's Storage bucket and every reader sees it. Falls back to the
+   picture built into the page when nothing has been uploaded. */
+function photoSrc() {
+  var u = state && state.meta && state.meta.photoUrl;
+  return (typeof u === "string" && u) ? u : ASSET_PHOTO;
+}
 
 /* ---------- state ---------- */
 var seed = JSON.parse(document.getElementById("seed").textContent);
@@ -2524,7 +2539,7 @@ function renderPacketReport() {
     ' &nbsp;·&nbsp; ' + esc(M.buildings) + '</div></div>' +
     '<button class="btn-print js-print" type="button">⬇ Print / PDF</button></header>' +
     '<div class="pk-gold"></div></div>' +
-    '<div class="pk-top-photo"><img src="' + ASSET_PHOTO + '" alt=""></div></div>' +
+    '<div class="pk-top-photo"><img src="' + esc(photoSrc()) + '" alt=""></div></div>' +
     '<section id="secSum" class="pk-stats">' + statCards(d) + '</section></div>');
   h.push(tplBanners(ctx.ED));
   /* dense 4-up: spend | donut | high-priority | top savings */
@@ -2656,7 +2671,7 @@ function renderClassicReport() {
       return tE("bid:" + x.j.id + ":0:amount", x.c.cost ? money(x.c.cost) : "", x.c.cost ? "Amount" : "Enter amount");
     return x.c.cost ? money(x.c.cost) : '<span class="pendchip">Pending</span>';
   }
-  h.push('<header class="hero"><img class="hero-img" src="' + ASSET_PHOTO + '" alt="">');
+  h.push('<header class="hero"><img class="hero-img" src="' + esc(photoSrc()) + '" alt="">');
   h.push('<div class="hero-content"><div>');
   h.push('<div class="herokick">' + tE("meta:condoName", M.condoName, "Condominium name") +
          " · " + tE("meta:regNo", M.regNo, "Reg. no.") + " · Board of Directors</div>");
@@ -3206,6 +3221,13 @@ function edOverviewHTML(M) {
   });
   h.push('<div class="esrow"><label>Annual budget (CAD)</label><input type="number" step="100" min="0" value="' +
     (M.budget ? esc(M.budget) : "") + '" data-mf="budget" placeholder="leave empty for no budget line"></div>');
+  h.push('<div class="esrow"><label>Building photo</label><div class="photorow">' +
+    '<img class="photoprev" src="' + esc(photoSrc()) + '" alt="">' +
+    '<div class="photoacts"><button class="edbtn" type="button" data-act="photo-pick">🏢 Upload a photo…</button>' +
+    (M.photoUrl ? '<button class="edbtn danger" type="button" data-act="photo-clear">Use the default again</button>' : "") +
+    '<span class="savenote" id="photoNote">' + (M.photoUrl ? "Your building\u2019s photo is in use." :
+      "The stock photo is in use \u2014 upload a picture of the building to replace it.") +
+    '</span></div></div></div>');
   h.push('<p class="edithint" style="margin:6px 0 0;font-size:12.5px">Section headings are edited in the report itself — ' +
     "open <strong>Preview report</strong> and click any heading to rename it.</p></div></div>");
   h.push(aiCardHTML());
@@ -3583,6 +3605,8 @@ function edWorkspaceAction(act, el, e) {
       return true;
     }
     case "edpreview": setView("report"); return true;
+    case "photo-pick": startPhotoUpload(); return true;
+    case "photo-clear": clearPhoto(); return true;
     case "edsave":
       /* everything is already saved as it is typed — this is the reassurance
          button, so it re-saves and stamps the header chip (no re-render, or
@@ -4037,6 +4061,47 @@ document.getElementById("progSave").onclick = function () {
   }
   next();
 };
+
+/* ---------- the building photo on the report header ---------- */
+/* Uploaded to this project's own Storage bucket and remembered in meta.photoUrl,
+   so every board member sees the same picture. The previous upload is deleted
+   after the new one is saved — one photo per report, no orphans left behind. */
+function startPhotoUpload() {
+  if (!isEditor()) return;
+  if (!cloud.store) { alert("Photo storage is not enabled for this site yet."); return; }
+  document.getElementById("filePhoto").click();
+}
+function photoNote(msg) { var el = document.getElementById("photoNote"); if (el) el.textContent = msg; }
+document.getElementById("filePhoto").addEventListener("change", function () {
+  var f = this.files[0]; this.value = "";
+  if (!f) return;
+  if (!/^image\//.test(f.type)) { alert("Choose an image file (JPG, PNG or WebP)."); return; }
+  if (f.size > 8 * 1024 * 1024) { alert("That image is over 8 MB — please use a smaller one."); return; }
+  var old = state.meta && state.meta.photoPath;
+  var path = "buildingPhoto/" + Date.now() + "-" + f.name.replace(/[^\w.\-() ]+/g, "_");
+  photoNote("Uploading " + f.name + "…");
+  cloud.store.ref(path).put(f)
+    .then(function (snap) { return snap.ref.getDownloadURL(); })
+    .then(function (url) {
+      state.meta = state.meta || Object.assign({}, META_DEFAULTS);
+      state.meta.photoUrl = url;
+      state.meta.photoPath = path;
+      persist(null, ["Building photo updated"]);
+      renderEditor(); renderReport();
+      if (old && old !== path) { try { cloud.store.ref(old).delete().catch(function(){}); } catch (e) {} }
+    })
+    .catch(function (e) {
+      photoNote("Upload failed (" + ((e && e.code) || "error") + ").");
+    });
+});
+function clearPhoto() {
+  if (!isEditor()) return;
+  var old = state.meta && state.meta.photoPath;
+  delete state.meta.photoUrl; delete state.meta.photoPath;
+  persist(null, ["Building photo reset to the default"]);
+  renderEditor(); renderReport();
+  if (old && cloud.store) { try { cloud.store.ref(old).delete().catch(function(){}); } catch (e) {} }
+}
 
 function startAttach(ji, bi) {
   if (!isEditor()) return;

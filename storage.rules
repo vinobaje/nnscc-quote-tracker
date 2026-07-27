@@ -59,6 +59,26 @@ service firebase.storage {
       allow delete: if orgLogoMayWrite();
     }
 
+    // The building photo on the NNSCC 292 report header. The property manager
+    // can replace the built-in picture with their own; public read because the
+    // photo appears on a report board members open with a passcode.
+    match /buildingPhoto/{allPaths=**} {
+      function nnsccPhotoEditor() {
+        return request.auth != null
+          && request.auth.token.get('email_verified', false) == true
+          && request.auth.token.email != null
+          && ( request.auth.token.email.lower() == 'mvinobaje@gmail.com'
+            || request.auth.token.email.lower() == 'nnscc292connect@cpomanagement.ca'
+            || request.auth.token.email.lower() in
+               firestore.get(/databases/(default)/documents/nnsccQuoteTrackerConfig/main).data.get('editors', []) );
+      }
+      allow read: if true;
+      allow create, update: if nnsccPhotoEditor()
+        && request.resource.size < 8 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+      allow delete: if nnsccPhotoEditor();
+    }
+
     match /quoteAttachments/{allPaths=**} {
       // Any authorized report editor (the owner or an email on the Firestore
       // editors list) may attach, replace, or remove quote files. Mirrors the
