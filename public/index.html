@@ -1779,7 +1779,7 @@ function persist(msg, explicitChanges) {
 }
 
 /* ---------- Firestore live sync (active when the Firebase SDK loaded) ---------- */
-var cloud = { on: false, db: null, user: null, docExists: null, denied: false,
+var cloud = { on: false, db: null, user: null, docExists: null, denied: false, blanked: false,
               active: { kind: "current", id: null, name: null }, unsub: null };
 var CURRENT_PATH = "nnsccQuoteTracker/main";      /* the live/current report */
 var REPORTS_COLL = "nnsccQuoteReports";           /* archived past-period reports */
@@ -1840,6 +1840,12 @@ function cloudInit() {
     cloud.user = u || null;
     cloud.denied = false;                       /* fresh sign-in clears any prior denial */
     subscribeBoard(u);                          /* board list + open-vote count (board/editors only) */
+    /* Firestore TERMINATES a listener that hits permission-denied — it does not
+       retry it when credentials arrive. The first read of a page load happens
+       before Firebase has restored a saved session, so without this the report
+       never loads for anyone signed in, and the empty state that follows can be
+       saved over the real report. */
+    subscribeActive();
     document.getElementById("btnSignOut").style.display = u ? "" : "none";
     /* a signed-out viewer can no longer read an archived (editor-only) report */
     if (!u && cloud.active.kind === "archived") { backToCurrent(); return; }
@@ -1869,6 +1875,7 @@ function onReportSnap(snap) {
      cancel any gate that was queued while the sign-in session was restoring. */
   clearTimeout(gateTimer);
   closeViewGate();
+  cloud.blanked = false;          /* real data is in hand again */
   cloud.docExists = snap.exists;
   if (snap.exists) {
     var remote = snap.data();
@@ -1935,6 +1942,12 @@ function openArchived(id, name) {
 }
 function cloudPush(changes) {
   if (!cloud.on || !cloud.user) return;
+  if (cloud.blanked) {
+    /* the local copy was emptied to put the passcode gate up — saving it now
+       would replace the report with nothing */
+    cloudStatusMsg("Not saving — the report hasn’t loaded yet. Reload the page.");
+    return;
+  }
   var path = reportPath();
   cloud.db.doc(path).set({
     reportName: state.reportName || defaultPeriodName(),
@@ -4517,6 +4530,7 @@ function closeViewGate() {
 function showViewGate() {
   var ov = document.getElementById("viewGateOverlay"); if (!ov) return;
   /* blank any locally-cached copy so no stale data shows behind the gate */
+  cloud.blanked = true;   /* ...and refuse to save that blank over the real report */
   try { state = normState({ jobs: [], meta: (state && state.meta) || null }); renderReport(); } catch (e) {}
   ov.classList.add("open");
   var saved = null; try { saved = sessionStorage.getItem("nnsccView"); } catch (e) {}
