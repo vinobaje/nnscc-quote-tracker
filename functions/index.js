@@ -302,6 +302,16 @@ function gateFields(beta) {
     ? { hash: "viewHashBeta", salt: "viewSaltBeta", fails: "viewFailsBeta", until: "viewLockBeta" }
     : { hash: "viewHash", salt: "viewSalt", fails: "viewFails", until: "viewLock" };
 }
+// A second, independent passcode for the same report. The building's own
+// passcode is set by its property manager; this one is set across every
+// building so a manager or director can open any report with one phrase.
+// Stored the same way — salted scrypt hash, never plaintext, never readable
+// by a client — and it shares the primary's rate limiter.
+function masterFields(beta) {
+  return beta
+    ? { hash: "masterHashBeta", salt: "masterSaltBeta" }
+    : { hash: "masterHash", salt: "masterSalt" };
+}
 function scryptHex(passcode, saltHex) {
   return crypto.scryptSync(String(passcode), Buffer.from(saltHex, "hex"), 32).toString("hex");
 }
@@ -328,16 +338,19 @@ exports.nnsccGate = onCall(
       if (email !== OWNER && !editors.includes(email)) {
         throw new HttpsError("permission-denied", "Only the property manager can set the view passcode.");
       }
-      if (data.check === true) return { set: !!cfg[f.hash] };
+      const m = masterFields(beta);
+      if (data.check === true) return { set: !!cfg[f.hash], master: !!cfg[m.hash] };
+      // {master:true} sets the all-buildings passcode instead of this one's
+      const t = data.master === true ? m : f;
       const pass = String(data.passcode || "");
-      if (!pass.length) { // clear the gate
-        await cfgRef.set({ [f.hash]: admin.firestore.FieldValue.delete(),
-          [f.salt]: admin.firestore.FieldValue.delete() }, { merge: true });
+      if (!pass.length) { // clear that passcode
+        await cfgRef.set({ [t.hash]: admin.firestore.FieldValue.delete(),
+          [t.salt]: admin.firestore.FieldValue.delete() }, { merge: true });
         return { set: false };
       }
       if (pass.length < 6) throw new HttpsError("invalid-argument", "Use at least 6 characters — a short phrase is best.");
       const salt = crypto.randomBytes(16).toString("hex");
-      await cfgRef.set({ [f.salt]: salt, [f.hash]: scryptHex(pass, salt), [f.fails]: 0, [f.until]: 0 }, { merge: true });
+      await cfgRef.set({ [t.salt]: salt, [t.hash]: scryptHex(pass, salt), [f.fails]: 0, [f.until]: 0 }, { merge: true });
       return { set: true };
     }
 
@@ -345,12 +358,15 @@ exports.nnsccGate = onCall(
     if (data.view === true) {
       const cfgSnap = await cfgRef.get();
       const cfg = cfgSnap.exists ? cfgSnap.data() : {};
-      if (!cfg[f.hash]) throw new HttpsError("failed-precondition", "Viewing isn’t protected yet — ask the manager to set a passcode.");
+      const mv = masterFields(beta);
+      if (!cfg[f.hash] && !cfg[mv.hash]) throw new HttpsError("failed-precondition", "Viewing isn’t protected yet — ask the manager to set a passcode.");
       const now = Date.now();
       if ((cfg[f.until] || 0) > now) throw new HttpsError("resource-exhausted", "Too many attempts — try again in a minute.");
       const pass = String(data.passcode || "");
-      const ok = pass.length > 0 &&
-        crypto.timingSafeEqual(Buffer.from(scryptHex(pass, cfg[f.salt]), "hex"), Buffer.from(cfg[f.hash], "hex"));
+      // either this building's passcode or the all-buildings one opens the report
+      const matches = (hash, salt) => hash && salt && pass.length > 0 &&
+        crypto.timingSafeEqual(Buffer.from(scryptHex(pass, salt), "hex"), Buffer.from(hash, "hex"));
+      const ok = matches(cfg[f.hash], cfg[f.salt]) || matches(cfg[mv.hash], cfg[mv.salt]);
       if (!ok) {
         const fails = (cfg[f.fails] || 0) + 1;
         const upd = { [f.fails]: fails };
