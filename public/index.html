@@ -1816,6 +1816,10 @@ function subscribeActive() {
   cloud.unsub = cloud.db.doc(reportPath()).onSnapshot(onReportSnap, onReportErr);
 }
 function onReportSnap(snap) {
+  /* We can read the report, so the passcode gate is not needed: close it and
+     cancel any gate that was queued while the sign-in session was restoring. */
+  clearTimeout(gateTimer);
+  closeViewGate();
   cloud.docExists = snap.exists;
   if (snap.exists) {
     var remote = snap.data();
@@ -1849,8 +1853,18 @@ function onReportErr(err) {
     return;
   }
   if (code === "permission-denied" && cloud.active.kind === "current" && !isEditor() && !isBoardMember()) {
-    cloudStatusMsg("● This report is passcode-protected.");
-    showViewGate();
+    /* Firebase restores a signed-in session a moment AFTER the listener
+       attaches, so the first read of a page load is denied even for the
+       property manager. Wait to see whether the retry succeeds — gating
+       immediately left a passcode box on top of a report the reader could
+       already see, with no way to dismiss it. */
+    clearTimeout(gateTimer);
+    gateTimer = setTimeout(function () {
+      if (cloud.docExists !== null) return;          /* a read landed: no gate */
+      if (isEditor() || isBoardMember()) return;     /* signed in after all */
+      cloudStatusMsg("● This report is passcode-protected.");
+      showViewGate();
+    }, 1500);
     return;
   }
   cloudStatusMsg("Cloud unavailable — saving to this browser (" + code + ")");
@@ -4446,6 +4460,11 @@ document.addEventListener("click", function (e) {
 
 /* ---------- shared-passcode view gate (non-editors) ---------- */
 function viewGateMsg(t) { var el = document.getElementById("viewGateMsg"); if (el) el.textContent = t || ""; }
+var gateTimer = null;
+function closeViewGate() {
+  var ov = document.getElementById("viewGateOverlay");
+  if (ov && ov.classList.contains("open")) { ov.classList.remove("open"); viewGateMsg(""); }
+}
 function showViewGate() {
   var ov = document.getElementById("viewGateOverlay"); if (!ov) return;
   /* blank any locally-cached copy so no stale data shows behind the gate */
