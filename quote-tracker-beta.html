@@ -309,6 +309,8 @@ input:focus, select:focus { outline:2px solid var(--accent); outline-offset:-1px
 .jdmedia img { width:54px; height:54px; object-fit:cover; border-radius:6px;
   margin:0 6px 0 0; cursor:zoom-in; vertical-align:middle; }
 .jdmedia .pk-vid { font-size:12.5px; margin-right:8px; }
+.jdnote { margin:8px 0 0; font-size:12.5px; line-height:1.5; color:var(--ink2);
+  background:var(--accent-soft); border-radius:6px; padding:8px 10px; }
 .jdmore { font-size:13px; color:var(--accent-ink); cursor:pointer; }
 .jdcarry { font-weight:700; }
 .jdscroll { overflow-x:auto; }
@@ -2174,7 +2176,8 @@ function openStatBreakdown(kind) {
   if (kind === "total" || kind === "hp" || kind === "std") {
     var set = kind === "hp" ? d.hp : (kind === "std" ? d.nhp : d.jobs);
     title = kind === "hp" ? "High-priority jobs" : (kind === "std" ? "Standard-priority jobs" : "Every job in this report");
-    lede = set.length + " job" + (set.length === 1 ? "" : "s") + ", counted at the quote carried in the totals.";
+    lede = set.length + " job" + (set.length === 1 ? "" : "s") +
+      ", each counted at the quote in the report totals — the lowest, unless another was chosen.";
     rows = set.map(jobRow).sort(function (a, b) { return b.amt - a.amt; });
     total = rows.reduce(function (t, r) { return t + r.amt; }, 0);
   } else if (kind === "approved") {
@@ -2311,7 +2314,10 @@ function jdQuotesHTML(j, c) {
   if (!j.bids.length) return '<p class="histempty">No quotes have been entered for this job yet.</p>';
   var rows = c.bids.map(function (x) {
     var tags = [];
-    if (x.carried) tags.push(x.override ? "carried (board's choice)" : "carried in the totals");
+    /* "counted in the totals" is bookkeeping, not a decision — the board may
+       not have approved the job at all, so never word it like an award */
+    if (x.carried) tags.push(x.override ? "counted in the totals — chosen over the lowest quote"
+      : (c.priced > 1 ? "lowest quote — counted in the totals" : "only quote in — counted in the totals"));
     else if (x.lowest) tags.push("lowest");
     if (x.b.qno) tags.push("quote #" + x.b.qno);
     var files = (x.b.files || []).length
@@ -2324,8 +2330,20 @@ function jdQuotesHTML(j, c) {
       '</td><td class="money' + (x.carried ? " jdcarry" : "") + '">' +
       (x.total == null ? "awaiting quote" : money(x.total)) + "</td></tr>";
   });
+  /* say plainly what being in the totals does and does not mean — a reader
+     should never take a counted quote for a job the board has decided on */
+  var st = j.status || "quoted", note;
+  if (st === "rejected" || st === "deferred")
+    note = "The board has marked this job " + statusLabel(st).toLowerCase() + ".";
+  else if (!APPROVED_SET[st])
+    note = "The totals count every quoted job at its lowest quote so the board can see the whole picture. " +
+      "That is bookkeeping only — this job has not been approved or awarded, and no contractor has been engaged.";
+  else if (!(j.awardedTo || "").trim())
+    note = "Approved by the board. No contractor has been formally awarded the work yet.";
+  else note = "";
   return '<div class="jdscroll"><table class="dashtable"><thead><tr><th>Contractor</th><th>Note</th>' +
-    '<th class="money">Total (incl. HST)</th></tr></thead><tbody>' + rows.join("") + "</tbody></table></div>";
+    '<th class="money">Total (incl. HST)</th></tr></thead><tbody>' + rows.join("") + "</tbody></table></div>" +
+    (note ? '<p class="jdnote">' + esc(note) + "</p>" : "");
 }
 function openJobDossier(id) {
   var j = findJob(id); if (!j) return;
@@ -2339,7 +2357,7 @@ function openJobDossier(id) {
   var f = [];
   f.push(jdFact("Added", jdDate(j.created) || "Not recorded",
     j.created ? jdAgo(j.created) : "in the report from the start"));
-  f.push(jdFact("Carried quote", c.cost ? money(c.cost) : "Pending",
+  f.push(jdFact("In the report totals", c.cost ? money(c.cost) : "Pending",
     carried ? (carried.b.contractor || "").trim() : ""));
   if (c.saving > 0) f.push(jdFact("Saved on this job", money(c.saving), "against the next-lowest quote"));
   if ((j.awardedTo || "").trim())
