@@ -283,7 +283,7 @@ input:focus, select:focus { outline:2px solid var(--accent); outline-offset:-1px
 .histentry li { margin:2px 0; }
 .histempty { color:var(--muted); font-size:13.5px; }
 /* One job's dossier — when it arrived, what it costs, what has happened since */
-.jdbox { width:min(700px, 94vw); box-sizing:border-box; }   /* padding inside the phone, not past it */
+.jdbox { width:min(920px, 96vw); box-sizing:border-box; }   /* padding inside the phone, not past it */
 .jdtop { display:flex; align-items:flex-start; justify-content:space-between; gap:14px; }
 .jdtop h3 { margin:0; }
 .jdfacts { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:8px; margin:2px 0 4px; }
@@ -323,6 +323,12 @@ input:focus, select:focus { outline:2px solid var(--accent); outline-offset:-1px
 tr.jrow:hover > td, tr.jrow:focus > td { background:var(--accent-soft); }
 div.jrow:hover, div.jrow:focus, li.jrow:hover, li.jrow:focus { background:var(--accent-soft); }
 li.jrow, div.jrow { border-radius:5px; }
+/* the comparison card's header is dark: keep it dark, and say what it does */
+.tpl-packet .pk-cmphead.jrow { border-radius:0; }
+.tpl-packet .pk-cmphead.jrow:hover, .tpl-packet .pk-cmphead.jrow:focus { background:#1e3550; }
+.tpl-packet .pk-cmphead.jrow::after { content:"View job ›"; margin-left:auto; font-size:11px;
+  font-weight:600; letter-spacing:.02em; opacity:.6; }
+.tpl-packet .pk-cmphead.jrow:hover::after, .tpl-packet .pk-cmphead.jrow:focus::after { opacity:1; }
 .jrow:focus { outline:2px solid var(--accent); outline-offset:-2px; }
 tr.jrow > td.num::after { content:"›"; margin-left:5px; color:var(--muted); opacity:0; }
 tr.jrow:hover > td.num::after, tr.jrow:focus > td.num::after { opacity:1; }
@@ -1307,7 +1313,7 @@ body[data-view="edit"] .wrap { max-width:none; }
   .attlink, .tpl-packet .pk-att.attlink { color:var(--muted); text-decoration:none; }
   .statlink { cursor:default; box-shadow:none; }
   .jrow { cursor:default; outline:none !important; }
-  tr.jrow > td.num::after { content:none !important; }
+  .jrow::after, tr.jrow > td.num::after { content:none !important; }
   /* the "2 bids" chip stays (it is information) but loses its ▾ affordance */
   .bids.expand::after { content:"" !important; }
   .tile:hover, .statcard:hover, .pk-progcard:hover { transform:none; box-shadow:none; }
@@ -1582,7 +1588,7 @@ body[data-view="edit"] .wrap { max-width:none; }
       <div><h3 id="jdTitle">Job</h3><p id="jdSub" class="histempty" style="margin:3px 0 0"></p></div>
       <button class="btn ghost" id="jdClose" type="button">Close</button>
     </div>
-    <div id="jdBody" class="histlist" style="max-height:min(560px,68vh)"></div>
+    <div id="jdBody" class="histlist" style="max-height:min(680px,74vh)"></div>
   </div>
 </div>
 
@@ -2844,7 +2850,7 @@ function packetSecB(d, ctx) {
           '<td class="pk-c-amt">' + amt + carriedFlag(cb, "pk-lowflag") + "</td></tr>");
       }
     });
-    cards.push('<div class="pk-cmpcard"><div class="pk-cmphead"><span class="pk-cmpno">' + (idx + 1) + "</span> " +
+    cards.push('<div class="pk-cmpcard"><div class="pk-cmphead jrow"' + jdData(x.j) + '><span class="pk-cmpno">' + (idx + 1) + "</span> " +
       esc(x.j.desc) + (x.j.priority ? ' <span class="pk-prio">High priority</span>' : "") + "</div>" +
       '<table class="pk-cmptable"><colgroup><col style="width:27%"><col><col style="width:16%"><col style="width:21%"></colgroup>' +
       '<thead><tr><th>Contractor</th><th>Scope summary</th><th>Quote date</th>' +
