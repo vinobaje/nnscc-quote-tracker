@@ -1110,6 +1110,12 @@ body[data-view="edit"] .wrap { max-width:none; }
 .ed-rail .qa .edbtn { width:100%; text-align:center; }
 .ed-railempty { font-size:12.5px; color:var(--muted); }
 
+/* summary figures are clickable — they open the jobs behind them */
+.statlink { cursor:pointer; }
+.statlink:hover { border-color:var(--accent); box-shadow:0 2px 10px rgba(45,86,127,.13); }
+.statlink:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+.tile.statlink:hover .v, .statcard.statlink:hover .sv-v { text-decoration:underline; text-underline-offset:3px; }
+
 /* Condo Super credit — closes the report on screen and on paper */
 .cscredit { margin:26px 0 6px; padding-top:12px; border-top:1px solid var(--line-soft);
   text-align:center; font-size:12px; color:var(--muted); letter-spacing:.01em; }
@@ -1252,6 +1258,7 @@ body[data-view="edit"] .wrap { max-width:none; }
   .printfoot .csfoot { color:#5a6a7a; }
   /* attachment links read as plain notes on paper */
   .attlink, .tpl-packet .pk-att.attlink { color:var(--muted); text-decoration:none; }
+  .statlink { cursor:default; box-shadow:none; }
   /* the "2 bids" chip stays (it is information) but loses its ▾ affordance */
   .bids.expand::after { content:"" !important; }
   .tile:hover, .statcard:hover, .pk-progcard:hover { transform:none; box-shadow:none; }
@@ -1508,6 +1515,15 @@ body[data-view="edit"] .wrap { max-width:none; }
     <h3 id="contractorTitle">Contractor quotes</h3>
     <div id="contractorBody" class="histlist" style="max-height:min(560px,70vh)"></div>
     <div class="row"><button class="btn ghost" id="contractorClose" type="button">Close</button></div>
+  </div>
+</div>
+
+<div class="overlay" id="statOverlay" role="dialog" aria-modal="true" aria-label="Figure breakdown">
+  <div class="pinbox dashbox">
+    <h3 id="statTitle">Breakdown</h3>
+    <p id="statLede" class="histempty" style="margin:0 0 10px"></p>
+    <div id="statBody" class="histlist" style="max-height:min(520px,66vh)"></div>
+    <div class="row"><button class="btn ghost" id="statClose" type="button">Close</button></div>
   </div>
 </div>
 
@@ -2081,6 +2097,82 @@ function creditHTML() {
     "Condo&nbsp;Super</a> \u00b7 condosuper.app</div>";
 }
 
+/* ---------- what is behind a summary figure ----------
+   Every headline number on the report opens the list of jobs it is made of.
+   A board member's first question about a total is always "which jobs?", and
+   the answer used to mean scrolling the sections and adding up by hand. */
+function openStatBreakdown(kind) {
+  var d = computeAll(), rows = [], title = "", lede = "", total = null, cols = ["Job", "Contractor", "Amount (incl. HST)"];
+  function jobRow(x) {
+    var names = [];
+    x.c.carriedBids.forEach(function (cb) { var n = (cb.b.contractor || "").trim(); if (n && names.indexOf(n) < 0) names.push(n); });
+    return { no: x.j.no, desc: x.j.desc || "job", who: names.join(", ") || "—", amt: x.c.cost, st: x.j.status };
+  }
+  if (kind === "total" || kind === "hp" || kind === "std") {
+    var set = kind === "hp" ? d.hp : (kind === "std" ? d.nhp : d.jobs);
+    title = kind === "hp" ? "High-priority jobs" : (kind === "std" ? "Standard-priority jobs" : "Every job in this report");
+    lede = set.length + " job" + (set.length === 1 ? "" : "s") + ", counted at the quote carried in the totals.";
+    rows = set.map(jobRow).sort(function (a, b) { return b.amt - a.amt; });
+    total = rows.reduce(function (t, r) { return t + r.amt; }, 0);
+  } else if (kind === "approved") {
+    var ap = d.jobs.filter(function (x) { return APPROVED_SET[x.j.status]; });
+    title = "Board-approved spend";
+    lede = "Jobs the board has approved, awarded, scheduled, in progress or completed.";
+    rows = ap.map(jobRow).sort(function (a, b) { return b.amt - a.amt; });
+    total = rows.reduce(function (t, r) { return t + r.amt; }, 0);
+  } else if (kind === "saved") {
+    title = "Saved via competing bids";
+    lede = "The difference between the quote carried in the totals and the next-lowest quote received for the same job.";
+    cols = ["Job", "Carried quote", "Saving"];
+    d.jobs.forEach(function (x) {
+      if (!(x.c.saving > 0)) return;
+      var carried = x.c.carriedBids[0];
+      rows.push({ no: x.j.no, desc: x.j.desc || "job",
+        who: carried ? ((carried.b.contractor || "").trim() || "—") + " · " + money(carried.total) : "—",
+        amt: x.c.saving });
+    });
+    rows.sort(function (a, b) { return b.amt - a.amt; });
+    total = rows.reduce(function (t, r) { return t + r.amt; }, 0);
+  } else if (kind === "pending") {
+    title = "Bids still pending";
+    lede = "Contractors who were invited to quote and have not returned a price yet.";
+    cols = ["Job", "Contractor", "Status"];
+    d.jobs.forEach(function (x) {
+      x.c.bids.forEach(function (b) {
+        if (b.pending) rows.push({ no: x.j.no, desc: x.j.desc || "job", who: (b.b.contractor || "").trim() || "—", amt: null });
+      });
+    });
+  }
+  document.getElementById("statTitle").textContent = title;
+  document.getElementById("statLede").textContent = lede;
+  var h = [];
+  if (!rows.length) h.push('<p class="histempty">Nothing to show here yet.</p>');
+  else {
+    h.push('<table class="dashtable"><thead><tr><th>#</th><th>' + cols[0] + "</th><th>" + cols[1] +
+      '</th><th class="money">' + cols[2] + "</th></tr></thead><tbody>");
+    rows.forEach(function (r) {
+      h.push("<tr><td>" + esc(r.no) + "</td><td>" + esc(r.desc) + "</td><td>" + esc(r.who) +
+        '</td><td class="money">' + (r.amt == null ? "awaiting quote" : money(r.amt)) + "</td></tr>");
+    });
+    if (total != null)
+      h.push('<tr style="font-weight:700"><td></td><td>Total</td><td></td><td class="money">' + money(total) + "</td></tr>");
+    h.push("</tbody></table>");
+  }
+  document.getElementById("statBody").innerHTML = h.join("");
+  document.getElementById("statOverlay").classList.add("open");
+}
+document.getElementById("statClose").onclick = function () { document.getElementById("statOverlay").classList.remove("open"); };
+document.getElementById("statOverlay").addEventListener("click", function (e) { if (e.target === this) this.classList.remove("open"); });
+document.addEventListener("click", function (e) {
+  var el = e.target && e.target.closest ? e.target.closest("[data-stat]") : null;
+  if (el) openStatBreakdown(el.getAttribute("data-stat"));
+});
+document.addEventListener("keydown", function (e) {
+  if (e.key !== "Enter" && e.key !== " ") return;
+  var el = e.target && e.target.closest ? e.target.closest("[data-stat]") : null;
+  if (el) { e.preventDefault(); openStatBreakdown(el.getAttribute("data-stat")); }
+});
+
 /* ---------- report rendering ---------- */
 /* The property manager can choose one of three report designs. The choice is
    stored in meta.template and shared with everyone (board members / viewers).
@@ -2268,15 +2360,16 @@ function donutSVG(slices, top, bot) {
 /* six headline stat cards (markup shared; parent class styles the look) */
 function statCards(d) {
   var cards = [
-    { c: "tt", ic: "💵", v: money(d.total), l: "Total, all jobs", s: "" },
-    { c: "hp", ic: "🚩", v: money(d.hpTotal), l: "High priority", s: d.hp.length + " jobs" },
-    { c: "sd", ic: "📁", v: money(d.total - d.hpTotal), l: "Standard priority", s: d.nhp.length + " jobs" },
-    { c: "sv", ic: "📈", v: money(d.savings), l: "Saved via bids", s: "vs. highest bids" },
-    { c: "pd", ic: "⏳", v: String(d.pendingCount), l: "Bids pending", s: "open for quotes" },
-    { c: "ap", ic: "✅", v: money(d.approvedTotal), l: "Board approved", s: "approved spend" }
+    { k: "total", c: "tt", ic: "💵", v: money(d.total), l: "Total, all jobs", s: "" },
+    { k: "hp", c: "hp", ic: "🚩", v: money(d.hpTotal), l: "High priority", s: d.hp.length + " jobs" },
+    { k: "std", c: "sd", ic: "📁", v: money(d.total - d.hpTotal), l: "Standard priority", s: d.nhp.length + " jobs" },
+    { k: "saved", c: "sv", ic: "📈", v: money(d.savings), l: "Saved via bids", s: "vs. highest bids" },
+    { k: "pending", c: "pd", ic: "⏳", v: String(d.pendingCount), l: "Bids pending", s: "open for quotes" },
+    { k: "approved", c: "ap", ic: "✅", v: money(d.approvedTotal), l: "Board approved", s: "approved spend" }
   ];
   return '<div class="statgrid">' + cards.map(function (k) {
-    return '<div class="statcard ' + k.c + '"><div class="sv-ic">' + k.ic + '</div><div class="sv-body">' +
+    return '<div class="statcard statlink ' + k.c + '" data-stat="' + k.k +
+      '" role="button" tabindex="0" title="See the jobs behind this figure"><div class="sv-ic">' + k.ic + '</div><div class="sv-body">' +
       '<div class="sv-v">' + k.v + '</div><div class="sv-l">' + k.l + '</div>' +
       (k.s ? '<div class="sv-s">' + k.s + '</div>' : '') + '</div></div>';
   }).join("") + '</div>';
@@ -2813,12 +2906,17 @@ function renderClassicReport() {
     ". Where a job received more than one priced quote, the lowest bid " +
     "is used in all totals. All amounts include 13% HST.</p>");
   h.push('<div class="tiles">');
-  h.push('<div class="tile"><div class="v">' + money(d.total) + '</div><div class="l">Total, all jobs</div></div>');
-  h.push('<div class="tile hp"><div class="v">' + money(d.hpTotal) + '</div><div class="l">High priority (' + d.hp.length + ' jobs)</div></div>');
-  h.push('<div class="tile"><div class="v">' + money(d.total - d.hpTotal) + '</div><div class="l">Standard (' + d.nhp.length + ' jobs)</div></div>');
-  h.push('<div class="tile sv"><div class="v">' + money(d.savings) + '</div><div class="l">Saved via competing bids</div></div>');
-  h.push('<div class="tile" style="border-top-color:#137333"><div class="v" style="color:#137333">' + money(d.approvedTotal) + '</div><div class="l">Board approved</div></div>');
-  h.push('<div class="tile pd"><div class="v">' + d.pendingCount + '</div><div class="l">Bids pending</div></div>');
+  function tile(stat, cls, val, label, style, vstyle) {
+    h.push('<div class="tile' + (cls ? " " + cls : "") + ' statlink" data-stat="' + stat +
+      '" role="button" tabindex="0" title="See the jobs behind this figure"' + (style || "") + '><div class="v"' +
+      (vstyle || "") + '>' + val + '</div><div class="l">' + label + '</div></div>');
+  }
+  tile("total", "", money(d.total), "Total, all jobs");
+  tile("hp", "hp", money(d.hpTotal), "High priority (" + d.hp.length + " jobs)");
+  tile("std", "", money(d.total - d.hpTotal), "Standard (" + d.nhp.length + " jobs)");
+  tile("saved", "sv", money(d.savings), "Saved via competing bids");
+  tile("approved", "", money(d.approvedTotal), "Board approved", ' style="border-top-color:#137333"', ' style="color:#137333"');
+  tile("pending", "pd", String(d.pendingCount), "Bids pending");
   h.push("</div>");
   /* pipeline: where every job sits in the lifecycle */
   var pl = [];
