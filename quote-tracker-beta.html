@@ -1807,6 +1807,11 @@ function cloudLine() {
    only these signed-in accounts ever see click-to-edit or the Edit tab.
    If you authorize a new editor in Firestore, add their address here too (lower-case). */
 var EDITOR_EMAILS = ["mvinobaje@gmail.com", "nnscc292connect@cpomanagement.ca"];
+/* The design everyone EXCEPT the property manager sees. The board and anyone
+   opening the report with the passcode get this layout; the manager keeps
+   whichever design they picked, so they can work in one and hand the board
+   another. Set to null to give every reader the manager's choice. */
+var VIEWER_TEMPLATE = "classic";
 function isAuthorizedEmail(e) { return EDITOR_EMAILS.indexOf(String(e || "").toLowerCase()) >= 0; }
 function cloudStatusMsg(t) { document.getElementById("cloudStatus").textContent = t; }
 function cloudInit() {
@@ -2081,10 +2086,17 @@ function creditHTML() {
    stored in meta.template and shared with everyone (board members / viewers).
    Classic = renderClassicReport (original). The two alternates reuse the same
    data (computeAll) and the shared section builders below. */
-function renderReport() {
-  /* Board packet is the default; anything unrecognised (including reports
-     saved under the retired "dashboard" design) falls back to it */
+/* Which design this reader gets. Board packet is the default; anything
+   unrecognised (including reports saved under the retired "dashboard"
+   design) falls back to it. Readers who are not the property manager get
+   VIEWER_TEMPLATE when the build sets one. */
+function activeTemplate() {
   var t = (state.meta && state.meta.template) === "classic" ? "classic" : "packet";
+  if (VIEWER_TEMPLATE && !isEditor()) t = VIEWER_TEMPLATE;
+  return t;
+}
+function renderReport() {
+  var t = activeTemplate();
   var rep = document.getElementById("report");
   if (rep) rep.className = "tpl-" + t;
   setPrintFooter();
@@ -5258,7 +5270,7 @@ function updateReportsButton() {
   if (btn) btn.classList.toggle("viewing-archived", cloud.active.kind === "archived");
   /* ---- slim top bar for the Board Packet: the period picker lives in the sidebar
      (Reports archive) and Print lives in the report header, so drop them here ---- */
-  var packet = ((state.meta && state.meta.template) || "classic") === "packet";
+  var packet = activeTemplate() === "packet";
   setDisp("btnReports", !packet);
   setDisp("btnPrint", !packet);
   var cs = document.getElementById("cloudStatus"); if (cs) cs.style.display = packet ? "none" : "";
