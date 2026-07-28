@@ -282,6 +282,45 @@ input:focus, select:focus { outline:2px solid var(--accent); outline-offset:-1px
 .histentry ul { margin:4px 0 0; padding-left:18px; font-size:13px; color:var(--ink2); }
 .histentry li { margin:2px 0; }
 .histempty { color:var(--muted); font-size:13.5px; }
+/* One job's dossier — when it arrived, what it costs, what has happened since */
+.jdbox { width:min(700px, 94vw); box-sizing:border-box; }   /* padding inside the phone, not past it */
+.jdtop { display:flex; align-items:flex-start; justify-content:space-between; gap:14px; }
+.jdtop h3 { margin:0; }
+.jdfacts { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:8px; margin:2px 0 4px; }
+.jdfact { border:1px solid var(--line); border-radius:7px; padding:7px 10px; min-width:0; }
+.jdfact b { display:block; font:700 11px/1.5 inherit; text-transform:uppercase;
+  letter-spacing:.05em; color:var(--muted); }
+.jdfact span { display:block; font-size:14.5px; font-weight:650; }
+.jdfact small { font-size:12px; color:var(--muted); font-weight:400; }
+.jdh { font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.05em;
+  color:var(--muted); margin:18px 0 8px; }
+.jdtl { list-style:none; margin:0 0 2px; padding:0 0 0 4px; }
+.jdtl li { position:relative; padding:0 0 13px 20px; border-left:2px solid var(--line-soft); }
+.jdtl li:last-child { border-left-color:transparent; padding-bottom:0; }
+.jdtl li::before { content:""; position:absolute; left:-6px; top:3px; width:10px; height:10px;
+  border-radius:50%; background:var(--card); border:2px solid var(--line); box-sizing:border-box; }
+.jdtl li.done::before { background:var(--accent); border-color:var(--accent); }
+.jdtl li.issue::before { background:var(--prio); border-color:var(--prio); }
+.jdwhen { font-size:12px; color:var(--muted); font-variant-numeric:tabular-nums; }
+.jdwhat { font-size:14px; line-height:1.45; }
+.jdwhat b { font-weight:650; }
+.jdwho { font-size:12px; color:var(--muted); }
+.jdmedia { margin-top:5px; }
+.jdmedia img { width:54px; height:54px; object-fit:cover; border-radius:6px;
+  margin:0 6px 0 0; cursor:zoom-in; vertical-align:middle; }
+.jdmedia .pk-vid { font-size:12.5px; margin-right:8px; }
+.jdmore { font-size:13px; color:var(--accent-ink); cursor:pointer; }
+.jdcarry { font-weight:700; }
+.jdscroll { overflow-x:auto; }
+@media screen and (max-width:560px) {
+  .jdbox { padding:16px 14px; }
+  .jdfacts { grid-template-columns:repeat(auto-fit,minmax(118px,1fr)); gap:6px; }
+  .jdfact { padding:6px 8px; }
+  .jdfact span { font-size:13.5px; }
+}
+tr.jlink { cursor:pointer; }
+tr.jlink:hover td, tr.jlink:focus td { background:var(--accent-soft); }
+tr.jlink td:first-child::after { content:" ›"; color:var(--muted); }
 /* Reports library overlay */
 .repbox { width:min(560px, 92vw); }
 .repcur { font-size:14px; color:var(--ink); background:var(--accent-soft); border-radius:6px;
@@ -1527,6 +1566,16 @@ body[data-view="edit"] .wrap { max-width:none; }
   </div>
 </div>
 
+<div class="overlay" id="jobOverlay" role="dialog" aria-modal="true" aria-label="Job history">
+  <div class="pinbox jdbox">
+    <div class="jdtop">
+      <div><h3 id="jdTitle">Job</h3><p id="jdSub" class="histempty" style="margin:3px 0 0"></p></div>
+      <button class="btn ghost" id="jdClose" type="button">Close</button>
+    </div>
+    <div id="jdBody" class="histlist" style="max-height:min(560px,68vh)"></div>
+  </div>
+</div>
+
 <div class="overlay" id="fileOverlay" role="dialog" aria-modal="true" aria-label="Attachment">
   <div class="pinbox filebox">
     <div class="fvhead">
@@ -1738,54 +1787,62 @@ var META_LABELS = { title: "report title", condoName: "condominium name", regNo:
   manager: "management company", buildings: "buildings line",
   headSum: "summary heading", headA: "Section A heading", headB: "Section B heading",
   headC: "Section C heading", headD: "Section D heading", headE: "Section E heading" };
+/* Each change carries the id of the job it happened to, so one job's history
+   can be pulled back out of the log exactly (job numbers move as the report is
+   reordered, and descriptions get edited — neither is a reliable key). */
 function diffStates(oldS, newS) {
   var out = [];
   if (!oldS) return out;
+  function put(id, t) { out.push({ id: id || "", t: t }); }
   var om = oldS.meta || {}, nm = newS.meta || {};
   Object.keys(META_LABELS).forEach(function (k) {
     if ((om[k] || "") !== (nm[k] || ""))
-      out.push("Report settings: " + META_LABELS[k] + " changed to “" + (nm[k] || "") + "”");
+      put("", "Report settings: " + META_LABELS[k] + " changed to “" + (nm[k] || "") + "”");
   });
   var oa = oldS.ai || null, na = newS.ai || null;
-  if (!oa && na) out.push("AI narrative added to the report");
-  else if (oa && !na) out.push("AI narrative removed from the report");
+  if (!oa && na) put("", "AI narrative added to the report");
+  else if (oa && !na) put("", "AI narrative removed from the report");
   else if (oa && na && JSON.stringify(oa) !== JSON.stringify(na))
-    out.push("AI narrative updated");
+    put("", "AI narrative updated");
   var oldBy = {}, newBy = {};
   oldS.jobs.forEach(function (j) { oldBy[j.id] = j; });
   newS.jobs.forEach(function (j) { newBy[j.id] = j; });
   oldS.jobs.forEach(function (j) {
-    if (!(j.id in newBy)) out.push("Deleted job " + j.no + " (" + j.desc + ")");
+    if (!(j.id in newBy)) put(j.id, "Deleted job " + j.no + " (" + j.desc + ")");
   });
   newS.jobs.forEach(function (j) {
     var o = oldBy[j.id];
-    if (!o) { out.push("Added job " + j.no + " (" + (j.desc || "no description") + ")"); return; }
+    if (!o) { put(j.id, "Added job " + j.no + " (" + (j.desc || "no description") + ")"); return; }
     var tag = "Job " + j.no + " (" + (j.desc || o.desc) + "): ";
-    if (o.desc !== j.desc) out.push(tag + "description changed to “" + j.desc + "”");
-    if (!!o.priority !== !!j.priority) out.push(tag + "priority set to " + (j.priority ? "High" : "Standard"));
+    if (o.desc !== j.desc) put(j.id, tag + "description changed to “" + j.desc + "”");
+    if (!!o.priority !== !!j.priority) put(j.id, tag + "priority set to " + (j.priority ? "High" : "Standard"));
     var oldBids = o.bids.slice();
     j.bids.forEach(function (b) {
       var idx = -1;
       for (var i = 0; i < oldBids.length; i++) {
         if (bidLabel(oldBids[i]).toLowerCase() === bidLabel(b).toLowerCase()) { idx = i; break; }
       }
-      if (idx < 0) { out.push(tag + "added bid — " + bidLabel(b) + ", " + amtLabel(b)); return; }
+      if (idx < 0) { put(j.id, tag + "added bid — " + bidLabel(b) + ", " + amtLabel(b)); return; }
       var ob = oldBids.splice(idx, 1)[0];
       if (String(ob.amount) !== String(b.amount) || !!ob.hst !== !!b.hst)
-        out.push(tag + bidLabel(b) + " quote " + amtLabel(b) + " (was " + amtLabel(ob) + ")");
-      if ((ob.notes || "") !== (b.notes || "")) out.push(tag + bidLabel(b) + " notes updated");
-      if (String(ob.qno || "") !== String(b.qno || "")) out.push(tag + bidLabel(b) + " quote # updated");
+        put(j.id, tag + bidLabel(b) + " quote " + amtLabel(b) + " (was " + amtLabel(ob) + ")");
+      if ((ob.notes || "") !== (b.notes || "")) put(j.id, tag + bidLabel(b) + " notes updated");
+      if (String(ob.qno || "") !== String(b.qno || "")) put(j.id, tag + bidLabel(b) + " quote # updated");
     });
-    oldBids.forEach(function (ob) { out.push(tag + "removed bid — " + bidLabel(ob)); });
+    oldBids.forEach(function (ob) { put(j.id, tag + "removed bid — " + bidLabel(ob)); });
   });
   return out;
 }
 
-function persist(msg, explicitChanges) {
+/* explicitChanges may be plain strings (most call sites) or {id,t} objects
+   (diffStates); jobId tags a whole batch of strings with one job. */
+function persist(msg, explicitChanges, jobId) {
   try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) {}
   var changes = explicitChanges || diffStates(lastSaved, state);
+  var texts = changes.map(function (c) { return typeof c === "string" ? c : c.t; });
+  var ids = changes.map(function (c) { return (typeof c === "string" ? jobId : (c.id || jobId)) || ""; });
   lastSaved = deepCopy(state);
-  cloudPush(changes);
+  cloudPush(texts, ids);
   var n = document.getElementById("saveNote");
   n.textContent = msg || ((cloud.user ? "Saved to cloud · " : "Saved in this browser · ") +
                           new Date().toLocaleTimeString());
@@ -1961,7 +2018,7 @@ function openArchived(id, name) {
   setView("report");
   updateReportsButton();
 }
-function cloudPush(changes) {
+function cloudPush(changes, jobIds) {
   if (!cloud.on || !cloud.user) return;
   if (cloud.blanked) {
     /* the local copy was emptied to put the passcode gate up — saving it now
@@ -1979,11 +2036,16 @@ function cloudPush(changes) {
     updatedBy: cloud.user.email
   }, { merge: true }).then(function () {   /* merge keeps archived docs' createdAt/archivedAt intact */
     if (changes && changes.length) {
-      cloud.db.doc(path).collection("audit").add({
+      var entry = {
         at: firebase.firestore.FieldValue.serverTimestamp(),
         by: cloud.user.email,
         changes: changes.slice(0, 40)
-      }).catch(function () {});
+      };
+      /* jobIds[i] belongs to changes[i] — how one job's own history is found */
+      if (jobIds && jobIds.some(function (s) { return !!s; })) entry.jobIds = jobIds.slice(0, 40);
+      cloud.db.doc(path).collection("audit").add(entry)
+        .then(function () { jdAudit.cache = null; })   /* a dossier must not show a stale log */
+        .catch(function () {});
     }
   }).catch(function (e) {
     var code = e && e.code || "";
@@ -2106,7 +2168,8 @@ function openStatBreakdown(kind) {
   function jobRow(x) {
     var names = [];
     x.c.carriedBids.forEach(function (cb) { var n = (cb.b.contractor || "").trim(); if (n && names.indexOf(n) < 0) names.push(n); });
-    return { no: x.j.no, desc: x.j.desc || "job", who: names.join(", ") || "—", amt: x.c.cost, st: x.j.status };
+    return { id: x.j.id, no: x.j.no, desc: x.j.desc || "job", who: names.join(", ") || "—",
+             amt: x.c.cost, st: x.j.status };
   }
   if (kind === "total" || kind === "hp" || kind === "std") {
     var set = kind === "hp" ? d.hp : (kind === "std" ? d.nhp : d.jobs);
@@ -2127,7 +2190,7 @@ function openStatBreakdown(kind) {
     d.jobs.forEach(function (x) {
       if (!(x.c.saving > 0)) return;
       var carried = x.c.carriedBids[0];
-      rows.push({ no: x.j.no, desc: x.j.desc || "job",
+      rows.push({ id: x.j.id, no: x.j.no, desc: x.j.desc || "job",
         who: carried ? ((carried.b.contractor || "").trim() || "—") + " · " + money(carried.total) : "—",
         amt: x.c.saving });
     });
@@ -2139,19 +2202,23 @@ function openStatBreakdown(kind) {
     cols = ["Job", "Contractor", "Status"];
     d.jobs.forEach(function (x) {
       x.c.bids.forEach(function (b) {
-        if (b.pending) rows.push({ no: x.j.no, desc: x.j.desc || "job", who: (b.b.contractor || "").trim() || "—", amt: null });
+        if (b.pending) rows.push({ id: x.j.id, no: x.j.no, desc: x.j.desc || "job",
+          who: (b.b.contractor || "").trim() || "—", amt: null });
       });
     });
   }
   document.getElementById("statTitle").textContent = title;
-  document.getElementById("statLede").textContent = lede;
+  document.getElementById("statLede").textContent = lede + (rows.length ? "  Open a job for its dates, quotes and progress." : "");
   var h = [];
   if (!rows.length) h.push('<p class="histempty">Nothing to show here yet.</p>');
   else {
     h.push('<table class="dashtable"><thead><tr><th>#</th><th>' + cols[0] + "</th><th>" + cols[1] +
       '</th><th class="money">' + cols[2] + "</th></tr></thead><tbody>");
     rows.forEach(function (r) {
-      h.push("<tr><td>" + esc(r.no) + "</td><td>" + esc(r.desc) + "</td><td>" + esc(r.who) +
+      /* every row is a way in to that job's own history */
+      h.push('<tr class="jlink" data-jdoss="' + esc(r.id) + '" role="button" tabindex="0"' +
+        ' title="Open this job — dates, quotes and progress"><td>' + esc(r.no) + "</td><td>" + esc(r.desc) +
+        "</td><td>" + esc(r.who) +
         '</td><td class="money">' + (r.amt == null ? "awaiting quote" : money(r.amt)) + "</td></tr>");
     });
     if (total != null)
@@ -2171,6 +2238,209 @@ document.addEventListener("keydown", function (e) {
   if (e.key !== "Enter" && e.key !== " ") return;
   var el = e.target && e.target.closest ? e.target.closest("[data-stat]") : null;
   if (el) { e.preventDefault(); openStatBreakdown(el.getAttribute("data-stat")); }
+});
+
+/* ---------- one job's story ----------
+   A breakdown answers "which jobs?". The next question a board asks is "since
+   when, and what has happened?" — that is this panel. It merges the dates the
+   job itself carries (added, board decision, award, dated site updates) with
+   the change log, which is where every earlier edit is kept. */
+var jdAudit = { cache: null, path: "" };   /* the log is fetched once per report */
+var jdJobId = null, jdShowAllLog = false;
+
+function jdDate(iso) {
+  var s = String(iso || "").slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return "";
+  var p = s.split("-");
+  return new Date(+p[0], +p[1] - 1, +p[2])
+    .toLocaleDateString("en-CA", { year: "numeric", month: "short", day: "numeric" });
+}
+function jdAgo(iso) {
+  var s = String(iso || "").slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return "";
+  var p = s.split("-");
+  var n = Math.round((Date.now() - new Date(+p[0], +p[1] - 1, +p[2]).getTime()) / 86400000);
+  if (n < 0) return "scheduled";
+  if (n === 0) return "today";
+  if (n === 1) return "yesterday";
+  if (n < 60) return n + " days ago";
+  return Math.max(2, Math.round(n / 30.44)) + " months ago";
+}
+function jdFact(label, val, sub) {
+  return '<div class="jdfact"><b>' + esc(label) + "</b><span>" + esc(val) + "</span>" +
+    (sub ? "<small>" + esc(sub) + "</small>" : "") + "</div>";
+}
+/* photos and clips on a site update open in the same in-page viewer as quotes */
+function jdMediaHTML(u) {
+  if (!u.media || !u.media.length) return "";
+  var ref = fvStashRef(u.media), cap = (u.d || "") + " site update";
+  return '<div class="jdmedia">' + u.media.map(function (m, i) {
+    var d = ' data-attstash="' + ref + '" data-atti="' + i + '" data-attcap="' + esc(cap) + '"';
+    return m.type === "video"
+      ? '<a class="pk-vid" href="' + esc(m.url) + '"' + d + ' title="Play this clip">▶ ' + esc(m.name || "video") + "</a>"
+      : '<a href="' + esc(m.url) + '"' + d + ' title="View this photo"><img src="' + esc(m.url) + '" alt="" loading="lazy"></a>';
+  }).join("") + "</div>";
+}
+function jdTimelineHTML(j, ED) {
+  var ev = [], st = j.status || "quoted";
+  if (j.created) ev.push({ d: j.created, done: true, what: "<b>Added to the report</b>" });
+  if (st !== "quoted" && j.statusDate)
+    ev.push({ d: j.statusDate, done: !!APPROVED_SET[st], stop: (st === "rejected" || st === "deferred"),
+      what: "<b>Marked " + esc(statusLabel(st)) + "</b>" + (j.statusNote ? " — " + esc(j.statusNote) : "") });
+  if ((j.awardedTo || "").trim() && j.awardDate)
+    ev.push({ d: j.awardDate, done: true, what: "<b>Awarded to " + esc(j.awardedTo.trim()) + "</b>" });
+  (j.updates || []).forEach(function (u) {
+    /* viewers see what the board sees: no blank drafts, no internal notes */
+    if (!ED && (u.internal || !((u.t || "").trim() || (u.media && u.media.length)))) return;
+    ev.push({ d: u.d, done: true, issue: !!u.issue,
+      what: (u.issue ? "<b>Issue reported</b> — " : "") + esc((u.t || "").trim() || "Site update") +
+        (ED && u.internal ? ' <span class="jdwho">(internal note)</span>' : ""),
+      media: jdMediaHTML(u) });
+  });
+  ev.sort(function (a, b) { return String(a.d || "").localeCompare(String(b.d || "")); });
+  if (!ev.length)
+    return '<p class="histempty">No dates recorded yet — this job is still at the quoting stage.</p>';
+  return '<ul class="jdtl">' + ev.map(function (e) {
+    return '<li class="' + (e.issue ? "issue" : (e.done && !e.stop ? "done" : "")) + '">' +
+      '<div class="jdwhen">' + esc(jdDate(e.d) || "date not recorded") +
+      (jdDate(e.d) ? " · " + esc(jdAgo(e.d)) : "") + "</div>" +
+      '<div class="jdwhat">' + e.what + "</div>" + (e.media || "") + "</li>";
+  }).join("") + "</ul>";
+}
+function jdQuotesHTML(j, c) {
+  if (!j.bids.length) return '<p class="histempty">No quotes have been entered for this job yet.</p>';
+  var rows = c.bids.map(function (x) {
+    var tags = [];
+    if (x.carried) tags.push(x.override ? "carried (board's choice)" : "carried in the totals");
+    else if (x.lowest) tags.push("lowest");
+    if (x.b.qno) tags.push("quote #" + x.b.qno);
+    var files = (x.b.files || []).length
+      ? ' <span class="attlink" role="button" tabindex="0" data-attstash="' + fvStashRef(x.b.files) +
+        '" data-atti="0" data-attcap="' + esc((x.b.contractor || "quote")) + '">📎 ' +
+        x.b.files.length + " file" + (x.b.files.length === 1 ? "" : "s") + "</span>"
+      : "";
+    return "<tr><td>" + esc((x.b.contractor || "").trim() || "—") + files + "</td><td>" +
+      esc(tags.join(" · ") + (x.b.notes ? (tags.length ? " · " : "") + x.b.notes : "")) +
+      '</td><td class="money' + (x.carried ? " jdcarry" : "") + '">' +
+      (x.total == null ? "awaiting quote" : money(x.total)) + "</td></tr>";
+  });
+  return '<div class="jdscroll"><table class="dashtable"><thead><tr><th>Contractor</th><th>Note</th>' +
+    '<th class="money">Total (incl. HST)</th></tr></thead><tbody>' + rows.join("") + "</tbody></table></div>";
+}
+function openJobDossier(id) {
+  var j = findJob(id); if (!j) return;
+  jdJobId = id; jdShowAllLog = false;
+  var c = jobCalc(j), ED = isEditor(), carried = c.carriedBids[0];
+  document.getElementById("jdTitle").textContent =
+    (j.archived ? "Archived job" : "Job " + j.no) + " · " + (j.desc || "job");
+  document.getElementById("jdSub").textContent =
+    (j.priority ? "High priority · " : "") + statusLabel(j.status || "quoted") + " · " +
+    c.priced + " of " + j.bids.length + " quote" + (j.bids.length === 1 ? "" : "s") + " in";
+  var f = [];
+  f.push(jdFact("Added", jdDate(j.created) || "Not recorded",
+    j.created ? jdAgo(j.created) : "in the report from the start"));
+  f.push(jdFact("Carried quote", c.cost ? money(c.cost) : "Pending",
+    carried ? (carried.b.contractor || "").trim() : ""));
+  if (c.saving > 0) f.push(jdFact("Saved on this job", money(c.saving), "against the next-lowest quote"));
+  if ((j.awardedTo || "").trim())
+    f.push(jdFact("Awarded to", j.awardedTo.trim(), jdDate(j.awardDate) || ""));
+  if (j.status === "inprogress" && j.pct != null) f.push(jdFact("Site work", j.pct + "%", "as last reported"));
+  document.getElementById("jdBody").innerHTML =
+    '<div class="jdfacts">' + f.join("") + "</div>" +
+    '<div class="jdh">What has happened</div>' + jdTimelineHTML(j, ED) +
+    '<div class="jdh">Quotes received</div>' + jdQuotesHTML(j, c) +
+    '<div class="jdh">Every change to this job</div><div id="jdLog"></div>';
+  document.getElementById("jobOverlay").classList.add("open");
+  jdLoadLog(j);
+}
+/* the log is stored per report, not per job — fetch once, filter per job */
+function jdFetchLog() {
+  var path = reportPath();
+  if (jdAudit.cache && jdAudit.path === path) return Promise.resolve(jdAudit.cache);
+  return cloud.db.doc(path).collection("audit").orderBy("at", "desc").limit(300).get()
+    .then(function (qs) {
+      var out = []; qs.forEach(function (d) { out.push(d.data()); });
+      jdAudit.cache = out; jdAudit.path = path;
+      return out;
+    });
+}
+function jdChangeIsJob(e, i, text, j) {
+  var ids = e.jobIds || [];
+  if (ids.length && ids.some(function (s) { return !!s; }))
+    return ids[i] === j.id;                     /* tagged entry — exact */
+  /* entries written before changes carried a job id: fall back to the
+     description, which every job-specific message quotes. A short description
+     is too weak a key to match on, so those are left out rather than guessed. */
+  var d = (j.desc || "").trim().toLowerCase();
+  return d.length >= 6 && String(text).toLowerCase().indexOf(d) >= 0;
+}
+function jdRenderLog(j, entries) {
+  var el = document.getElementById("jdLog"); if (!el) return;
+  var rows = [];
+  entries.forEach(function (e) {
+    (e.changes || []).forEach(function (t, i) {
+      if (jdChangeIsJob(e, i, t, j)) rows.push({ at: e.at, by: e.by, t: t });
+    });
+  });
+  if (!rows.length) {
+    el.innerHTML = '<p class="histempty">No edits recorded against this job yet.</p>';
+    return;
+  }
+  var show = jdShowAllLog ? rows : rows.slice(0, 8);
+  var h = show.map(function (r) {
+    var when = r.at && r.at.toDate ? r.at.toDate().toLocaleString("en-CA") : "";
+    return '<div class="histentry"><div class="histwho">' + esc(r.by || "unknown") +
+      ' <span class="histwhen">· ' + esc(when) + '</span></div><div class="jdwhat">' + esc(r.t) + "</div></div>";
+  });
+  if (rows.length > show.length)
+    h.push('<a class="jdmore" role="button" tabindex="0" data-jdmore="1">Show all ' + rows.length + " changes ↓</a>");
+  el.innerHTML = h.join("");
+}
+function jdLoadLog(j) {
+  var el = document.getElementById("jdLog"); if (!el) return;
+  if (!cloud.on) { el.innerHTML = '<p class="histempty">Changes are recorded on the live site only.</p>'; return; }
+  el.innerHTML = '<p class="histempty">Loading…</p>';
+  jdFetchLog().then(function (entries) {
+    if (jdJobId !== j.id) return;              /* the reader has moved on */
+    jdRenderLog(j, entries);
+  }).catch(function (err) {
+    var code = (err && err.code) || "";
+    el.innerHTML = '<p class="histempty">' + (code === "permission-denied"
+      ? "The edit log is open to the board and the property manager."
+      : "Could not load the changes (" + esc(code || "error") + ").") + "</p>";
+  });
+}
+function closeJobDossier() {
+  document.getElementById("jobOverlay").classList.remove("open");
+  jdJobId = null;
+}
+document.getElementById("jdClose").onclick = closeJobDossier;
+document.getElementById("jobOverlay").addEventListener("click", function (e) {
+  if (e.target === this) closeJobDossier();
+});
+document.addEventListener("click", function (e) {
+  if (!e.target || !e.target.closest) return;
+  if (e.target.closest("[data-jdmore]")) {
+    var jm = findJob(jdJobId);
+    if (jm) { jdShowAllLog = true; jdFetchLog().then(function (es) { jdRenderLog(jm, es); }); }
+    return;
+  }
+  var el = e.target.closest("[data-jdoss]");
+  if (el) openJobDossier(el.getAttribute("data-jdoss"));
+});
+document.addEventListener("keydown", function (e) {
+  if (e.key === "Escape") {
+    var fo = document.getElementById("fileOverlay");
+    if (fo && fo.classList.contains("open")) return;   /* the viewer on top closes first */
+    var jo = document.getElementById("jobOverlay");
+    if (jo.classList.contains("open")) { closeJobDossier(); return; }
+    var so = document.getElementById("statOverlay");
+    if (so.classList.contains("open")) so.classList.remove("open");
+    return;
+  }
+  if (e.key !== "Enter" && e.key !== " ") return;
+  var el = e.target && e.target.closest ? e.target.closest("[data-jdoss],[data-jdmore]") : null;
+  if (el) { e.preventDefault(); el.click(); }
 });
 
 /* ---------- report rendering ---------- */
@@ -3618,7 +3888,7 @@ document.getElementById("editor").addEventListener("change", function (e) {
     j.status = e.target.value;
     if (!j.statusDate && j.status !== "quoted") j.statusDate = todayISO();
     if (j.status === "completed") j.pct = 100;   /* finished work is 100% by definition */
-    persist(null, ['Job ' + j.no + ' (' + (j.desc || "job") + ') marked ' + statusLabel(j.status)]);
+    persist(null, ['Job ' + j.no + ' (' + (j.desc || "job") + ') marked ' + statusLabel(j.status)], j.id);
     renderEditor(); renderReport(); return;
   }
   else if (f === "statusDate") j.statusDate = e.target.value;
@@ -3628,7 +3898,7 @@ document.getElementById("editor").addEventListener("change", function (e) {
     if (j.awardedTo && !j.awardDate) j.awardDate = todayISO();
     persist(null, [j.awardedTo
       ? 'Job ' + j.no + ' (' + (j.desc || "job") + ') awarded to ' + j.awardedTo
-      : 'Job ' + j.no + ' (' + (j.desc || "job") + ') award cleared']);
+      : 'Job ' + j.no + ' (' + (j.desc || "job") + ') award cleared'], j.id);
     renderEditor(); renderReport(); return;
   }
   else if (f === "awardDate") j.awardDate = e.target.value;
@@ -3674,7 +3944,7 @@ document.getElementById("editor").addEventListener("click", function (e) {
     if (!nb || !!nb.priority !== !!mj.priority) return;   /* stay within the same group */
     state.jobs[mi] = nb; state.jobs[mi + dir] = mj;
     orderJobs(state.jobs);
-    persist(null, ['Moved “' + (mj.desc || "job") + '” ' + (dir < 0 ? "up" : "down")]);
+    persist(null, ['Moved “' + (mj.desc || "job") + '” ' + (dir < 0 ? "up" : "down")], mj.id);
     renderEditor(); renderReport();
     var moved = document.querySelector('#editor .ecard[data-jid="' + mj.id + '"]');
     if (moved) moved.scrollIntoView({ block: "nearest" });
@@ -3860,12 +4130,12 @@ function edWorkspaceAction(act, el, e) {
       }
       /* picking the quote the rules would have chosen anyway = back to automatic */
       var auto = jobCalcAutoIndex(pj);
-      if (auto === bi) { delete pj.pick; persist(null, ['Job ' + pj.no + ': carrying the lowest quote again']); }
+      if (auto === bi) { delete pj.pick; persist(null, ['Job ' + pj.no + ': carrying the lowest quote again'], pj.id); }
       else {
         pj.pick = bi;
         persist(null, ['Job ' + pj.no + ' (' + (pj.desc || "job") + '): carrying ' +
           ((bd.contractor || "").trim() || "a higher quote") + " " + money(bidTotal(bd)) +
-          " instead of the lowest quote"]);
+          " instead of the lowest quote"], pj.id);
       }
       renderEditor(); renderReport(); return true;
     }
@@ -3873,7 +4143,7 @@ function edWorkspaceAction(act, el, e) {
       var ac = el.closest(".jcard"); if (!ac) return true;
       var aj = state.jobs[+ac.dataset.ji]; if (!aj) return true;
       delete aj.pick;
-      persist(null, ['Job ' + aj.no + ': carrying the lowest quote again']);
+      persist(null, ['Job ' + aj.no + ': carrying the lowest quote again'], aj.id);
       renderEditor(); renderReport(); return true;
     }
     /* --- summary-rail tools --- */
@@ -3902,7 +4172,7 @@ function edWorkspaceAction(act, el, e) {
       state.jobs.splice(dj.i + 1, 0, copy);
       orderJobs(state.jobs);
       edSel = copy.id; edOpen[copy.id] = true;
-      persist(null, ['Duplicated “' + (dj.j.desc || "job") + '” as job ' + copy.no]);
+      persist(null, ['Duplicated “' + (dj.j.desc || "job") + '” as job ' + copy.no], copy.id);
       renderEditor(); renderReport(); return true;
     }
     case "jarchive": {
@@ -3912,14 +4182,14 @@ function edWorkspaceAction(act, el, e) {
       aj2.j.archived = true;
       orderJobs(state.jobs);
       edArchOpen = true;
-      persist(null, ['Archived “' + (aj2.j.desc || "job") + '” — removed from the report and its totals']);
+      persist(null, ['Archived “' + (aj2.j.desc || "job") + '” — removed from the report and its totals'], aj2.j.id);
       renderEditor(); renderReport(); return true;
     }
     case "jrestore": {
       var rj = edJobById(edSel); if (!rj) return true;
       delete rj.j.archived;
       orderJobs(state.jobs);
-      persist(null, ['Restored “' + (rj.j.desc || "job") + '” to the report as job ' + rj.j.no]);
+      persist(null, ['Restored “' + (rj.j.desc || "job") + '” to the report as job ' + rj.j.no], rj.j.id);
       renderEditor(); renderReport(); return true;
     }
     case "jdelete": {
@@ -3929,7 +4199,7 @@ function edWorkspaceAction(act, el, e) {
       state.jobs.splice(xj.i, 1);
       orderJobs(state.jobs);
       edSel = null;
-      persist(null, ['Deleted “' + (xj.j.desc || "job") + '” permanently']);
+      persist(null, ['Deleted “' + (xj.j.desc || "job") + '” permanently'], xj.j.id);
       renderEditor(); renderReport(); return true;
     }
   }
@@ -4003,7 +4273,7 @@ document.getElementById("editor").addEventListener("drop", function (e) {
   if (from < to) to--;                        /* account for the removed element */
   state.jobs.splice(to, 0, moved);
   orderJobs(state.jobs);                       /* re-sort priority-first + renumber */
-  persist(null, ['Moved “' + (moved.desc || "job") + '” to position ' + moved.no]);
+  persist(null, ['Moved “' + (moved.desc || "job") + '” to position ' + moved.no], moved.id);
   renderEditor(); renderReport();
   var m = document.querySelector('#editor .ecard[data-jid="' + moved.id + '"]');
   if (m) m.scrollIntoView({ block: "nearest" });
@@ -4161,7 +4431,7 @@ function aiIntakeCommit() {
       qdate: gv("ipQdate") || todayISO(), files: [] }] };
   state.jobs.push(nj);
   orderJobs(state.jobs);
-  persist(null, ['AI intake added job “' + nj.desc + '” (confirmed by editor)']);
+  persist(null, ['AI intake added job “' + nj.desc + '” (confirmed by editor)'], nj.id);
   var ta = document.getElementById("aiIntakeText"); if (ta) ta.value = "";
   aiIntakeCancel();
   renderEditor(); renderReport();
@@ -4261,7 +4531,7 @@ document.getElementById("progSave").onclick = function () {
       var np = Math.max(0, Math.min(100, Math.round(+document.getElementById("progPct").value || 0)));
       if (np !== j.pct) { j.pct = np; msgs.push('Job ' + j.no + ' site work set to ' + np + '%'); }
     }
-    persist(null, msgs);
+    persist(null, msgs, j.id);
     document.getElementById("progOverlay").classList.remove("open");
     progTarget = null; progMedia = [];
     renderReport();
@@ -4330,7 +4600,7 @@ document.getElementById("fileAttach").addEventListener("change", function () {
     .then(function (url) {
       if (!Array.isArray(b.files)) b.files = [];
       b.files.push({ name: f.name, url: url, path: path, size: f.size });
-      persist(null, ['Attached “' + f.name + '” to a bid on “' + (j.desc || "job") + '”']);
+      persist(null, ['Attached “' + f.name + '” to a bid on “' + (j.desc || "job") + '”'], j.id);
       renderEditor(); renderReport();
     })
     .catch(function (e) { alert("Upload failed (" + ((e && e.code) || "error") + ")."); });
@@ -5586,7 +5856,7 @@ function pkStageClick(stp) {
   if (stage === "approved") {
     if (!confirm('Mark “' + name + '” as board-approved?')) return;
     j.status = "approved"; if (!j.statusDate) j.statusDate = todayISO();
-    persist(null, ['Job ' + j.no + ' (' + name + ') marked Approved']);
+    persist(null, ['Job ' + j.no + ' (' + name + ') marked Approved'], j.id);
   } else if (stage === "awarded") {
     var win = (j.awardedTo || "").trim();
     if (!win) { var c = jobCalc(j); win = c.carriedBids.length ? (c.carriedBids[0].b.contractor || "").trim() : ""; }
@@ -5594,15 +5864,15 @@ function pkStageClick(stp) {
     if (win) j.awardedTo = win;
     if (!j.awardDate) j.awardDate = todayISO();
     if (!APPROVED_SET[j.status]) { j.status = "approved"; if (!j.statusDate) j.statusDate = todayISO(); }
-    persist(null, ['Job ' + j.no + ' (' + name + ') awarded' + (win ? ' to ' + win : '')]);
+    persist(null, ['Job ' + j.no + ' (' + name + ') awarded' + (win ? ' to ' + win : '')], j.id);
   } else if (stage === "inprogress") {
     if (!confirm('Mark work on “' + name + '” as started (in progress)?')) return;
     j.status = "inprogress"; if (!j.statusDate) j.statusDate = todayISO();
-    persist(null, ['Job ' + j.no + ' (' + name + ') marked In progress']);
+    persist(null, ['Job ' + j.no + ' (' + name + ') marked In progress'], j.id);
   } else if (stage === "completed") {
     if (!confirm('Mark “' + name + '” as completed?')) return;
     j.status = "completed"; j.pct = 100; j.statusDate = todayISO();
-    persist(null, ['Job ' + j.no + ' (' + name + ') marked Completed']);
+    persist(null, ['Job ' + j.no + ' (' + name + ') marked Completed'], j.id);
   } else return;
   renderReport();
   if (document.body.dataset.view === "edit") renderEditor();
@@ -5620,7 +5890,7 @@ document.getElementById("report").addEventListener("change", function (e) {
   if (!e.target.classList.contains("pk-prange") || !isEditor()) return;
   var card = e.target.closest(".pk-progcard"); var j = card && findJob(card.dataset.jid); if (!j) return;
   j.pct = Math.max(0, Math.min(100, Math.round(+e.target.value || 0)));
-  persist(null, ['Job ' + j.no + ' (' + (j.desc || "job") + ') site work set to ' + j.pct + '%']);
+  persist(null, ['Job ' + j.no + ' (' + (j.desc || "job") + ') site work set to ' + j.pct + '%'], j.id);
   renderReport();
 });
 document.getElementById("report").addEventListener("keydown", function (e) {
