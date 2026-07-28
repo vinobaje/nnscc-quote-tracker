@@ -318,9 +318,11 @@ input:focus, select:focus { outline:2px solid var(--accent); outline-offset:-1px
   .jdfact { padding:6px 8px; }
   .jdfact span { font-size:13.5px; }
 }
-/* job rows on the report itself: quiet until pointed at, invisible on paper */
+/* anything that names a job: quiet until pointed at, invisible on paper */
 .jrow { cursor:pointer; }
-tr.jrow:hover > td, tr.jrow:focus > td, div.jrow:hover, div.jrow:focus { background:var(--accent-soft); }
+tr.jrow:hover > td, tr.jrow:focus > td { background:var(--accent-soft); }
+div.jrow:hover, div.jrow:focus, li.jrow:hover, li.jrow:focus { background:var(--accent-soft); }
+li.jrow, div.jrow { border-radius:5px; }
 .jrow:focus { outline:2px solid var(--accent); outline-offset:-2px; }
 tr.jrow > td.num::after { content:"›"; margin-left:5px; color:var(--muted); opacity:0; }
 tr.jrow:hover > td.num::after, tr.jrow:focus > td.num::after { opacity:1; }
@@ -2442,22 +2444,23 @@ document.getElementById("jdClose").onclick = closeJobDossier;
 document.getElementById("jobOverlay").addEventListener("click", function (e) {
   if (e.target === this) closeJobDossier();
 });
-/* a job row on the report: open it, unless the click was meant for something
-   inside the row that already does its own job */
-var JD_INNER = "[data-edit],[data-att],[data-attstash],[data-stage],.bids,.expand," +
+/* Anything that names a job — a report row, a savings row, an open item, a row
+   in a contractor's quote list — opens that job, unless the click was meant for
+   something inside it that already does its own work. */
+var JD_INNER = "[data-edit],[data-att],[data-attstash],[data-stage],[data-cn],.bids,.expand," +
                "a,button,input,select,textarea,label,[contenteditable=true]";
-function jdFromReport(e) {
+function jdFromEvent(e) {
   var t = e.target; if (!t || !t.closest) return null;
   var host = t.closest("[data-jdoss]"); if (!host) return null;
   var inner = t.closest(JD_INNER);
   if (inner && host.contains(inner) && inner !== host) return null;
   return host.getAttribute("data-jdoss");
 }
-document.getElementById("report").addEventListener("click", function (e) {
-  var id = jdFromReport(e);
+document.addEventListener("click", function (e) {
+  var id = jdFromEvent(e);
   if (id) { e.preventDefault(); openJobDossier(id); }
 });
-document.getElementById("report").addEventListener("keydown", function (e) {
+document.addEventListener("keydown", function (e) {
   if (e.key !== "Enter" && e.key !== " ") return;
   if (!e.target || !e.target.hasAttribute || !e.target.hasAttribute("data-jdoss")) return;
   e.preventDefault(); openJobDossier(e.target.getAttribute("data-jdoss"));
@@ -2469,10 +2472,6 @@ document.addEventListener("click", function (e) {
     if (jm) { jdShowAllLog = true; jdFetchLog().then(function (es) { jdRenderLog(jm, es); }); }
     return;
   }
-  /* rows in a figure breakdown — the report's own rows are handled above,
-     where the controls inside a row have to be let through first */
-  var el = e.target.closest("#statBody [data-jdoss]");
-  if (el) openJobDossier(el.getAttribute("data-jdoss"));
 });
 document.addEventListener("keydown", function (e) {
   if (e.key === "Escape") {
@@ -2485,8 +2484,7 @@ document.addEventListener("keydown", function (e) {
     return;
   }
   if (e.key !== "Enter" && e.key !== " ") return;
-  var el = e.target && e.target.closest
-    ? e.target.closest("#statBody [data-jdoss],[data-jdmore]") : null;
+  var el = e.target && e.target.closest ? e.target.closest("[data-jdmore]") : null;
   if (el) { e.preventDefault(); el.click(); }
 });
 
@@ -2616,12 +2614,12 @@ function secEBlocks(d, M, EDITOR) {
     h.push('<p class="seclede ainarr">' + tEdit("ai:openNote", state.ai.openNote, "AI note") + "</p>");
   h.push('<ul class="notes">');
   pend.forEach(function (x) {
-    h.push("<li>Job " + esc(x.j.no) + " (" + esc(x.j.desc) + "): awaiting quotes from " +
+    h.push("<li class=\"jrow\"" + jdData(x.j) + ">Job " + esc(x.j.no) + " (" + esc(x.j.desc) + "): awaiting quotes from " +
            esc(x.c.pendingNames.join(", ")) + ".</li>");
   });
   if (biggest && biggest.c.cost > 0)
-    h.push("<li>Largest single item: Job " + esc(biggest.j.no) + " (" + esc(biggest.j.desc) + ") at " +
-           money(biggest.c.cost) + ".</li>");
+    h.push("<li class=\"jrow\"" + jdData(biggest.j) + ">Largest single item: Job " + esc(biggest.j.no) +
+           " (" + esc(biggest.j.desc) + ") at " + money(biggest.c.cost) + ".</li>");
   if (!pend.length) h.push("<li>No bids outstanding — every invited contractor has quoted.</li>");
   h.push("</ul>");
   var decided = d.jobs.filter(function (x) { return x.j.statusDate || (x.j.status && x.j.status !== "quoted"); })
@@ -2629,7 +2627,7 @@ function secEBlocks(d, M, EDITOR) {
   if (decided.length) {
     h.push('<h3 style="margin-top:16px">Status &amp; board decisions</h3><ul class="notes">');
     decided.slice(0, 15).forEach(function (x) {
-      h.push("<li>Job " + esc(x.j.no) + " (" + esc(x.j.desc) + "): <strong>" + esc(statusLabel(x.j.status)) + "</strong>" +
+      h.push("<li class=\"jrow\"" + jdData(x.j) + ">Job " + esc(x.j.no) + " (" + esc(x.j.desc) + "): <strong>" + esc(statusLabel(x.j.status)) + "</strong>" +
         (x.j.statusDate ? " on " + esc(x.j.statusDate) : "") +
         (x.j.statusNote ? " — " + esc(x.j.statusNote) : "") + "</li>");
     });
@@ -2717,7 +2715,7 @@ function hpCompactRows(d, ctx) {
 function topSavingsList(d, ov) {
   var h = ['<div class="pk-saves">'];
   ov.savers.slice(0, 3).forEach(function (x) {
-    h.push('<div class="pk-saverow"><div class="sr-job"><b>Job ' + esc(x.j.no) + '</b> ' + esc(x.j.desc) +
+    h.push('<div class="pk-saverow jrow"' + jdData(x.j) + '><div class="sr-job"><b>Job ' + esc(x.j.no) + '</b> ' + esc(x.j.desc) +
       '</div><div class="amt">' + money(x.c.saving) + '</div></div>');
   });
   if (!ov.savers.length) h.push('<div class="pk-saverow"><div class="sr-job">No competing-bid savings yet.</div></div>');
@@ -3004,7 +3002,7 @@ function packetProgress(d, ctx) {
         '" data-donen="' + doneN + '" title="Drag to set how far the site work is">' +
         '<span class="pk-prangeval">' + (sg.pct == null ? "—" : sg.pct + "%") + '</span></div>';
     }
-    cards.push('<div class="pk-progcard" data-jid="' + esc(j.id) + '"><div class="pk-proghead">' +
+    cards.push('<div class="pk-progcard" data-jid="' + esc(j.id) + '"><div class="pk-proghead jrow"' + jdData(j) + '>' +
       '<div class="pk-progjob"><span class="pk-cmpno">' + esc(j.no) + '</span> ' +
       tEdit("job:" + j.id + ":desc", j.desc, "Job description") +
       (j.priority ? ' <span class="pk-prio">High priority</span>' : "") + stChip(j) + health + '</div>' +
@@ -3333,12 +3331,12 @@ function renderClassicReport() {
     h.push('<p class="seclede">' + tE("meta:ledeE", M.ledeE, "Add a description (optional)") + "</p>");
   h.push('<ul class="notes">');
   pend.forEach(function (x) {
-    h.push("<li>Job " + esc(x.j.no) + " (" + esc(x.j.desc) + "): awaiting quotes from " +
+    h.push("<li class=\"jrow\"" + jdData(x.j) + ">Job " + esc(x.j.no) + " (" + esc(x.j.desc) + "): awaiting quotes from " +
            esc(x.c.pendingNames.join(", ")) + ".</li>");
   });
   if (biggest && biggest.c.cost > 0)
-    h.push("<li>Largest single item: Job " + esc(biggest.j.no) + " (" + esc(biggest.j.desc) + ") at " +
-           money(biggest.c.cost) + ".</li>");
+    h.push("<li class=\"jrow\"" + jdData(biggest.j) + ">Largest single item: Job " + esc(biggest.j.no) +
+           " (" + esc(biggest.j.desc) + ") at " + money(biggest.c.cost) + ".</li>");
   if (!pend.length) h.push("<li>No bids outstanding — every invited contractor has quoted.</li>");
   h.push("</ul>");
   var decided = d.jobs.filter(function (x) { return x.j.statusDate || (x.j.status && x.j.status !== "quoted"); })
@@ -3346,7 +3344,7 @@ function renderClassicReport() {
   if (decided.length) {
     h.push('<h2 style="margin-top:22px">Status &amp; board decisions</h2><ul class="notes">');
     decided.slice(0, 15).forEach(function (x) {
-      h.push("<li>Job " + esc(x.j.no) + " (" + esc(x.j.desc) + "): <strong>" + esc(statusLabel(x.j.status)) + "</strong>" +
+      h.push("<li class=\"jrow\"" + jdData(x.j) + ">Job " + esc(x.j.no) + " (" + esc(x.j.desc) + "): <strong>" + esc(statusLabel(x.j.status)) + "</strong>" +
         (x.j.statusDate ? " on " + esc(x.j.statusDate) : "") +
         (x.j.statusNote ? " — " + esc(x.j.statusNote) : "") + "</li>");
     });
@@ -4861,7 +4859,6 @@ function openContractorOverlay(name, jobsList) {
   var h = [];
   h.push('<p class="histempty" style="margin:0 0 4px">' + rows.length + " quote" + (rows.length === 1 ? "" : "s") +
     " on record · lowest on " + won + " job" + (won === 1 ? "" : "s") + " · " + money(wonTot) + " counted toward committed spend (incl. HST).</p>");
-  h.push('<p class="histempty" style="margin:0 0 10px;font-size:11.5px;color:var(--muted)">“Lowest” = the lowest quote for that job, used in the report totals. It does <em>not</em> mean the board has voted or that the work has been awarded.</p>');
   if (!rows.length) h.push('<p class="histempty">No quotes found for this contractor.</p>');
   else {
     h.push('<table class="dashtable"><thead><tr><th>Job</th><th>Quote #</th><th class="money">Amount (incl. HST)</th><th>In totals</th></tr></thead><tbody>');
@@ -4875,7 +4872,10 @@ function openContractorOverlay(name, jobsList) {
         fvStashRef(r.x.b.files) + '" data-attcap="' + esc(name) + '" title="View the attached quote">📎 ' +
         r.x.b.files.length + "</span>" : "";
       var per = r.j._period ? '<span style="font-size:11px;color:var(--muted)"> · ' + esc(r.j._period) + "</span>" : "";
-      h.push("<tr><td><strong>" + esc(r.j.no) + "</strong> · " + esc(r.j.desc || "job") + per + notes + "</td>" +
+      /* a job from an archived period is not in the current report, so there is
+         nothing to open for it */
+      var opens = !allPeriods && findJob(r.j.id) ? ' class="jrow"' + jdData(r.j) : "";
+      h.push("<tr" + opens + "><td><strong>" + esc(r.j.no) + "</strong> · " + esc(r.j.desc || "job") + per + notes + "</td>" +
         "<td>" + esc(r.x.b.qno || "—") + "</td>" +
         '<td class="money">' + amt + files + "</td>" +
         "<td>" + tag + "</td></tr>");
