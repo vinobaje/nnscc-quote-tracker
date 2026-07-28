@@ -309,8 +309,6 @@ input:focus, select:focus { outline:2px solid var(--accent); outline-offset:-1px
 .jdmedia img { width:54px; height:54px; object-fit:cover; border-radius:6px;
   margin:0 6px 0 0; cursor:zoom-in; vertical-align:middle; }
 .jdmedia .pk-vid { font-size:12.5px; margin-right:8px; }
-.jdnote { margin:8px 0 0; font-size:12.5px; line-height:1.5; color:var(--ink2);
-  background:var(--accent-soft); border-radius:6px; padding:8px 10px; }
 .jdmore { font-size:13px; color:var(--accent-ink); cursor:pointer; }
 .jdcarry { font-weight:700; }
 .jdscroll { overflow-x:auto; }
@@ -320,6 +318,12 @@ input:focus, select:focus { outline:2px solid var(--accent); outline-offset:-1px
   .jdfact { padding:6px 8px; }
   .jdfact span { font-size:13.5px; }
 }
+/* job rows on the report itself: quiet until pointed at, invisible on paper */
+.jrow { cursor:pointer; }
+tr.jrow:hover > td, tr.jrow:focus > td, div.jrow:hover, div.jrow:focus { background:var(--accent-soft); }
+.jrow:focus { outline:2px solid var(--accent); outline-offset:-2px; }
+tr.jrow > td.num::after { content:"›"; margin-left:5px; color:var(--muted); opacity:0; }
+tr.jrow:hover > td.num::after, tr.jrow:focus > td.num::after { opacity:1; }
 tr.jlink { cursor:pointer; }
 tr.jlink:hover td, tr.jlink:focus td { background:var(--accent-soft); }
 tr.jlink td:first-child::after { content:" ›"; color:var(--muted); }
@@ -1300,6 +1304,8 @@ body[data-view="edit"] .wrap { max-width:none; }
   /* attachment links read as plain notes on paper */
   .attlink, .tpl-packet .pk-att.attlink { color:var(--muted); text-decoration:none; }
   .statlink { cursor:default; box-shadow:none; }
+  .jrow { cursor:default; outline:none !important; }
+  tr.jrow > td.num::after { content:none !important; }
   /* the "2 bids" chip stays (it is information) but loses its ▾ affordance */
   .bids.expand::after { content:"" !important; }
   .tile:hover, .statcard:hover, .pk-progcard:hover { transform:none; box-shadow:none; }
@@ -2269,6 +2275,16 @@ function jdAgo(iso) {
   if (n < 60) return n + " days ago";
   return Math.max(2, Math.round(n / 30.44)) + " months ago";
 }
+/* Every job on the report opens its own history — the same panel the figure
+   breakdowns use. Rows carry the job id; the click handler on #report ignores
+   the controls that already live inside a row (quote chips, attachments and,
+   for the property manager, the editable description). */
+function jdData(j) {
+  return ' data-jdoss="' + esc(j.id) + '" tabindex="0" title="Open this job — dates, quotes and progress"';
+}
+function jrowAttrs(j, cls) {
+  return ' class="jrow' + (cls ? " " + cls : "") + '"' + jdData(j);
+}
 function jdFact(label, val, sub) {
   return '<div class="jdfact"><b>' + esc(label) + "</b><span>" + esc(val) + "</span>" +
     (sub ? "<small>" + esc(sub) + "</small>" : "") + "</div>";
@@ -2330,20 +2346,10 @@ function jdQuotesHTML(j, c) {
       '</td><td class="money' + (x.carried ? " jdcarry" : "") + '">' +
       (x.total == null ? "awaiting quote" : money(x.total)) + "</td></tr>";
   });
-  /* say plainly what being in the totals does and does not mean — a reader
-     should never take a counted quote for a job the board has decided on */
-  var st = j.status || "quoted", note;
-  if (st === "rejected" || st === "deferred")
-    note = "The board has marked this job " + statusLabel(st).toLowerCase() + ".";
-  else if (!APPROVED_SET[st])
-    note = "The totals count every quoted job at its lowest quote so the board can see the whole picture. " +
-      "That is bookkeeping only — this job has not been approved or awarded, and no contractor has been engaged.";
-  else if (!(j.awardedTo || "").trim())
-    note = "Approved by the board. No contractor has been formally awarded the work yet.";
-  else note = "";
+  /* No explaining paragraph here: the quote label says "counted in the totals"
+     and the status sits in the header — the board reads the panel, not a lecture. */
   return '<div class="jdscroll"><table class="dashtable"><thead><tr><th>Contractor</th><th>Note</th>' +
-    '<th class="money">Total (incl. HST)</th></tr></thead><tbody>' + rows.join("") + "</tbody></table></div>" +
-    (note ? '<p class="jdnote">' + esc(note) + "</p>" : "");
+    '<th class="money">Total (incl. HST)</th></tr></thead><tbody>' + rows.join("") + "</tbody></table></div>";
 }
 function openJobDossier(id) {
   var j = findJob(id); if (!j) return;
@@ -2436,6 +2442,26 @@ document.getElementById("jdClose").onclick = closeJobDossier;
 document.getElementById("jobOverlay").addEventListener("click", function (e) {
   if (e.target === this) closeJobDossier();
 });
+/* a job row on the report: open it, unless the click was meant for something
+   inside the row that already does its own job */
+var JD_INNER = "[data-edit],[data-att],[data-attstash],[data-stage],.bids,.expand," +
+               "a,button,input,select,textarea,label,[contenteditable=true]";
+function jdFromReport(e) {
+  var t = e.target; if (!t || !t.closest) return null;
+  var host = t.closest("[data-jdoss]"); if (!host) return null;
+  var inner = t.closest(JD_INNER);
+  if (inner && host.contains(inner) && inner !== host) return null;
+  return host.getAttribute("data-jdoss");
+}
+document.getElementById("report").addEventListener("click", function (e) {
+  var id = jdFromReport(e);
+  if (id) { e.preventDefault(); openJobDossier(id); }
+});
+document.getElementById("report").addEventListener("keydown", function (e) {
+  if (e.key !== "Enter" && e.key !== " ") return;
+  if (!e.target || !e.target.hasAttribute || !e.target.hasAttribute("data-jdoss")) return;
+  e.preventDefault(); openJobDossier(e.target.getAttribute("data-jdoss"));
+});
 document.addEventListener("click", function (e) {
   if (!e.target || !e.target.closest) return;
   if (e.target.closest("[data-jdmore]")) {
@@ -2443,7 +2469,9 @@ document.addEventListener("click", function (e) {
     if (jm) { jdShowAllLog = true; jdFetchLog().then(function (es) { jdRenderLog(jm, es); }); }
     return;
   }
-  var el = e.target.closest("[data-jdoss]");
+  /* rows in a figure breakdown — the report's own rows are handled above,
+     where the controls inside a row have to be let through first */
+  var el = e.target.closest("#statBody [data-jdoss]");
   if (el) openJobDossier(el.getAttribute("data-jdoss"));
 });
 document.addEventListener("keydown", function (e) {
@@ -2457,7 +2485,8 @@ document.addEventListener("keydown", function (e) {
     return;
   }
   if (e.key !== "Enter" && e.key !== " ") return;
-  var el = e.target && e.target.closest ? e.target.closest("[data-jdoss],[data-jdmore]") : null;
+  var el = e.target && e.target.closest
+    ? e.target.closest("#statBody [data-jdoss],[data-jdmore]") : null;
   if (el) { e.preventDefault(); el.click(); }
 });
 
@@ -2555,7 +2584,7 @@ function secCRows(d, ctx) {
     var notes = []; x.c.carriedBids.forEach(function (cb) {
       if (cb.b.notes && notes.indexOf(cb.b.notes) < 0) notes.push(cb.b.notes); });
     nhpTotal += x.c.cost;
-    h.push('<tr><td class="num">' + esc(x.j.no) + "</td><td>" + tEdit("job:" + x.j.id + ":desc", x.j.desc, "Job description") + stChip(x.j) +
+    h.push("<tr" + jrowAttrs(x.j) + '><td class="num">' + esc(x.j.no) + "</td><td>" + tEdit("job:" + x.j.id + ":desc", x.j.desc, "Job description") + stChip(x.j) +
       (notes.length ? '<span class="fn">' + esc(notes.join(" · ")) + "</span>" : "") + "</td><td>" +
       ctx.cCell(x, names) + '</td><td class="money">' + ctx.aCell(x) + "</td></tr>");
     h.push(bidRowHTML(x, 4));
@@ -2568,7 +2597,7 @@ function secBCards(d, ctx) {
   if (!multi.length) return '<p class="seclede">No jobs currently have more than one bid.</p>';
   var h = [];
   multi.forEach(function (x) {
-    h.push('<div class="card"><div class="cardhead"><span class="jobno">Job ' + esc(x.j.no) + "</span> <strong>" +
+    h.push('<div class="card"><div class="cardhead jrow"' + jdData(x.j) + '><span class="jobno">Job ' + esc(x.j.no) + "</span> <strong>" +
       tEdit("job:" + x.j.id + ":desc", x.j.desc, "Job description") + "</strong>" + (x.j.priority ? ' <span class="prio">High priority</span>' : "") + stChip(x.j) + "</div>");
     h.push('<table class="cmp"><thead><tr><th>Contractor</th><th>Scope note</th><th class="money">Total (incl. HST)</th><th></th></tr></thead><tbody>');
     h.push(cmpRows(x));
@@ -2676,7 +2705,7 @@ function hpCompactRows(d, ctx) {
     var amt = (ctx.ED && x.j.bids.length === 1)
       ? tEdit("bid:" + x.j.id + ":0:amount", x.c.cost ? money(x.c.cost) : "", x.c.cost ? "Amount" : "Enter amount")
       : (x.c.cost ? money(x.c.cost) : '<span class="pendchip">Pending</span>');
-    h.push('<tr' + (i >= 5 ? ' class="pk-hp-extra"' : '') + '><td class="num">' + esc(x.j.no) + '</td><td class="pk-hp-job">' +
+    h.push("<tr" + jrowAttrs(x.j, i >= 5 ? "pk-hp-extra" : "") + '><td class="num">' + esc(x.j.no) + '</td><td class="pk-hp-job">' +
       tEdit("job:" + x.j.id + ":desc", x.j.desc, "Job description") +
       '</td><td class="pk-hp-con">' + contractor + '</td><td class="ctr">' + x.j.bids.length + '</td><td class="money">' + amt +
       '</td><td class="pk-hp-stat"><span class="hi-flag">High</span></td></tr>');
@@ -2841,7 +2870,7 @@ function packetSecC(d, ctx) {
       ? ' <span class="bids expand" role="button" tabindex="0" title="Show the competing quotes">' + x.j.bids.length + " bids</span>"
       : "";
     var amt = x.c.cost ? money(x.c.cost) : '<span class="pendchip">Pending</span>';
-    rows.push('<tr><td class="pk-ord"><span class="pk-oline" style="background:' + color + '"></span>' +
+    rows.push("<tr" + jrowAttrs(x.j) + '><td class="pk-ord"><span class="pk-oline" style="background:' + color + '"></span>' +
       '<span class="pk-odot" style="border-color:' + color + ';color:' + color + '">' + (i + 1) + "</span></td>" +
       '<td class="pk-job">' + tEdit("job:" + x.j.id + ":desc", x.j.desc, "Job description") + bidsChip + note + "</td>" +
       '<td class="pk-con"><div class="pk-cflex pk-cflex-mid">' + pkAvatar(primary) + '<span class="pk-cn">' + esc(names.join(", ") || "—") + "</span></div></td>" +
@@ -3235,7 +3264,7 @@ function renderClassicReport() {
       if (names.indexOf(cb.b.contractor) < 0) names.push(cb.b.contractor); });
     var notes = []; x.c.carriedBids.forEach(function (cb) {
       if (cb.b.notes && notes.indexOf(cb.b.notes) < 0) notes.push(cb.b.notes); });
-    h.push("<tr><td class=\"num\">" + esc(x.j.no) + "</td><td>" + tE("job:" + x.j.id + ":desc", x.j.desc, "Job description") + stChip(x.j) +
+    h.push("<tr" + jrowAttrs(x.j) + "><td class=\"num\">" + esc(x.j.no) + "</td><td>" + tE("job:" + x.j.id + ":desc", x.j.desc, "Job description") + stChip(x.j) +
       (notes.length ? '<span class="fn">' + esc(notes.join(" · ")) + "</span>" : "") + "</td><td>" +
       cCell(x, names) + '</td><td class="money">' + aCell(x) + "</td></tr>");
     h.push(bidRowHTML(x, 4));
@@ -3249,7 +3278,7 @@ function renderClassicReport() {
   h.push('<p class="seclede">' + tE("meta:ledeB", M.ledeB, "Section description") + "</p>");
   if (!multi.length) h.push('<p class="seclede">No jobs currently have more than one bid.</p>');
   multi.forEach(function (x) {
-    h.push('<div class="card"><div class="cardhead"><span class="jobno">Job ' + esc(x.j.no) + "</span> <strong>" +
+    h.push('<div class="card"><div class="cardhead jrow"' + jdData(x.j) + '><span class="jobno">Job ' + esc(x.j.no) + "</span> <strong>" +
       tE("job:" + x.j.id + ":desc", x.j.desc, "Job description") + "</strong>" + (x.j.priority ? ' <span class="prio">High priority</span>' : "") + stChip(x.j) + "</div>");
     h.push('<table class="cmp"><thead><tr><th>Contractor</th><th>Scope note</th><th class="money">Total (incl. HST)</th><th></th></tr></thead><tbody>');
     h.push(cmpRows(x));
@@ -3269,7 +3298,7 @@ function renderClassicReport() {
     var notes = []; x.c.carriedBids.forEach(function (cb) {
       if (cb.b.notes && notes.indexOf(cb.b.notes) < 0) notes.push(cb.b.notes); });
     nhpTotal += x.c.cost;
-    h.push('<tr><td class="num">' + esc(x.j.no) + "</td><td>" + tE("job:" + x.j.id + ":desc", x.j.desc, "Job description") + stChip(x.j) +
+    h.push("<tr" + jrowAttrs(x.j) + '><td class="num">' + esc(x.j.no) + "</td><td>" + tE("job:" + x.j.id + ":desc", x.j.desc, "Job description") + stChip(x.j) +
       (notes.length ? '<span class="fn">' + esc(notes.join(" · ")) + "</span>" : "") + "</td><td>" +
       cCell(x, names) + '</td><td class="money">' + aCell(x) + "</td></tr>");
     h.push(bidRowHTML(x, 4));
