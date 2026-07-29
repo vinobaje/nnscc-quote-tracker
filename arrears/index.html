@@ -466,8 +466,21 @@ td input.amt { text-align:right; font-variant-numeric:tabular-nums; }
     <textarea id="paste" class="mono" rows="7" placeholder="402   1,234.56&#10;510, J. Smith, 680.00&#10;Unit 1108 — $2,415.90"></textarea>
     <div class="row" style="margin-top:10px">
       <button class="btn primary" id="btnParse">Read the list</button>
+      <button class="btn ico" id="btnAging"><span class="i"></span>Import the A/R aging report</button>
+      <input type="file" id="agingFile" accept=".xlsx" style="display:none">
       <button class="btn ghost" id="btnAddRow">Add a unit by hand</button>
       <span class="barnote" id="parseNote" style="color:var(--muted)"></span>
+    </div>
+    <div id="agingBox" style="display:none;margin-top:12px">
+      <div class="note info" style="margin:0">
+        <div id="agingSummary"></div>
+        <div class="row" style="margin-top:10px">
+          <div class="seg">
+            <button class="btn on" id="btnUseOverdue">Letter the overdue amount</button>
+            <button class="btn" id="btnUseTotal">Letter the whole balance</button>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -636,6 +649,7 @@ td input.amt { text-align:right; font-variant-numeric:tabular-nums; }
         <select id="tplEdit" style="min-width:300px"></select></label>
       <span class="spacer"></span>
       <span class="barnote" id="tplNote" style="color:var(--muted)"></span>
+      <button class="btn ghost" id="btnTplReset">Load the standard letters</button>
       <button class="btn primary" id="btnTplSave">Save</button>
     </div>
     <label class="fld" style="margin-bottom:8px">Name of this template
@@ -747,7 +761,9 @@ var CORP = {
      account, not necessarily in whichever account signs in — so a draft is tried
      with this From and retried without it if Gmail refuses, rather than failing. */
   sendAs:      "nnscc292connect@cpomanagement.ca",
-  sendAsName:  "Waterview Condominium"
+  sendAsName:  "Waterview Condominium",
+  corpFull:    "Niagara North Standard Condominium Corporation No. 292",
+  regNoShort:  "NNSCC 292"      /* how a cheque is made payable */
 };
 
 var ROSTER_DOC = "nnsccArrearsRoster/main";
@@ -823,58 +839,83 @@ function unitKey(u) { return String(u == null ? "" : u).trim().toUpperCase().rep
    are to be replaced with the Corporation's approved letters. */
 var DEFAULT_TEMPLATES = [
 {
-  id: "first", name: "First notice — common expense arrears",
+  id: "arrears-email", name: "Arrears notification — covering email",
   body:
-"# Notice of Arrears\n\n" +
-"**Re: Unit {{unit}} — common expenses**\nAmount outstanding as at {{date}}: **{{amount}}**\n\n" +
 "Dear {{owner}},\n\n" +
-"Our records show that the common expense contributions for Unit {{unit}} are in arrears in the amount of **{{amount}}** as at {{date}}.\n\n" +
-"Under the Condominium Act, 1998 (Ontario) and the by-laws of {{condo}}, each owner is required to contribute to the common expenses of the Corporation in the amounts and at the times set out in the Corporation's budget. Contributions are due on the first day of each month.\n\n" +
-"We ask that the outstanding amount of {{amount}} be paid on or before {{due_date}}.\n\n" +
-"If your payment has already been sent, please accept our thanks and disregard this notice.\n\n" +
-"If you are not able to pay the full amount at this time, please contact the property manager as soon as you can so that arrangements may be discussed.\n\n" +
+"This letter formally notifies you that the account for your property, Unit {{unit}}, is currently in arrears.\n\n" +
+"Our records indicate that the total overdue amount is **{{amount}}**. This amount represents outstanding fees, payments and/or chargebacks that are past their due date.\n\n" +
+"We understand that oversights can happen, but prompt payment is required to maintain the financial health and compliance of the building.\n\n" +
+"**Required action.** Please remit the full amount of {{amount}} immediately to bring your account into good standing. If payment is not received within five (5) business days of this notice, we may be required to take further action as outlined in the Corporation's governing documents.\n\n" +
+"If you have already made this payment, please disregard this notice and contact us with proof of payment so we can update our records.\n\n" +
+"Acceptable payment methods: one-time Pre-Authorized Payment, cheque, or bank draft. **We do not accept e-transfers or credit cards.**\n\n" +
+"If you have any questions or would like to discuss a payment plan, please contact us by replying to this notice or by calling {{phone}}.\n\n" +
+"Thank you for your immediate attention to this important matter.\n\n" +
 "[[SIGNATURE]]"
 },
 {
-  id: "second", name: "Second notice — arrears still outstanding",
+  id: "outstanding-fee", name: "Outstanding common expense fee",
   body:
-"# Second Notice of Arrears\n\n" +
-"**Re: Unit {{unit}} — common expenses**\nAmount outstanding as at {{date}}: **{{amount}}**\n\n" +
+"Unit # {{unit}}\n\n" +
 "Dear {{owner}},\n\n" +
-"Further to our earlier correspondence, the common expense contributions for Unit {{unit}} remain unpaid. The amount outstanding as at {{date}} is **{{amount}}**.\n\n" +
-"Our records show {{prior_count}} previous written notice(s) to you regarding this account, the first dated {{first_notice}}.\n\n" +
-"We ask that the full amount of {{amount}} be paid on or before {{due_date}}.\n\n" +
-"Please be aware that under the Condominium Act, 1998 (Ontario) the Corporation has a lien against an owner's unit for unpaid common expenses, together with interest owing and the reasonable legal costs and expenses incurred by the Corporation in collecting or attempting to collect the unpaid amount. Those costs may be added to the amount owing.\n\n" +
-"We would much prefer to resolve this without any further step being taken. Please contact the property manager to arrange payment.\n\n" +
+"**RE: {{condo}}**\n{{office_addr}}\n\n" +
+"# Outstanding Common Expense Fee\n\n" +
+"As of today's date, your account shows an outstanding balance of **{{amount}}**, which represents {{description}}.\n\n" +
+"According to the Condominium Act, Section 85 (1), if an owner defaults in the obligation to contribute to the common expenses, the Corporation may register a lien against the owner's unit and its appurtenant common interest for the unpaid amount, together with all interest owing and all reasonable legal costs and reasonable expenses incurred by the Corporation in connection with the collection or attempted collection of the unpaid amount.\n\n" +
+"Acceptable payment methods: one-time Pre-Authorized Payment, cheque, or bank draft. **We do not accept e-transfers or credit cards.**\n\n" +
+"Kindly remit your payment within five (5) business days. Your cheque should be made payable to **{{reg_no_short}}** and delivered to the management office in the amenities building.\n\n" +
+"Please contact the Property Manager at {{contact}} in order to reconcile your account.\n\n" +
 "[[SIGNATURE]]"
 },
 {
-  id: "pad", name: "One-time pre-authorized debit authorization",
+  id: "pap-onetime", name: "One-time PAP payment authorization",
   body:
-"# One-Time Pre-Authorized Debit Authorization\n\n" +
-"**Re: Unit {{unit}} — common expense arrears**\nAmount: **{{amount}}**\n\n" +
-"Dear {{owner}},\n\n" +
-"To settle the outstanding common expense arrears for Unit {{unit}} in the amount of {{amount}}, you may authorize a single withdrawal from your bank account by completing and returning the authorization below.\n\n" +
-"This authorization is for **one withdrawal only**, in the amount shown, on or after the date you provide. It does not set up an ongoing pre-authorized debit plan, and it does not change or replace any monthly pre-authorized debit you may already have with the Corporation.\n\n" +
-"Please complete and sign the form below and return it to the property manager, together with a cheque marked \"VOID\" drawn on the account to be debited.\n\n" +
-"[[PAD_FORM]]\n\n" +
-"[[SIGNATURE]]"
+"# {{corp_full}}\n\n" +
+"# Chargeback Authorization Form\n\n" +
+"**Unit information**\nUnit number: {{unit}}\nOwner's name: {{owner}}\n{{co_line}}Located at: {{office_addr}}\n\n" +
+"**Chargeback details**\nAmount authorized: **{{amount}}**\nDescription: {{description}}\nDate of withdrawal: {{withdrawal_date}}\n\n" +
+"**Authorization**\n\n" +
+"I, the undersigned, hereby authorize {{manager}} on behalf of {{reg_no_short}} to withdraw the above noted amount from my bank account currently on file under the Pre-Authorized Payment (PAP) plan.\n\n" +
+"This authorization applies to a one-time chargeback transaction only and does not alter or affect my ongoing monthly condominium fee withdrawals.\n\n" +
+"I understand that sufficient funds must be available in my account on the specified withdrawal date, and I will be responsible for any fees related to insufficient funds.\n\n" +
+"**Acknowledgment and consent**\n\n" +
+"By signing below, I confirm that I have read, understood, and agree to the terms of this authorization.\n\n" +
+"[[SIGN_LINES]]"
+},
+{
+  id: "chargeback-consent", name: "Chargeback consent acknowledgement",
+  body:
+"# Resident Consent Acknowledgement — Chargeback\n\n" +
+"Dear Resident,\n\n" +
+"By signing below, you acknowledge and consent that if a plumbing, electrical or fire safety issue originates within your area of responsibility, as defined in the Corporation's Standard Unit Definition, Declaration, By-Laws, or other governing documents, you will be responsible for the related repair costs.\n\n" +
+"Should the Corporation's contractor be required to attend to such an issue — for example a leak from a toilet, dishwasher, washing machine or similar fixture, or windows, smoke detectors and the like — you agree to reimburse the Corporation for the associated invoiced amount within five (5) business days of notification and/or receipt of the charge.\n\n" +
+"This acknowledgement is intended to prevent arrears and ensure consistent cost recovery for owner-responsible repairs.\n\n" +
+"Please refer to the Corporation's legal documents and maintenance responsibility legal binder for further clarification.\n\n" +
+"[[CONSENT_LINES]]"
 }];
 
 /* ---------------- merge fields ---------------- */
 var FIELD_LIST = [
-  ["owner",        "Owner of record"],
-  ["unit",         "Unit number"],
-  ["address",      "Mailing address"],
-  ["amount",       "Amount outstanding"],
-  ["date",         "Date on the letter"],
-  ["due_date",     "Pay-by date"],
-  ["prior_count",  "How many letters already sent"],
-  ["first_notice", "Date of the first letter"],
-  ["condo",        "Waterview Condominium"],
-  ["reg_no",       "NNSCC No. 292"],
-  ["manager",      "CPO Management Inc."],
-  ["buildings",    "Buildings line"]
+  ["owner",           "Owner of record"],
+  ["unit",            "Unit number"],
+  ["address",         "Mailing address"],
+  ["amount",          "Amount being demanded"],
+  ["description",     "What the charge is for — typed per unit"],
+  ["date",            "Date on the letter"],
+  ["due_date",        "Pay-by date"],
+  ["withdrawal_date", "Date of the PAP withdrawal"],
+  ["prior_count",     "How many letters already sent"],
+  ["first_notice",    "Date of the first letter"],
+  ["condo",           "Waterview Condominium"],
+  ["corp_full",       "Niagara North Standard Condominium Corporation No. 292"],
+  ["reg_no",          "NNSCC No. 292"],
+  ["reg_no_short",    "NNSCC 292 — how a cheque is made payable"],
+  ["manager",         "CPO Management Inc."],
+  ["buildings",       "Buildings line"],
+  ["office_addr",     "The Corporation's address"],
+  ["phone",           "Office telephone"],
+  ["contact",         "Office email"],
+  ["owner_email",     "The owner's email, where one is on file"],
+  ["co_line",         "\"C/O: …\" line, when the owner has an agent"]
 ];
 
 /* Values are escaped here, once, so the renderer can treat the whole merged
@@ -892,10 +933,36 @@ function fieldsFor(row, opts) {
     prior_count:  esc(String(prior.count)),
     first_notice: esc(prior.first ? fmtLongDate(prior.first) : "—"),
     condo:        esc(CORP.condo),
+    corp_full:    esc(CORP.corpFull),
     reg_no:       esc(CORP.regNo),
+    reg_no_short: esc(CORP.regNoShort),
     manager:      esc(CORP.manager),
-    buildings:    esc(CORP.buildings)
+    buildings:    esc(CORP.buildings),
+    office_addr:  esc(CORP.officeAddr),
+    phone:        esc(CORP.phone),
+    contact:      esc(CORP.contact),
+    description:  esc(row.description || "the outstanding amount noted above"),
+    withdrawal_date: esc(opts.withdrawal ? fmtLongDate(fromISO(opts.withdrawal)) : "____________________"),
+    owner_email:  esc((emailableOwners(row.unit)[0]) || "________________________"),
+    co_line:      coLine(row, true)
   };
+}
+/* Some units are owned through an agent — "C/O: SLS Property Management" — and the
+   PAP form has a line for it. Blank rather than empty-labelled when there is none. */
+function coLine(row, forHtml) {
+  var u = rosterFind(row.unit);
+  if (!u || !u.people) return "";
+  var agent = null;
+  u.people.forEach(function (p) {
+    if (!agent && /agent|management|property/i.test(p.role || "") && !/owner/i.test(p.role || "")) agent = p.name;
+  });
+  if (!agent) {
+    /* an owner name that itself carries a management company, as the export writes it */
+    var m = /,\s*([^,]*(?:Property Management|Management)[^,]*)$/i.exec(String(u.owner || ""));
+    if (m) agent = m[1].replace(/^\s+|\s+$/g, "");
+  }
+  if (!agent) return "";
+  return (forHtml ? "C/O: " + esc(agent) : "C/O: " + agent) + "\n";
 }
 
 /* what the log already knows about this unit */
@@ -926,12 +993,43 @@ function renderBody(tplText, fields) {
     if (b === "---") { out.push("<hr>"); continue; }
     if (b === "[[SIGNATURE]]") { out.push(signatureBlock()); continue; }
     if (b === "[[PAD_FORM]]") { out.push(padFormBlock(fields)); continue; }
+    if (b === "[[SIGN_LINES]]") { out.push(signLines(fields)); continue; }
+    if (b === "[[CONSENT_LINES]]") { out.push(consentLines(fields)); continue; }
     if (b.indexOf("# ") === 0) { out.push("<h2>" + inline(b.slice(2)) + "</h2>"); continue; }
     out.push("<p>" + inline(b).split("\n").join("<br>") + "</p>");
   }
   return out.join("\n");
 }
 function inline(s) { return s.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>"); }
+
+/* Where the owner signs the PAP authorisation. No banking fields: the account is
+   already on file under the monthly PAP plan, so this only authorises one extra
+   withdrawal from it — which is why nothing here asks for an account number. */
+function signLines(f) {
+  function ruled(label, fixed) {
+    return '<div class="pf-l" style="flex:1"><span class="pf-lab">' + label + "</span>" +
+      (fixed ? '<span class="pf-fixed">' + fixed + "</span>" : '<span class="pf-rule"></span>') + "</div>";
+  }
+  return '<div class="padform">' +
+    '<div class="pf-row">' + ruled("Signature of owner") + ruled("Date") + "</div>" +
+    '<div class="pf-row" style="margin-bottom:4px">' + ruled("Printed name") +
+      ruled("Email", f.owner_email && f.owner_email.indexOf("____") < 0 ? f.owner_email : "") + "</div>" +
+    "</div>";
+}
+/* The standing consent form: not about one unit, so it is left blank to be filled
+   in by hand at the door. */
+function consentLines(f) {
+  function ruled(label) {
+    return '<div class="pf-l" style="flex:1"><span class="pf-lab">' + label +
+      '</span><span class="pf-rule"></span></div>';
+  }
+  return '<div class="padform">' +
+    '<div class="pf-row">' + ruled("Owner / resident name") + "</div>" +
+    '<div class="pf-row">' + ruled("Suite #") + ruled("Work type") + "</div>" +
+    '<div class="pf-row" style="margin-bottom:4px">' + ruled("Signature") + ruled("Date") + "</div>" +
+    '<p class="pf-t" style="margin-bottom:0">' + esc(CORP.manager) + " / Agents for and on behalf of " +
+    esc(CORP.regNoShort) + "</p></div>";
+}
 
 function signatureBlock() {
   return '<div class="sig"><p>Yours truly,</p>' +
@@ -1202,7 +1300,13 @@ function fieldsRaw(row, opts) {
     due_date: fmtLongDate(addDays(d, Number(opts.dueDays) || 0)),
     prior_count: String(prior.count),
     first_notice: prior.first ? fmtLongDate(prior.first) : "—",
-    condo: CORP.condo, reg_no: CORP.regNo, manager: CORP.manager, buildings: CORP.buildings
+    condo: CORP.condo, corp_full: CORP.corpFull, reg_no: CORP.regNo,
+    reg_no_short: CORP.regNoShort, manager: CORP.manager, buildings: CORP.buildings,
+    office_addr: CORP.officeAddr, phone: CORP.phone, contact: CORP.contact,
+    description: row.description || "the outstanding amount noted above",
+    withdrawal_date: opts.withdrawal ? fmtLongDate(fromISO(opts.withdrawal)) : "____________________",
+    owner_email: (emailableOwners(row.unit)[0]) || "",
+    co_line: coLine(row, false)
   };
 }
 function letterPlainText(row, tpl, opts) {
@@ -1214,6 +1318,14 @@ function letterPlainText(row, tpl, opts) {
   s = s.replace(/\[\[PAD_FORM\]\]/g,
     "The authorization form is on the second page of the attached letter. " +
     "Please print it, complete it, sign it and return it to the property manager.");
+  s = s.replace(/\[\[SIGN_LINES\]\]/g,
+    "Signature of owner: ______________________   Date: ______________\n" +
+    "Printed name: ____________________________   Email: " + (f.owner_email || "______________"));
+  s = s.replace(/\[\[CONSENT_LINES\]\]/g,
+    "Owner / resident name: ______________________________\n" +
+    "Suite #: ____________   Work type: ____________________\n" +
+    "Signature: __________________   Date: ________________\n\n" +
+    CORP.manager + " / Agents for and on behalf of " + CORP.regNoShort);
   s = s.replace(/\[\[SIGNATURE\]\]/g,
     "Yours truly,\n\n" + CORP.signer + "\n" + CORP.signerTitle + ", " + CORP.manager + "\n" +
     CORP.agentLine + "\n" + CORP.condoFull + "\n" + CORP.officeAddr + "\nPhone: " + CORP.phone);
@@ -2083,8 +2195,13 @@ function renderBatch() {
   if (!A.rows.length) { card.style.display = "none"; optc.style.display = "none"; return; }
   card.style.display = ""; optc.style.display = "";
 
+  /* Chargeback letters name what the charge is for, so the column only appears when
+     the chosen wording actually uses it. */
+  var wantsDesc = /\{\{description\}\}/.test((currentTpl() || {}).body || "");
   var h = ["<tr><th style='width:34px'></th><th style='width:80px'>Unit</th><th>Owner of record</th>" +
-           "<th class='num' style='width:120px'>Amount</th><th style='width:150px'>Already sent</th><th style='width:44px'></th></tr>"];
+           (wantsDesc ? "<th style='width:22%'>What the charge is for</th>" : "") +
+           "<th class='num' style='width:120px'>Amount</th><th style='width:150px'>Already sent</th>" +
+           "<th style='width:70px'></th></tr>"];
   A.rows.forEach(function (r, i) {
     var known = rosterFind(r.unit);
     var prior = priorFor(r.unit);
@@ -2097,6 +2214,8 @@ function renderBatch() {
       '<td><input type="checkbox" data-on="' + i + '"' + (r.on ? " checked" : "") + '></td>' +
       '<td><input type="text" data-b="' + i + '" data-k="unit" value="' + esc(r.unit) + '"></td>' +
       '<td><input type="text" data-b="' + i + '" data-k="owner" value="' + esc(r.owner) + '" placeholder="Owner of record"> ' + flag + "</td>" +
+      (wantsDesc ? '<td><input type="text" data-b="' + i + '" data-k="description" value="' +
+         esc(r.description || "") + '" placeholder="e.g. replacement of smoke detectors"></td>' : "") +
       '<td class="num"><input type="text" class="amt" data-b="' + i + '" data-k="amount" value="' + esc(money(r.amount)) + '"></td>' +
       "<td>" + (prior.count
         ? '<span class="chip">' + prior.count + " letter" + (prior.count === 1 ? "" : "s") + "</span>" +
@@ -2127,9 +2246,12 @@ function batchSummary() {
   var tot = on.reduce(function (s, r) { return s + (Number(r.amount) || 0); }, 0);
   var noName = on.filter(function (r) { return !r.owner; }).length;
   var noAmt = on.filter(function (r) { return !(Number(r.amount) > 0); }).length;
+  var wantsDesc = /\{\{description\}\}/.test((currentTpl() || {}).body || "");
+  var noDesc = wantsDesc ? on.filter(function (r) { return !(r.description || "").replace(/\s/g, ""); }).length : 0;
   var bits = [];
   if (noName) bits.push(noName + " missing an owner name");
   if (noAmt) bits.push(noAmt + " still to price");
+  if (noDesc) bits.push(noDesc + " missing what the charge is for");
   $("batchSum").innerHTML = "<b>" + on.length + "</b> letter" + (on.length === 1 ? "" : "s") +
     " · total outstanding <b>" + esc(money(tot)) + "</b>" +
     (bits.length ? ' · <span style="color:var(--prio);font-weight:700">' + esc(bits.join(" · ")) + "</span>" : "");
@@ -2137,7 +2259,7 @@ function batchSummary() {
   /* Emailing is the point of the tool, so it leads — but not every owner can be
      reached that way, and the buttons should say which is which before she clicks
      rather than after. */
-  var ready = on.length && !noName && !noAmt;
+  var ready = on.length && !noName && !noAmt && !noDesc;
   var mailable = on.filter(function (r) { return emailableOwners(r.unit).length; }).length;
   var postOnly = on.length - mailable;
 
@@ -2390,10 +2512,183 @@ $("btnParse").onclick = function () {
   renderBatch();
   $("batchCard").scrollIntoView({ behavior:"smooth", block:"start" });
 };
+$("btnAging").onclick = function () { $("agingFile").click(); };
+$("agingFile").onchange = function () {
+  var f = this.files && this.files[0];
+  this.value = "";
+  if (f) importAging(f);
+};
+$("btnUseOverdue").onclick = function () { A.agingBasis = "overdue"; applyAging(); };
+$("btnUseTotal").onclick = function () {
+  if (!confirm("Letter the whole balance instead of just the overdue part?\n\n" +
+      "That includes this month's fees, which are not yet late — owners who owe nothing " +
+      "overdue will receive a notice.")) return;
+  A.agingBasis = "total"; applyAging();
+};
 $("btnAddRow").onclick = function () {
   A.rows.push({ unit:"", owner:"", address:"", amount:0, on:true });
   renderBatch();
 };
+/* ---------------- the A/R aging report ----------------
+   The accountant's QuickBooks export, read directly so nothing is retyped.
+
+   Two things about this file decide whether the letters are right:
+
+   Column B is CURRENT — this month's fees, not yet late. In the June report 16 of
+   38 units had their whole balance sitting in CURRENT and owed nothing overdue at
+   all. Taking the Total column at face value would have posted arrears notices to
+   all 16 and overstated the other 20 by $17,153. So the overdue amount leads, and
+   the whole balance is a deliberate second choice.
+
+   And the Total is NOT reliably in column G. QuickBooks writes it just after the
+   last populated bucket, so it lands in D, E, F or G depending on the row. What
+   does hold, on all 38 rows, is that the last numeric cell equals the sum of the
+   ones before it — so the total is read as "the last number on the line". */
+function inflateRaw(bytes) {
+  if (typeof DecompressionStream === "undefined") {
+    return Promise.reject(new Error("This browser cannot unzip a spreadsheet — paste the list instead."));
+  }
+  var ds = new DecompressionStream("deflate-raw");
+  var w = ds.writable.getWriter();
+  w.write(bytes); w.close();
+  return new Response(ds.readable).arrayBuffer().then(function (b) { return new Uint8Array(b); });
+}
+/* Minimal zip reader: an xlsx is a zip, and the two parts worth having are the
+   first worksheet and the shared string table. */
+function unzip(buf, wanted) {
+  var d = new DataView(buf), u8 = new Uint8Array(buf), out = {};
+  var eocd = -1;
+  for (var i = buf.byteLength - 22; i >= 0 && i > buf.byteLength - 66000; i--) {
+    if (d.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
+  }
+  if (eocd < 0) return Promise.reject(new Error("That file is not a readable .xlsx."));
+  var n = d.getUint16(eocd + 10, true), cd = d.getUint32(eocd + 16, true);
+  var jobs = [], p = cd;
+  for (var k = 0; k < n; k++) {
+    if (d.getUint32(p, true) !== 0x02014b50) break;
+    var method = d.getUint16(p + 10, true);
+    var csize = d.getUint32(p + 20, true);
+    var nameLen = d.getUint16(p + 28, true);
+    var extraLen = d.getUint16(p + 30, true);
+    var cmtLen = d.getUint16(p + 32, true);
+    var lho = d.getUint32(p + 42, true);
+    var name = new TextDecoder().decode(u8.subarray(p + 46, p + 46 + nameLen));
+    p += 46 + nameLen + extraLen + cmtLen;
+    if (wanted.indexOf(name) < 0) continue;
+    var lnLen = d.getUint16(lho + 26, true), lxLen = d.getUint16(lho + 28, true);
+    var start = lho + 30 + lnLen + lxLen;
+    var raw = u8.subarray(start, start + csize);
+    jobs.push(
+      (method === 0 ? Promise.resolve(raw) : inflateRaw(raw))
+        .then(function (nm) {
+          return function (bytes) { out[nm] = new TextDecoder().decode(bytes); };
+        }(name))
+    );
+  }
+  return Promise.all(jobs).then(function () { return out; });
+}
+function colOf(ref) { return String(ref || "").replace(/[0-9]/g, ""); }
+function parseAging(xml, shared) {
+  var doc = new DOMParser().parseFromString(xml, "application/xml");
+  var rows = doc.getElementsByTagName("row"), out = [], skipped = 0;
+  for (var i = 0; i < rows.length; i++) {
+    var cells = rows[i].getElementsByTagName("c");
+    var label = null, current = 0, nums = [];
+    for (var j = 0; j < cells.length; j++) {
+      var c = cells[j], col = colOf(c.getAttribute("r"));
+      var vEl = c.getElementsByTagName("v")[0];
+      var isEl = c.getElementsByTagName("is")[0];
+      var txt = isEl ? isEl.textContent : (vEl ? vEl.textContent : "");
+      if (!txt) continue;
+      if (c.getAttribute("t") === "s") {
+        var ix = parseInt(txt, 10);
+        txt = (shared && shared[ix] != null) ? shared[ix] : txt;
+      }
+      if (col === "A") { label = String(txt); continue; }
+      var f = parseFloat(txt);
+      if (!isFinite(f)) continue;
+      if (col === "B") current = f;
+      nums.push(f);
+    }
+    if (!label || !nums.length) continue;
+    /* only unit lines: the header, TOTAL and Customer Balance rows are not units */
+    var um = /^\s*(5[56]0-[A-Za-z0-9]+)\s*(.*)$/.exec(label);
+    if (!um) { continue; }
+    var total = nums[nums.length - 1];
+    var overdue = total - current;
+    out.push({
+      unit: um[1],
+      name: String(um[2] || "").replace(/^\s*OLD\s+/i, "").replace(/\s+/g, " ").replace(/^\s+|\s+$/g, ""),
+      total: total, current: current, overdue: overdue < 0.005 ? 0 : overdue
+    });
+  }
+  return out;
+}
+function readSharedStrings(xml) {
+  if (!xml) return [];
+  var doc = new DOMParser().parseFromString(xml, "application/xml");
+  var si = doc.getElementsByTagName("si"), out = [];
+  for (var i = 0; i < si.length; i++) out.push(si[i].textContent);
+  return out;
+}
+function importAging(file) {
+  note("parseNote", "Reading " + file.name + "…", false, true);
+  return file.arrayBuffer()
+    .then(function (buf) { return unzip(buf, ["xl/worksheets/sheet1.xml", "xl/sharedStrings.xml"]); })
+    .then(function (parts) {
+      var sheet = parts["xl/worksheets/sheet1.xml"];
+      if (!sheet) throw new Error("No worksheet in that file.");
+      var lines = parseAging(sheet, readSharedStrings(parts["xl/sharedStrings.xml"]));
+      if (!lines.length) throw new Error("No unit rows found — is this the A/R Aging Summary?");
+      A.aging = lines;
+      A.agingBasis = "overdue";
+      applyAging();
+    })
+    .catch(function (e) {
+      note("parseNote", "Could not read it — " + ((e && e.message) || "error"), true);
+    });
+}
+function applyAging() {
+  var lines = A.aging || [];
+  var basis = A.agingBasis === "total" ? "total" : "overdue";
+  var credits = lines.filter(function (L) { return L.total <= 0; });
+  var usable = lines.filter(function (L) { return L[basis] > 0.005; });
+  var currentOnly = lines.filter(function (L) { return L.total > 0 && L.overdue <= 0.005; });
+
+  A.rows = usable.map(function (L) {
+    var known = rosterFind(L.unit);
+    return {
+      unit: L.unit,
+      owner: (known && known.owner) || L.name || "",
+      address: known ? known.address : "",
+      nonResident: !!(known && known.nonResident),
+      amount: Math.round(L[basis] * 100) / 100,
+      total: L.total, current: L.current, overdue: L.overdue,
+      description: "", on: true
+    };
+  });
+  A.selRow = null;
+  renderBatch();
+
+  $("agingBox").style.display = "";
+  $("btnUseOverdue").classList.toggle("on", basis === "overdue");
+  $("btnUseTotal").classList.toggle("on", basis === "total");
+  var sum = A.rows.reduce(function (s, r) { return s + r.amount; }, 0);
+  $("agingSummary").innerHTML =
+    "<b>" + lines.length + "</b> units in the report · lettering <b>" + A.rows.length +
+    "</b> for <b>" + esc(money(sum)) + "</b>" +
+    (basis === "overdue"
+      ? " (the amount past due, excluding this month's fees)"
+      : " (the whole balance, including this month's fees)") + ".<br>" +
+    (currentOnly.length
+      ? "<b>" + currentOnly.length + "</b> owe only current fees — nothing overdue" +
+        (basis === "overdue" ? ", so they are left out." : ", but the whole balance includes them.") + " "
+      : "") +
+    (credits.length ? "<b>" + credits.length + "</b> in credit, skipped. " : "");
+  note("parseNote", A.rows.length + " unit" + (A.rows.length === 1 ? "" : "s") + " ready.");
+  if (A.rows.length) $("batchCard").scrollIntoView({ behavior:"smooth", block:"start" });
+}
+
 /* ---------------- unit typeahead ----------------
    Typing "210" has to offer 550-210 and 560-210: nobody thinks of the building
    prefix first, and there are two of every unit number across the two towers. */
@@ -2565,7 +2860,8 @@ document.addEventListener("keydown", function (e) {
 });
 $("tplPick").onchange = function () {
   A.tplIdx = +this.value; $("tplEdit").value = this.value;
-  loadTplEditor(); renderPreview();   /* the panel follows the chosen template */
+  loadTplEditor();
+  renderBatch();        /* the description column comes and goes with the wording */
 };
 $("btnPreview").onclick = function () {
   var on = A.rows.filter(function (r) { return r.on; });
@@ -2696,7 +2992,7 @@ $("rosterFind").addEventListener("input", function () { A.openUnit = -1; renderR
   var pairs = [["btnRosterAdd", ICON.plus], ["btnRosterCSV", ICON.upload], ["btnRosterImport", ICON.clip],
                ["btnFilters", ICON.filter], ["btnRosterSave", ICON.save], ["btnGuide", ICON.file],
                ["btnPdf", ICON.file], ["btnEmail", ICON.send], ["btnPrevPdf", ICON.eye],
-               ["btnGenerate", ICON.printer]];
+               ["btnGenerate", ICON.printer], ["btnAging", ICON.upload]];
   pairs.forEach(function (p) {
     var el = $(p[0]); if (!el) return;
     var slot = el.querySelector(".i"); if (slot) slot.innerHTML = p[1];
@@ -2838,6 +3134,20 @@ $("tplEdit").onchange = function () { A.tplIdx = +this.value; $("tplPick").value
 $("tplBody").addEventListener("input", renderTplPreview);
 $("tplName").addEventListener("input", renderTplPreview);
 $("btnTplSave").onclick = saveTemplates;
+/* The four letters CPO actually uses. Needed because the wording saved in Firestore
+   on the first run was placeholder text, and nothing would otherwise replace it. */
+$("btnTplReset").onclick = function () {
+  if (!confirm("Replace the saved wording with the four standard letters?\n\n" +
+      "  · Arrears notification — covering email\n" +
+      "  · Outstanding common expense fee\n" +
+      "  · One-time PAP payment authorization\n" +
+      "  · Chargeback consent acknowledgement\n\n" +
+      "Any edits you have made to the current wording will be lost.")) return;
+  A.templates = JSON.parse(JSON.stringify(DEFAULT_TEMPLATES));
+  A.tplIdx = 0;
+  renderTplPickers(); loadTplEditor(); saveTemplates(); renderBatch();
+  note("tplNote", "The four standard letters are loaded.");
+};
 $("fieldChips").innerHTML = FIELD_LIST.map(function (f) {
   return '<button data-f="' + f[0] + '" title="' + esc(f[1]) + '">{{' + f[0] + "}}</button>";
 }).join("");
