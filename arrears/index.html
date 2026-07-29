@@ -220,21 +220,32 @@ select.rowtpl { width:100%; font-size:12px; padding:4px; border-radius:5px; back
 /* ---------- Letters tab: list beside a live preview ----------
    The reading columns stay narrow; only the checking step takes the extra width,
    because that is the one that benefits from having the letter alongside it. */
-body[data-tab="tabLetters"] .wrap { max-width:1400px; }
+/* Prose stays at a readable width; the checking step takes whatever the screen
+   has. A 17-inch laptop and a widescreen should both be usable, so the width is
+   fluid rather than a fixed cap with empty margins either side of it. */
+body[data-tab="tabLetters"] .wrap { max-width:min(2000px, 96vw); }
 body[data-tab="tabLetters"] #pLetters > header,
 body[data-tab="tabLetters"] #pLetters > .card:not(#batchCard),
-body[data-tab="tabLetters"] #pLetters > .note { max-width:1000px; }
+body[data-tab="tabLetters"] #pLetters > .note { max-width:1040px; }
+body[data-tab="tabRoster"] .wrap { max-width:min(1800px, 96vw); }
 /* No align-items:start here. That shrinks the right column to the panel's own
    height, leaving position:sticky nothing to travel inside — the panel then scrolls
    away with the page. Stretching the column to the row height is what lets it pin. */
-#batchCard.split { display:grid; grid-template-columns:minmax(0,1fr) 430px; gap:22px;
-  align-items:stretch; }
+#batchCard.split { display:grid; gap:22px; align-items:stretch;
+  grid-template-columns:minmax(0,1fr) clamp(370px, 26%, 560px); }
 #batchCard.split .prevcol { align-self:stretch; }
 #batchCard.split .bcol { min-width:0; }
-@media (max-width:1120px) {
-  body[data-tab="tabLetters"] .wrap { max-width:1000px; }
+/* Below this the columns would start squeezing the unit number down to "55"
+   again, so the table keeps its floor and the column scrolls instead. */
+#batchCard.split .bcol:first-child { overflow-x:auto; }
+#batchTbl { min-width:690px; }
+#batchTbl td:nth-child(2) input { min-width:74px; }
+@media (max-width:1080px) {
+  body[data-tab="tabLetters"] .wrap { max-width:min(1000px, 96vw); }
   #batchCard.split { display:block; }
   #batchCard.split .prevcol { margin-top:18px; }
+  .prevcard { position:static; max-height:none; }
+  .prevletter { max-height:520px; }
 }
 #batchTbl tr.brow { cursor:pointer; }
 #batchTbl tr.brow:hover td { background:#F7FAFD; }
@@ -2604,16 +2615,17 @@ $("btnAddRow").onclick = function () {
 
    Two things about this file decide whether the letters are right:
 
-   Column B is CURRENT — this month's fees, not yet late. In the June report 16 of
-   38 units had their whole balance sitting in CURRENT and owed nothing overdue at
-   all. Taking the Total column at face value would have posted arrears notices to
-   all 16 and overstated the other 20 by $17,153. So the overdue amount leads, and
-   the whole balance is a deliberate second choice.
+   The layout, confirmed against the file rather than inferred: column A is
+   "unit owner", B is CURRENT, C to F are the 1-30 / 31-60 / 61-90 / 91-and-over
+   buckets, and G is the Total, carrying the formula B+C+D+E+F. Empty buckets are
+   written as self-closing cells, so a row's populated columns are sparse — reading
+   the numbers in order and calling the last one the total happens to work, but G
+   is read directly because that is what it actually is.
 
-   And the Total is NOT reliably in column G. QuickBooks writes it just after the
-   last populated bucket, so it lands in D, E, F or G depending on the row. What
-   does hold, on all 38 rows, is that the last numeric cell equals the sum of the
-   ones before it — so the total is read as "the last number on the line". */
+   Column B still matters on its own: it is this month's fees, which are not yet
+   late. In the June report that was $2,289.88 of a $52,646.25 balance. Lettering
+   the whole balance therefore demands money that is not overdue, so the overdue
+   amount leads and the whole balance is a deliberate second choice. */
 function inflateRaw(bytes) {
   if (typeof DecompressionStream === "undefined") {
     return Promise.reject(new Error("This browser cannot unzip a spreadsheet — paste the list instead."));
@@ -2663,7 +2675,7 @@ function parseAging(xml, shared) {
   var rows = doc.getElementsByTagName("row"), out = [], skipped = 0;
   for (var i = 0; i < rows.length; i++) {
     var cells = rows[i].getElementsByTagName("c");
-    var label = null, current = 0, nums = [];
+    var label = null, current = 0, total = null, nums = [];
     for (var j = 0; j < cells.length; j++) {
       var c = cells[j], col = colOf(c.getAttribute("r"));
       var vEl = c.getElementsByTagName("v")[0];
@@ -2678,13 +2690,15 @@ function parseAging(xml, shared) {
       var f = parseFloat(txt);
       if (!isFinite(f)) continue;
       if (col === "B") current = f;
+      if (col === "G") total = f;          /* the Total column, formula B+C+D+E+F */
       nums.push(f);
     }
     if (!label || !nums.length) continue;
     /* only unit lines: the header, TOTAL and Customer Balance rows are not units */
     var um = /^\s*(5[56]0-[A-Za-z0-9]+)\s*(.*)$/.exec(label);
     if (!um) { continue; }
-    var total = nums[nums.length - 1];
+    /* G if it is there, otherwise the last number on the line */
+    if (total === null) total = nums[nums.length - 1];
     var overdue = total - current;
     out.push({
       unit: um[1],
@@ -3256,6 +3270,9 @@ function measureBar() {
 }
 measureBar();
 window.addEventListener("resize", measureBar);
+/* setTab only ran on click, so on first load body carried no data-tab and the
+   Letters layout never widened — the table sat crushed in a 1000px column. */
+document.body.dataset.tab = "tabLetters";
 if (!gmailConfigured()) {
   $("btnEmail").disabled = true;
   $("btnEmail").title = "Gmail is not connected yet — the OAuth client ID has not been set.";
