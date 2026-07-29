@@ -279,6 +279,7 @@ input:focus, select:focus { outline:2px solid var(--accent); outline-offset:-1px
 .histentry:first-child { border-top:none; }
 .histwho { font-size:12.5px; font-weight:650; color:var(--accent-ink); }
 .histwhen { font-size:12px; color:var(--muted); font-weight:400; }
+.whorole { font-weight:400; color:var(--muted); }
 .histentry ul { margin:4px 0 0; padding-left:18px; font-size:13px; color:var(--ink2); }
 .histentry li { margin:2px 0; }
 .histempty { color:var(--muted); font-size:13.5px; }
@@ -2298,6 +2299,16 @@ function jdData(j) {
 function jrowAttrs(j, cls) {
   return ' class="jrow' + (cls ? " " + cls : "") + '"' + jdData(j);
 }
+/* Who made a change, in words. The log records the account that signed in, but
+   an email address tells a board member nothing — show the person, with their
+   role, and fall back to the address for anyone not on the list. */
+var PEOPLE = { "nnscc292connect@cpomanagement.ca": { name: "Sarah", role: "property manager" } };
+function personLabel(email) {
+  var e = String(email || "").trim();
+  var p = PEOPLE[e.toLowerCase()];
+  if (!p) return esc(e) || "unknown";
+  return esc(p.name) + (p.role ? ' <span class="whorole">(' + esc(p.role) + ")</span>" : "");
+}
 function jdFact(label, val, sub) {
   return '<div class="jdfact"><b>' + esc(label) + "</b><span>" + esc(val) + "</span>" +
     (sub ? "<small>" + esc(sub) + "</small>" : "") + "</div>";
@@ -2447,7 +2458,7 @@ function jdRenderLog(j, entries) {
   var show = jdShowAllLog ? rows : rows.slice(0, 8);
   var h = show.map(function (r) {
     var when = r.at && r.at.toDate ? r.at.toDate().toLocaleString("en-CA") : "";
-    return '<div class="histentry"><div class="histwho">' + esc(r.by || "unknown") +
+    return '<div class="histentry"><div class="histwho">' + personLabel(r.by) +
       ' <span class="histwhen">· ' + esc(when) + '</span></div><div class="jdwhat">' + esc(r.t) + "</div></div>";
   });
   if (rows.length > show.length)
@@ -5626,7 +5637,7 @@ function openDecLog() {
     qs.forEach(function (d) {
       var e = d.data();
       var when = e.at && e.at.toDate ? e.at.toDate().toLocaleString("en-CA") : "";
-      h.push('<div class="histentry"><div class="histwho">' + esc(e.by || "") +
+      h.push('<div class="histentry"><div class="histwho">' + personLabel(e.by) +
         ' <span class="histwhen">· ' + esc(when) + "</span></div><ul><li>" + esc(e.text || "") + "</li></ul></div>");
     });
     el.innerHTML = h.join("");
@@ -6082,7 +6093,7 @@ document.getElementById("btnHistory").onclick = function () {
       qs.forEach(function (docSnap) {
         var e = docSnap.data();
         var when = e.at && e.at.toDate ? e.at.toDate().toLocaleString("en-CA") : "";
-        h.push('<div class="histentry"><div class="histwho">' + esc(e.by || "unknown") +
+        h.push('<div class="histentry"><div class="histwho">' + personLabel(e.by) +
           ' <span class="histwhen">· ' + esc(when) + "</span></div><ul>");
         (e.changes || []).forEach(function (c) { h.push("<li>" + esc(c) + "</li>"); });
         h.push("</ul></div>");
