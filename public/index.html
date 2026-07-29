@@ -954,6 +954,61 @@ body:has(#report.tpl-packet) .wrap { max-width:1560px; }
   .tpl-packet .pk-detailcard { padding:14px; }
 }
 .tpl-packet .pk-lbl { display:none; }   /* "Quoted" label — only shown in the phone card */
+
+/* ---- Classic on a phone: the tables become cards ----
+   The board reads this design, most of them on a phone. A four-column table at
+   375px either scrolls sideways inside its own box or breaks every word onto
+   its own line; neither is readable. Each row becomes a block instead: number
+   and job name, the contractor under it, the amount last and large. */
+@media screen and (max-width:600px) {
+  /* six figures stacked one per screen is a lot of thumb; two across fits
+     a phone and still reads at a glance */
+  .tpl-classic .tiles { grid-template-columns:repeat(2,minmax(0,1fr)); gap:9px; }
+  .tpl-classic .tile { padding:11px 12px; }
+  .tpl-classic .tile .v { font-size:19px; }
+  .tpl-classic .tile .l { font-size:10.5px; }
+  /* spend bars: a 120px name column left the bar about 30px wide and cut the
+     contractor's name in half. Name and amount on one line, bar underneath. */
+  .tpl-classic .brow { grid-template-columns:minmax(0,1fr) auto; row-gap:5px;
+    column-gap:8px; padding:7px 0; }
+  .tpl-classic .blabel { grid-area:1 / 1; text-align:left; font-weight:600;
+    color:var(--ink); font-size:13.5px; white-space:normal; }
+  .tpl-classic .bval { grid-area:1 / 2; text-align:right; }
+  .tpl-classic .btrack { grid-area:2 / 1 / 2 / -1; height:10px; border-radius:4px; }
+  .tpl-classic .bar { border-radius:4px; }
+  .tpl-classic .chart { padding:12px 13px; }
+  .tpl-classic .tablewrap { overflow-x:visible; }
+  .tpl-classic table, .tpl-classic tbody, .tpl-classic tr, .tpl-classic td { display:block; width:auto; }
+  .tpl-classic thead { display:none; }
+  .tpl-classic tbody tr { position:relative; padding:12px 13px 13px 34px;
+    border-bottom:1px solid var(--line-soft); }
+  .tpl-classic tbody tr:last-child { border-bottom:none; }
+  .tpl-classic td { border:none; padding:0; }
+  .tpl-classic td:empty { display:none; }
+  .tpl-classic td.num { position:absolute; left:12px; top:12px; width:auto;
+    font-size:13px; font-weight:700; color:var(--muted); }
+  .tpl-classic td:nth-child(2) { font-size:15.5px; font-weight:600; line-height:1.35; }
+  .tpl-classic td:nth-child(3) { font-size:13.5px; color:var(--ink2); margin-top:4px; }
+  .tpl-classic td.money { margin-top:6px; font-size:17px; font-weight:700; text-align:left; }
+  .tpl-classic .fn { display:block; font-weight:400; }
+  /* subtotals read as a footer line, not a card */
+  .tpl-classic tr.subtotal { padding-left:13px; background:var(--accent-soft); }
+  .tpl-classic tr.subtotal td:nth-child(2) { font-size:13px; text-transform:uppercase;
+    letter-spacing:.04em; color:var(--ink2); }
+  .tpl-classic tr.subtotal td.money { margin-top:2px; }
+  /* the competing quotes that open under a job: same treatment, one shade in */
+  .tpl-classic tr[hidden] { display:none; }   /* display:block must not beat [hidden] */
+  .tpl-classic tr.bidrow { padding:0; }
+  .tpl-classic .bidrow-inner { padding:0 0 0 4px; }
+  .tpl-classic table.cmp tbody tr { padding:10px 0 10px 4px; }
+  .tpl-classic table.cmp td:nth-child(1) { font-size:14.5px; font-weight:650; }
+  .tpl-classic table.cmp td:nth-child(2) { font-size:13px; color:var(--ink2); margin-top:2px; }
+  .tpl-classic .nonote { display:none; }     /* no note is nothing to say, not a dash */
+  .tpl-classic table.cmp td.money { font-size:15.5px; margin-top:4px; }
+  .tpl-classic tr.pend td.money { color:var(--amber); font-weight:600; font-style:italic; }
+  /* the tick that marks the counted quote sits next to the amount, not alone */
+  .tpl-classic table.cmp td:nth-child(4) { display:inline-block; margin-left:8px; }
+}
 @media screen and (max-width:600px){
   /* comparison table → stacked cards on phones. A 3–4 column table is too narrow,
      so text broke onto many lines; here each bid is a readable full-width block:
@@ -3374,7 +3429,7 @@ function cmpRows(x) {
     if (!ed && !(cb.b.contractor || "").trim() && cb.total == null) return;   /* hide empty rows for viewers only */
     var cName = tEdit("bid:" + jid + ":" + bi + ":contractor", cb.b.contractor, "Contractor");
     var cNote = ed ? tEdit("bid:" + jid + ":" + bi + ":notes", cb.b.notes, "Add scope note")
-                   : (esc(cb.b.notes) || "—");
+                   : (esc(cb.b.notes) || '<span class="nonote">—</span>');
     cNote += bidMetaHTML(cb.b, jid, bi);
     if (cb.total == null) {
       var amtP = ed ? tEdit("bid:" + jid + ":" + bi + ":amount", "", "Enter amount") : "Quote pending";
