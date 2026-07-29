@@ -283,17 +283,56 @@ input:focus, select:focus { outline:2px solid var(--accent); outline-offset:-1px
 .histentry li { margin:2px 0; }
 .histempty { color:var(--muted); font-size:13.5px; }
 /* One job's dossier — when it arrived, what it costs, what has happened since */
-.jdbox { width:min(920px, 96vw); box-sizing:border-box; }   /* padding inside the phone, not past it */
-.jdtop { display:flex; align-items:flex-start; justify-content:space-between; gap:14px; }
-.jdtop h3 { margin:0; }
-.jdfacts { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:8px; margin:2px 0 4px; }
-.jdfact { border:1px solid var(--line); border-radius:7px; padding:7px 10px; min-width:0; }
+/* ---------- one job's panel: header, facts, timeline + summary rail ---------- */
+.jdbox { width:min(1060px, 96vw); box-sizing:border-box; padding:0; overflow:hidden;
+  display:flex; flex-direction:column; max-height:92vh; }
+.jdtop { display:flex; align-items:flex-start; justify-content:space-between; gap:14px;
+  padding:20px 22px 14px; border-bottom:1px solid var(--line-soft); }
+.jdtop h3 { margin:0; font:600 20px/1.3 Georgia,serif; }
+.jdx { flex:none; width:32px; height:32px; border-radius:8px; border:1px solid var(--line);
+  background:var(--card); color:var(--ink2); font-size:14px; line-height:1; cursor:pointer; }
+.jdx:hover { background:var(--accent-soft); color:var(--ink); }
+.jdchips { display:flex; flex-wrap:wrap; gap:7px; margin-top:9px; }
+.jdchip { display:inline-flex; align-items:center; gap:5px; font-size:12px; font-weight:650;
+  border-radius:99px; padding:3px 10px; background:var(--accent-soft); color:var(--accent-ink); }
+.jdchip.prio { background:var(--prio-soft); color:var(--prio); }
+.jdchip.plain { background:var(--paper); color:var(--ink2); border:1px solid var(--line); }
+.jdbody { padding:16px 22px 20px; overflow-y:auto; }
+.jdfoot { padding:11px 22px; border-top:1px solid var(--line-soft); background:var(--paper);
+  font-size:12px; color:var(--muted); text-align:center; }
+.jdfacts { display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:12px; margin:0 0 18px; }
+.jdfact { display:flex; align-items:flex-start; gap:11px; border:1px solid var(--line);
+  border-radius:10px; padding:12px 14px; min-width:0; }
+.jdfico { flex:none; width:34px; height:34px; border-radius:9px; background:var(--accent-soft);
+  color:var(--accent); display:flex; align-items:center; justify-content:center; }
+.jdfico svg { width:17px; height:17px; }
+.jdfact.good .jdfico { background:var(--good-soft); color:var(--good); }
+.jdfact.good .jdfval { color:var(--good); }
+.jdftxt { min-width:0; }
 .jdfact b { display:block; font:700 11px/1.5 inherit; text-transform:uppercase;
   letter-spacing:.05em; color:var(--muted); }
-.jdfact span { display:block; font-size:14.5px; font-weight:650; }
-.jdfact small { font-size:12px; color:var(--muted); font-weight:400; }
+.jdfval { display:block; font-size:19px; font-weight:700; line-height:1.3; }
+.jdfact small { display:block; font-size:12px; color:var(--muted); font-weight:400; }
+/* two columns: the story on the left, the numbers and actions on the right */
+.jdcols { display:grid; grid-template-columns:minmax(0,1.85fr) minmax(0,1fr); gap:18px; align-items:start; }
+.jdpanel { border:1px solid var(--line); border-radius:10px; padding:14px 16px; }
+.jdpanel + .jdpanel { margin-top:14px; }
 .jdh { font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.05em;
   color:var(--muted); margin:18px 0 8px; }
+.jdcols .jdh:first-child, .jdpanel h4 { margin-top:0; }
+.jdpanel h4 { font:600 15px/1.3 Georgia,serif; margin:0 0 10px; }
+.jdsrow { display:flex; align-items:baseline; justify-content:space-between; gap:10px;
+  padding:8px 0; border-top:1px solid var(--line-soft); font-size:13.5px; }
+.jdsrow:first-of-type { border-top:none; }
+.jdsrow .k { color:var(--ink2); }
+.jdsrow .v { font-weight:650; text-align:right; }
+.jdsrow .v small { display:block; font-weight:400; font-size:12px; color:var(--muted); }
+.jdact { display:flex; align-items:center; gap:8px; width:100%; text-align:left; cursor:pointer;
+  border:1px solid var(--line); border-radius:8px; background:var(--card); color:var(--accent-ink);
+  font:650 13.5px/1.3 inherit; padding:10px 12px; margin-top:8px; }
+.jdact:first-of-type { margin-top:0; }
+.jdact:hover { background:var(--accent-soft); }
+.jdact .arw { margin-left:auto; color:var(--muted); font-weight:400; }
 .jdtl { list-style:none; margin:0 0 2px; padding:0 0 0 4px; }
 .jdtl li { position:relative; padding:0 0 13px 20px; border-left:2px solid var(--line-soft); }
 .jdtl li:last-child { border-left-color:transparent; padding-bottom:0; }
@@ -309,14 +348,40 @@ input:focus, select:focus { outline:2px solid var(--accent); outline-offset:-1px
 .jdmedia img { width:54px; height:54px; object-fit:cover; border-radius:6px;
   margin:0 6px 0 0; cursor:zoom-in; vertical-align:middle; }
 .jdmedia .pk-vid { font-size:12.5px; margin-right:8px; }
-.jdmore { font-size:13px; color:var(--accent-ink); cursor:pointer; }
-.jdcarry { font-weight:700; }
+.jdmore { display:inline-block; margin-top:8px; font-size:13px; color:var(--accent-ink); cursor:pointer; }
+/* quotes table: the one counted in the totals is marked, not just bolded */
+.jdqt { width:100%; border-collapse:collapse; }
+.jdqt th { font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted);
+  text-align:left; font-weight:700; padding:0 10px 7px 0; border-bottom:1px solid var(--line-soft); }
+.jdqt td { padding:10px 10px 10px 0; border-bottom:1px solid var(--line-soft); font-size:13.5px;
+  vertical-align:top; }
+.jdqt tr:last-child td { border-bottom:none; }
+.jdqt .money { text-align:right; padding-right:0; white-space:nowrap; }
+.jdqt tr.on td { background:var(--good-soft); }
+.jdqt tr.on td:first-child { border-radius:7px 0 0 7px; }
+.jdqt tr.on td:last-child { border-radius:0 7px 7px 0; }
+.jdqt tr.on .money { color:var(--good); font-weight:700; }
+.jdtick { color:var(--good); font-weight:700; margin-right:5px; }
+.jdnote-sm { font-size:12.5px; color:var(--ink2); }
+/* activity log: who did it, with a face to the name */
+.jdlog { display:flex; gap:10px; padding:10px 0; border-top:1px solid var(--line-soft); }
+.jdlog:first-child { border-top:none; padding-top:2px; }
+.jdav { flex:none; width:28px; height:28px; border-radius:50%; background:var(--accent);
+  color:#fff; font-size:11px; font-weight:700; display:flex; align-items:center; justify-content:center; }
+.jdlogwho { font-size:13px; font-weight:650; }
+.jdlogwhen { font-size:11.5px; color:var(--muted); }
+.jdlogtxt { font-size:13.5px; line-height:1.45; margin-top:2px; }
 .jdscroll { overflow-x:auto; }
+@media screen and (max-width:820px) {
+  .jdcols { grid-template-columns:minmax(0,1fr); }
+}
 @media screen and (max-width:560px) {
-  .jdbox { padding:16px 14px; }
-  .jdfacts { grid-template-columns:repeat(auto-fit,minmax(118px,1fr)); gap:6px; }
-  .jdfact { padding:6px 8px; }
-  .jdfact span { font-size:13.5px; }
+  .jdtop { padding:16px 14px 12px; }
+  .jdbody { padding:14px; }
+  .jdfoot { padding:10px 14px; }
+  .jdtop h3 { font-size:17px; }
+  .jdfacts { grid-template-columns:minmax(0,1fr); gap:8px; }
+  .jdfval { font-size:17px; }
 }
 /* anything that names a job: quiet until pointed at, invisible on paper */
 .jrow { cursor:pointer; }
@@ -872,6 +937,7 @@ body:has(#report.tpl-packet) .wrap { max-width:1560px; }
   100% { background-color:#ffffff; box-shadow:0 0 0 0 rgba(41,133,96,0); }
 }
 #report .pk-flash { animation:pkflash 1.5s ease-out; border-radius:12px; position:relative; z-index:5; }
+#report tr.pk-flash > td, #report li.pk-flash { animation:pkflash 1.5s ease-out; }
 
 /* ---- phone layout: collapse the dark sidebars to a brand strip ---- */
 @media screen and (max-width:700px){
@@ -1585,10 +1651,14 @@ body[data-view="edit"] .wrap { max-width:none; }
 <div class="overlay" id="jobOverlay" role="dialog" aria-modal="true" aria-label="Job history">
   <div class="pinbox jdbox">
     <div class="jdtop">
-      <div><h3 id="jdTitle">Job</h3><p id="jdSub" class="histempty" style="margin:3px 0 0"></p></div>
-      <button class="btn ghost" id="jdClose" type="button">Close</button>
+      <div class="jdhead">
+        <h3 id="jdTitle">Job</h3>
+        <div id="jdChips" class="jdchips"></div>
+      </div>
+      <button class="jdx" id="jdClose" type="button" aria-label="Close">✕</button>
     </div>
-    <div id="jdBody" class="histlist" style="max-height:min(680px,74vh)"></div>
+    <div id="jdBody" class="jdbody"></div>
+    <div id="jdFoot" class="jdfoot"></div>
   </div>
 </div>
 
@@ -2363,62 +2433,161 @@ function jdTimelineHTML(j, ED) {
       '<div class="jdwhat">' + e.what + "</div>" + (e.media || "") + "</li>";
   }).join("") + "</ul>";
 }
+/* the three icons the headline facts use */
+var JD_ICO = {
+  cal: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">' +
+    '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>',
+  cash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">' +
+    '<circle cx="12" cy="12" r="9"/><path d="M12 6v12M14.5 9.5c-.6-.9-1.5-1.2-2.5-1.2-1.4 0-2.5.7-2.5 1.9 0 2.6 5 1.5 5 4.1 0 1.2-1.1 2-2.5 2-1.1 0-2.1-.4-2.6-1.3"/></svg>',
+  save: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+    '<path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/></svg>'
+};
+function jdFactCard(icon, label, value, sub, good) {
+  return '<div class="jdfact' + (good ? " good" : "") + '"><span class="jdfico">' + JD_ICO[icon] + "</span>" +
+    '<span class="jdftxt"><b>' + esc(label) + '</b><span class="jdfval">' + esc(value) + "</span>" +
+    (sub ? "<small>" + esc(sub) + "</small>" : "") + "</span></div>";
+}
 function jdQuotesHTML(j, c) {
   if (!j.bids.length) return '<p class="histempty">No quotes have been entered for this job yet.</p>';
   var rows = c.bids.map(function (x) {
-    var tags = [];
+    var note;
     /* "counted in the totals" is bookkeeping, not a decision — the board may
        not have approved the job at all, so never word it like an award */
-    if (x.carried) tags.push(x.override ? "counted in the totals — chosen over the lowest quote"
-      : (c.priced > 1 ? "lowest quote — counted in the totals" : "only quote in — counted in the totals"));
-    else if (x.lowest) tags.push("lowest");
-    if (x.b.qno) tags.push("quote #" + x.b.qno);
-    var files = (x.b.files || []).length
-      ? ' <span class="attlink" role="button" tabindex="0" data-attstash="' + fvStashRef(x.b.files) +
-        '" data-atti="0" data-attcap="' + esc((x.b.contractor || "quote")) + '">📎 ' +
-        x.b.files.length + " file" + (x.b.files.length === 1 ? "" : "s") + "</span>"
-      : "";
-    return "<tr><td>" + esc((x.b.contractor || "").trim() || "—") + files + "</td><td>" +
-      esc(tags.join(" · ") + (x.b.notes ? (tags.length ? " · " : "") + x.b.notes : "")) +
-      '</td><td class="money' + (x.carried ? " jdcarry" : "") + '">' +
-      (x.total == null ? "awaiting quote" : money(x.total)) + "</td></tr>";
+    if (x.carried) note = x.override ? "Counted in totals — chosen over the lowest quote"
+      : (c.priced > 1 ? "Lowest quote — counted in totals" : "Only quote in — counted in totals");
+    else if (x.pending) note = "Awaiting quote";
+    else if (x.lowest) note = "Lowest";
+    else note = "";
+    if (x.b.qno) note += (note ? " · " : "") + "Quote #" + x.b.qno;
+    if (x.b.notes) note += (note ? " · " : "") + x.b.notes;
+    var n = (x.b.files || []).length;
+    var files = n
+      ? '<span class="attlink" role="button" tabindex="0" data-attstash="' + fvStashRef(x.b.files) +
+        '" data-atti="0" data-attcap="' + esc((x.b.contractor || "quote")) + '">\u{1F4CE} ' +
+        n + " file" + (n === 1 ? "" : "s") + "</span>"
+      : '<span class="jdwho">—</span>';
+    return '<tr' + (x.carried ? ' class="on"' : "") + "><td>" +
+      (x.carried ? '<span class="jdtick">✓</span>' : "") +
+      esc((x.b.contractor || "").trim() || "—") + '</td><td class="jdnote-sm">' + esc(note || "—") +
+      "</td><td>" + files + '</td><td class="money">' +
+      (x.total == null ? '<span class="jdwho">—</span>' : money(x.total)) + "</td></tr>";
   });
-  /* No explaining paragraph here: the quote label says "counted in the totals"
-     and the status sits in the header — the board reads the panel, not a lecture. */
-  return '<div class="jdscroll"><table class="dashtable"><thead><tr><th>Contractor</th><th>Note</th>' +
-    '<th class="money">Total (incl. HST)</th></tr></thead><tbody>' + rows.join("") + "</tbody></table></div>";
+  return '<div class="jdscroll"><table class="jdqt"><thead><tr><th>Contractor</th><th>Note</th>' +
+    '<th>Attachment</th><th class="money">Total (incl. HST)</th></tr></thead><tbody>' +
+    rows.join("") + "</tbody></table></div>";
+}
+/* the right-hand rail: the numbers a board member asks for out loud */
+function jdSummaryHTML(j, c) {
+  function row(k, v, sub) {
+    return '<div class="jdsrow"><span class="k">' + esc(k) + '</span><span class="v">' + esc(v) +
+      (sub ? "<small>" + esc(sub) + "</small>" : "") + "</span></div>";
+  }
+  var h = ['<div class="jdpanel"><h4>Job summary</h4>'];
+  h.push('<div class="jdsrow"><span class="k">Job stage</span><span class="v">' +
+    '<span class="stchip st-' + esc(j.status || "quoted") + '">' + esc(statusLabel(j.status || "quoted")) +
+    "</span></span></div>");
+  h.push(row("Quotes received", c.priced + " of " + j.bids.length));
+  var carried = c.carriedBids[0];
+  if (carried) h.push(row(carried.override ? "Counted in totals" : "Current lowest quote",
+    money(carried.total), (carried.b.contractor || "").trim()));
+  /* the quote the saving is measured against */
+  var alt = c.bids.filter(function (x) { return x.total != null && !x.carried; })
+    .sort(function (a, b) { return a.total - b.total; })[0];
+  if (alt) h.push(row("Next lowest quote", money(alt.total), (alt.b.contractor || "").trim()));
+  if (c.pendingNames.length)
+    h.push(row(c.pendingNames.length === 1 ? "Pending contractor" : "Pending contractors",
+      c.pendingNames.join(", "), "Awaiting quote"));
+  if ((j.awardedTo || "").trim())
+    h.push(row("Awarded to", j.awardedTo.trim(), jdDate(j.awardDate) || ""));
+  if (j.status === "inprogress" && j.pct != null) h.push(row("Site work", j.pct + "%", "as last reported"));
+  if (j.statusNote) h.push(row("Board note", j.statusNote));
+  h.push("</div>");
+
+  /* quick actions — only ones that lead somewhere for this reader */
+  var acts = [], nf = 0;
+  j.bids.forEach(function (b) { nf += ((b && b.files) || []).length; });
+  if (nf) acts.push('<button class="jdact" type="button" data-jdact="files">\u{1F4CE} View attachment' +
+    (nf === 1 ? " (1 file)" : "s (" + nf + " files)") + '<span class="arw">›</span></button>');
+  if (isEditor()) {
+    acts.push('<button class="jdact" type="button" data-jdact="note">\u{1F4DD} Add note<span class="arw">›</span></button>');
+    acts.push('<button class="jdact" type="button" data-jdact="edit">⚙️ Open full job<span class="arw">›</span></button>');
+  } else {
+    acts.push('<button class="jdact" type="button" data-jdact="show">\u{1F50E} Show on the report<span class="arw">›</span></button>');
+  }
+  h.push('<div class="jdpanel"><h4>Quick actions</h4>' + acts.join("") + "</div>");
+  return h.join("");
 }
 function openJobDossier(id) {
   var j = findJob(id); if (!j) return;
   jdJobId = id; jdShowAllLog = false;
-  var c = jobCalc(j), ED = isEditor(), carried = c.carriedBids[0];
+  var c = jobCalc(j), ED = isEditor(), carried = c.carriedBids[0], fq = jdFirstQuote(j);
   document.getElementById("jdTitle").textContent =
     (j.archived ? "Archived job" : "Job " + j.no) + " · " + (j.desc || "job");
-  document.getElementById("jdSub").textContent =
-    (j.priority ? "High priority · " : "") + statusLabel(j.status || "quoted") + " · " +
-    c.priced + " of " + j.bids.length + " quote" + (j.bids.length === 1 ? "" : "s") + " in";
-  var f = [], fq = jdFirstQuote(j);
-  /* two different dates, both worth having: when the job was raised, and when
-     the first contractor priced it. Jobs that predate the tracker have no
-     creation date anywhere, so for those the first quote stands alone rather
-     than a blank or a date we would have had to invent. */
-  if (j.created) f.push(jdFact("Date added", jdDate(j.created), jdAgo(j.created)));
-  else if (!fq) f.push(jdFact("Date added", "Not recorded", "predates the tracker"));
-  if (fq) f.push(jdFact("First quoted", jdDate(fq), jdAgo(fq)));
-  f.push(jdFact("In the report totals", c.cost ? money(c.cost) : "Pending",
-    carried ? (carried.b.contractor || "").trim() : ""));
-  if (c.saving > 0) f.push(jdFact("Saved on this job", money(c.saving), "against the next-lowest quote"));
-  if ((j.awardedTo || "").trim())
-    f.push(jdFact("Awarded to", j.awardedTo.trim(), jdDate(j.awardDate) || ""));
-  if (j.status === "inprogress" && j.pct != null) f.push(jdFact("Site work", j.pct + "%", "as last reported"));
+  var chips = [];
+  if (j.priority) chips.push('<span class="jdchip prio">⚑ High priority</span>');
+  chips.push('<span class="jdchip">' + esc(statusLabel(j.status || "quoted")) + "</span>");
+  chips.push('<span class="jdchip plain">' + c.priced + " of " + j.bids.length + " quote" +
+    (j.bids.length === 1 ? "" : "s") + " received</span>");
+  document.getElementById("jdChips").innerHTML = chips.join("");
+
+  /* three headline facts. Two different dates are worth having — when the job
+     was raised and when the first contractor priced it — and jobs that predate
+     the tracker have no creation date anywhere, so those lead with the quote. */
+  var f = [];
+  if (j.created) f.push(jdFactCard("cal", "Date added", jdDate(j.created), jdAgo(j.created)));
+  else if (fq) f.push(jdFactCard("cal", "First quoted", jdDate(fq), jdAgo(fq)));
+  else f.push(jdFactCard("cal", "Date added", "Not recorded", "predates the tracker"));
+  if (j.created && fq) f.push(jdFactCard("cal", "First quoted", jdDate(fq), jdAgo(fq)));
+  f.push(jdFactCard("cash", carried && carried.override ? "Counted in totals" : "Lowest quote · in totals",
+    c.cost ? money(c.cost) : "Pending", carried ? (carried.b.contractor || "").trim() : "no priced quote yet"));
+  if (c.saving > 0)
+    f.push(jdFactCard("save", "Savings on this job", money(c.saving), "vs. next-lowest quote", true));
+
   document.getElementById("jdBody").innerHTML =
     '<div class="jdfacts">' + f.join("") + "</div>" +
-    '<div class="jdh">What has happened</div>' + jdTimelineHTML(j, ED) +
-    '<div class="jdh">Quotes received</div>' + jdQuotesHTML(j, c) +
-    '<div class="jdh">Every change to this job</div><div id="jdLog"></div>';
+    '<div class="jdcols"><div class="jdmain">' +
+      '<div class="jdh">Timeline</div>' + jdTimelineHTML(j, ED) +
+      '<div class="jdh">Quotes received</div>' + jdQuotesHTML(j, c) +
+      '<div class="jdh">Activity log</div><div id="jdLog"></div>' +
+    '</div><div class="jdside">' + jdSummaryHTML(j, c) + "</div></div>";
+  document.getElementById("jdFoot").textContent =
+    j.created ? "Job created " + jdDate(j.created) : "This job predates the tracker";
   document.getElementById("jobOverlay").classList.add("open");
   jdLoadLog(j);
 }
+/* what a quick action does */
+function jdAction(what) {
+  var j = findJob(jdJobId); if (!j) return;
+  if (what === "files") {
+    var all = [];
+    j.bids.forEach(function (b) { ((b && b.files) || []).forEach(function (f) { all.push(f); }); });
+    if (all.length) openFileViewer(all, 0, (j.desc || "job") + " — attached quotes");
+    return;
+  }
+  if (what === "note") { closeJobDossier(); openProgressModal(j); return; }
+  if (what === "edit") {
+    closeJobDossier();
+    edSel = j.id; edOpen[j.id] = true;
+    setView("edit"); renderEditor();
+    var card = document.querySelector('#editor .jcard[data-jid="' + j.id + '"]') ||
+               document.querySelector('#editor .ecard[data-jid="' + j.id + '"]');
+    if (card) card.scrollIntoView({ block: "center" });
+    return;
+  }
+  if (what === "show") {
+    closeJobDossier();
+    var row = document.querySelector('#report [data-jdoss="' + j.id + '"]');
+    if (row) {
+      row.scrollIntoView({ block: "center" });
+      row.classList.add("pk-flash");                 /* the same pulse the sidebar nav uses */
+      setTimeout(function () { row.classList.remove("pk-flash"); }, 1600);
+    }
+  }
+}
+document.addEventListener("click", function (e) {
+  var b = e.target && e.target.closest ? e.target.closest("[data-jdact]") : null;
+  if (b) { e.preventDefault(); jdAction(b.getAttribute("data-jdact")); }
+});
 /* the log is stored per report, not per job — fetch once, filter per job */
 function jdFetchLog() {
   var path = reportPath();
@@ -2452,15 +2621,30 @@ function jdRenderLog(j, entries) {
     el.innerHTML = '<p class="histempty">No edits recorded against this job yet.</p>';
     return;
   }
-  var show = jdShowAllLog ? rows : rows.slice(0, 8);
+  var show = jdShowAllLog ? rows : rows.slice(0, 6);
   var h = show.map(function (r) {
     var when = r.at && r.at.toDate ? r.at.toDate().toLocaleString("en-CA") : "";
-    return '<div class="histentry"><div class="histwho">' + personLabel(r.by) +
-      ' <span class="histwhen">· ' + esc(when) + '</span></div><div class="jdwhat">' + esc(r.t) + "</div></div>";
+    return '<div class="jdlog"><span class="jdav">' + esc(jdInitials(r.by)) + "</span><div>" +
+      '<span class="jdlogwho">' + personLabel(r.by) + "</span>" +
+      (when ? ' <span class="jdlogwhen">' + esc(when) + "</span>" : "") +
+      '<div class="jdlogtxt">' + esc(r.t) + "</div></div></div>";
   });
   if (rows.length > show.length)
     h.push('<a class="jdmore" role="button" tabindex="0" data-jdmore="1">Show all ' + rows.length + " changes ↓</a>");
   el.innerHTML = h.join("");
+  /* the footer carries the last hand on this job */
+  var foot = document.getElementById("jdFoot"), newest = rows[0];
+  if (foot && newest && newest.at && newest.at.toDate) {
+    var who = String(PEOPLE[String(newest.by || "").toLowerCase()] || newest.by || "").trim();
+    foot.textContent = (j.created ? "Job created " + jdDate(j.created) : "This job predates the tracker") +
+      " · Last updated " + newest.at.toDate().toLocaleString("en-CA") + (who ? " by " + who : "");
+  }
+}
+/* initials for the little avatar — a name gives two, an address gives one */
+function jdInitials(email) {
+  var name = PEOPLE[String(email || "").trim().toLowerCase()];
+  if (name) return name.split(/\s+/).slice(0, 2).map(function (w) { return w.charAt(0); }).join("").toUpperCase();
+  return String(email || "?").charAt(0).toUpperCase();
 }
 function jdLoadLog(j) {
   var el = document.getElementById("jdLog"); if (!el) return;
