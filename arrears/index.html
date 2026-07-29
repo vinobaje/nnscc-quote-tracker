@@ -211,6 +211,11 @@ td .chip { margin-bottom:2px; }
   .expand .ecol + .ecol { border-left:none; border-top:1px solid var(--line-soft); }
 }
 .nowrap { white-space:nowrap; }
+/* the per-unit letter picker sits in a narrow column */
+select.rowtpl { width:100%; font-size:12px; padding:4px; border-radius:5px; background:#fff; }
+#batchTbl td { padding:8px; }
+#batchTbl th { padding:0 8px 7px; }
+#batchTbl td input[type=text] { padding:5px 6px; }
 
 /* ---------- Letters tab: list beside a live preview ----------
    The reading columns stay narrow; only the checking step takes the extra width,
@@ -219,7 +224,12 @@ body[data-tab="tabLetters"] .wrap { max-width:1400px; }
 body[data-tab="tabLetters"] #pLetters > header,
 body[data-tab="tabLetters"] #pLetters > .card:not(#batchCard),
 body[data-tab="tabLetters"] #pLetters > .note { max-width:1000px; }
-#batchCard.split { display:grid; grid-template-columns:minmax(0,1fr) 430px; gap:22px; align-items:start; }
+/* No align-items:start here. That shrinks the right column to the panel's own
+   height, leaving position:sticky nothing to travel inside — the panel then scrolls
+   away with the page. Stretching the column to the row height is what lets it pin. */
+#batchCard.split { display:grid; grid-template-columns:minmax(0,1fr) 430px; gap:22px;
+  align-items:stretch; }
+#batchCard.split .prevcol { align-self:stretch; }
 #batchCard.split .bcol { min-width:0; }
 @media (max-width:1120px) {
   body[data-tab="tabLetters"] .wrap { max-width:1000px; }
@@ -230,8 +240,15 @@ body[data-tab="tabLetters"] #pLetters > .note { max-width:1000px; }
 #batchTbl tr.brow:hover td { background:#F7FAFD; }
 #batchTbl tr.brow.sel td { background:var(--accent-soft); box-shadow:inset 3px 0 0 var(--accent); }
 
+/* Sticky only holds an element that is shorter than the viewport. The panel was
+   856px tall, so once the list got long it scrolled away like anything else. It now
+   fits the window and scrolls the letter inside itself instead. */
 .prevcard { border:1px solid var(--line); border-radius:9px; overflow:hidden; position:sticky;
-  top:calc(var(--abh,48px) + 12px); background:var(--card); }
+  top:calc(var(--abh,48px) + 12px); background:var(--card);
+  max-height:min(700px, calc(100vh - var(--abh,48px) - 26px));
+  display:flex; flex-direction:column; }
+.prevcard .prevhead, .prevcard .prevfoot { flex:none; }
+.prevcard > .prevsec:first-of-type { flex:none; }
 .prevhead { padding:11px 14px; background:#FAFBFC; border-bottom:1px solid var(--line-soft); }
 .prevhead .pu { font:600 15px Georgia,serif; color:var(--ink); }
 .prevhead .po { font-size:12.5px; color:var(--ink2); margin-top:2px; }
@@ -244,10 +261,12 @@ body[data-tab="tabLetters"] #pLetters > .note { max-width:1000px; }
 .envrow .ev.bad { color:var(--prio); font-weight:600; }
 .envrow .ev.mail { color:var(--accent-ink); font-weight:600; }
 /* the letter at true width, scaled to fit the column */
-.prevletter { height:520px; overflow-y:auto; overflow-x:hidden; background:#EFF1F3; padding:10px; }
-.prevletter .letterdoc { width:170mm; transform:scale(.62); transform-origin:top left;
+.prevletter { flex:1 1 auto; min-height:170px; overflow-y:auto; overflow-x:hidden;
+  background:#EFF1F3; padding:10px; }
+.prevcard > .prevsec.grow { display:flex; flex-direction:column; min-height:0; flex:1 1 auto; }
+.prevletter .letterdoc { width:170mm; transform:scale(.55); transform-origin:top left;
   background:#fff; padding:10mm 8mm; box-shadow:0 1px 6px rgba(20,26,33,.18); }
-.prevletter .shrinkwrap { width:calc(170mm * 0.62); height:1px; }
+.prevletter .shrinkwrap { width:calc(170mm * 0.55); height:1px; }
 .prevfoot { padding:11px 14px; display:flex; gap:8px; }
 .prevempty { padding:28px 16px; text-align:center; color:var(--muted); font-size:13px; }
 
@@ -522,8 +541,8 @@ td input.amt { text-align:right; font-variant-numeric:tabular-nums; }
             <div class="ph">The email</div>
             <div id="prevEnv"></div>
           </div>
-          <div class="prevsec" style="padding:0">
-            <div class="ph" style="padding:11px 14px 0">The letter</div>
+          <div class="prevsec grow" style="padding:0">
+            <div class="ph" style="padding:11px 14px 0;flex:none">The letter</div>
             <div class="prevletter"><div class="letterdoc" id="prevLetter"></div>
               <div class="shrinkwrap"></div></div>
           </div>
@@ -1102,9 +1121,9 @@ function letterHtml(row, tpl, opts) {
 var PAGE_H_PX = (279.4 - 16 - 12) * (96 / 25.4);
 
 function fillPrintArea(rows, tpl, opts) {
-  $("printArea").innerHTML = rows.map(function (r) { return letterHtml(r, tpl, opts); }).join("\n");
+  $("printArea").innerHTML = rows.map(function (r) { return letterHtml(r, tplFor(r), opts); }).join("\n");
   /* the document title is what the browser offers as the PDF filename */
-  document.title = tpl.name + " — " + CORP.condo;
+  document.title = batchTplName(rows) + " — " + CORP.condo;
 }
 function restoreTitle() { document.title = CORP.condo + " — Arrears Letters"; }
 
@@ -1136,7 +1155,7 @@ function printAreaCss() {
   return out.join("\n");
 }
 function standaloneLetterDoc(rows, tpl, opts) {
-  var body = rows.map(function (r) { return letterHtml(r, tpl, opts); }).join("\n");
+  var body = rows.map(function (r) { return letterHtml(r, tplFor(r), opts); }).join("\n");
   return '<!doctype html><html><head><meta charset="utf-8"><title>' + esc(tpl.name) +
     "</title><style>html,body{margin:0;padding:0;background:#fff}\n" + printAreaCss() +
     "</style></head><body>" +
@@ -1169,8 +1188,21 @@ function pdfBlob(b64) {
 }
 /* a filename that says which unit it is, because these get filed one per owner */
 function pdfName(rows, tpl) {
-  var stem = rows.length === 1 ? "Unit " + rows[0].unit : rows.length + " letters";
-  return (stem + " — " + tpl.name + ".pdf").replace(/[\\/:*?"<>|]/g, "-");
+  var one = rows.length === 1;
+  var name = one ? ((tplFor(rows[0]) || tpl || {}).name) : batchTplName(rows);
+  var stem = one ? "Unit " + rows[0].unit : rows.length + " letters";
+  return (stem + " — " + (name || "arrears letter") + ".pdf").replace(/[\\/:*?"<>|]/g, "-");
+}
+/* One name when every row is getting the same letter, an honest label when they are
+   not — a batch can now be a mix of first notices and s.85 letters. */
+function batchTplName(rows) {
+  var seen = [];
+  (rows || []).forEach(function (r) {
+    var n = (tplFor(r) || {}).name;
+    if (n && seen.indexOf(n) < 0) seen.push(n);
+  });
+  if (!seen.length) return "arrears letter";
+  return seen.length === 1 ? seen[0] : seen.length + " different letters";
 }
 function downloadPdf(rows, tpl, opts) {
   note("genNote", "Rendering " + rows.length + " letter" + (rows.length === 1 ? "" : "s") +
@@ -1387,7 +1419,7 @@ function createGmailDraft(token, row, tpl, opts, pdfB64) {
     to: emailableOwners(row.unit).join(", "),
     subject: (tpl.name.replace(/\s*—.*$/, "")) + " — Unit " + row.unit + " — " + CORP.condo,
     body: letterPlainText(row, tpl, opts),
-    filename: pdfName([row], tpl),
+    filename: pdfName([row], tplFor(row)),
     pdfB64: pdfB64
   };
   assertOneUnit(row, base);
@@ -1597,7 +1629,7 @@ function renderPreview() {
     return;
   }
   $("prevEmpty").style.display = "none"; $("prevBody").style.display = "";
-  var tpl = currentTpl() || DEFAULT_TEMPLATES[0], o = opts();
+  var tpl = tplFor(r) || currentTpl() || DEFAULT_TEMPLATES[0], o = opts();
 
   $("prevUnit").textContent = "Unit " + (r.unit || "—");
   $("prevOwner").textContent = r.owner || "no owner name yet";
@@ -1646,7 +1678,7 @@ function previewLetters(rows, tpl, opts) {
   var pages = heights.map(function (h) { return Math.max(1, Math.ceil(h / PAGE_H_PX)); });
   var most = Math.max.apply(null, pages);
   $("pvLabel").textContent = rows.length + " letter" + (rows.length === 1 ? "" : "s") +
-    " · " + tpl.name;
+    " · " + batchTplName(rows);
   $("pvFit").textContent = most === 1
     ? "one page each"
     : most + " pages each — " + (/pre-authorized/i.test(tpl.name)
@@ -1667,7 +1699,7 @@ function logBatch(rows, tpl, opts, via) {
     var doc = {
       batchId: batchId, unit: String(r.unit || ""), unitKey: unitKey(r.unit),
       owner: r.owner || "", address: r.address || "", amount: Number(r.amount) || 0,
-      templateId: tpl.id, templateName: tpl.name, dateISO: opts.date,
+      templateId: tplFor(r).id, templateName: tplFor(r).name, dateISO: opts.date,
       dueDays: Number(opts.dueDays) || 0, by: by, via: via || "print",
       at: firebase.firestore.FieldValue.serverTimestamp(), voided: false
     };
@@ -2197,11 +2229,12 @@ function renderBatch() {
 
   /* Chargeback letters name what the charge is for, so the column only appears when
      the chosen wording actually uses it. */
-  var wantsDesc = /\{\{description\}\}/.test((currentTpl() || {}).body || "");
-  var h = ["<tr><th style='width:34px'></th><th style='width:80px'>Unit</th><th>Owner of record</th>" +
-           (wantsDesc ? "<th style='width:22%'>What the charge is for</th>" : "") +
-           "<th class='num' style='width:120px'>Amount</th><th style='width:150px'>Already sent</th>" +
-           "<th style='width:70px'></th></tr>"];
+  var wantsDesc = A.rows.some(function (r) { return /\{\{description\}\}/.test((tplFor(r) || {}).body || ""); });
+  var h = ["<tr><th style='width:30px'></th><th style='width:108px'>Unit</th>" +
+           "<th style='width:150px'>Letter</th><th>Owner of record</th>" +
+           (wantsDesc ? "<th style='width:19%'>What the charge is for</th>" : "") +
+           "<th class='num' style='width:104px'>Amount</th><th style='width:112px'>Already sent</th>" +
+           "<th style='width:62px'></th></tr>"];
   A.rows.forEach(function (r, i) {
     var known = rosterFind(r.unit);
     var prior = priorFor(r.unit);
@@ -2213,6 +2246,7 @@ function renderBatch() {
       '" data-row="' + i + '">' +
       '<td><input type="checkbox" data-on="' + i + '"' + (r.on ? " checked" : "") + '></td>' +
       '<td><input type="text" data-b="' + i + '" data-k="unit" value="' + esc(r.unit) + '"></td>' +
+      '<td>' + rowTplSelect(r, i) + '</td>' +
       '<td><input type="text" data-b="' + i + '" data-k="owner" value="' + esc(r.owner) + '" placeholder="Owner of record"> ' + flag + "</td>" +
       (wantsDesc ? '<td><input type="text" data-b="' + i + '" data-k="description" value="' +
          esc(r.description || "") + '" placeholder="e.g. replacement of smoke detectors"></td>' : "") +
@@ -2246,8 +2280,9 @@ function batchSummary() {
   var tot = on.reduce(function (s, r) { return s + (Number(r.amount) || 0); }, 0);
   var noName = on.filter(function (r) { return !r.owner; }).length;
   var noAmt = on.filter(function (r) { return !(Number(r.amount) > 0); }).length;
-  var wantsDesc = /\{\{description\}\}/.test((currentTpl() || {}).body || "");
-  var noDesc = wantsDesc ? on.filter(function (r) { return !(r.description || "").replace(/\s/g, ""); }).length : 0;
+  var noDesc = on.filter(function (r) {
+    return /\{\{description\}\}/.test((tplFor(r) || {}).body || "") && !(r.description || "").replace(/\s/g, "");
+  }).length;
   var bits = [];
   if (noName) bits.push(noName + " missing an owner name");
   if (noAmt) bits.push(noAmt + " still to price");
@@ -2311,6 +2346,40 @@ function absorbIntoRoster(rows) {
 
 /* ---------------- templates ---------------- */
 function currentTpl() { return A.templates[A.tplIdx] || A.templates[0]; }
+/* One batch, many stages. The arrears list arrives in one go but the units on it
+   are not all at the same point in the chase — some are getting a first notice,
+   others a second, others the s.85 letter. So the letter is chosen per unit and the
+   picker in step 3 sets them all at once. */
+function tplById(id) {
+  for (var i = 0; i < A.templates.length; i++) if (A.templates[i].id === id) return A.templates[i];
+  return null;
+}
+function tplFor(r) { return (r && tplById(r.tplId)) || currentTpl() || A.templates[0]; }
+/* A sensible starting point rather than a decision: what has already gone out to
+   this unit picks the stage, and she overrides whatever looks wrong. */
+function suggestTplId(unit) {
+  var n = priorFor(unit).count;
+  var order = ["arrears-email", "outstanding-fee", "outstanding-fee"];
+  var want = order[Math.min(n, order.length - 1)];
+  return tplById(want) ? want : ((A.templates[0] || {}).id || "");
+}
+function rowTplSelect(r, i) {
+  var cur = tplFor(r);
+  return '<select data-b="' + i + '" data-k="tplId" class="rowtpl">' +
+    A.templates.map(function (t) {
+      return '<option value="' + esc(t.id) + '"' + (t.id === (cur || {}).id ? " selected" : "") + '>' +
+        esc(shortTplName(t.name)) + "</option>";
+    }).join("") + "</select>";
+}
+/* the full names are long; the column is not */
+function shortTplName(n) {
+  return String(n || "")
+    .replace(/^Arrears notification.*$/i, "1st — email")
+    .replace(/^Outstanding common expense fee$/i, "Outstanding fee")
+    .replace(/^One-time PAP payment authorization$/i, "PAP authorization")
+    .replace(/^Chargeback consent acknowledgement$/i, "Chargeback consent")
+    .replace(/\s*—\s*common expense arrears$/i, "");
+}
 function renderTplPickers() {
   var opts = A.templates.map(function (t, i) {
     return '<option value="' + i + '">' + esc(t.name) + "</option>";
@@ -2504,7 +2573,8 @@ $("btnParse").onclick = function () {
   A.rows = r.rows.map(function (x) {
     var known = rosterFind(x.unit);
     return { unit:x.unit, owner:(known && known.owner) || x.owner || "", address: known ? known.address : "",
-             nonResident: !!(known && known.nonResident), amount:x.amount, on:true };
+             nonResident: !!(known && known.nonResident), amount:x.amount,
+             tplId: suggestTplId(x.unit), description:"", on:true };
   });
   note("parseNote", r.rows.length + " unit" + (r.rows.length === 1 ? "" : "s") + " read" +
     (r.noAmount ? ", " + r.noAmount + " needing an amount" : "") +
@@ -2664,7 +2734,7 @@ function applyAging() {
       nonResident: !!(known && known.nonResident),
       amount: Math.round(L[basis] * 100) / 100,
       total: L.total, current: L.current, overdue: L.overdue,
-      description: "", on: true
+      description: "", tplId: suggestTplId(L.unit), on: true
     };
   });
   A.selRow = null;
@@ -2814,7 +2884,13 @@ $("batchTbl").addEventListener("input", function (e) {
   batchSummary();
 });
 $("batchTbl").addEventListener("change", function (e) {
-  var i = e.target.getAttribute("data-on");
+  var t = e.target;
+  if (t.getAttribute && t.getAttribute("data-k") === "tplId") {
+    A.rows[+t.getAttribute("data-b")].tplId = t.value;
+    renderBatch();          /* the description column may come or go with it */
+    return;
+  }
+  var i = t.getAttribute("data-on");
   if (i == null) return;
   A.rows[+i].on = e.target.checked;
   renderBatch();
@@ -2861,7 +2937,11 @@ document.addEventListener("keydown", function (e) {
 $("tplPick").onchange = function () {
   A.tplIdx = +this.value; $("tplEdit").value = this.value;
   loadTplEditor();
-  renderBatch();        /* the description column comes and goes with the wording */
+  var t = currentTpl();
+  if (t && A.rows.length) {
+    A.rows.forEach(function (r) { r.tplId = t.id; });   /* set them all to this one */
+  }
+  renderBatch();
 };
 $("btnPreview").onclick = function () {
   var on = A.rows.filter(function (r) { return r.on; });
@@ -2873,7 +2953,8 @@ $("btnGenerate").onclick = function () {
   var tpl = currentTpl();
   if (!on.length || !tpl) return;
   var tot = on.reduce(function (s, r) { return s + (Number(r.amount) || 0); }, 0);
-  if (!confirm("Generate " + on.length + " × “" + tpl.name + "”, totalling " + money(tot) + "?\n\n" +
+  if (!confirm("Print " + on.length + " letter" + (on.length === 1 ? "" : "s") +
+               " (" + batchTplName(on) + "), totalling " + money(tot) + "?\n\n" +
                "The batch is recorded in History as soon as it prints.")) return;
   absorbIntoRoster(on);
   printLetters(on, tpl, opts(), true);
