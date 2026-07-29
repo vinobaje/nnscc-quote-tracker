@@ -208,6 +208,45 @@ td .chip { margin-bottom:2px; }
 }
 .nowrap { white-space:nowrap; }
 
+/* ---------- Letters tab: list beside a live preview ----------
+   The reading columns stay narrow; only the checking step takes the extra width,
+   because that is the one that benefits from having the letter alongside it. */
+body[data-tab="tabLetters"] .wrap { max-width:1400px; }
+body[data-tab="tabLetters"] #pLetters > header,
+body[data-tab="tabLetters"] #pLetters > .card:not(#batchCard),
+body[data-tab="tabLetters"] #pLetters > .note { max-width:1000px; }
+#batchCard.split { display:grid; grid-template-columns:minmax(0,1fr) 430px; gap:22px; align-items:start; }
+#batchCard.split .bcol { min-width:0; }
+@media (max-width:1120px) {
+  body[data-tab="tabLetters"] .wrap { max-width:1000px; }
+  #batchCard.split { display:block; }
+  #batchCard.split .prevcol { margin-top:18px; }
+}
+#batchTbl tr.brow { cursor:pointer; }
+#batchTbl tr.brow:hover td { background:#F7FAFD; }
+#batchTbl tr.brow.sel td { background:var(--accent-soft); box-shadow:inset 3px 0 0 var(--accent); }
+
+.prevcard { border:1px solid var(--line); border-radius:9px; overflow:hidden; position:sticky;
+  top:calc(var(--abh,48px) + 12px); background:var(--card); }
+.prevhead { padding:11px 14px; background:#FAFBFC; border-bottom:1px solid var(--line-soft); }
+.prevhead .pu { font:600 15px Georgia,serif; color:var(--ink); }
+.prevhead .po { font-size:12.5px; color:var(--ink2); margin-top:2px; }
+.prevsec { padding:11px 14px; border-bottom:1px solid var(--line-soft); }
+.prevsec .ph { font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted);
+  font-weight:700; margin-bottom:7px; }
+.envrow { display:flex; gap:8px; font-size:12px; line-height:1.5; margin:2px 0; }
+.envrow .el { flex:none; width:62px; color:var(--muted); }
+.envrow .ev { color:var(--ink); overflow-wrap:anywhere; }
+.envrow .ev.bad { color:var(--prio); font-weight:600; }
+.envrow .ev.mail { color:var(--accent-ink); font-weight:600; }
+/* the letter at true width, scaled to fit the column */
+.prevletter { height:520px; overflow-y:auto; overflow-x:hidden; background:#EFF1F3; padding:10px; }
+.prevletter .letterdoc { width:170mm; transform:scale(.62); transform-origin:top left;
+  background:#fff; padding:10mm 8mm; box-shadow:0 1px 6px rgba(20,26,33,.18); }
+.prevletter .shrinkwrap { width:calc(170mm * 0.62); height:1px; }
+.prevfoot { padding:11px 14px; display:flex; gap:8px; }
+.prevempty { padding:28px 16px; text-align:center; color:var(--muted); font-size:13px; }
+
 /* ---------- awaiting send ---------- */
 .card.pend { border-left:3px solid var(--amber); }
 .pendhead b { font:600 15px Georgia,serif; color:var(--ink); }
@@ -262,44 +301,44 @@ td .chip { margin-bottom:2px; }
    page, no fonts, an empty "q Q" content stream — because the print job captures
    the original empty document. Printing in place also drops the pop-up prompt. */
 #printArea { display:none; }
-#printArea, #printArea * { box-sizing:border-box; }
-#printArea { font:11.5pt/1.48 Georgia,"Times New Roman",serif; color:#1b2430; background:#fff; }
-#printArea .letter { max-width:170mm; margin:0 auto; }
-#printArea .letter + .letter { break-before:page; page-break-before:always; }
-#printArea .lh { display:flex; align-items:center; gap:15px; border-bottom:2.5px solid #16273f;
+.letterdoc, .letterdoc * { box-sizing:border-box; }
+.letterdoc { font:11.5pt/1.48 Georgia,"Times New Roman",serif; color:#1b2430; background:#fff; }
+.letterdoc .letter { max-width:170mm; margin:0 auto; }
+.letterdoc .letter + .letter { break-before:page; page-break-before:always; }
+.letterdoc .lh { display:flex; align-items:center; gap:15px; border-bottom:2.5px solid #16273f;
   padding-bottom:10px; }
-#printArea .lh img { height:44px; width:auto; }
-#printArea .lh .corp { flex:1; }
-#printArea .lh .cn { font:700 15.5pt/1.15 Georgia,serif; color:#16273f; letter-spacing:.2px; }
-#printArea .lh .cs { font-size:9.5pt; color:#4a5566; margin-top:2px; }
-#printArea .dt { margin:14px 0 10px; font-size:10.5pt; color:#4a5566; }
-#printArea .addr { font-size:11pt; line-height:1.4; margin-bottom:15px; }
-#printArea .addr .nm { font-weight:700; }
-#printArea h2 { font:600 12.5pt Georgia,serif; letter-spacing:1px; text-transform:uppercase;
+.letterdoc .lh img { height:44px; width:auto; }
+.letterdoc .lh .corp { flex:1; }
+.letterdoc .lh .cn { font:700 15.5pt/1.15 Georgia,serif; color:#16273f; letter-spacing:.2px; }
+.letterdoc .lh .cs { font-size:9.5pt; color:#4a5566; margin-top:2px; }
+.letterdoc .dt { margin:14px 0 10px; font-size:10.5pt; color:#4a5566; }
+.letterdoc .addr { font-size:11pt; line-height:1.4; margin-bottom:15px; }
+.letterdoc .addr .nm { font-weight:700; }
+.letterdoc h2 { font:600 12.5pt Georgia,serif; letter-spacing:1px; text-transform:uppercase;
   text-align:center; margin:0 0 12px; break-after:avoid; page-break-after:avoid; }
-#printArea p { margin:8px 0; orphans:2; widows:2; }
-#printArea hr { border:none; border-top:1px solid #b7c0cc; margin:13px 0; }
-#printArea .sig { margin-top:18px; break-inside:avoid; page-break-inside:avoid; }
-#printArea .sigline { border-bottom:1.2px solid #26333f; width:62mm; height:28px; margin:3px 0 5px; }
-#printArea .signame { font-size:10.5pt; margin:0; line-height:1.4; }
+.letterdoc p { margin:8px 0; orphans:2; widows:2; }
+.letterdoc hr { border:none; border-top:1px solid #b7c0cc; margin:13px 0; }
+.letterdoc .sig { margin-top:18px; break-inside:avoid; page-break-inside:avoid; }
+.letterdoc .sigline { border-bottom:1.2px solid #26333f; width:62mm; height:28px; margin:3px 0 5px; }
+.letterdoc .signame { font-size:10.5pt; margin:0; line-height:1.4; }
 /* The authorization is a form to sign and send back, so it starts its own sheet:
    the covering letter explains, page two is the thing that gets returned. Left to
    fall naturally it is too tall for the space under the letter and jumps anyway,
    stranding half a blank page behind it. */
-#printArea .padform { border:1.5px solid #16273f; border-radius:5px; padding:13px 15px; margin:14px 0;
+.letterdoc .padform { border:1.5px solid #16273f; border-radius:5px; padding:13px 15px; margin:14px 0;
   break-inside:avoid; page-break-inside:avoid;
   break-before:page; page-break-before:always; }
-#printArea .padform:first-child { break-before:auto; page-break-before:auto; }
-#printArea .pf-h { font:700 10.5pt Georgia,serif; color:#16273f; text-transform:uppercase;
+.letterdoc .padform:first-child { break-before:auto; page-break-before:auto; }
+.letterdoc .pf-h { font:700 10.5pt Georgia,serif; color:#16273f; text-transform:uppercase;
   letter-spacing:.6px; border-bottom:1px solid #b7c0cc; padding-bottom:5px; margin-bottom:11px; }
-#printArea .pf-row { display:flex; gap:14px; margin-bottom:14px; }
-#printArea .pf-l { display:flex; flex-direction:column-reverse; }
-#printArea .pf-lab { font:8.5pt/1.2 -apple-system,Helvetica,Arial,sans-serif; color:#5a6472; margin-top:3px; }
-#printArea .pf-rule { border-bottom:1px solid #26333f; height:16px; }
-#printArea .pf-fixed { border-bottom:1px solid #26333f; height:16px; font-weight:700; font-size:11pt; }
-#printArea .pf-t { font-size:8.5pt; line-height:1.4; color:#3a4450; margin:6px 0; }
-#printArea .pf-void { font-size:9pt; margin-top:9px; }
-#printArea .foot { margin-top:16px; border-top:1px solid #cdd5df; padding-top:6px; font-size:8pt;
+.letterdoc .pf-row { display:flex; gap:14px; margin-bottom:14px; }
+.letterdoc .pf-l { display:flex; flex-direction:column-reverse; }
+.letterdoc .pf-lab { font:8.5pt/1.2 -apple-system,Helvetica,Arial,sans-serif; color:#5a6472; margin-top:3px; }
+.letterdoc .pf-rule { border-bottom:1px solid #26333f; height:16px; }
+.letterdoc .pf-fixed { border-bottom:1px solid #26333f; height:16px; font-weight:700; font-size:11pt; }
+.letterdoc .pf-t { font-size:8.5pt; line-height:1.4; color:#3a4450; margin:6px 0; }
+.letterdoc .pf-void { font-size:9pt; margin-top:9px; }
+.letterdoc .foot { margin-top:16px; border-top:1px solid #cdd5df; padding-top:6px; font-size:8pt;
   color:#7a838f; display:flex; justify-content:space-between; break-inside:avoid; }
 
 @media print {
@@ -442,13 +481,40 @@ td input.amt { text-align:right; font-variant-numeric:tabular-nums; }
       deleted, so a cleared row means "no longer waiting", not "proven delivered".</p>
   </div>
 
-  <div class="card" id="batchCard" style="display:none">
-    <div class="step"><span class="stepno">2</span><h3>Check the list</h3></div>
-    <p class="seclede" style="margin-top:0">Owner names and addresses come from the Units tab.
-      Anything not found there is flagged — fill it in here and it will be saved for next time.</p>
-    <table id="batchTbl"></table>
-    <div class="row" style="margin-top:12px">
-      <span class="barnote" id="batchSum" style="color:var(--ink2)"></span>
+  <div class="card split" id="batchCard" style="display:none">
+    <div class="bcol">
+      <div class="step"><span class="stepno">2</span><h3>Check the list</h3></div>
+      <p class="seclede" style="margin-top:0">Owner names and addresses come from the Units tab.
+        Anything not found there is flagged — fill it in here and it will be saved for next time.
+        Click any row to see exactly what that owner would receive.</p>
+      <table id="batchTbl"></table>
+      <div class="row" style="margin-top:12px">
+        <span class="barnote" id="batchSum" style="color:var(--ink2)"></span>
+      </div>
+    </div>
+    <div class="bcol prevcol">
+      <div class="prevcard" id="prevCard">
+        <div class="prevempty" id="prevEmpty">Click a unit on the left to see the email and the
+          letter it would receive.</div>
+        <div id="prevBody" style="display:none">
+          <div class="prevhead">
+            <div class="pu" id="prevUnit"></div>
+            <div class="po" id="prevOwner"></div>
+          </div>
+          <div class="prevsec">
+            <div class="ph">The email</div>
+            <div id="prevEnv"></div>
+          </div>
+          <div class="prevsec" style="padding:0">
+            <div class="ph" style="padding:11px 14px 0">The letter</div>
+            <div class="prevletter"><div class="letterdoc" id="prevLetter"></div>
+              <div class="shrinkwrap"></div></div>
+          </div>
+          <div class="prevfoot">
+            <button class="btn ico" id="btnPrevPdf"><span class="i"></span>Show the real PDF</button>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -626,7 +692,7 @@ td input.amt { text-align:right; font-variant-numeric:tabular-nums; }
   <button class="btn" id="pvPrint">Print / save as PDF</button>
   <button class="btn" id="pvClose">Close preview</button>
 </div>
-<div id="printArea"></div>
+<div id="printArea" class="letterdoc"></div>
 
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
@@ -901,7 +967,8 @@ function padFormBlock(f) {
 }
 
 /* ---------------- printable letter ----------------
-   Its styling lives in the page stylesheet under #printArea. */
+   Its styling lives in the page stylesheet under .letterdoc, shared by the print
+   container and the on-page preview panel. */
 
 function letterHtml(row, tpl, opts) {
   var f = fieldsFor(row, opts);
@@ -953,7 +1020,7 @@ function printAreaCss() {
     try { rules = ss.cssRules; } catch (e) { return; }     /* cross-origin sheet */
     [].forEach.call(rules, function (r) {
       if (r.type === CSSRule.PAGE_RULE) { out.push(r.cssText); return; }
-      if (r.selectorText && r.selectorText.indexOf("#printArea") >= 0) { out.push(r.cssText); return; }
+      if (r.selectorText && r.selectorText.indexOf(".letterdoc") >= 0) { out.push(r.cssText); return; }
       if (r.type === CSSRule.MEDIA_RULE && /print/.test(r.conditionText || (r.media && r.media.mediaText) || "")) {
         [].forEach.call(r.cssRules, function (x) { if (x.type === CSSRule.PAGE_RULE) out.push(x.cssText); });
       }
@@ -965,8 +1032,8 @@ function standaloneLetterDoc(rows, tpl, opts) {
   var body = rows.map(function (r) { return letterHtml(r, tpl, opts); }).join("\n");
   return '<!doctype html><html><head><meta charset="utf-8"><title>' + esc(tpl.name) +
     "</title><style>html,body{margin:0;padding:0;background:#fff}\n" + printAreaCss() +
-    "\n#printArea{display:block !important}</style></head><body>" +
-    '<div id="printArea">' + body + "</div></body></html>";
+    "</style></head><body>" +
+    '<div class="letterdoc">' + body + "</div></body></html>";
 }
 function renderPdf(rows, tpl, opts) {
   if (!firebase.functions) return Promise.reject(new Error("The PDF service is not loaded."));
@@ -1396,6 +1463,51 @@ function checkGmailDrafts() {
     $("btnCheckDrafts").disabled = false;
     note("pendNote", msg, true);
   });
+}
+
+/* ---------------- the side panel ----------------
+   The whole point is that the check costs nothing: this renders from the same
+   markup the PDF is built from, so clicking down a list of twenty is instant. The
+   real file is one button away when she wants the authoritative thing. */
+function renderPreview() {
+  var i = A.selRow, r = (i != null && i >= 0) ? A.rows[i] : null;
+  if (!r) {
+    $("prevEmpty").style.display = ""; $("prevBody").style.display = "none";
+    return;
+  }
+  $("prevEmpty").style.display = "none"; $("prevBody").style.display = "";
+  var tpl = currentTpl() || DEFAULT_TEMPLATES[0], o = opts();
+
+  $("prevUnit").textContent = "Unit " + (r.unit || "—");
+  $("prevOwner").textContent = r.owner || "no owner name yet";
+
+  var to = r.unit ? emailableOwners(r.unit) : [];
+  var known = rosterFind(r.unit);
+  var env = [];
+  env.push('<div class="envrow"><span class="el">To</span><span class="ev ' +
+    (to.length ? "mail" : "bad") + '">' +
+    (to.length ? esc(to.join(", "))
+      : (known ? "no owner email on file that has opted in — prints only"
+               : "unit is not in the Units tab")) + "</span></div>");
+  env.push('<div class="envrow"><span class="el">Subject</span><span class="ev">' +
+    esc((tpl.name.replace(/\s*—.*$/, "")) + " — Unit " + (r.unit || "?") + " — " + CORP.condo) + "</span></div>");
+  env.push('<div class="envrow"><span class="el">From</span><span class="ev">' +
+    esc(CORP.sendAsName + " <" + CORP.sendAs + ">") + "</span></div>");
+  env.push('<div class="envrow"><span class="el">Attached</span><span class="ev">' +
+    esc(mimeFilename(pdfName([r], tpl))) + "</span></div>");
+  env.push('<div class="envrow"><span class="el">Posting to</span><span class="ev">' +
+    (r.address ? esc(r.address).split("\n").join(", ") : '<span class="bad">no mailing address</span>') + "</span></div>");
+  $("prevEnv").innerHTML = env.join("");
+
+  $("prevLetter").innerHTML = letterHtml(r, tpl, o);
+  /* keep the scaled sheet's real height so the scroller can reach the bottom */
+  var sheet = $("prevLetter");
+  var wrapEl = sheet.parentNode.querySelector(".shrinkwrap");
+  if (wrapEl) wrapEl.style.height = Math.round(sheet.getBoundingClientRect().height) + "px";
+}
+function selectRow(i) {
+  A.selRow = (A.selRow === i) ? -1 : i;
+  renderBatch();
 }
 
 function printLetters(rows, tpl, opts, andLog) {
@@ -1971,7 +2083,8 @@ function renderBatch() {
       ? '<span class="chip bad">name needed</span>'
       : (!known ? '<span class="chip warn" title="This unit is not in the Units tab — the name and address here will not be remembered unless you add it">not in Units</span>'
                 : (r.nonResident ? '<span class="chip warn" title="Owner lives elsewhere — this goes to their mailing address, not the unit">non-resident</span>' : ""));
-    h.push('<tr class="' + (r.on ? "" : "off") + '">' +
+    h.push('<tr class="brow' + (r.on ? "" : " off") + (A.selRow === i ? " sel" : "") +
+      '" data-row="' + i + '">' +
       '<td><input type="checkbox" data-on="' + i + '"' + (r.on ? " checked" : "") + '></td>' +
       '<td><input type="text" data-b="' + i + '" data-k="unit" value="' + esc(r.unit) + '"></td>' +
       '<td><input type="text" data-b="' + i + '" data-k="owner" value="' + esc(r.owner) + '" placeholder="Owner of record"> ' + flag + "</td>" +
@@ -1988,6 +2101,14 @@ function renderBatch() {
   $("batchTbl").innerHTML = h.join("");
 
   batchSummary();
+  /* keep a sensible selection: first row when nothing is chosen, and never a row
+     that has since been dropped */
+  if (A.selRow == null || A.selRow < 0 || A.selRow >= A.rows.length) {
+    A.selRow = A.rows.length ? 0 : -1;
+    var tr = $("batchTbl").querySelector('tr[data-row="0"]');
+    if (tr && A.selRow === 0) tr.classList.add("sel");
+  }
+  renderPreview();
 }
 
 /* One place decides whether a batch is ready to print: a letter needs somebody to
@@ -2159,6 +2280,7 @@ function note(id, msg, bad, sticky) {
 }
 var TABS = [["tabLetters","pLetters"],["tabRoster","pRoster"],["tabTpl","pTpl"],["tabHist","pHist"]];
 function setTab(which) {
+  document.body.dataset.tab = which;   /* the Letters tab is laid out wider */
   TABS.forEach(function (t) {
     $(t[0]).classList.toggle("on", t[0] === which);
     $(t[1]).classList.toggle("on", t[0] === which);
@@ -2366,10 +2488,26 @@ $("batchTbl").addEventListener("click", function (e) {
     return;
   }
   var rm = e.target.closest && e.target.closest("[data-brm]");
-  if (!rm) return;
-  A.rows.splice(+rm.getAttribute("data-brm"), 1);
+  if (rm) {
+    var gone = +rm.getAttribute("data-brm");
+    A.rows.splice(gone, 1);
+    if (A.selRow > gone) A.selRow--; else if (A.selRow === gone) A.selRow = -1;
+    renderBatch();
+    return;
+  }
+  /* clicking the row selects it for the preview — but not when the click was aimed
+     at a field or a control inside it */
+  if (/^(INPUT|TEXTAREA|SELECT|BUTTON|LABEL)$/.test(e.target.tagName)) return;
+  var tr = e.target.closest && e.target.closest("tr[data-row]");
+  if (!tr) return;
+  A.selRow = +tr.getAttribute("data-row");
   renderBatch();
 });
+$("btnPrevPdf").onclick = function () {
+  var r = (A.selRow != null && A.selRow >= 0) ? A.rows[A.selRow] : null;
+  var t = currentTpl();
+  if (r && t) previewUnitPdf(r, t, opts());
+};
 /* escape hatch: if the inline view ever comes up blank, pop the same file out */
 $("btnCheckDrafts").onclick = checkGmailDrafts;
 $("pdfTab").onclick = function () {
@@ -2381,7 +2519,10 @@ $("pdfOverlay").addEventListener("click", function (e) { if (e.target === this) 
 document.addEventListener("keydown", function (e) {
   if (e.key === "Escape" && $("pdfOverlay").classList.contains("open")) closePdfPreview();
 });
-$("tplPick").onchange = function () { A.tplIdx = +this.value; $("tplEdit").value = this.value; loadTplEditor(); };
+$("tplPick").onchange = function () {
+  A.tplIdx = +this.value; $("tplEdit").value = this.value;
+  loadTplEditor(); renderPreview();   /* the panel follows the chosen template */
+};
 $("btnPreview").onclick = function () {
   var on = A.rows.filter(function (r) { return r.on; });
   if (!on.length) return;
@@ -2510,7 +2651,7 @@ $("rosterFind").addEventListener("input", function () { A.openUnit = -1; renderR
 (function () {
   var pairs = [["btnRosterAdd", ICON.plus], ["btnRosterCSV", ICON.upload], ["btnRosterImport", ICON.clip],
                ["btnFilters", ICON.filter], ["btnRosterSave", ICON.save], ["btnGuide", ICON.file],
-               ["btnPdf", ICON.file], ["btnEmail", ICON.upload]];
+               ["btnPdf", ICON.file], ["btnEmail", ICON.upload], ["btnPrevPdf", ICON.eye]];
   pairs.forEach(function (p) {
     var el = $(p[0]); if (!el) return;
     var slot = el.querySelector(".i"); if (slot) slot.innerHTML = p[1];
@@ -2684,8 +2825,8 @@ if (!gmailConfigured()) {
   $("btnEmail").title = "Gmail is not connected yet — the OAuth client ID has not been set.";
 }
 $("letterDate").value = isoToday();
-$("letterDate").addEventListener("change", renderTplPreview);
-$("dueDays").addEventListener("input", renderTplPreview);
+$("letterDate").addEventListener("change", function () { renderTplPreview(); renderPreview(); });
+$("dueDays").addEventListener("input", function () { renderTplPreview(); renderPreview(); });
 if (ASSET_LOGO && ASSET_LOGO.indexOf("_LOGO_") < 0) {
   $("gateLogo").src = ASSET_LOGO; $("gateLogo").style.display = "";
   $("barLogo").src = ASSET_LOGO; $("barLogo").style.display = "";
