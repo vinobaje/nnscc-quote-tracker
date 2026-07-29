@@ -2538,7 +2538,7 @@ function openJobDossier(id) {
   else if (fq) f.push(jdFactCard("cal", "First quoted", jdDate(fq), jdAgo(fq)));
   else f.push(jdFactCard("cal", "Date added", "Not recorded", "predates the tracker"));
   if (j.created && fq) f.push(jdFactCard("cal", "First quoted", jdDate(fq), jdAgo(fq)));
-  f.push(jdFactCard("cash", carried && carried.override ? "Counted in totals" : "Lowest quote · in totals",
+  f.push(jdFactCard("cash", "Selected / lowest quote",
     c.cost ? money(c.cost) : "Pending", carried ? (carried.b.contractor || "").trim() : "no priced quote yet"));
   if (c.saving > 0)
     f.push(jdFactCard("save", "Savings on this job", money(c.saving), "vs. next-lowest quote", true));
