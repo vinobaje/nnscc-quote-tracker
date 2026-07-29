@@ -384,6 +384,85 @@ exports.nnsccGate = onCall(
   }
 );
 
+// ---------------------------------------------------------------------------
+// Arrears letters — render to PDF (nnscc-arrears at nnscc292.web.app)
+//
+// The browser can print a letter but cannot hand the resulting PDF back to the
+// page, and a PDF is exactly what has to be attached to an email. So the same
+// letter HTML the app prints is rendered here by headless Chrome. Rendering the
+// identical markup, with preferCSSPageSize so the page's own @page rule governs,
+// is what keeps the emailed PDF byte-identical to the printed one — a second
+// layout engine would drift from it the first time anyone edited a template.
+// ---------------------------------------------------------------------------
+
+async function requireArrearsEditor(request) {
+  const auth = request.auth;
+  if (!auth || !auth.token || !auth.token.email || auth.token.email_verified !== true) {
+    throw new HttpsError("unauthenticated", "Sign in with an authorized account.");
+  }
+  const email = auth.token.email.toLowerCase();
+  const cfgSnap = await admin.firestore().doc("nnsccQuoteTrackerConfig/main").get();
+  const editors = ((cfgSnap.exists ? cfgSnap.data().editors : []) || []).map((e) => String(e).toLowerCase());
+  if (email !== OWNER && !editors.includes(email)) {
+    throw new HttpsError("permission-denied", "Only the property manager can produce arrears letters.");
+  }
+  return email;
+}
+
+exports.nnsccArrearsPdf = onCall(
+  { region: "us-central1", memory: "1GiB", timeoutSeconds: 180, maxInstances: 2, concurrency: 1 },
+  async (request) => {
+    await requireArrearsEditor(request);
+
+    const html = String((request.data && request.data.html) || "");
+    if (!html) throw new HttpsError("invalid-argument", "No letter markup was sent.");
+    if (html.length > 4000000) {
+      throw new HttpsError("invalid-argument", "That batch is too large to render in one go — split it.");
+    }
+
+    // puppeteer-core + @sparticuz/chromium rather than full puppeteer: the normal
+    // package downloads a Chromium for whatever machine ran `npm install`, which
+    // on a Mac means an arm64 binary that cannot execute on Cloud Run's linux/x64.
+    const chromium = require("@sparticuz/chromium");
+    const puppeteer = require("puppeteer-core");
+    let browser;
+    try {
+      browser = await puppeteer.launch({
+        headless: true,
+        args: [...chromium.args, "--font-render-hinting=none"],
+        defaultViewport: { width: 1100, height: 1400 },
+        executablePath: await chromium.executablePath(),
+      });
+      const page = await browser.newPage();
+
+      // The markup comes from our own client, but it is still content arriving
+      // over the wire: no scripts run, and nothing may be fetched except the
+      // data: URIs the letterhead logo is embedded as.
+      await page.setJavaScriptEnabled(false);
+      await page.setRequestInterception(true);
+      page.on("request", (req) => {
+        const u = req.url();
+        if (u.startsWith("data:") || u === "about:blank") req.continue();
+        else req.abort();
+      });
+
+      await page.setContent(html, { waitUntil: "load", timeout: 30000 });
+      await page.emulateMediaType("print");
+      const pdf = await page.pdf({
+        format: "letter",
+        printBackground: true,
+        preferCSSPageSize: true,   // the letter's own @page rule wins
+      });
+      return { pdf: Buffer.from(pdf).toString("base64") };
+    } catch (e) {
+      if (e instanceof HttpsError) throw e;
+      throw new HttpsError("internal", "Could not render the letter: " + ((e && e.message) || "unknown error"));
+    } finally {
+      if (browser) { try { await browser.close(); } catch (_) { /* nothing to do */ } }
+    }
+  }
+);
+
 // NOTE: The multi-tenant CondoQuote SaaS functions (saas*) live in the
 // separate SAAS repo (github.com/vinobaje/SAAS), functions codebase "saas".
 // Do not add SaaS code here.

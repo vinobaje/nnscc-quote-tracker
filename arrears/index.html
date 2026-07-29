@@ -1,0 +1,2393 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Waterview Condominium — Arrears Letters</title>
+<style>
+:root {
+  --paper:#F7F8F9; --card:#FFFFFF; --ink:#1E2833; --ink2:#4A5866; --muted:#7A8794;
+  --line:#D9DEE3; --line-soft:#E8ECEF;
+  --accent:#2D567F; --accent-ink:#24466B; --accent-soft:#EAF0F6;
+  --good:#1E7A46; --good-soft:#E7F3EC; --prio:#A03636; --prio-soft:#F7ECEC;
+  --amber:#B0700F; --amber-soft:#F8EFDD;
+}
+html { background:var(--paper); color-scheme:light; }
+body { font:15px/1.55 -apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; color:var(--ink);
+  background:var(--paper); margin:0; padding:0 20px 80px; }
+.wrap { max-width:1000px; margin:0 auto; }
+h1,h2,h3 { font-family:Georgia,"Iowan Old Style","Times New Roman",serif; font-weight:600; text-wrap:balance; }
+h2 { font-size:21px; margin:0 0 4px; }
+h3 { font-size:16px; margin:0 0 6px; }
+.kicker { text-transform:uppercase; letter-spacing:.14em; font-size:11.5px; color:var(--accent-ink); font-weight:600; }
+.seclede { color:var(--ink2); font-size:14px; max-width:70ch; margin:2px 0 16px; }
+a { color:var(--accent-ink); }
+
+/* ---------- app bar ---------- */
+.appbar { position:sticky; top:0; z-index:30; background:linear-gradient(90deg,#1B2634 0%,#25405E 100%);
+  box-shadow:0 2px 12px rgba(15,22,31,.35); margin:0 -20px; }
+.appbar-inner { max-width:1000px; margin:0 auto; padding:9px 20px; display:flex; gap:8px;
+  align-items:center; flex-wrap:wrap; }
+.appbrand { display:flex; align-items:center; gap:9px; font-family:Georgia,serif; font-size:15.5px;
+  font-weight:600; color:#fff; margin-right:6px; white-space:nowrap; }
+.appbrand img { height:24px; display:block; }
+.appbar .spacer { flex:1; }
+.appbar .btn { background:rgba(255,255,255,.08); color:#E8EEF5; border:1px solid rgba(255,255,255,.22); }
+.appbar .btn:hover { background:rgba(255,255,255,.18); filter:none; }
+.appbar .btn.on { background:#fff; color:#24466B; border-color:#fff; }
+.barnote { font-size:12px; color:rgba(255,255,255,.65); }
+
+.btn { font:600 13px/1 -apple-system,"Segoe UI",Roboto,sans-serif; color:var(--accent-ink);
+  background:var(--accent-soft); border:1px solid var(--line); border-radius:6px; padding:8px 13px;
+  cursor:pointer; white-space:nowrap; }
+.btn:hover { filter:brightness(.97); }
+.btn:disabled { opacity:.5; cursor:default; filter:none; }
+.btn.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+.btn.ghost { background:transparent; }
+.btn.danger { color:var(--prio); background:var(--prio-soft); border-color:#E7CFCF; }
+.btn.sm { padding:5px 9px; font-size:12px; }
+
+/* ---------- layout ---------- */
+header.pg { padding:26px 0 14px; border-bottom:3px double var(--line); margin-bottom:22px; }
+.panel { display:none; }
+.panel.on { display:block; }
+.card { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:18px 20px;
+  box-shadow:0 1px 3px rgba(30,40,51,.06); margin:16px 0; }
+.card > h3:first-child { margin-top:0; }
+.step { display:flex; align-items:baseline; gap:9px; margin:0 0 8px; }
+.stepno { flex:none; width:22px; height:22px; border-radius:50%; background:var(--accent); color:#fff;
+  font:700 12px/22px -apple-system,sans-serif; text-align:center; }
+.row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+.row.end { justify-content:flex-end; }
+label.fld { display:flex; flex-direction:column; gap:4px; font-size:12.5px; font-weight:600; color:var(--ink2); }
+input[type=text], input[type=date], input[type=number], select, textarea {
+  font:14px -apple-system,"Segoe UI",Roboto,sans-serif; color:var(--ink); background:#fff;
+  border:1px solid var(--line); border-radius:6px; padding:7px 9px; }
+input:focus, select:focus, textarea:focus { outline:2px solid var(--accent); outline-offset:-1px; border-color:var(--accent); }
+textarea { width:100%; box-sizing:border-box; resize:vertical; line-height:1.5; }
+textarea.mono { font:13px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace; }
+
+/* ---------- tables ---------- */
+table { border-collapse:collapse; width:100%; font-size:13.5px; }
+th { text-align:left; font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted);
+  font-weight:700; padding:0 10px 7px; border-bottom:1px solid var(--line); white-space:nowrap; }
+td { padding:8px 10px; border-bottom:1px solid var(--line-soft); vertical-align:middle; }
+td.num, th.num { text-align:right; font-variant-numeric:tabular-nums; }
+tr.off td { opacity:.42; }
+td input[type=text] { width:100%; box-sizing:border-box; padding:5px 7px; font-size:13px; }
+td textarea { width:100%; box-sizing:border-box; padding:5px 7px; font-size:12.5px; line-height:1.4;
+  resize:vertical; min-height:30px; }
+.sub { display:block; font-size:11px; color:var(--muted); margin-top:2px; line-height:1.35;
+  overflow-wrap:anywhere; }
+.sub.mail { color:var(--accent-ink); }
+td .chip { margin-bottom:2px; }
+.dtog { font-size:13px; padding:4px 7px; }
+
+/* ---------- units: header, banner, toolbar, table ---------- */
+.pghead { display:flex; justify-content:space-between; align-items:flex-start; gap:20px; }
+.btn.ico { display:inline-flex; align-items:center; gap:7px; }
+.btn.ico .i { display:inline-flex; width:15px; height:15px; flex:none; }
+.btn.ico .i svg { width:15px; height:15px; display:block; }
+.btn.save { background:#1F2E42; border-color:#1F2E42; color:#fff; }
+.btn.save:hover { background:#2A3D55; filter:none; }
+
+.banner { display:flex; gap:12px; align-items:flex-start; background:#EEF4FB; border:1px solid #CFDFEF;
+  border-radius:10px; padding:14px 16px; margin:16px 0; font-size:13.5px; line-height:1.55;
+  color:var(--accent-ink); }
+.banner .bico { flex:none; width:22px; height:22px; border-radius:50%; background:var(--accent);
+  color:#fff; display:flex; align-items:center; justify-content:center; margin-top:1px; }
+.banner .bico svg { width:13px; height:13px; }
+.banner .btext { flex:1; }
+.banner .btext b { color:#173350; }
+.banner .bclose { flex:none; border:none; background:none; color:var(--accent-ink); opacity:.5;
+  cursor:pointer; font-size:14px; padding:2px 4px; line-height:1; }
+.banner .bclose:hover { opacity:1; }
+
+.panelcard { background:var(--card); border:1px solid var(--line); border-radius:10px;
+  box-shadow:0 1px 3px rgba(30,40,51,.07); overflow:visible; }
+.toolbar { display:flex; gap:8px; align-items:center; flex-wrap:wrap; padding:14px 16px 12px; }
+.searchwrap { position:relative; flex:1 1 260px; min-width:200px; }
+.searchwrap input { width:100%; box-sizing:border-box; padding:9px 30px 9px 34px; font-size:13.5px;
+  border-radius:8px; background:#FBFCFD; }
+.searchicon { position:absolute; left:11px; top:50%; transform:translateY(-50%);
+  color:var(--muted); pointer-events:none; display:flex; }
+.searchicon svg { width:15px; height:15px; display:block; }
+.clearx { position:absolute; right:6px; top:50%; transform:translateY(-50%); display:none;
+  border:none; background:none; color:var(--muted); cursor:pointer; font-size:13px; padding:4px 6px; }
+.searchwrap.has .clearx { display:block; }
+
+.filterbar { display:flex; gap:7px; flex-wrap:wrap; padding:0 16px 12px; }
+.fchip { font:600 12px -apple-system,"Segoe UI",Roboto,sans-serif; border:1px solid var(--line);
+  background:var(--card); color:var(--ink2); border-radius:99px; padding:5px 12px; cursor:pointer; }
+.fchip:hover { background:var(--accent-soft); }
+.fchip.on { background:var(--accent); border-color:var(--accent); color:#fff; }
+
+.statrow { display:flex; align-items:center; gap:14px; padding:0 16px 12px; font-size:12.5px;
+  color:var(--muted); flex-wrap:wrap; }
+.statrow .stat { display:inline-flex; align-items:center; gap:6px; }
+.statrow .stat svg { width:14px; height:14px; color:var(--muted); }
+.statrow .stat b { color:var(--ink); font-size:14px; font-weight:700; }
+.statrow .vsep { width:1px; height:16px; background:var(--line); }
+.inbox { padding:0 16px 14px; }
+
+/* people matches, shown above the table while searching */
+.hits { background:var(--card); border:1px solid var(--line); border-radius:8px;
+  box-shadow:0 1px 3px rgba(30,40,51,.06); margin-bottom:12px; overflow:hidden; }
+.hits .hhead { font-size:10.5px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted);
+  font-weight:700; padding:9px 14px; background:#F7F8FA; border-bottom:1px solid var(--line-soft); }
+.hit { display:flex; gap:10px; align-items:baseline; padding:8px 14px; cursor:pointer;
+  border-bottom:1px solid var(--line-soft); }
+.hit:last-child { border-bottom:none; }
+.hit:hover { background:var(--accent-soft); }
+.hit .hn { color:var(--accent-ink); font-weight:600; font-size:13.5px; }
+.hit .hm { font-size:12.5px; color:var(--ink2); }
+.hit .hm b { color:var(--ink); }
+
+/* The sticky header must not sit in an overflow:hidden box — that makes the box a
+   scroll container and the header offsets itself inside it, covering the first row. */
+#rosterTbl { width:100%; border-collapse:separate; border-spacing:0; font-size:13px; }
+#rosterTbl th { position:sticky; top:var(--abh,44px); z-index:5; background:#FAFBFC;
+  padding:10px 14px; font-size:10.5px; letter-spacing:.06em; text-transform:uppercase;
+  color:var(--muted); font-weight:700; text-align:left; white-space:nowrap;
+  border-top:1px solid var(--line-soft); border-bottom:1px solid var(--line-soft); }
+#rosterTbl th.sortable { cursor:pointer; user-select:none; }
+#rosterTbl th.sortable:hover { color:var(--accent-ink); }
+#rosterTbl th .arw { opacity:0; margin-left:4px; font-size:9px; }
+#rosterTbl th.on { color:var(--accent-ink); }
+#rosterTbl th.on .arw { opacity:1; }
+#rosterTbl th.cact { text-align:right; }
+#rosterTbl td { padding:12px 14px; border-bottom:1px solid var(--line-soft); vertical-align:top;
+  line-height:1.45; }
+#rosterTbl tr.u:hover td { background:#F7FAFD; }
+#rosterTbl tr.u.open td { background:#F2F7FC; }
+#rosterTbl tr:last-child td { border-bottom:none; }
+
+.cx { width:44px; padding-right:0 !important; }
+#rosterTbl th:nth-child(2) { width:104px; }
+#rosterTbl th:nth-child(4) { width:170px; }
+#rosterTbl th:nth-child(5) { width:30%; }
+#rosterTbl th.cact { width:112px; }
+.chev { width:26px; height:26px; border-radius:7px; border:1px solid var(--line);
+  background:var(--card); color:var(--ink2); cursor:pointer; display:flex; align-items:center;
+  justify-content:center; padding:0; }
+.chev:hover { background:var(--accent-soft); border-color:#CFDDEA; color:var(--accent-ink); }
+.chev svg { width:13px; height:13px; transition:transform .15s; }
+.chev.open svg { transform:rotate(90deg); }
+
+.unitpill { display:inline-block; font:700 12.5px ui-monospace,SFMono-Regular,Menlo,monospace;
+  background:#EAF1F9; color:#24466B; border-radius:6px; padding:4px 9px; white-space:nowrap; }
+.oname { font-weight:600; color:var(--ink); font-size:13.5px; }
+.omail { font-size:11.5px; color:var(--accent-ink); margin-top:2px; overflow-wrap:anywhere; }
+.omail.none { color:var(--muted); font-style:italic; }
+.occ { display:flex; flex-direction:column; gap:4px; align-items:flex-start; }
+#rosterTbl .addr { color:var(--ink2); font-size:12.5px; }
+.acts { text-align:right; white-space:nowrap; }
+.iconbtn { width:28px; height:28px; border-radius:7px; border:1px solid transparent;
+  background:none; color:var(--muted); cursor:pointer; padding:0; display:inline-flex;
+  align-items:center; justify-content:center; vertical-align:middle; }
+.iconbtn svg { width:15px; height:15px; }
+.iconbtn:hover { background:var(--accent-soft); color:var(--accent-ink); border-color:#DCE7F2; }
+.iconbtn.del:hover { background:var(--prio-soft); color:var(--prio); border-color:#E7CFCF; }
+
+/* expanded row — tenant, notes, quick actions */
+#rosterTbl tr.det td { background:#F7F9FB; padding:0 14px 14px; }
+.expand { display:grid; grid-template-columns:1.1fr 1.1fr .9fr; gap:0;
+  background:var(--card); border:1px solid var(--line); border-radius:9px; overflow:hidden; }
+.expand .ecol { padding:14px 16px; }
+.expand .ecol + .ecol { border-left:1px solid var(--line-soft); }
+.ehead { font-size:10.5px; letter-spacing:.07em; text-transform:uppercase; color:var(--muted);
+  font-weight:700; margin-bottom:9px; }
+.eline { display:flex; gap:9px; align-items:flex-start; font-size:12.5px; color:var(--ink2); }
+.eline svg { width:15px; height:15px; flex:none; color:var(--muted); margin-top:2px; }
+.eline .en { color:var(--ink); font-weight:600; display:block; margin-bottom:2px; }
+.eline .em { color:var(--accent-ink); display:block; overflow-wrap:anywhere; }
+.eline.flag { color:var(--prio); }
+.eline.flag svg { color:var(--prio); }
+.qa { display:flex; flex-direction:column; gap:7px; align-items:stretch; }
+.qa .btn { justify-content:center; }
+@media (max-width:820px) {
+  .expand { grid-template-columns:1fr; }
+  .expand .ecol + .ecol { border-left:none; border-top:1px solid var(--line-soft); }
+}
+.nowrap { white-space:nowrap; }
+
+/* ---------- unit typeahead (Letters tab) ---------- */
+.ac { position:absolute; z-index:200; background:var(--card); border:1px solid var(--line);
+  border-radius:8px; box-shadow:0 12px 34px rgba(20,26,33,.24); overflow-y:auto;
+  max-height:270px; min-width:290px; padding:4px; }
+.acitem { display:flex; gap:9px; align-items:center; padding:7px 8px; cursor:pointer;
+  border-radius:6px; }
+.acitem.on, .acitem:hover { background:var(--accent-soft); }
+.acitem .unitpill { font-size:11.5px; padding:3px 7px; }
+.acbody { flex:1; min-width:0; display:block; }
+.acname { display:block; font-size:13px; color:var(--ink); font-weight:600; white-space:nowrap;
+  overflow:hidden; text-overflow:ellipsis; }
+.acmeta { display:block; font-size:11px; color:var(--muted); white-space:nowrap; overflow:hidden;
+  text-overflow:ellipsis; margin-top:1px; }
+.acempty { padding:9px 10px; font-size:12.5px; color:var(--muted); }
+.achint { padding:6px 10px 4px; font-size:10.5px; letter-spacing:.06em; text-transform:uppercase;
+  color:var(--muted); font-weight:700; }
+
+/* ---------- the printed letter ----------
+   Letters print from a container inside this page, not from a document.write
+   pop-up. A written-into pop-up previews correctly but saves a BLANK pdf — one
+   page, no fonts, an empty "q Q" content stream — because the print job captures
+   the original empty document. Printing in place also drops the pop-up prompt. */
+#printArea { display:none; }
+#printArea, #printArea * { box-sizing:border-box; }
+#printArea { font:11.5pt/1.48 Georgia,"Times New Roman",serif; color:#1b2430; background:#fff; }
+#printArea .letter { max-width:170mm; margin:0 auto; }
+#printArea .letter + .letter { break-before:page; page-break-before:always; }
+#printArea .lh { display:flex; align-items:center; gap:15px; border-bottom:2.5px solid #16273f;
+  padding-bottom:10px; }
+#printArea .lh img { height:44px; width:auto; }
+#printArea .lh .corp { flex:1; }
+#printArea .lh .cn { font:700 15.5pt/1.15 Georgia,serif; color:#16273f; letter-spacing:.2px; }
+#printArea .lh .cs { font-size:9.5pt; color:#4a5566; margin-top:2px; }
+#printArea .dt { margin:14px 0 10px; font-size:10.5pt; color:#4a5566; }
+#printArea .addr { font-size:11pt; line-height:1.4; margin-bottom:15px; }
+#printArea .addr .nm { font-weight:700; }
+#printArea h2 { font:600 12.5pt Georgia,serif; letter-spacing:1px; text-transform:uppercase;
+  text-align:center; margin:0 0 12px; break-after:avoid; page-break-after:avoid; }
+#printArea p { margin:8px 0; orphans:2; widows:2; }
+#printArea hr { border:none; border-top:1px solid #b7c0cc; margin:13px 0; }
+#printArea .sig { margin-top:18px; break-inside:avoid; page-break-inside:avoid; }
+#printArea .sigline { border-bottom:1.2px solid #26333f; width:62mm; height:28px; margin:3px 0 5px; }
+#printArea .signame { font-size:10.5pt; margin:0; line-height:1.4; }
+/* The authorization is a form to sign and send back, so it starts its own sheet:
+   the covering letter explains, page two is the thing that gets returned. Left to
+   fall naturally it is too tall for the space under the letter and jumps anyway,
+   stranding half a blank page behind it. */
+#printArea .padform { border:1.5px solid #16273f; border-radius:5px; padding:13px 15px; margin:14px 0;
+  break-inside:avoid; page-break-inside:avoid;
+  break-before:page; page-break-before:always; }
+#printArea .padform:first-child { break-before:auto; page-break-before:auto; }
+#printArea .pf-h { font:700 10.5pt Georgia,serif; color:#16273f; text-transform:uppercase;
+  letter-spacing:.6px; border-bottom:1px solid #b7c0cc; padding-bottom:5px; margin-bottom:11px; }
+#printArea .pf-row { display:flex; gap:14px; margin-bottom:14px; }
+#printArea .pf-l { display:flex; flex-direction:column-reverse; }
+#printArea .pf-lab { font:8.5pt/1.2 -apple-system,Helvetica,Arial,sans-serif; color:#5a6472; margin-top:3px; }
+#printArea .pf-rule { border-bottom:1px solid #26333f; height:16px; }
+#printArea .pf-fixed { border-bottom:1px solid #26333f; height:16px; font-weight:700; font-size:11pt; }
+#printArea .pf-t { font-size:8.5pt; line-height:1.4; color:#3a4450; margin:6px 0; }
+#printArea .pf-void { font-size:9pt; margin-top:9px; }
+#printArea .foot { margin-top:16px; border-top:1px solid #cdd5df; padding-top:6px; font-size:8pt;
+  color:#7a838f; display:flex; justify-content:space-between; break-inside:avoid; }
+
+@media print {
+  @page { size:letter; margin:16mm 20mm 12mm; }
+  html, body { background:#fff !important; margin:0 !important; padding:0 !important; }
+  .appbar, .wrap, .gate, .ac, .banner { display:none !important; }
+  #printArea { display:block !important; }
+}
+/* on-screen proof sheet: the same markup, shown at true page width */
+body.previewing #printArea { display:block; background:#fff; padding:14mm 20mm;
+  max-width:215.9mm; margin:16px auto; box-shadow:0 6px 30px rgba(20,26,33,.22); }
+body.previewing .wrap, body.previewing .appbar { display:none; }
+.pvbar { position:fixed; top:0; left:0; right:0; z-index:90; display:none;
+  background:linear-gradient(90deg,#1B2634 0%,#25405E 100%); padding:9px 20px; gap:8px;
+  align-items:center; box-shadow:0 2px 12px rgba(15,22,31,.35); }
+body.previewing .pvbar { display:flex; }
+.pvbar .lab { color:#E8EEF5; font:600 13px -apple-system,sans-serif; margin-right:auto; }
+.pvbar .fit { color:rgba(255,255,255,.72); font:12px -apple-system,sans-serif; margin-right:10px; }
+body.previewing { padding-top:52px; }
+@media print { .pvbar { display:none !important; } }
+
+/* ---------- expanded unit detail ---------- */
+.dedit { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px; }
+.dedit label { font-size:11.5px; font-weight:700; color:var(--ink2); display:flex;
+  flex-direction:column; gap:4px; }
+.dedit input, .dedit textarea { font-size:13px; }
+@media (max-width:700px) { .dedit { grid-template-columns:1fr; } }
+.detail { background:#FBFCFD; border:1px solid var(--line-soft); border-radius:7px;
+  padding:12px 14px; margin:2px 0 8px; }
+.dsec + .dsec { margin-top:12px; border-top:1px solid var(--line-soft); padding-top:12px; }
+.dhead { font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted);
+  font-weight:700; margin-bottom:8px; }
+.d-row { display:flex; gap:10px; font-size:12.5px; line-height:1.45; margin:3px 0; }
+.d-lab { flex:none; width:126px; color:var(--muted); }
+.d-val { color:var(--ink); }
+.d-val.flag { color:var(--prio); font-weight:600; }
+.pcard { background:var(--card); border:1px solid var(--line); border-radius:6px;
+  padding:9px 11px; margin-bottom:8px; }
+.pcard:last-child { margin-bottom:0; }
+.p-head { margin-bottom:5px; font-size:13.5px; }
+td input.amt { text-align:right; font-variant-numeric:tabular-nums; }
+.chip { display:inline-block; font-size:11px; font-weight:700; border-radius:99px; padding:2px 8px;
+  background:var(--accent-soft); color:var(--accent-ink); white-space:nowrap; }
+.chip.warn { background:var(--amber-soft); color:var(--amber); }
+.chip.bad { background:var(--prio-soft); color:var(--prio); }
+.chip.ok { background:var(--good-soft); color:var(--good); }
+.empty { color:var(--muted); font-size:13.5px; padding:16px 2px; }
+
+/* ---------- notices ---------- */
+.note { border-radius:7px; padding:11px 14px; font-size:13.5px; margin:14px 0; line-height:1.5; }
+.note.info { background:var(--accent-soft); color:var(--accent-ink); border:1px solid #CFDDEA; }
+.note.warn { background:var(--amber-soft); color:#7A4D0A; border:1px solid #E9D3A8; }
+.note b { font-weight:700; }
+
+/* ---------- merge-field chips ---------- */
+.fields { display:flex; flex-wrap:wrap; gap:5px; margin:8px 0 12px; }
+.fields button { font:600 11.5px ui-monospace,Menlo,monospace; color:var(--accent-ink);
+  background:var(--accent-soft); border:1px solid #CFDDEA; border-radius:5px; padding:3px 7px; cursor:pointer; }
+.fields button:hover { background:#DCE7F2; }
+
+/* ---------- letter preview ---------- */
+.preview { background:#fff; border:1px solid var(--line); border-radius:6px; padding:26px 30px;
+  font:12pt/1.6 Georgia,"Times New Roman",serif; color:#1b2430; max-height:560px; overflow-y:auto; }
+.preview h2 { font-size:13.5pt; letter-spacing:1px; text-transform:uppercase; text-align:center; margin:0 0 14px; }
+.preview p { margin:11px 0; }
+.preview hr { border:none; border-top:1px solid #b7c0cc; margin:16px 0; }
+
+/* ---------- sign-in gate ---------- */
+.gate { position:fixed; inset:0; background:linear-gradient(160deg,#1B2634 0%,#25405E 100%);
+  z-index:80; display:flex; align-items:center; justify-content:center; padding:20px; }
+.gate.off { display:none; }
+.gatebox { background:var(--card); border-radius:10px; box-shadow:0 18px 50px rgba(10,16,24,.45);
+  padding:30px 32px; width:min(430px,94vw); text-align:center; }
+.gatebox img { height:44px; margin-bottom:14px; }
+.gatebox h1 { font:600 22px Georgia,serif; margin:0 0 6px; }
+.gatebox p { color:var(--ink2); font-size:13.5px; margin:0 0 18px; line-height:1.55; }
+.gatebox .err { color:var(--prio); font-size:13px; min-height:20px; margin-top:12px; font-weight:600; }
+</style>
+
+<div class="gate" id="gate">
+  <div class="gatebox">
+    <img id="gateLogo" src="" alt="" style="display:none">
+    <h1>Arrears Letters</h1>
+    <p>Waterview Condominium · NNSCC No. 292</p>
+    <button class="btn primary" id="btnSignIn" style="padding:10px 20px;font-size:14px">Sign in with Google</button>
+    <div class="err" id="gateErr"></div>
+  </div>
+</div>
+
+<div class="appbar">
+  <div class="appbar-inner">
+    <span class="appbrand"><img id="barLogo" src="" alt="" style="display:none">Arrears Letters</span>
+    <button class="btn on" id="tabLetters">Letters</button>
+    <button class="btn" id="tabRoster">Units</button>
+    <button class="btn" id="tabTpl">Templates</button>
+    <button class="btn" id="tabHist">History</button>
+    <span class="spacer"></span>
+    <span class="barnote" id="who"></span>
+    <button class="btn" id="btnSignOut">Sign out</button>
+  </div>
+</div>
+
+<div class="wrap">
+
+<!-- ============ LETTERS ============ -->
+<div class="panel on" id="pLetters">
+  <header class="pg">
+    <div class="kicker">Waterview Condominium · NNSCC No. 292</div>
+    <h2>Prepare a batch of letters</h2>
+    <p class="seclede">Paste this month's arrears list, check the rows, pick a template,
+      and print. Every letter is recorded so the next batch knows what has already gone out.</p>
+  </header>
+
+  <div class="card">
+    <div class="step"><span class="stepno">1</span><h3>Paste the arrears list</h3></div>
+    <p class="seclede" style="margin-top:0">One unit per line. Unit number first, dollar amount last —
+      a name in between is optional. Commas, tabs, dashes and <code>$</code> are all fine.
+      Copying straight out of a spreadsheet works.<br>
+      Or paste just the unit numbers — <code>550-210, 560-811, 560-406</code> — and type the
+      amounts into the table below.</p>
+    <textarea id="paste" class="mono" rows="7" placeholder="402   1,234.56&#10;510, J. Smith, 680.00&#10;Unit 1108 — $2,415.90"></textarea>
+    <div class="row" style="margin-top:10px">
+      <button class="btn primary" id="btnParse">Read the list</button>
+      <button class="btn ghost" id="btnAddRow">Add a unit by hand</button>
+      <span class="barnote" id="parseNote" style="color:var(--muted)"></span>
+    </div>
+  </div>
+
+  <div class="card" id="batchCard" style="display:none">
+    <div class="step"><span class="stepno">2</span><h3>Check the list</h3></div>
+    <p class="seclede" style="margin-top:0">Owner names and addresses come from the Units tab.
+      Anything not found there is flagged — fill it in here and it will be saved for next time.</p>
+    <table id="batchTbl"></table>
+    <div class="row" style="margin-top:12px">
+      <span class="barnote" id="batchSum" style="color:var(--ink2)"></span>
+    </div>
+  </div>
+
+  <div class="card" id="optCard" style="display:none">
+    <div class="step"><span class="stepno">3</span><h3>Choose the letter</h3></div>
+    <div class="row" style="gap:16px">
+      <label class="fld">Template
+        <select id="tplPick" style="min-width:260px"></select></label>
+      <label class="fld">Date on the letter
+        <input type="date" id="letterDate"></label>
+      <label class="fld">Days to pay
+        <input type="number" id="dueDays" value="15" min="0" max="120" style="width:80px"></label>
+    </div>
+    <div class="row" style="margin-top:18px">
+      <button class="btn primary" id="btnGenerate" style="padding:10px 18px;font-size:14px">Generate letters</button>
+      <button class="btn" id="btnPreview">Preview the first one</button>
+      <button class="btn ico" id="btnPdf"><span class="i"></span>Download PDF</button>
+      <button class="btn ico" id="btnEmail"><span class="i"></span>Email drafts</button>
+      <span class="barnote" id="genNote" style="color:var(--muted)"></span>
+    </div>
+    <div class="note info" style="margin-bottom:0">
+      Generating opens a printable page — use your browser's <b>Print → Save as PDF</b>.
+      Each letter starts on its own page. The batch is written to the History tab at the
+      same time; nothing is emailed or sent for you.
+    </div>
+  </div>
+</div>
+
+<!-- ============ ROSTER ============ -->
+<div class="panel" id="pRoster">
+  <header class="pg pghead">
+    <div>
+      <div class="kicker">Units</div>
+      <h2>Owner of record</h2>
+      <p class="seclede">The name and mailing address used on every letter. Fill this in once;
+        after that you only ever paste unit numbers and amounts.</p>
+    </div>
+    <button class="btn ghost ico" id="btnGuide"><span class="i"></span>Import guide</button>
+  </header>
+
+  <div class="banner" id="importBanner">
+    <span class="bico"></span>
+    <div class="btext">
+      <b>Importing from the management system.</b>
+      Click <b>Import CSVs</b> and select the <b>Unit Manager</b> and <b>User Manager</b> exports
+      together — the order you pick them in does not matter, they are applied in the right one.
+      Unit Manager carries the units, owners, tenants, parking, lockers and entry instructions;
+      User Manager carries every person with their contacts and each owner's real mailing address.
+      You need both for a complete record.
+      Re-importing later updates what has changed and never duplicates a unit.
+    </div>
+    <button class="bclose" id="bannerClose" title="Hide">✕</button>
+  </div>
+  <div class="note warn" id="rosterWarn" style="display:none"></div>
+
+  <div class="panelcard">
+    <div class="toolbar">
+      <button class="btn primary ico" id="btnRosterAdd"><span class="i"></span>Add unit</button>
+      <button class="btn ico" id="btnRosterCSV"><span class="i"></span>Import CSVs</button>
+      <input type="file" id="csvFile" accept=".csv,text/csv" multiple style="display:none">
+      <button class="btn ico" id="btnRosterImport"><span class="i"></span>Bulk paste</button>
+      <div class="searchwrap">
+        <span class="searchicon"></span>
+        <input type="text" id="rosterFind" autocomplete="off"
+               placeholder="Search by unit, owner or email…">
+        <button class="clearx" id="findClear" title="Clear">✕</button>
+      </div>
+      <button class="btn ico" id="btnFilters"><span class="i"></span>Filters</button>
+      <span class="spacer"></span>
+      <span class="barnote" id="rosterNote"></span>
+      <button class="btn save ico" id="btnRosterSave"><span class="i"></span>Save changes</button>
+    </div>
+
+    <div class="filterbar" id="filterBar" style="display:none"></div>
+
+    <div class="statrow" id="rosterCount"></div>
+
+    <div id="importBox" style="display:none" class="inbox">
+      <p class="seclede" style="margin-top:0">One unit per line: <b>unit, owner name, mailing address</b>.
+        Units already on the list are updated, not duplicated.</p>
+      <textarea id="importText" class="mono" rows="6" placeholder="550-402, John Smith&#10;550-510, Mary Chan"></textarea>
+      <div class="row" style="margin-top:8px">
+        <button class="btn primary sm" id="btnImportGo">Add them</button>
+        <button class="btn ghost sm" id="btnImportCancel">Cancel</button>
+      </div>
+    </div>
+
+    <div id="peopleHits"></div>
+    <table id="rosterTbl"></table>
+  </div>
+</div>
+
+<!-- ============ TEMPLATES ============ -->
+<div class="panel" id="pTpl">
+  <header class="pg">
+    <div class="kicker">Templates</div>
+    <h2>Letter wording</h2>
+    <p class="seclede">Edit the wording here and it applies to every letter from then on.
+      The <code>{{...}}</code> fields are filled in per unit when you generate.</p>
+  </header>
+
+  <div class="note warn">
+    <b>The wording below is a starting draft, not approved text.</b> Replace it with the
+    Corporation's own letters and have counsel review anything that refers to liens,
+    interest, costs or deadlines before it goes out. The same goes for the pre-authorized
+    debit form — confirm the wording with the Corporation's bank.
+  </div>
+
+  <div class="card">
+    <div class="row" style="margin-bottom:12px">
+      <label class="fld">Editing
+        <select id="tplEdit" style="min-width:300px"></select></label>
+      <span class="spacer"></span>
+      <span class="barnote" id="tplNote" style="color:var(--muted)"></span>
+      <button class="btn primary" id="btnTplSave">Save</button>
+    </div>
+    <label class="fld" style="margin-bottom:8px">Name of this template
+      <input type="text" id="tplName" style="max-width:400px"></label>
+    <div class="fields" id="fieldChips"></div>
+    <textarea id="tplBody" class="mono" rows="20"></textarea>
+    <p class="seclede" style="margin:10px 0 0">
+      Blank line = new paragraph. <code># Heading</code> centres a title.
+      <code>**bold**</code> for bold. <code>---</code> draws a line.
+      <code>[[SIGNATURE]]</code> and <code>[[PAD_FORM]]</code> drop in the signature block
+      and the banking authorization form.</p>
+  </div>
+
+  <div class="card">
+    <h3>Preview</h3>
+    <p class="seclede" style="margin-top:0">Shown with sample figures.</p>
+    <div class="preview" id="tplPreview"></div>
+  </div>
+</div>
+
+<!-- ============ HISTORY ============ -->
+<div class="panel" id="pHist">
+  <header class="pg">
+    <div class="kicker">History</div>
+    <h2>Every letter that has gone out</h2>
+    <p class="seclede">The record of what was demanded, from whom, and when. Letters cannot be
+      edited or deleted — one sent in error is marked void and stays on the record.</p>
+  </header>
+  <div class="card">
+    <div class="row" style="margin-bottom:12px">
+      <label class="fld">Filter by unit
+        <input type="text" id="histFilter" placeholder="e.g. 402" style="width:140px"></label>
+      <span class="spacer"></span>
+      <button class="btn" id="btnHistReload">Refresh</button>
+    </div>
+    <table id="histTbl"></table>
+  </div>
+</div>
+
+</div>
+
+<div class="pvbar" id="pvBar">
+  <span class="lab" id="pvLabel"></span>
+  <span class="fit" id="pvFit"></span>
+  <button class="btn" id="pvPrint">Print / save as PDF</button>
+  <button class="btn" id="pvClose">Close preview</button>
+</div>
+<div id="printArea"></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-functions-compat.js"></script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script>
+/* =======================================================================
+   Waterview Condominium (NNSCC No. 292) — arrears letter tool.
+
+   Editor-only throughout: this file shows nothing at all until an
+   allowlisted property-manager account signs in, because every screen in it
+   pairs an owner's name with what they owe.
+
+   Firestore:
+     nnsccArrearsRoster/main     { units:[...] }        the owner-of-record list
+     nnsccArrearsTemplates/main  { templates:[...] }    the letter wording
+     nnsccArrearsLetters/{id}    one doc per letter     append-only record
+   ======================================================================= */
+
+var ASSET_LOGO = "data:image/webp;base64,UklGRkguAABXRUJQVlA4WAoAAAAQAAAA7wEASgEAQUxQSOYVAAABHAVt2zAJf9j7QxARE8BPR1ObiZFkmQAFq6IGE5sg3Wp78ljQBIqICAkVUoBLmBKmDvfhIoi2EIdbAAVsCZTAOTZGnzDXc7V/JyJoQbJVN4wGsiyueyQe1xeQ7eTfbrTtQWtbBIoUKVSoQIEKcAGcc24FBJRAeAogIN8lMMyNqMERBVAAsYfY0SlBMzYI6ft/S3YWEa5o2wqh82ry4mWQSsL/6/9SkzM33tx/nLEhNncZrF1Ga9eDtesuWlvNkYytiWzu0lu7NHadorXrIRq77mKM1tbEYO7SWbuMxr4FVPfOsrfA6symvUVkaCvhTVsGzPnIqhqw3jifVW+B1f1JdHYtPdiayDa9xQlhe4loUgkxGD9Cg0klIWrqJpUQGj187CRnzlJVt6jEXWIHaG1SCevqFpV4dC9ILBDsWTpwdelKrFlG1NqgEoqXOmhtQQkePhxobVCJw1cJRgiW1MQAWhtU4jouBFrbU0KMe1AEkzfjLaIHre0pIYX/MEww3y3gOkU8OSOWHrS2pyRo6/aUuF6wAK3tKWF13X4STfAArc0poV4ZwLo5JUERKKi1tqaEoqLuoj6R8coAWltT4mK3jlmbU8JRfei3psSrFoXW2nwSlS85zHqExG4lg9bWk4z9QVo8k/kkutBBmLUxJU5wF9DamBJWeQvFkYlMVkbCrI0p4QF1Y0q8tPhj1taTKDcGL6xuPInSkwJmPVZirtJhdVtKgi4uUGttSolThgUXT2wpEQOHw6xNKfFiUMCsTSkhVtb9TQTbaJT11tqSEopiHbO+RWKn0mPWlpQ49Q4vnsmUEpbjP2ZtO0lyPvKYtSUlrI3+FG+FTVQyZm1ICSGuAVlbUhIAsEO/ISUOcQzM2pASRvwCsjadBFBLYId+O0qI1XVq6qaTAEoNB1nbUUIxDjr021ESor4eJ4ENU0YHWdtREgZEgNbajBKHBQDI2o4SxuqQtRklPg6oxxMzSggrPWRtRkkAt3OQtRUlBAZ7yHomiUVKD1kbTjIkZkDWZpQwGOmhuhUlHg30kLUVJTzCDSjOSDBGGaBDvxElNMQJqKlbURLiuEO/ESUuDqmHBiNKeEw9TkuwQ8mQtRElPGZFb61tKPH4+x2xtqGE8Lc7ZG1DSRj0bo9zE0xQRkKsbSgJeB2yNqHERbyOWNtQwjiQtQklXrF1Q6xNKCFF6RBrq0mGrQ+QtQUlpAnryEc0JpSEOGmdzSJxmqB+7xdqgjOLxKAOuSRo8ckfxUTCjrimqA/Ub2LiYDpNdaB+ERMFO96KqDbQv4eJcDDdUFUG5ucw0TBd0mUV82OYSAfTNV1OEea3MDGw2lsQZhQhfgoTiTu3FWk+kT+EiUgLFWZp1P28794EmAFolzaX2/czmABPbE1e7etv2ETYth/HLSDLOPatFRdHH5hVGNT6mqGJtbZt2/4g3esfWFvwkki24+bjZRtbiWnrE9+Bjcn1hpOJbftl93HymPumvKbt4hGytK+DqBG6eJVNyTK/tPBvP/d9ay0LpyPnzcFlYxedSjqrPZUnoAhIM816StmWPmwqOJjYfodt89oVMcKe7JERdVJNcIJc9jEwS1KbyBa9W9dGFG95mmzQxZfhaeCz8ylCkZrY0RPIcyjZ4u2hhOU0IS9gYN4LKicCU1Qy2WJN0WaCJq4EP8NHZkmzPh2aopuQhWwvoKvYmCZ5CE4TgsTJSo7k29uJ0tB7DjJcX3LHQn/EKdZnWs9AnmUxsicrZpGmYorfJdzVC5PtHQoS2Xo+Ek5SscX7VmDpjpv7TUTO/iTclhIRsFonkpFXHVYE5MPzkinUv8IZvyjgYtz2ar6XiswEzJJQvPG7RvmN3fbeZQE8WyeY4x8Y1/DM4Nn3bJ2ugnB1aF/y5Of3AH9/D3D4gK2bDcJzdWXw/BL7iM3rTLpn61SuEU+++EZ/Rna2ial5xrKKh2b1jOlkkJovD5nExhl/zzOTZ8xgwsVXzTo7J7B43jLkmIb1tAvrmnWJLlU0vecudQm683h13od1w5q50tEp8BeV4c56tuy3q7Fq0rHGy1i3fQD3kq3rMb/HJMuXWNv1K8Jf6RD+uvPEWVWG+N7Mft6p1rb9DC1sm8yyAUvq4wMN4vAw8FurZDM9U7p4rh8uEC6ZP0Qf4fPXNLbDHfLXvzSEcUtrr8+/bi1TVIsbmihftpfyPqzdmuKvdIUnXN3a9piIJsptKHobW+TOsCItp4gNNNXG9Weo07kbNzHEPCxm8Lju8HSInqg1ZjB85zGMhztstBO2NKPk+qjeq/BJPDyjBllc69LBYWnGV4T6dgThkppJ6geENaMhJtZWkQQvtG/3y8v9qKyi8XhphNwddAWu4Jf8PeDQTCW5+BeQ+YuM/s8XmWKIHDOnwn8Tz9FfyU1XUPWtwWELOTodJCjI/DH+P+vLFvgeftAhRld4GPDqW7LB47RDkOGOqvDbcgQtpb/uJ7/VJ7fX7sDlRb+BANRFNx2SZ5w38Rwyat/Vxejs2QBzKxFJXJ/K0e23yKwiHR6CupkciHMDFnbN35jDAWIyU5ahS2+XaWHc5D38T6oQGg9j3ZxS0ed/aUBder1zitGtyyGPKVOWsybynsjBR+oOj8e62cB2k3wDKDPB74NLb6Q+i6D3VTzRNz3r+Ia9IgA9gzxhHegyrY8n3L7RMASgDNYF0HeRsNfxr3EweIKAPrPibpgogN7B3wc3FKAztyW8JtbxROvC4XEC7swd+HCRSj+Jzu0THPKZf3VMT5EgjNc1AfCqNQHbahYVQk26/BsThoZAR4HXDY7g3+1B4cGETdBkD0s3Xzq4Lh0eJ/UTh1O4QrMP5mk2a5hyP2ckCiNPV42H8V3KPRknYYXmscJDm9jczxjJrvmVg+vC4Qn4LmVNJZS9JeKaP5Sr2Vz7Z569ikagQhXMmAQ43K+Ta+53pjm6FrM03mTI/IIb3f04vG5woG90F6JB4DSG+nInMbldU+cOqj494fC6dHg8viudUrm5gBsh1gQmIu9d9yJ5TkKI1zUBDtuVQm68B//2iJhDYrLm3FBIokpQOrwuHB6+rfTBXLMh7hDEmJAPqVrzftkPX0VKwawI8HAca0AvmzsmsCGWJDEZCsYevwoC3RBAqHWdPhR6ChYTHgGJSZd64Z91FuLQhSsePOYiY194YGNfI15CeG1SfKJDAl0ToCIzNmIk0zO8hYi0aEya0iJIvljhoKR8IK1ZPYA7GhqTOucIEjSOYElEgI7Y0mYCPanYoKExqQv7I0m+QGSgLN1b2qB0wzSfng6F6GhoTJrC/hgKXTgUDN/1jlgkyqTo0TsuTK2BNQeAIRwak66oCEOjfxDDFRtglAWNyZB18P24Cvn1oYSiqGYd4qExyXo/roDfpxGORmcFumZYAPdpaEzWvD+7hh4lqYGoYN78HO7uEsR9WBKT5FNzyvw4i+uQRFcRMI67pgfcoY82IX22Zcge2AUNjW4+hyaCDnCjJtqEdBxVXZJxktKR6NJ9DIPDb+HsHInJmvlxcy10IJWh0fXHMMVtPmAcNIVJsu6z/5zDxSpIdOFi+CBvlnQ1wYRO3wvyHJOAhjItc9ZMfaSMPj1RvIl4Zv/B1CX5UARXQaObKHhaxNIAmpZ4ky7/r29tPWph4ZDoYNOSCYTZxRMGiupbIyL/7xlYAiGNrj+C9Xj9TjPDd0kmNOFegveItPhV3IIjLFwcH7EY7q1vuwOb2PRwyCGjx0Qhbeo9tLPVBzAcY+lUP4NN1iK8q9emswjsKm578POthj1Tnb4bFp8eBTXpfLpeiPf8ja8Q672/H51wvHlOryXSaQF/vwaaIHZYV4r3ePYK6cPf69WsWQfUntgAZUGKE5cLAZDFeA13D7S4+F6v4cs6ANKGvqe3xpgIiL8X5DX7M4jm6m3H0vFknTqHFY9wDcSkQXhvc4n0CFlqBNPl6aq58VinoUsvT6g+itSlm4i+LN/Ceh0KDks1e8TRo2G0J2mCUtdXTUJ2gfdznWhi18J83FCgzusmLc0prguGhkocRDs+0nuI7H2KiezL86m7FlaSd2lTcY6E820CTrJ5ygn9mnp6EDazH8KCTUwxi9dDSik70VFpTnQeJnPUUKwZ2OdUru9YrlPX1Kcs0wxT6ll3p+PlZsqjB8oynZuit6abgo/Lwa75s2yCK2JQf2+/kfEinod6I9ip5fsStdg4f5iYgvmsuk/5LnFuoxi7+qrlBWFCq5E9u8wvVcv5IJyaX0YrKV45GvFoxYxWG3fqDHtRjawPw9v2WIIhkJKfx4Y3Q5VlEQtj9DsfU/Fys7zYsGaqMi1yowMzWBTLlFaGs7uLXFNZrm6osPgATJt/rIuHxhh8F26osPxx/q3piNWD5X16+e/CDRUa8CuKFB4r78PZfw0GQwUH/hKyfyjBbsMWX8F6uoqGia3qjV8aJZCeV5deRcElI1M4idXCq8wUVRmk3RiVshUBf3Z/OTbpbXtO3ZVVMcSOfE47OuBL0CRWO5fFVFUSaXcei1FyvcSsVn3hY1FnmLnGCqVrCJpLuDjHi/RJTrI0XpIfi3tkmlK/64Ea+6Son/axbrOT79XSYA7Hgm7iXkfNU4f8gSeG16xWrttLPxX5JYOFyXEQ6pAuFO0lHM/yPwtNOva1HwsUhjJFv8P7NVUloioPR0iMDrSa5HYzeq8+O1mEGPX5ugEejOdUR1Ye5ESPDs0s5tC92rjixMQ/Y9DMC+RZURtReURfd58lZeC0fIm5rMj26mEwmC4TOvZo9PMj/iDch1q8cpa4qDxIZDlrWGLIKsSZ0q3rE1bzmIbQ8w+ySGFKJnB10w3TNM/z+pJpmobh+MyDuaw8OIqbzSqytrK2bft+Pstxr15+KKuM4eWuPmQ5c5GZdLjy4CrhBVnNlkNFo0joUlIFWgXhWS+5zRtyIKQwW+yCFFwFMqHJKyZQeTB381sZkVzEFsBknoljGTMsiBPPlasUVwaTmaftk5J4hbn7ZaIyY2lscicMLdtu6sglTOFMKD5fYjd7MHRD+kS/2hJ6W88+XjQiaoUvdIunuwTN/QiAh2T3dW7xyJcgnvji/ntJfHzO5OYeNT9ilfJfpnzsSzj+SZm+SfnoVmHesMWA5Evc4mHz1FZMA3Yl7jd8C2CqZ7bilz7zr/gWSDCf2CoMmBb/NTRPe4mJrfyATM9fPnOe2Qrokf9hkqUm6C2Us/IfwFmVHdmlMtVV9/embXq2VM+UNpxPFVIBm5YQlpIH9QPaAn3qLoANbqliKnAO8njUDZ5Qia1+NFxma1sB6oI0sqp415qV9N3QRx28Hn3QcgxXSWcqx6Dh7KmbNtR1PlCXsq4fW5uEmfK9fmx6tss4lCINCJM6f3DqOo5ztppBO+Z1ldlluOhIZa0fJfXdu4WSuJetrio+pe5XB3nvNb/jkKCBssu8i4LU9weS9vGd0LOKKEJnGbD152HU9yCWXNM1eHyONkgUubmUStFwRDlfduXCVLK/vmM64DO6lF33p/TbvJbtRgrQ+70UBZpLvMIl9JSy3EYMyP1ENBM6hKWUjxAXFsltcpYXilXFVpfzdZ0frtdQRVFLqp/zdZxzwKRQEG8kyU611k2D7kzm2qZtdb+P6JEs9VszoSPwuSxSg+XWi+vR4XcafDkGgWvS8UqXngQtjcW7Kood2ETeylY3efo1CB/NIk7RNC3V7RbgCzgJp5lQPdRtG9z6XHyXw+1UrM3alYrX8cpN61zU0ir2suDOsceZiFno3+F2Q4hMoFXTtFzX+4gEZAFWTaia5YgBWs4eSKUGyvnUHS1VwqUcQ8VqSta5ybnCTMXZPKnPKvQP0peTdynv4aj81wv99qoJ1ZLqoqZpWz9wqLhefS8qmvblY+SuqMqmgN2wxLmIe/30+zyMGFCaxufBaHsThH6TZkJ1NC4zAF9SS9sEFdc95aeuOk7XTawml86ODeNd02x0jiBtE8YRGT0cNUOaBjEs9wmqCdXBNekRmpwKg8julbOW1143HNm9coHbNRfCCKTyHgRzCN6h73HHzU52NMoFivv9dpoJXQWAQ52e1m16zVCxl+6CosWX8layl+6CMoglrSj9lFSuU7LcjBH92BSDS+E8qb7vAvMk4i6smNBcWMNnFNc77PnVBexqp9AS1pqv6KKBYsI/AJ+aRjzHXVVsdbu6uIQQR5a6b730UQ2uj8fg3ggTkruD5PFJf9d8838ubnPxShXUPf7RWhcd7pzVhCMe/44RA18eRxq31ORyiVgXxPWi/24aNFvEx+CORb0hcf1BIoDOlKd7X77449YGCxW+JKEROjg2q6qCpexCI0DZXHRvkHO8Iu0LxnNaHYN7G9hm0HUJ2HBcbW6VdWLGuRnQsVUpsYLmFs2qipPEPryxpq1T0YtmW11b/+qslrfi4jG49wEd7313kBxEx+bWc3+TuCSf00tHyVs/1U3DdcdTFpiSUz/VBD7Xm5B32TmnSyC5GXI+MF8GdwjjLh56MDQcHRt/53O9Nm31cEkVJB8F9uJReg+ptrqjbGJj9rKAz+1n4ogjjq6jezOHtt3T9Ab3PrDnOaE3jl6k7wP7nc/tLykfTdDNQM7AkQOl+9XnVDeQUoBDPvq53O1waPxLHN37aGJJp6v9wb0RRnLXiUkxHEdHVZ/LjYHW4iXUbkU5w4TuKNe9AXCrMbPxKUL71pEwN3EEHd1bOK4XWNHVXPcBDLw4LT2CZjiOvqKQ9Lk7rXlBW384sY4MLBtrXUGc9O0ViAwsG3/8n+RxNUuq5QMTmb8S9i6WdnuAubY0uHqGXqCLkwmY/3zSuJp9ubZhv3xWnzLLQbPPkP0H+ZJBWHCggyGR4PbfljpuLtdj8MZ8z+3PLTXrAAj28zQ9/owIZdt9wA90elEnZd/96yHj5kot66XVdRvMDn6fcsUQPQVhB7+1+Cd1XGzfTIgj//NX8i8DrmQbwRAT3cVVkVml7Lv/v1Cky2xt6zWS7vU97e/UOM6WcP86P0ChltjmQR4eq/Dz/OyBfsLPUJ/Uv6KbB5/ooNl7zl+q0uz+9W20Gmfqna1k7giz+te82py93+A6JKZs4eWNsmnHRhyaB5kRp8kqc+FM/sW/0sifI87hk6rufv/Kh20eEnc5NOGb/SsTzYOsJC7zZ+Lv8q9sNA9ylLjKnQnxWP96kkUjH4krssqXjfoD0YsbPIk2g4nrrJmQ4oPvyzD9hO1BxkXhTiZnJgH3r/m3BwHb/MOKLLMUSv71U0IJyDbzCQiTLRPq/oN0P2sjWD4nc9a79yjbg4wngGdRXFxX+3WzyscN2afZHpQjATjLUlYaV+03zfCRy3wHzYNSJYDeT5WseVB68XAWhW4efOsLCPMy+WKaB0Xq0JVvk3I2D77wBdBsCto8+B1cXL1MCtg8+OIXR7MoWfPgK0lcO12m5sHXkDh4P1mI5sG3kkCcM1lsHnyVjtg/9/bgW0vAMT3w9uDLS8CFJ90efIkJuJ8tabcHv9lE2Fy//q8+VVZQOCA8GAAA8JMAnQEq8AFLAT5tNpdIJD+iIaR0eoPwDYlnQybrGn4WtEr3A9ADjn0J8ofy/M6NzvG/6jYgBp9cPfiJ+jH9G8kD8AP0A/gHQAfjX+gH9JtdjMKvxb8RrzGXn+R3GX4vGf1Dm7N+5Nb5Tx79189P+s9SX6h/XL4AOcx5gP3F9bL/feq3/femr55XsUbzZ/fukA//+/z+nv7z+Jf6SecP+h/ID9gPf/ry91X1uPJlxPsnlRQ7mRl9TUD2RZ+D9QTxpc66oP5avrt/eX2Mf2P//5M7VVxsKtjtN6rVRHKC4wtVEcoLjC1URvC2Ufu+yWXqC2AZmYHX99Wx2qrjYVbHaquNhVqlBE8fxOqrYm3Mnp6I5QXGFqojlBcYWqiGWbPWbFwLfWnH5/DpFqTulsdqq42FWx2qrjYVSkuuUtCATCXunogc2FWx2qrjYVbHaqqYDCD8chOr5WFD7HjlMcD9IQ1qojlBcYWqiOUFwWnLAxcGD6lNN8xZmsnOUFxhaqI5QXGFn4Tn+JN5yuLvKTFbz0171RGTNCbfFqojlBcYWp1282f3vyDvwdj0ZTUD51bMbmF3j1JGmaP8Ib5rAjouZuMVIpSm0FtYu7QsOCnFXVxsKtjtJU2sCj53oI+fdUv9DxqGZDbtJReygIav2VbRHjARGk2apVz1z8ow+/5PHEwTEKOQNHe6JgC+lJhuI5RwTCkbRojPiCTLzaBkFyOEwq42FUpMbFuDvzEjYJyfVIu6i1dOMIr7ChOlWRDVA0Fe4+MzDuK2LZ/TJBwoqvArK33XRLu5XazFgVSVBtdoimuv8snOV7vrdfa5PZlLrKwC7w1pAW0/flZxK2MeIMIoLjCS3siBPiaP/mJyqQT36bnKCeRBVAGkuJAA8z9/eUaZL/hs/64CTRnQKUpqvRhDs4RkRLhFysFoJSd88fU9S0pMOmlqP9wFNi4/80EiyFVqojkgr+bYGj/zpcjWjf0MWHGW47ZftRqVKHSETvQsVx//xE4h3FDgj2XssMV7YmzqkZHbQ4VbaYK2bv7i7J9/9HVphrpvi1T6mbdRDz1AJchrqWLBqk2+VGoCNy/2nIaRKl8f5YgDebzJ9ZFQzfTPsfNmdq2iOfkNYSfctDhoSiZPbqPtTctRS4oy6PsIKKJ+uGx1URygM09m14KALwwCgOxKzTQuo7Mom27pnQgVZ/z2GsBtBn4vlo587ToK2ToEM2BL+sB6bz7nFaqQjOO5WpSJYbdnpcZFbXMxkWcGeuO9+Mlta6Z6TsXFPIoPOIi+E9CfHkWPpwxys6D/6a9DxLR7O9DpCYbq9tKvpkWvuIRcUOZuVoZmRVprONts5ZNDhXgWDnshXu52DCZQxwI46Jdi6Ad+no0mOKvphPbJ8jlgYA2MX8r6gQSdrkx+kXWtFqoM4kIgiDfk1F5DkTRLFtlHGaTlE8twk987OxljxH7zDDAWE93BTCa1Jo6vi40Vk3mEBP0tPXML8UdvVQzehaxxygCm8US+WmNbPNeYod9Tapl+3hme/z6I2pH4F4AlLjC1UQzhBNemqiHS/7WsQ79/8rQRsDkCNGljweXiU2RP0pvGRfiVQAD+04EBKVbQowRTGgMj30SsAAAwvzEfbA+0W6CsnZNEFvK/ncQfxGhDdp5jm7tKW1/LSS2PuNooARR7AAApfwnduRkUiZ3A044CvLZBUnWcn/CiSC1EfrmJzKdOupORBK0B2Wx7UnJSoWatD0T6Rk+lb8lhF29IAACVnMgUO2J9F8h/lKw/SGGDT4IstYd6rV6oTpPje9jhpz8m4PAr08QI57rmxpNkxtV31g1Y4ys8AAK38tLvZ+TfRo3+tyTD4xyFKXKhAR/9AOt5oxflJrrP5WRU01LxjHl8t3YGH91Bw+RVszfAAByhOmkUgAPy17IdhHqIjc1jSkibNRhFaxBxVXaOHTn8Go490bdHGXWazS7+PftHKMJ9Iyzz/zxHn4iWbH8xwABC/mJAft222p5vB+A4+bWM3m8YI4xAILAA9i31nZfJY0nG7mBIHcCqMpkcZW73I70gUqzAAjvyEf3d4cpg7mMsDk3Ge5ZZUmT+b6w7fZCrt/ArkZzkH8/vmJcwBW3beuz5KpfFLiIu+3SFo0gAnx3gKdMF2zjpDIfsyYbvK4YfrHk41nuGliwTNn8IVOUf8tGtnwFxJ4Yg/SpImRF+inBoIDzeERnYORgt+CiwyLiX8E2m4oc2K5kYwlxN0MRgXYIWEZsqML+/KIKv4qQAZ102zEsAfGYHVeoUW4YzKRG+/3M0T/gGp0WbkOQrTgECaXnWeeOLCuW5oXIFaUw3RiTrpQ/BuCxL16LQxOnYyLXf+rNgbhE4WIg5mFdjfWZBnRVhtCVzr23+EyAJKt8ojKzdGrzFJKw1/HJrb467HZbQ1GKXhpuSnaXbnPy5RqIbclgAiEJ5gaB6QW8VzORgEpE/bfY7ky3uTsvBsThf+MVVK3aS4+xpPrNa9WNIQrOUMVLZ9+jGSu+yPe3rdKkhshfW/gXknh+S3JE1QV8sW6RN6eNBGddZ96b9ZOE6ByuK0NWeUZa5g9eztcFPxdGOLW1+Yl4+09v4IIgZ8YsOYYxb872qiXYnm5uSRWQKS6ffPnfMj5TWJDYdccbDFQyKsocWYM5aS7CkK/dFELg6h3VYV9i3li7CLJ+ILFIJjsP3r481jg2oDqSMObFKO3/d2hDj70yl7yCyt49ZLrQ3ZLZD6lW7XtOlOIQphiNjYJtQx6az/KJMl22b/2/8B9uYNLej+eAhAD/7GJgZ+u9NoV6+A4NzniX9iYqnPJs3jUiyZ5tA/5zBKeuKGYmzCZJtBW/9VkJU5HyQCP6GZEX5YjkzZv+pxjtXSgO+m/uqX80jLvXhWHdsQ7vQJ5nQDyDUnbMGlTNIlWLb/Uiq/dhFspL/Qh5YUu3QFpzU+yba47gXKk7iIBxBCVo0ipQ4069F54HTbdJBQ5GOaMNqYRJUSltHn21cKZokkxTK1IUY+C0X+yl8NKqEX1tDWz0z8EzSEk5CaFkvgIx4ayFIkTxrwflvS1h9bkUi3/fxd+3a1n1nGUAWpqLuy8EEscuGbIBgkFFI4eJUP/tj/tM1PGWzF575s9Pl1Lr7tSUDb68MN1TKV7/hWHhYLyNBEGsRjQeB9/Fo+6MhLLd4FEJhioNQUC4saIwtgECJuXQvRCpEXH8mrOuH8hbq0/LBzSENC+6I1uKAcWgjoJMf7LgaIfRMZLE6SGAC+3TqzYcN0J/4tNEngsqkk3xoOamyXb4CDdAoK79x/5Q4ofTZf5bm/55OoEBd0TDknKmfeM9XqFwghbQrjpOQ80vDyRG6v31+ofWowrRnnjxMSiORYQIdbVvd7xrEq1RUHYX/XLPxU0N/G16DkvV3RELHdExroO4vlNzv6/c780Zqflr5tPnDcty4kF59xvwu1XkM05MBzke8H3de76Dkx89MdRo4NHe+06Kt0I5DfQSBRG8Nvohwt3dX8qKpcabMVCXFDJ8WbLa3T375RbMk82pBUT5bIcV+sPCnnP+39vc/fHM9GE4/R4fSI3X89iYT25eUV6dEM/UbmlGzobXWNW3D/wnLYE0DtZpoSnTkRpMkj1FKxEL26qIF+nI3/MYXj+Kd3L8l187QRD6Tq6SOHukoDJ/OlEMxc3AlnH4363Z/WVCQChGh/zoqL/0R7/4Atvg4hHDUiFFNO1/ygC16zc/Noi3j0p/0+EHDeSZwFhmY3lkGeLFRdSepgTI3gl1slpJ6T9szYz8Amh/hozeidJ4ZPvUsPoGQccV7Jd74CwON9hi4eeN/3BLe7YqfZWP4Rv9Ii4AUPEnunhhS1KUwgL45P6vQmltBrR5Y5hDFKVeyxVEBRPQphju02OV4SmOxp9K2ywO7y1UNoogv4cQHw0rXHNlpq37Y81Kf4kqVUNBhcEBLIPMWnzXd0yC+jHfPjB5i+dLxeCxtRvt7KgWZanw464KvEMtmmcYH/8xDiB+NtuDUR1gBPRlzT8z8cVRLtX/IpjvFSQL+FkElsPh25iBrn8Oxp5+28tjoHXkspRfCjoKOZUPEX3PQOwAtSJEu9UB2C6t95AAJwz/oojV9o6YkNT+7mx9VMQ/ipzwFaR7ngcRrXo+yn6mBFVu9RtikC3V5f347opyVDpR17jw3/+ToEPLLRCjQuRoab1oUFRS17R08PJTotPOvKwleK1RwUIbFKPA3FbY2fX1BJICfm67OZEervMDDJWIu7TMieFkP4kddnhdwpuD1S4fH+JIf0rgtqynnZ1hQ9MfB4FqCiMEAW+rKtnUNLR8n87dBbJAgWrqiHJPciFysoebMIvOaZrk5Ex+E4ZysKQm4x48T6fKInWB/guhVPGLmskGM5JMZ66GdNL1aow0UVHvnrmbViMRPxybBNI7/kk/tLgta21qWLLV8KEAhgMqQ0waHggMVvVU+t9ys1lydY4EuAJSy5bEqCkX70VB8FES5ovQcD6jJlmijzpjBz5mEbx+5bANV7fbk1G8RI3CypdPzuQNwpoh5bRZlf3O12+XOKTLDX+WC7PYkgKRGwEhvw/C/rebXXOyoQnjBo1LepRWP4R0Fw3sVTQuLGDwF2+zcuU3Eld//SHFBeZOVF7ZY7+Qvb5Q3cFIBn4KeBzFZrk0bpXZYZfldUzKHzMBu3KxTxznnjMzAykS7DVPdEop5Ez+4wPXPmc5eLQEkSyxwdwNgXEGfjl24nJJe1bLO3L02Qn7fMwHdctt+vMRprGD+rVGuogsbUjb/LeR4c+y8J/pMu/76ABdU87iNwKPbC9iQgDj3nILncpPBzbBHd/64mHD7GZfOYa+CrF3BD8jAKUqyCNHQwnjaitYad/46Ok4IE0qMGPyWh3nZjcQhAOvmWikJNhBaZ0TysSEJI7cXiqyuIzIl7jOlu02T5R9YMazZZMahUkx6c3A8gRSkRXP9XNIsyCZfHdrbqyWe01HbOmc3TrMI5O20JT7gs1zZF4HlczsDYa9xhwjAIrPiY3lZeXUfyfqWfSBLP43/D8IAwVZ3VLh6EUoi04Jy1VYMv6wJzLfNGWX68vuKTHdaWLQ0LcHlTlRmHbJ0UAo8DrzxKUMWukabfu99aLtwequqaMC7fqTYZi5w+kWOM7AVntOaFXJzC/VJg/BM2Ybh0uyxHNnqNGf3D0kFmu7Pw7esf6t6w/4RcZlqjVJ++fQ0BvUGZM0IS+wUu/WQalZo4K7lQ1sgoMzbDfiexf/eSftulAXHaMYYXEbjTItmT0Os/S6Mwojo4MXluINhexhql2vilw+Y/VxOAuxPzSyYfu4h1dZYxV0RDcFXjQn4Ee35XCoH2Aum8dVEJAoJWDhEVZloLV7wNQL7T+lTTcq3+Fh5A86QGgB1xI8Nuz7B9sBbePEvJAnnPMSAmvE3ft9ruiieEJTWAPOAH/J1jOY1PvaPHz2RMPxLzq1xus4s1yhCivxMlyFNTspyvuSD6dALky3xTXVBqURx2xG13vg4clSzKTmAdpE+Gt3WT/TiR+hAtaClOYGmedR4RgyoylKUw4+qukX/aUlQyGjFsPxMt+w1q1VaheBx/qZrk2em6pIcR6k88BKvnOHJ3sgl2dX6ms4Cf8AGQf5IzNwcoPoBAbE9byDxnKz+p4R8Ggr8sa0edRQBxlAIZa5DT+gsoMkjWBejY4jeEPuXHf2iYggk7oMm0sOd/FT0Kn5UfTJ42hBZjynS6V+JCt0FBPZUdvw/V+ofnx8zjjm5g8tDBTHOW10jS8xltHPX6bv/BpFl5gLhc2q+uf99tN7o8EuSA5TBBPYnIzCpcDe0TQl+AejAeJ7c6z7k40+Z+6apdBzKzbxBO8w05AbdcHh2Gcb99bPTmT/Jg4j6LmYPXHhh/MdRTqT1qpRvVDf8FKJDTYHbKukF/XIpbAqtHUKoVdXin9tT6/smww/K63lWNPm5nf4nOACKmorHL9M/B3JmPFvqAyc2qk4W2R4/pgp5pMCO/NxPA+AxgGVCra+fQ5fT1Em4WaRWri+hx4g5GRypD+/KvrClzdk1Aq0tIlX1fHEzGD48fZBI+0aNsY9/oG6W9GNe7RE04AMdzyJeACnMx+5kz4F3NrR8rqxkeWWWRZP/+VRZCVp12R6FbjrH3sKmMCKLKz66OuhDK7xJOKfQVNv9pBACPcxcDhxLi6xRNTlR22KdHgokmCo8DC4woyIemzWCYp2ZwIj+EldD/VAjLoVEmMRexdc8jAn+zopo+UCs39actel61iHQzK+3Mz3dlkDi5QaMowHqbfyP1GU0kxzwwV6CLV7KwAvC9YulF7YcnyELhfl7Eic4Ls5WHij1EyPDmoXLMWPaelbFQaLdb+KWUaz3auwBCDetIlR+5FFliKdexoxvwmveVO3+3RGxsF3rHM+hr++R3Rnf3gbzlxStpYn92ItyZd8Wdp+sy0tR3xWSriN4V5fcNIVzRHkykPTVLjmz//qozZpI1/tnw6W6M5AZhIneoDhMvCfQi+Yo7+8CRB2faQnU99y4aGb6meMqzeSlHFMI8EXuLsEP8WGY46kGJmSpbisityIgVE5l3ZPC/fN8S/jxlUsauuFK0xnailePqtIELBYTmGqK+do0cZ/RPUNJ9G8szqkB2fJvPkZx3wQzyHfh/ZcM+RGWRw/KV7ZJ9PPWHKA/Zb736PM4KzS0i7D+pfboB0AbnLCQGAslFZ9UwZr3fZ+vR+wHOVMKondO9Xx54kJ4nugev5J1zknezvZZ8UJNNeVKJMgMbbP0hkIN9viTtmDlpd6HR8IHDTsLxcp9J2+2iX96eauM4EKjpcrUQSwLImNL0qEj3r6lGd080GPiXTWRTJOhWGBj/q6uTOwKg/elWe5CYiom0OmIr6sxpGNO/BNNtyXQfeAZvCNrXB8EXkGjz46ZDI7z8QYDOWSAOBr0m8ws6pbBkwZDRlAD72Zc19MsYWFAJn+MHc2K262jKKIxvm6cNDc3cIR1H4NH1GoIpQ38pPiY/IfoevLSVsLru52pGYSfHAZQC/6epyBr1KZRWGyJjiLUE+COPge4pBnpCyCQp8yiavdn/7C+N1WWQD2j6SSnTeJaKHkApj1UNHpw/U2WHSwPasw/G4yBaKB+BgihVNOmkrNwOZqnXl0mVz6loBtec48qfm9+RSFO/N80XFZZdTGlKB+ugueo0IY467sx/DuVdI7yVb20W2kVtwk790WEKRmTlRBYnYdE9j4RY0bsMIfqMe84eMC2VKU5IkKgmQ8v1/hBAYCGqkWsjVd1YAnIRR5wQhq9u5+Yzt+UvAVNeYES3tsniSOO8QWY+d+YnVcf0Bi36VB3EAIU2nMQAAAKWxKB1682qbte9rD7tDGgRAF3M6+aZkSFNF3Eo9NW8G7B287Y5hj4He0E0iuz2l4w4s7Ke+1gExxQ4+8Dw90NhidYOcTVt/kh7f3X3mQdzNbFsarko7VuWINSeUgwUv5pzllSi/NOC92vcGrLGUTYR+afuZ/lr4RnUSE8YDDYHtDfOAznw28ebpdZYmV5Q12FDF6Kbz5AA+cwFpP5K8gJt5uu6VVaUGCF7njhEde7Jt5b44/CQkyeqs5BO3HzrydSb5emC8D3hUgk4jqRLAlYZGe6nhWwYt7R6r0Ppa3FW3Rim4AAhDOkE4b74Ogh9NUwTDVLP+bjQU+Y13VYUG4mciWtmq8X6UOw8c1EJnTuyW2orNBusF8UJayEU6O0RFGlj+k4ov6RV56ICVJdwtIY2LDaWorEjTWvdsYd/bzH5wtQzPbu/xoLGRIVDFM2yCgTH/vS56O6tEhmZ6Q9K/PdqniZfPu45/dDhkXmCjIl/COn/e69cIfXJVtSfv3Kua+fDpt+PvKmArfKFpnoxaYjBV3x3Rp2eXLioa+aFTEAbxA/2q/BwNndN4KR6Q3bGD0c8mBTJHLigTR/YyvY0fT6j/9fIGEf//TQUcT2UsHOq+0pBckicO7vSW3untjnKzxFr+nNO6nv+oYFQzxJTwD/A/ZHgWIFDyfDP0kMYdqB/lH4ScETb3sKTipqEHDZ5iAQtHi3edyXyA3LpwLVTHhtaYZPrNp05sVB5JzD5uwL3q02JifdTs/ncRcxSuAXjOpGJIyB3jSjk3uivRiwdnED15wIJ89PSLaI/5sXJi4/gwBuf+iTLIBuKkf51+5YgAEdGfKLnGw/IvMwelD2Tp6x3SmKkLaDszh/EmYwHeNjfJvx0UzF/srH5/uYONeBRyN5vYL4kmuzL521bphpMfsecAAA3yBK6WpEPj7a1aqzReQvvh0S2AAA";
+
+/* Kept in step with EDITOR_EMAILS in the quote tracker. The Firestore rules are
+   what actually enforce this; the list here only decides what the UI offers. */
+var EDITOR_EMAILS = ["mvinobaje@gmail.com", "nnscc292connect@cpomanagement.ca"];
+
+/* Who signs the letters, and how the Corporation is identified on them. This is the
+   one place to change it — the letterhead, the signature block and the pre-authorized
+   debit form all read from here. Note the office postal code (L3M 4E8) is the
+   Corporation's own, and is deliberately NOT the one used for residents' unit
+   addresses: owners here write L3M 0H9 for 550 and L3M 0G3 for 560. */
+var CORP = {
+  condo:       "Waterview Condominium",
+  condoFull:   "Waterview Condominiums",
+  regNo:       "NNSCC No. 292",
+  manager:     "CPO Management Inc.",
+  buildings:   "Buildings 550 & 560",
+  signer:      "Sarah Giles",
+  signerTitle: "Assistant Property Manager",
+  agentLine:   "Agents for and on behalf of NNSCC292",
+  officeAddr:  "550-560 North Service Road, Grimsby, Ontario, L3M 4E8",
+  phone:       "905.296.0420",
+  contact:     "nnscc292connect@cpomanagement.ca",
+  /* A verified "Send mail as" identity in Sarah's Gmail. It is verified in HER
+     account, not necessarily in whichever account signs in — so a draft is tried
+     with this From and retried without it if Gmail refuses, rather than failing. */
+  sendAs:      "nnscc292connect@cpomanagement.ca",
+  sendAsName:  "Waterview Condominium"
+};
+
+var ROSTER_DOC = "nnsccArrearsRoster/main";
+var TPL_DOC    = "nnsccArrearsTemplates/main";
+var LETTERS    = "nnsccArrearsLetters";
+
+var A = { db:null, user:null, units:[], templates:[], rows:[], letters:[], tplIdx:0, dirtyRoster:false };
+
+/* ---------------- helpers ---------------- */
+function esc(s) {
+  return String(s == null ? "" : s)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+function $(id) { return document.getElementById(id); }
+
+/* Inline icons. Everything here is self-contained — no icon font, no CDN. */
+function svg(d, extra) {
+  return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
+    'stroke-linecap="round" stroke-linejoin="round">' + d + (extra || "") + "</svg>";
+}
+var ICON = {
+  info:     svg('<circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/>'),
+  plus:     svg('<path d="M12 5v14M5 12h14"/>'),
+  upload:   svg('<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/>'),
+  clip:     svg('<rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>'),
+  search:   svg('<circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>'),
+  filter:   svg('<path d="M22 3H2l8 9.5V19l4 2v-8.5L22 3z"/>'),
+  save:     svg('<path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/>'),
+  file:     svg('<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8"/>'),
+  chevron:  svg('<path d="M9 18l6-6-6-6"/>'),
+  pencil:   svg('<path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/>'),
+  trash:    svg('<path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>'),
+  dots:     svg('<circle cx="12" cy="5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="19" r="1.6"/>'),
+  user:     svg('<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>'),
+  users:    svg('<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>'),
+  note:     svg('<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/>'),
+  building: svg('<path d="M3 21h18M5 21V7l7-4 7 4v14"/><path d="M9 9h.01M15 9h.01M9 13h.01M15 13h.01M9 17h.01M15 17h.01"/>'),
+  alert:    svg('<path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/>')
+};
+function money(n) {
+  var v = Number(n) || 0;
+  return "$" + v.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+}
+function parseMoney(s) {
+  var n = parseFloat(String(s == null ? "" : s).replace(/[^0-9.\-]/g, ""));
+  return isFinite(n) ? n : 0;
+}
+function fmtLongDate(d) {
+  try { return d.toLocaleDateString("en-CA", { year:"numeric", month:"long", day:"numeric" }); }
+  catch (e) { return d.toDateString(); }
+}
+function isoToday() {
+  var d = new Date(), p = function (n) { return (n < 10 ? "0" : "") + n; };
+  return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate());
+}
+/* an ISO yyyy-mm-dd read as a LOCAL date — new Date("2026-07-28") is UTC midnight,
+   which lands on the 27th west of Greenwich and would misdate every letter */
+function fromISO(s) {
+  var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(s || ""));
+  return m ? new Date(+m[1], +m[2] - 1, +m[3]) : new Date();
+}
+function addDays(d, n) { var x = new Date(d.getTime()); x.setDate(x.getDate() + n); return x; }
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+/* "402" and "0402" and "402 " are the same unit to a human, so they are here too */
+function unitKey(u) { return String(u == null ? "" : u).trim().toUpperCase().replace(/^0+(?=\d)/, ""); }
+
+/* ---------------- default letter wording ----------------
+   Placeholder drafts. The Templates tab carries a standing warning that these
+   are to be replaced with the Corporation's approved letters. */
+var DEFAULT_TEMPLATES = [
+{
+  id: "first", name: "First notice — common expense arrears",
+  body:
+"# Notice of Arrears\n\n" +
+"**Re: Unit {{unit}} — common expenses**\nAmount outstanding as at {{date}}: **{{amount}}**\n\n" +
+"Dear {{owner}},\n\n" +
+"Our records show that the common expense contributions for Unit {{unit}} are in arrears in the amount of **{{amount}}** as at {{date}}.\n\n" +
+"Under the Condominium Act, 1998 (Ontario) and the by-laws of {{condo}}, each owner is required to contribute to the common expenses of the Corporation in the amounts and at the times set out in the Corporation's budget. Contributions are due on the first day of each month.\n\n" +
+"We ask that the outstanding amount of {{amount}} be paid on or before {{due_date}}.\n\n" +
+"If your payment has already been sent, please accept our thanks and disregard this notice.\n\n" +
+"If you are not able to pay the full amount at this time, please contact the property manager as soon as you can so that arrangements may be discussed.\n\n" +
+"[[SIGNATURE]]"
+},
+{
+  id: "second", name: "Second notice — arrears still outstanding",
+  body:
+"# Second Notice of Arrears\n\n" +
+"**Re: Unit {{unit}} — common expenses**\nAmount outstanding as at {{date}}: **{{amount}}**\n\n" +
+"Dear {{owner}},\n\n" +
+"Further to our earlier correspondence, the common expense contributions for Unit {{unit}} remain unpaid. The amount outstanding as at {{date}} is **{{amount}}**.\n\n" +
+"Our records show {{prior_count}} previous written notice(s) to you regarding this account, the first dated {{first_notice}}.\n\n" +
+"We ask that the full amount of {{amount}} be paid on or before {{due_date}}.\n\n" +
+"Please be aware that under the Condominium Act, 1998 (Ontario) the Corporation has a lien against an owner's unit for unpaid common expenses, together with interest owing and the reasonable legal costs and expenses incurred by the Corporation in collecting or attempting to collect the unpaid amount. Those costs may be added to the amount owing.\n\n" +
+"We would much prefer to resolve this without any further step being taken. Please contact the property manager to arrange payment.\n\n" +
+"[[SIGNATURE]]"
+},
+{
+  id: "pad", name: "One-time pre-authorized debit authorization",
+  body:
+"# One-Time Pre-Authorized Debit Authorization\n\n" +
+"**Re: Unit {{unit}} — common expense arrears**\nAmount: **{{amount}}**\n\n" +
+"Dear {{owner}},\n\n" +
+"To settle the outstanding common expense arrears for Unit {{unit}} in the amount of {{amount}}, you may authorize a single withdrawal from your bank account by completing and returning the authorization below.\n\n" +
+"This authorization is for **one withdrawal only**, in the amount shown, on or after the date you provide. It does not set up an ongoing pre-authorized debit plan, and it does not change or replace any monthly pre-authorized debit you may already have with the Corporation.\n\n" +
+"Please complete and sign the form below and return it to the property manager, together with a cheque marked \"VOID\" drawn on the account to be debited.\n\n" +
+"[[PAD_FORM]]\n\n" +
+"[[SIGNATURE]]"
+}];
+
+/* ---------------- merge fields ---------------- */
+var FIELD_LIST = [
+  ["owner",        "Owner of record"],
+  ["unit",         "Unit number"],
+  ["address",      "Mailing address"],
+  ["amount",       "Amount outstanding"],
+  ["date",         "Date on the letter"],
+  ["due_date",     "Pay-by date"],
+  ["prior_count",  "How many letters already sent"],
+  ["first_notice", "Date of the first letter"],
+  ["condo",        "Waterview Condominium"],
+  ["reg_no",       "NNSCC No. 292"],
+  ["manager",      "CPO Management Inc."],
+  ["buildings",    "Buildings line"]
+];
+
+/* Values are escaped here, once, so the renderer can treat the whole merged
+   string as plain text and never has to trust an owner name. */
+function fieldsFor(row, opts) {
+  var d = fromISO(opts.date);
+  var prior = priorFor(row.unit);
+  return {
+    owner:        esc(row.owner || "Owner"),
+    unit:         esc(row.unit || ""),
+    address:      esc(row.address || "").split("\n").join("<br>"),
+    amount:       esc(money(row.amount)),
+    date:         esc(fmtLongDate(d)),
+    due_date:     esc(fmtLongDate(addDays(d, Number(opts.dueDays) || 0))),
+    prior_count:  esc(String(prior.count)),
+    first_notice: esc(prior.first ? fmtLongDate(prior.first) : "—"),
+    condo:        esc(CORP.condo),
+    reg_no:       esc(CORP.regNo),
+    manager:      esc(CORP.manager),
+    buildings:    esc(CORP.buildings)
+  };
+}
+
+/* what the log already knows about this unit */
+function priorFor(unit) {
+  var k = unitKey(unit), count = 0, first = null;
+  for (var i = 0; i < A.letters.length; i++) {
+    var L = A.letters[i];
+    if (unitKey(L.unit) !== k || L.voided) continue;
+    count++;
+    var t = L.at && L.at.toDate ? L.at.toDate() : (L.dateISO ? fromISO(L.dateISO) : null);
+    if (t && (!first || t < first)) first = t;
+  }
+  return { count: count, first: first };
+}
+
+/* ---------------- template rendering ----------------
+   The template text is escaped first, so everything below operates on text that
+   can no longer carry markup, and the small set of markers we do honour is
+   turned into HTML afterwards. */
+function renderBody(tplText, fields) {
+  var s = esc(tplText).replace(/\{\{(\w+)\}\}/g, function (m, k) {
+    return Object.prototype.hasOwnProperty.call(fields, k) ? fields[k] : m;
+  });
+  var blocks = s.split(/\n\s*\n/), out = [];
+  for (var i = 0; i < blocks.length; i++) {
+    var b = blocks[i].replace(/^\s+|\s+$/g, "");
+    if (!b) continue;
+    if (b === "---") { out.push("<hr>"); continue; }
+    if (b === "[[SIGNATURE]]") { out.push(signatureBlock()); continue; }
+    if (b === "[[PAD_FORM]]") { out.push(padFormBlock(fields)); continue; }
+    if (b.indexOf("# ") === 0) { out.push("<h2>" + inline(b.slice(2)) + "</h2>"); continue; }
+    out.push("<p>" + inline(b).split("\n").join("<br>") + "</p>");
+  }
+  return out.join("\n");
+}
+function inline(s) { return s.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>"); }
+
+function signatureBlock() {
+  return '<div class="sig"><p>Yours truly,</p>' +
+    '<div class="sigline"></div>' +
+    '<p class="signame"><b>' + esc(CORP.signer) + "</b><br>" +
+    esc(CORP.signerTitle) + ", " + esc(CORP.manager) + "<br>" +
+    esc(CORP.agentLine) + "<br>" +
+    esc(CORP.condoFull) + "<br>" +
+    esc(CORP.officeAddr) + "<br>" +
+    "Phone: " + esc(CORP.phone) + "</p></div>";
+}
+
+/* Payments Canada Rule H1 wants a sporadic PAD authorization to carry the payor's
+   details, the amount, the recourse statement and the cancellation terms. The
+   banking numbers are left blank ON PURPOSE — the owner writes them in and hands
+   the paper back. Nothing in this tool ever collects an account number. */
+function padFormBlock(f) {
+  function line(label, w) {
+    return '<div class="pf-l" style="flex:' + (w || 1) + '"><span class="pf-lab">' + label + "</span><span class=\"pf-rule\"></span></div>";
+  }
+  return '<div class="padform">' +
+    '<div class="pf-h">One-Time (Sporadic) Pre-Authorized Debit — Payor\'s Authorization</div>' +
+    '<div class="pf-row">' + line("Payor name (as it appears on the account)") + "</div>" +
+    '<div class="pf-row">' + line("Address") + "</div>" +
+    '<div class="pf-row">' + line("Financial institution") + line("Branch address") + "</div>" +
+    '<div class="pf-row">' + line("Transit no. (5 digits)") + line("Institution no. (3)") + line("Account no.") + "</div>" +
+    '<div class="pf-row"><div class="pf-l" style="flex:1"><span class="pf-lab">Amount of the single withdrawal</span>' +
+      '<span class="pf-fixed">' + f.amount + "</span></div>" + line("To be withdrawn on or after") + "</div>" +
+    '<p class="pf-t">I authorize ' + f.condo + " (" + f.reg_no + "), and the financial institution named above, to debit the account identified above " +
+    "for the single amount shown, on or after the date shown. This is a one-time (sporadic) Pre-Authorized Debit for personal use. " +
+    "I understand that this authorization is for one withdrawal only and does not create a recurring pre-authorized debit plan.</p>" +
+    '<p class="pf-t">I waive the right to receive pre-notification of the amount and date of this one-time debit.</p>' +
+    '<p class="pf-t">I have certain recourse rights if any debit does not comply with this agreement. For example, I have the right to receive ' +
+    "reimbursement for any debit that is not authorized or is not consistent with this authorization. To obtain more information on my recourse rights, " +
+    "I may contact my financial institution or visit payments.ca.</p>" +
+    '<p class="pf-t">I may revoke this authorization at any time up to ten (10) business days before the withdrawal date by giving written notice to the ' +
+    "property manager at " + esc(CORP.officeAddr) + " (telephone " + esc(CORP.phone) + ", " + esc(CORP.contact) +
+    "). Revoking this authorization does not affect my obligation to pay the amount owing.</p>" +
+    '<div class="pf-row" style="margin-top:14px">' + line("Signature of payor") + line("Date") + "</div>" +
+    '<p class="pf-t pf-void">Please attach a cheque marked <strong>VOID</strong> drawn on the account above.</p>' +
+    "</div>";
+}
+
+/* ---------------- printable letter ----------------
+   Its styling lives in the page stylesheet under #printArea. */
+
+function letterHtml(row, tpl, opts) {
+  var f = fieldsFor(row, opts);
+  var h = ['<div class="letter">'];
+  h.push('<div class="lh">' +
+    (ASSET_LOGO && ASSET_LOGO.indexOf("_LOGO_") < 0 ? '<img src="' + esc(ASSET_LOGO) + '" alt="">' : "") +
+    '<div class="corp"><div class="cn">' + esc(CORP.condo) + "</div>" +
+    '<div class="cs">' + esc(CORP.regNo) + " · " + esc(CORP.buildings) + " · Managed by " + esc(CORP.manager) + "</div></div></div>");
+  h.push('<div class="dt">' + f.date + "</div>");
+  /* The mailing address already carries the unit for an owner who lives here, and
+     for one who does not the unit belongs in the Re: line, not on the envelope. */
+  h.push('<div class="addr"><span class="nm">' + f.owner + "</span>" +
+    (row.address ? "<br>" + esc(row.address).split("\n").join("<br>") : "") + "</div>");
+  h.push(renderBody(tpl.body, f));
+  h.push('<div class="foot"><span>' + esc(CORP.condo) + " · Unit " + f.unit +
+    "</span><span>" + esc(tpl.name) + "</span></div>");
+  h.push("</div>");
+  return h.join("");
+}
+
+/* The printable height of one Letter page, in CSS pixels, given the @page margins
+   above: 11in tall, less 16mm top and 12mm bottom. Used to warn when a letter is
+   about to spill its signature onto a second page. */
+var PAGE_H_PX = (279.4 - 16 - 12) * (96 / 25.4);
+
+function fillPrintArea(rows, tpl, opts) {
+  $("printArea").innerHTML = rows.map(function (r) { return letterHtml(r, tpl, opts); }).join("\n");
+  /* the document title is what the browser offers as the PDF filename */
+  document.title = tpl.name + " — " + CORP.condo;
+}
+function restoreTitle() { document.title = CORP.condo + " — Arrears Letters"; }
+
+/* how tall each letter renders, so "it will not fit" is measured, not guessed */
+function pageFit() {
+  var out = [], els = $("printArea").querySelectorAll(".letter");
+  [].forEach.call(els, function (el) { out.push(el.getBoundingClientRect().height); });
+  return out;
+}
+/* ---------------- PDF ----------------
+   A browser can print a letter but cannot hand the resulting file back to the
+   page, and a file is what an email attachment needs. The same markup is sent to
+   nnsccArrearsPdf, where headless Chrome renders it. The styles are read back out
+   of this page's own stylesheet rather than written a second time, so the PDF and
+   the printout cannot drift apart. */
+function printAreaCss() {
+  var out = [];
+  [].forEach.call(document.styleSheets, function (ss) {
+    var rules;
+    try { rules = ss.cssRules; } catch (e) { return; }     /* cross-origin sheet */
+    [].forEach.call(rules, function (r) {
+      if (r.type === CSSRule.PAGE_RULE) { out.push(r.cssText); return; }
+      if (r.selectorText && r.selectorText.indexOf("#printArea") >= 0) { out.push(r.cssText); return; }
+      if (r.type === CSSRule.MEDIA_RULE && /print/.test(r.conditionText || (r.media && r.media.mediaText) || "")) {
+        [].forEach.call(r.cssRules, function (x) { if (x.type === CSSRule.PAGE_RULE) out.push(x.cssText); });
+      }
+    });
+  });
+  return out.join("\n");
+}
+function standaloneLetterDoc(rows, tpl, opts) {
+  var body = rows.map(function (r) { return letterHtml(r, tpl, opts); }).join("\n");
+  return '<!doctype html><html><head><meta charset="utf-8"><title>' + esc(tpl.name) +
+    "</title><style>html,body{margin:0;padding:0;background:#fff}\n" + printAreaCss() +
+    "\n#printArea{display:block !important}</style></head><body>" +
+    '<div id="printArea">' + body + "</div></body></html>";
+}
+function renderPdf(rows, tpl, opts) {
+  if (!firebase.functions) return Promise.reject(new Error("The PDF service is not loaded."));
+  var call = firebase.functions().httpsCallable("nnsccArrearsPdf", { timeout: 180000 });
+  return call({ html: standaloneLetterDoc(rows, tpl, opts) }).then(function (res) {
+    var b64 = res && res.data && res.data.pdf;
+    if (!b64) throw new Error("No PDF came back.");
+    return b64;
+  });
+}
+function pdfBlob(b64) {
+  var bin = atob(b64), n = bin.length, u8 = new Uint8Array(n);
+  for (var i = 0; i < n; i++) u8[i] = bin.charCodeAt(i);
+  return new Blob([u8], { type: "application/pdf" });
+}
+/* a filename that says which unit it is, because these get filed one per owner */
+function pdfName(rows, tpl) {
+  var stem = rows.length === 1 ? "Unit " + rows[0].unit : rows.length + " letters";
+  return (stem + " — " + tpl.name + ".pdf").replace(/[\\/:*?"<>|]/g, "-");
+}
+function downloadPdf(rows, tpl, opts) {
+  note("genNote", "Rendering " + rows.length + " letter" + (rows.length === 1 ? "" : "s") + "…");
+  $("btnPdf").disabled = true;
+  return renderPdf(rows, tpl, opts).then(function (b64) {
+    var url = URL.createObjectURL(pdfBlob(b64));
+    var a = document.createElement("a");
+    a.href = url; a.download = pdfName(rows, tpl);
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 30000);
+    note("genNote", "PDF downloaded.");
+  }).catch(function (e) {
+    note("genNote", "Could not make the PDF — " + ((e && e.message) || "error"), true);
+  }).then(function () { $("btnPdf").disabled = false; });
+}
+
+/* ---------------- Gmail drafts ----------------
+   Nothing here sends anything. Each letter becomes a draft in the manager's own
+   Gmail with its PDF attached; she reads it and presses Send. An arrears notice
+   going out unread is not a risk worth taking to save one click.
+
+   The client id belongs to a throwaway project that holds ONLY this OAuth client.
+   It is deliberately NOT the Firebase project: putting a restricted Gmail scope on
+   that one, or moving it to Testing, would block every board member's Google
+   sign-in to the quote tracker. */
+/* Project nnscc-arrears-mail (790649941023) — holds ONLY this client. Publishing
+   status stays Testing, so access is limited to the listed test users and the
+   token needs re-granting about weekly. The matching client SECRET is not used:
+   this is a browser implicit-token flow, and nothing server-side exchanges a code. */
+var GMAIL_CLIENT_ID = "790649941023-o10djlqd3vnhb4s442sfu6gotfvireve.apps.googleusercontent.com";
+var GMAIL_SCOPE = "https://www.googleapis.com/auth/gmail.compose";
+var GM = { token:null, expires:0, client:null, pending:null };
+
+function gmailConfigured() { return !!GMAIL_CLIENT_ID; }
+function gmailLoaded() {
+  return !!(window.google && google.accounts && google.accounts.oauth2);
+}
+/* Testing-mode tokens are short-lived, so this re-prompts roughly weekly. */
+function gmailToken(cb, onFail) {
+  if (!gmailConfigured()) { onFail("Gmail is not connected yet — the client ID has not been set."); return; }
+  if (!gmailLoaded()) { onFail("Google sign-in did not load. Check the connection and reload."); return; }
+  if (GM.token && Date.now() < GM.expires - 60000) { cb(GM.token); return; }
+  if (!GM.client) {
+    GM.client = google.accounts.oauth2.initTokenClient({
+      client_id: GMAIL_CLIENT_ID,
+      scope: GMAIL_SCOPE,
+      callback: function (resp) {
+        var f = GM.pending; GM.pending = null;
+        if (!resp || resp.error || !resp.access_token) {
+          if (GM.onFail) GM.onFail("Gmail access was not granted.");
+          return;
+        }
+        GM.token = resp.access_token;
+        GM.expires = Date.now() + (Number(resp.expires_in || 3600) * 1000);
+        if (f) f(GM.token);
+      }
+    });
+  }
+  GM.pending = cb; GM.onFail = onFail;
+  GM.client.requestAccessToken({ prompt: GM.token ? "" : "consent" });
+}
+
+/* base64 of a UTF-8 string, chunked so a long letter cannot blow the call stack */
+function b64utf8(s) {
+  var bytes = new TextEncoder().encode(s), out = "", CH = 0x8000;
+  for (var i = 0; i < bytes.length; i += CH) {
+    out += String.fromCharCode.apply(null, bytes.subarray(i, i + CH));
+  }
+  return btoa(out);
+}
+/* RFC 2047 — subjects carry em dashes and owners' names carry accents */
+function mimeHeader(s) { return /^[\x20-\x7E]*$/.test(s) ? s : "=?UTF-8?B?" + b64utf8(s) + "?="; }
+
+/* Attachment filenames go in the headers unencoded, so they must be plain ASCII —
+   the template names carry em dashes, which would otherwise make the whole message
+   non-Latin1 and break base64 encoding of it. */
+function mimeFilename(s) {
+  return String(s || "attachment.pdf")
+    .replace(/[‐-―]/g, "-").replace(/[‘’]/g, "'")
+    .replace(/[“”]/g, '"').replace(/ /g, " ")
+    .replace(/[^\x20-\x7E]/g, "").replace(/"/g, "").replace(/\s+/g, " ")
+    .replace(/^\s+|\s+$/g, "") || "letter.pdf";
+}
+
+function mimeMessage(o) {
+  var b = "nnscc" + uid();
+  var fname = mimeFilename(o.filename);
+  var L = [];
+  if (o.from) {
+    L.push("From: " + (o.fromName ? mimeHeader(o.fromName) + " <" + o.from + ">" : o.from));
+    L.push("Reply-To: " + o.from);
+  }
+  L.push("To: " + o.to);
+  L.push("Subject: " + mimeHeader(o.subject));
+  L.push("MIME-Version: 1.0");
+  L.push('Content-Type: multipart/mixed; boundary="' + b + '"');
+  L.push("");
+  L.push("--" + b);
+  L.push('Content-Type: text/plain; charset="UTF-8"');
+  L.push("Content-Transfer-Encoding: base64");
+  L.push("");
+  L.push(b64utf8(o.body).replace(/(.{76})/g, "$1\r\n"));
+  L.push("--" + b);
+  L.push('Content-Type: application/pdf; name="' + fname + '"');
+  L.push("Content-Transfer-Encoding: base64");
+  L.push('Content-Disposition: attachment; filename="' + fname + '"');
+  L.push("");
+  L.push(o.pdfB64.replace(/(.{76})/g, "$1\r\n"));
+  L.push("--" + b + "--");
+  return L.join("\r\n");
+}
+function b64url(ascii) {
+  /* the message is ASCII by construction; say so loudly if that ever stops holding
+     rather than surfacing a bare InvalidCharacterError from btoa */
+  var bad = ascii.match(/[^\x00-\xFF]/);
+  if (bad) throw new Error("The message contains a character that cannot be encoded: " + bad[0]);
+  return btoa(ascii).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+/* the letter as plain text, for the body of the email that carries the PDF */
+function fieldsRaw(row, opts) {
+  var d = fromISO(opts.date), prior = priorFor(row.unit);
+  return {
+    owner: row.owner || "Owner", unit: row.unit || "", address: row.address || "",
+    amount: money(row.amount), date: fmtLongDate(d),
+    due_date: fmtLongDate(addDays(d, Number(opts.dueDays) || 0)),
+    prior_count: String(prior.count),
+    first_notice: prior.first ? fmtLongDate(prior.first) : "—",
+    condo: CORP.condo, reg_no: CORP.regNo, manager: CORP.manager, buildings: CORP.buildings
+  };
+}
+function letterPlainText(row, tpl, opts) {
+  var f = fieldsRaw(row, opts);
+  var s = String(tpl.body || "").replace(/\{\{(\w+)\}\}/g, function (m, k) {
+    return Object.prototype.hasOwnProperty.call(f, k) ? f[k] : m;
+  });
+  s = s.replace(/\*\*([^*]+)\*\*/g, "$1").replace(/^# /gm, "").replace(/^---$/gm, "");
+  s = s.replace(/\[\[PAD_FORM\]\]/g,
+    "The authorization form is on the second page of the attached letter. " +
+    "Please print it, complete it, sign it and return it to the property manager.");
+  s = s.replace(/\[\[SIGNATURE\]\]/g,
+    "Yours truly,\n\n" + CORP.signer + "\n" + CORP.signerTitle + ", " + CORP.manager + "\n" +
+    CORP.agentLine + "\n" + CORP.condoFull + "\n" + CORP.officeAddr + "\nPhone: " + CORP.phone);
+  return s.replace(/\n{3,}/g, "\n\n").replace(/^\s+|\s+$/g, "") +
+    "\n\nA copy of this notice is attached as a PDF.";
+}
+
+/* owners only, opted in only — a tenant must never receive the owner's arrears */
+function emailableOwners(unit) {
+  var u = rosterFind(unit);
+  if (!u) return [];
+  return peopleBy(u, /owner/i).filter(function (p) {
+    return p.email && !/^no$/i.test(p.optIn || "");
+  }).map(function (p) { return p.email; }).filter(function (e, i, a) { return a.indexOf(e) === i; });
+}
+
+function postDraft(token, raw) {
+  return fetch("https://gmail.googleapis.com/gmail/v1/users/me/drafts", {
+    method: "POST",
+    headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
+    body: JSON.stringify({ message: { raw: raw } })
+  }).then(function (r) {
+    if (r.ok) return r.json();
+    return r.json().then(function (j) {
+      var e = new Error((j && j.error && j.error.message) || ("HTTP " + r.status));
+      e.status = r.status;
+      throw e;
+    }, function () {
+      var e = new Error("HTTP " + r.status); e.status = r.status; throw e;
+    });
+  });
+}
+function createGmailDraft(token, row, tpl, opts, pdfB64) {
+  var base = {
+    to: emailableOwners(row.unit).join(", "),
+    subject: (tpl.name.replace(/\s*—.*$/, "")) + " — Unit " + row.unit + " — " + CORP.condo,
+    body: letterPlainText(row, tpl, opts),
+    filename: pdfName([row], tpl),
+    pdfB64: pdfB64
+  };
+  var withFrom = {}, k;
+  for (k in base) withFrom[k] = base[k];
+  withFrom.from = CORP.sendAs || "";
+  withFrom.fromName = CORP.sendAsName || "";
+
+  if (!withFrom.from) return postDraft(token, b64url(mimeMessage(base)));
+  return postDraft(token, b64url(mimeMessage(withFrom))).catch(function (e) {
+    /* Gmail refuses a From the signed-in account has not verified as a send-as.
+       Better a draft from her own address than no draft at all — she can change
+       the sender in the compose window before sending. */
+    if (e && e.status && e.status !== 400 && e.status !== 403) throw e;
+    A.sendAsRejected = true;
+    return postDraft(token, b64url(mimeMessage(base)));
+  });
+}
+
+/* One draft per unit, each with that unit's own PDF. Sequential on purpose: it is
+   a handful of letters a month, and a partial failure must be legible. */
+function emailDrafts(rows, tpl, opts) {
+  var can = rows.filter(function (r) { return emailableOwners(r.unit).length; });
+  var cannot = rows.length - can.length;
+  if (!can.length) {
+    note("genNote", "None of these owners has an email on file that has opted in — print those.", true);
+    return;
+  }
+  if (!confirm("Create " + can.length + " Gmail draft" + (can.length === 1 ? "" : "s") +
+      ", each with its PDF attached?" + (cannot ? "\n\n" + cannot + " have no emailable owner and are left for printing." : "") +
+      "\n\nNothing is sent — you review and send each one from Gmail.")) return;
+
+  $("btnEmail").disabled = true;
+  A.sendAsRejected = false;
+  gmailToken(function (token) {
+    var made = [], failed = [];
+    function step(i) {
+      if (i >= can.length) {
+        $("btnEmail").disabled = false;
+        if (made.length) logBatch(made, tpl, opts, "email-draft");
+        note("genNote", made.length + " draft" + (made.length === 1 ? "" : "s") + " waiting in Gmail" +
+          (A.sendAsRejected ? " — sent from your own address, not " + CORP.sendAs +
+            " (that send-as is not verified in this Gmail account)" : "") +
+          (failed.length ? " · " + failed.length + " failed (" + failed[0] + ")" : "") +
+          (cannot ? " · " + cannot + " to print" : "") + ".", !!failed.length || !!A.sendAsRejected);
+        return;
+      }
+      var r = can[i];
+      note("genNote", "Drafting " + (i + 1) + " of " + can.length + " — Unit " + r.unit + "…");
+      renderPdf([r], tpl, opts)
+        .then(function (b64) { return createGmailDraft(token, r, tpl, opts, b64); })
+        .then(function () { made.push(r); })
+        .catch(function (e) { failed.push((e && e.message) || "error"); })
+        .then(function () { step(i + 1); });
+    }
+    step(0);
+  }, function (msg) {
+    $("btnEmail").disabled = false;
+    note("genNote", msg, true);
+  });
+}
+
+function printLetters(rows, tpl, opts, andLog) {
+  fillPrintArea(rows, tpl, opts);
+  window.onafterprint = function () { restoreTitle(); window.onafterprint = null; };
+  window.print();
+  setTimeout(restoreTitle, 2000);
+  if (andLog) logBatch(rows, tpl, opts, "print");
+}
+/* on-screen proof at true page width, with an honest fit check before printing */
+function previewLetters(rows, tpl, opts) {
+  fillPrintArea(rows, tpl, opts);
+  document.body.classList.add("previewing");
+  var heights = pageFit();
+  var pages = heights.map(function (h) { return Math.max(1, Math.ceil(h / PAGE_H_PX)); });
+  var most = Math.max.apply(null, pages);
+  $("pvLabel").textContent = rows.length + " letter" + (rows.length === 1 ? "" : "s") +
+    " · " + tpl.name;
+  $("pvFit").textContent = most === 1
+    ? "one page each"
+    : most + " pages each — " + (/pre-authorized/i.test(tpl.name)
+        ? "the authorization form is its own sheet"
+        : "check the break before printing");
+  window.scrollTo(0, 0);
+}
+function closePreview() {
+  document.body.classList.remove("previewing");
+  restoreTitle();
+}
+
+/* ---------------- the append-only log ---------------- */
+function logBatch(rows, tpl, opts, via) {
+  var batchId = uid(), by = (A.user && A.user.email) || "", n = rows.length;
+  var batch = A.db.batch();
+  rows.forEach(function (r) {
+    batch.set(A.db.collection(LETTERS).doc(), {
+      batchId: batchId, unit: String(r.unit || ""), unitKey: unitKey(r.unit),
+      owner: r.owner || "", address: r.address || "", amount: Number(r.amount) || 0,
+      templateId: tpl.id, templateName: tpl.name, dateISO: opts.date,
+      dueDays: Number(opts.dueDays) || 0, by: by, via: via || "print",
+      at: firebase.firestore.FieldValue.serverTimestamp(), voided: false
+    });
+  });
+  return batch.commit().then(function () {
+    note("genNote", n + " letter" + (n === 1 ? "" : "s") + " recorded in History.");
+    loadLetters();
+  }).catch(function (e) {
+    note("genNote", "The letters were produced but could NOT be recorded (" + ((e && e.code) || "error") + ").", true);
+  });
+}
+
+/* ---------------- parsing the pasted list ----------------
+   Deliberately forgiving: the manager pastes whatever her accounting package
+   gives her, and the review table is where mistakes get caught. */
+/* A line that is nothing but unit numbers — "550-210, 560-811, 560-406" — is a
+   request to letter those units with the amounts typed in afterwards, not a broken
+   row. Only tokens that are unmistakably units qualify: a building-prefixed number,
+   or one already in the Units tab. A bare column of figures must never be mistaken
+   for a list of units. */
+function unitsOnly(line) {
+  var toks = line.split(/[\s,;|]+/), out = [];
+  for (var i = 0; i < toks.length; i++) {
+    var t = toks[i];
+    if (!t || /^unit$/i.test(t)) continue;
+    var known = rosterFind(t);
+    if (known) { out.push(known.unit); continue; }
+    if (/^\d{2,4}[-–][A-Za-z0-9]{1,6}$/.test(t) || /^\d{2,4}[A-Za-z][A-Za-z0-9]*$/.test(t)) {
+      out.push(t); continue;
+    }
+    return null;                      /* anything else and this is not a unit list */
+  }
+  return out.length ? out : null;
+}
+
+function parseArrears(text) {
+  var lines = String(text || "").split(/\r?\n/), out = [], skipped = 0, noAmount = 0;
+  for (var i = 0; i < lines.length; i++) {
+    var raw = lines[i].replace(/^\s+|\s+$/g, "");
+    if (!raw) continue;
+    var bare = unitsOnly(raw);
+    if (bare) {
+      bare.forEach(function (u) { out.push({ unit:u, owner:"", amount:0 }); noAmount++; });
+      continue;
+    }
+    /* The unit leads the line. Waterview numbers units by building — 550-1001,
+       560-201, 560COMA1 — so a bare "550" is NOT the unit here; taking the first
+       number on the line would read 550-1001 as unit 550 and letter the wrong owner. */
+    var um = /^\s*(?:unit\s*)?(\d{2,4}(?:[-–][A-Za-z0-9]{1,6}|[A-Za-z]{1,5}\d{0,3})?)(?=$|[\s,;:|\t])/i.exec(raw);
+    if (!um) { skipped++; continue; }
+    var uRaw = um[1];
+    var rest = raw.slice(um[0].length);
+    /* Every number in what is left. A minus sign counts only when it is joined to
+       the figure: "310 - Smith - 450.00" uses dashes as separators, and owes +450. */
+    var nums = rest.match(/-?\$\s?\d[\d,]*(?:\.\d{1,2})?|-?\d[\d,]*(?:\.\d{1,2})?/g);
+    if (!nums || !nums.length) { skipped++; continue; }
+    var last = nums[nums.length - 1];
+    var amount = parseMoney(last);
+    /* a nil or credit balance is not an arrears letter */
+    if (amount <= 0) { skipped++; continue; }
+    /* whatever sits between the unit and the figure, stripped of separators, is a name */
+    var mid = rest.slice(0, rest.lastIndexOf(last));
+    /* a dash between spaces is a separator; a dash inside a word is part of the
+       surname, and Smith-Jones must not become Smith Jones on a formal notice */
+    var name = mid.replace(/[\t|;]+/g, " ").replace(/\s[-–—]+\s|^\s*[-–—]+|[-–—]+\s*$/g, " ")
+                  .replace(/\s*,\s*$|^\s*,\s*/g, "").replace(/\s+/g, " ").replace(/^\s+|\s+$/g, "");
+    if (/^unit$/i.test(name)) name = "";
+    out.push({ unit: uRaw, owner: name, amount: amount });
+  }
+  return { rows: out, skipped: skipped, noAmount: noAmount };
+}
+
+/* ---------------- roster ---------------- */
+function rosterFind(unit) {
+  var k = unitKey(unit);
+  for (var i = 0; i < A.units.length; i++) if (unitKey(A.units[i].unit) === k) return A.units[i];
+  return null;
+}
+/* one labelled line in the expanded unit detail, dropped entirely when empty */
+function dRow(label, val, cls) {
+  if (!val) return "";
+  return '<div class="d-row"><span class="d-lab">' + esc(label) + '</span>' +
+    '<span class="d-val' + (cls ? " " + cls : "") + '">' + esc(val).split("\n").join("<br>") + "</span></div>";
+}
+function personCard(p) {
+  var head = '<div class="p-head"><b>' + esc(p.name || "—") + "</b>" +
+    (p.role ? ' <span class="chip' + (/non-resident/i.test(p.role) ? " warn" : (/owner/i.test(p.role) ? " ok" : "")) + '">' +
+      esc(p.role) + "</span>" : "") + "</div>";
+  return '<div class="pcard">' + head +
+    dRow("Email", p.email) + dRow("Phone", p.phone) + dRow("Cell", p.cell) +
+    dRow("Office", p.office) + dRow("Address", p.address) +
+    dRow("Resident", p.resident) + dRow("Email opt-in", p.optIn) + dRow("Groups", p.groups) +
+    dRow("Vehicle", p.vehicle) + dRow("Parking permit", p.permit) +
+    dRow("Evacuation help", p.evac, "flag") + dRow("Emergency contact", p.emergency) +
+    dRow("Other email", p.altEmail) + dRow("Other contact", p.contactInfo) + dRow("Notes", p.notes) +
+    "</div>";
+}
+/* The opened row: who lives there, anything standing against the unit, and the few
+   actions worth reaching for. The whole imported record is one click further in —
+   it is reference material, not something wanted on every glance. */
+function unitDetail(u, i) {
+  if (A.editUnit === i) {
+    return '<div class="detail"><div class="dedit">' +
+      '<label>Unit<input type="text" data-r="' + i + '" data-k="unit" value="' + esc(u.unit) + '"></label>' +
+      '<label>Name a letter is addressed to' +
+        '<input type="text" data-r="' + i + '" data-k="owner" value="' + esc(u.owner) + '" id="focusOwner"></label>' +
+      '<label style="grid-column:1/-1">Mailing address a letter is sent to' +
+        '<textarea rows="3" data-r="' + i + '" data-k="address">' + esc(u.address) + "</textarea></label></div>" +
+      '<div class="row"><button class="btn primary sm" data-done="' + i + '">Done</button>' +
+      '<span class="barnote" style="color:var(--muted)">Changes are kept when you press ' +
+      "<b>Save changes</b>. A re-import will overwrite them.</span></div></div>";
+  }
+
+  var occ = occupancyOf(u);
+  var tenants = occ.tenants;
+  var h = ['<div class="expand">'];
+
+  /* tenant column */
+  h.push('<div class="ecol"><div class="ehead">Tenant</div>');
+  if (tenants.length) {
+    h.push(tenants.map(function (p) {
+      return '<div class="eline">' + ICON.user + "<span><span class=\"en\">" + esc(p.name || "—") + "</span>" +
+        (p.email ? '<span class="em">' + esc(p.email) + "</span>" : "") +
+        (p.cell ? '<span class="em">' + esc(p.cell) + "</span>" : "") + "</span></div>";
+    }).join(""));
+  } else if (occ.tenantNames) {
+    h.push('<div class="eline">' + ICON.user + '<span><span class="en">' + esc(occ.tenantNames) + "</span></span></div>");
+  } else {
+    h.push('<div class="eline"><span style="color:var(--muted)">Owner-occupied — no tenant on file.</span></div>');
+  }
+  h.push("</div>");
+
+  /* notes column */
+  var notes = [];
+  if (u.entryAccess) notes.push(['<div class="eline flag">' + ICON.alert + "<span>" +
+    esc(u.entryAccess).split("\n").join("<br>") + "</span></div>"]);
+  if (u.unitNotes) notes.push('<div class="eline">' + ICON.note + "<span>" +
+    esc(u.unitNotes).split("\n").join("<br>") + "</span></div>");
+  if (u.evac) notes.push('<div class="eline flag">' + ICON.alert +
+    "<span>Evacuation assistance: " + esc(u.evac) + "</span></div>");
+  var pk = [u.parking ? "Parking " + u.parking : "", u.locker ? "Locker " + u.locker : ""]
+    .filter(function (x) { return x; }).join(" · ");
+  if (pk) notes.push('<div class="eline">' + ICON.building + "<span>" + esc(pk) + "</span></div>");
+  h.push('<div class="ecol"><div class="ehead">Notes</div>' +
+    (notes.length ? notes.join("") : '<div class="eline"><span style="color:var(--muted)">Nothing recorded.</span></div>') +
+    "</div>");
+
+  /* actions column */
+  h.push('<div class="ecol"><div class="ehead">Quick actions</div><div class="qa">' +
+    '<button class="btn ico sm" data-edit="' + i + '"><span class="i">' + ICON.pencil + "</span>Edit owner</button>" +
+    '<button class="btn ico sm" data-copy="' + i + '"><span class="i">' + ICON.clip + "</span>Copy address</button>" +
+    '<button class="btn ico sm" data-full="' + i + '"><span class="i">' + ICON.building + "</span>" +
+      (A.fullUnit === i ? "Hide full record" : "View full record") + "</button></div></div>");
+  h.push("</div>");
+
+  if (A.fullUnit === i) {
+    h.push('<div class="detail" style="margin-top:10px">');
+    h.push('<div class="dsec">' +
+      dRow("Owner of record", u.ownerOfRecord) + dRow("Tenant", u.tenant) +
+      dRow("Parking", u.parking) + dRow("Locker", u.locker) +
+      dRow("Evacuation help", u.evac, "flag") +
+      dRow("Entry access", u.entryAccess, "flag") + dRow("Unit notes", u.unitNotes) + "</div>");
+    var ppl = u.people || [];
+    if (ppl.length) {
+      h.push('<div class="dsec"><div class="dhead">' + ppl.length + " on file for this unit</div>" +
+        ppl.map(personCard).join("") + "</div>");
+    }
+    h.push("</div>");
+  }
+  return h.join("");
+}
+function peopleBy(u, re) {
+  return (u.people || []).filter(function (p) { return re.test(p.role || ""); });
+}
+function emailsOf(list) {
+  var out = [];
+  list.forEach(function (p) { if (p.email && out.indexOf(p.email) < 0) out.push(p.email); });
+  return out;
+}
+/* distinct people, not person-per-unit links: one landlord can hold sixty units
+   and counting them sixty times would overstate what is actually on file */
+function countPeople() {
+  var seen = {}, n = 0;
+  A.units.forEach(function (u) {
+    (u.people || []).forEach(function (p) {
+      var k = (p.email || "") + "|" + (p.name || "");
+      if (k !== "|" && !seen[k]) { seen[k] = 1; n++; }
+    });
+  });
+  return n;
+}
+/* How the unit is actually occupied, stated in the export's own words rather than
+   a category of our invention — the manager needs to know whether the owner is at
+   the door or a tenant is, before anything is posted to it. */
+function occupancyOf(u) {
+  var owners = peopleBy(u, /owner/i), tenants = peopleBy(u, /tenant/i);
+  var roles = [];
+  owners.forEach(function (p) { if (roles.indexOf(p.role) < 0) roles.push(p.role); });
+  return { roles:roles, owners:owners, tenants:tenants,
+           tenantNames: u.tenant || tenants.map(function (p) { return p.name; }).join(", ") };
+}
+/* Filter chips are OR within the set: ticking "Tenanted" and "No owner email" shows
+   units that are either, which is how someone scanning for problems thinks. */
+function passesFilters(u) {
+  var on = [];
+  (typeof FILTERS === "undefined" ? [] : FILTERS).forEach(function (f) {
+    if (A.filters && A.filters[f[0]]) on.push(f[2]);
+  });
+  if (!on.length) return true;
+  for (var i = 0; i < on.length; i++) if (on[i](u)) return true;
+  return false;
+}
+function rosterMatch(u, q) {
+  if (!q) return true;
+  var hay = [u.unit, u.owner, u.ownerOfRecord, u.tenant, u.address]
+    .concat(emailsOf(u.people || [])).join(" ").toLowerCase();
+  return hay.indexOf(q) >= 0;
+}
+var SORT_KEYS = {
+  unit:      function (u) { return unitKey(u.unit); },
+  owner:     function (u) { return (u.owner || "~").toLowerCase(); },
+  tenant:    function (u) { return (occupancyOf(u).tenantNames || "~").toLowerCase(); },
+  occupancy: function (u) { return (occupancyOf(u).roles.join(" ") || "~").toLowerCase(); }
+};
+/* The tenant lives in the opened row, as the design has it, so there is no tenant
+   column. An empty key means the column is shown but not sortable. */
+var COLS = [["unit","Unit"],["owner","Owner of record"],["occupancy","Occupancy"],["","Mailing address"]];
+
+/* People matching the search, listed above the table — searching "550-611" should
+   show who is actually at 550-611, not just that the unit exists. */
+function renderPeopleHits(q) {
+  var box = $("peopleHits");
+  if (!box) return;
+  if (!q || q.length < 2) { box.innerHTML = ""; return; }
+  var out = [], seen = {};
+  A.units.forEach(function (u, i) {
+    (u.people || []).forEach(function (p) {
+      var hay = ((p.name || "") + " " + (p.email || "") + " " + u.unit).toLowerCase();
+      if (hay.indexOf(q) < 0) return;
+      var k = u.unit + "|" + (p.name || "") + "|" + (p.role || "");
+      if (seen[k]) return;
+      seen[k] = 1;
+      out.push({ i:i, unit:u.unit, name:p.name, role:p.role, email:p.email });
+    });
+  });
+  if (!out.length) { box.innerHTML = ""; return; }
+  var capped = out.slice(0, 12);
+  box.innerHTML = '<div class="hits"><div class="hhead">People matching “' + esc(q) + '”' +
+    (out.length > capped.length ? " — first " + capped.length + " of " + out.length : "") + "</div>" +
+    capped.map(function (x) {
+      return '<div class="hit" data-hit="' + x.i + '"><span class="hn">' + esc(x.name || "—") + "</span>" +
+        '<span class="hm"><b>' + esc(x.unit) + "</b> · " + esc(x.role || "—") +
+        (x.email ? " · " + esc(x.email) : "") + "</span></div>";
+    }).join("") + "</div>";
+}
+
+function renderRoster() {
+  var t = $("rosterTbl");
+  var q = String(($("rosterFind") && $("rosterFind").value) || "").toLowerCase().replace(/^\s+|\s+$/g, "");
+  var sw = $("rosterFind") && $("rosterFind").parentNode;
+  if (sw) sw.classList.toggle("has", !!q);
+  renderPeopleHits(q);
+
+  if (!A.units.length) {
+    t.innerHTML = '<tr><td class="empty">No units yet — click <b>Import both CSVs</b> and pick the Unit Manager and User Manager exports.</td></tr>';
+    $("rosterCount").textContent = "";
+    return;
+  }
+
+  var key = A.sortKey || "unit", dir = A.sortDir === -1 ? -1 : 1;
+  var rows = [];
+  A.units.forEach(function (u, i) { if (rosterMatch(u, q) && passesFilters(u)) rows.push({ u:u, i:i }); });
+  var kf = SORT_KEYS[key] || SORT_KEYS.unit;
+  rows.sort(function (a, b) {
+    var x = kf(a.u), y = kf(b.u);
+    if (x === y) return unitKey(a.u.unit).localeCompare(unitKey(b.u.unit), undefined, { numeric:true });
+    return dir * String(x).localeCompare(String(y), undefined, { numeric:true });
+  });
+
+  var h = ['<tr><th class="cx"></th>' + COLS.map(function (c) {
+    if (!c[0]) return "<th>" + c[1] + "</th>";
+    var on = c[0] === key;
+    return '<th class="sortable' + (on ? " on" : "") + '" data-sort="' + c[0] + '">' + c[1] +
+      '<span class="arw">' + (dir === 1 ? "▲" : "▼") + "</span></th>";
+  }).join("") + '<th class="cact">Actions</th></tr>'];
+
+  rows.forEach(function (r) {
+    var u = r.u, i = r.i, open = A.openUnit === i;
+    var occ = occupancyOf(u);
+    var mails = emailsOf(occ.owners.length ? occ.owners : (u.people || []));
+    var chips = occ.roles.map(function (role) {
+      return '<span class="chip ' + (/non-resident/i.test(role) ? "warn" : "ok") + '">' + esc(role) + "</span>";
+    }).join("");
+    if (!chips && u.nonResident) chips = '<span class="chip warn">Non-Resident Owner</span>';
+    if (occ.tenants.length || occ.tenantNames) chips += '<span class="chip">Tenanted</span>';
+    if (u.entryAccess) chips += '<span class="chip bad" title="Standing entry instructions">Entry notes</span>';
+
+    h.push('<tr class="u' + (open ? " open" : "") + '" data-det="' + i + '">' +
+      '<td class="cx"><button class="chev' + (open ? " open" : "") +
+        '" data-det="' + i + '" title="Show the full record">' + ICON.chevron + "</button></td>" +
+      '<td><span class="unitpill">' + esc(u.unit || "—") + "</span></td>" +
+      '<td><div class="oname">' + esc(u.owner || "—") + "</div>" +
+        (mails.length ? '<div class="omail">' + esc(mails.join(" · ")) + "</div>"
+                      : '<div class="omail none">no email on file</div>') + "</td>" +
+      '<td><div class="occ">' + (chips || '<span class="sub">—</span>') + "</div></td>" +
+      '<td class="addr">' + esc(u.address || "—").split("\n").join("<br>") + "</td>" +
+      '<td class="acts">' +
+        '<button class="iconbtn" data-edit="' + i + '" title="Edit the name and address a letter uses">' + ICON.pencil + "</button>" +
+        '<button class="iconbtn del" data-del="' + i + '" title="Remove this unit">' + ICON.trash + "</button>" +
+        '<button class="iconbtn" data-full="' + i + '" title="Everything on file">' + ICON.dots + "</button>" +
+      "</td></tr>");
+    if (open) h.push('<tr class="det"><td colspan="6">' + unitDetail(u, i) + "</td></tr>");
+  });
+  if (!rows.length) h.push('<tr><td class="empty" colspan="6">Nothing matches “' + esc(q) + '”.</td></tr>');
+  t.innerHTML = h.join("");
+
+  var tenanted = A.units.filter(function (u) { return peopleBy(u, /tenant/i).length || u.tenant; }).length;
+  var nonRes = A.units.filter(function (u) { return u.nonResident; }).length;
+  $("rosterCount").innerHTML =
+    '<span class="stat">' + ICON.user + "<b>" + (q ? rows.length + " of " + A.units.length : A.units.length) +
+      "</b> Total units</span><span class=\"vsep\"></span>" +
+    '<span class="stat">' + ICON.users + "<b>" + tenanted + "</b> Tenanted units</span><span class=\"vsep\"></span>" +
+    '<span class="stat">' + ICON.building + "<b>" + nonRes + "</b> Non-resident owners</span><span class=\"vsep\"></span>" +
+    '<span class="stat">' + ICON.note + "<b>" + countPeople() + "</b> People on file</span>";
+
+  /* A roster with units but no people came from the Unit Manager export alone, or
+     from a build of this tool that did not read the people yet. Say so plainly —
+     silently letting letters go out without owner contacts is the worse failure. */
+  var warn = $("rosterWarn");
+  if (!warn) return;
+  var ppl = A.units.reduce(function (s, u) { return s + ((u.people && u.people.length) || 0); }, 0);
+  if (ppl) { warn.style.display = "none"; return; }
+  warn.style.display = "";
+  warn.innerHTML = "<b>Owner contacts and tenants are missing.</b> These " + A.units.length +
+    " units have no people on file, so no email addresses, no occupancy, and the mailing " +
+    "addresses may be stale. Click <b>Import both CSVs</b> and select the Unit Manager and " +
+    "User Manager exports together to rebuild the record.";
+}
+function saveRoster() {
+  A.db.doc(ROSTER_DOC).set({
+    units: A.units, updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    updatedBy: (A.user && A.user.email) || ""
+  }).then(function () { A.dirtyRoster = false; note("rosterNote", "Saved."); })
+    .catch(function (e) { note("rosterNote", "Could not save (" + ((e && e.code) || "error") + ").", true); });
+}
+
+/* ---------------- CSV import ----------------
+   Two exports out of the management system feed this roster, and the importer
+   works out which one it is from the header:
+     Unit Manager — one row per unit, giving the owner of record.
+     User Manager — one row per person, giving the owner's real mailing address.
+   Letters go to OWNERS. Tenant rows are read and discarded: 194 of the units here
+   are tenanted, and a notice posted to the unit reaches the tenant, not the owner. */
+function parseCSVText(s) {
+  var rows = [], f = "", r = [], q = false;
+  for (var i = 0; i < s.length; i++) {
+    var c = s.charAt(i);
+    if (q) {
+      if (c === '"') { if (s.charAt(i + 1) === '"') { f += '"'; i++; } else q = false; }
+      else f += c;
+    }
+    else if (c === '"') q = true;
+    else if (c === ",") { r.push(f); f = ""; }
+    else if (c === "\n") { r.push(f); f = ""; rows.push(r); r = []; }
+    else if (c !== "\r") f += c;
+  }
+  if (f || r.length) { r.push(f); rows.push(r); }
+  return rows.filter(function (row) {
+    return row.some(function (c) { return /\S/.test(String(c)); });
+  });
+}
+function cl(s) { return String(s == null ? "" : s).replace(/\s+/g, " ").replace(/^\s+|\s+$/g, ""); }
+/* same, but keeps the line breaks — entry-access instructions and contact blocks
+   are written as several lines and read as nonsense once they are run together */
+function clm(s) {
+  return String(s == null ? "" : s).replace(/\r/g, "")
+    .replace(/[ \t]+/g, " ").replace(/[ \t]*\n[ \t]*/g, "\n").replace(/^\s+|\s+$/g, "");
+}
+/* the export marks corporate owners with a trailing asterisk; it is not part of the name */
+function ownerName(s) { return cl(s).replace(/\s*\*+\s*$/, ""); }
+function personName(first, last) {
+  var l = cl(last).replace(/^\*+$/, "");
+  return ownerName(cl(first) + " " + l);
+}
+function joinNames(list) {
+  if (list.length <= 1) return list[0] || "";
+  if (list.length === 2) return list[0] + " and " + list[1];
+  return list.slice(0, -1).join(", ") + " and " + list[list.length - 1];
+}
+var NON_UNIT = /^(test|front desk|management office)$/i;
+/* Where an owner-occupied unit's mail goes. The building's own postal code and the
+   "1001 - 550 North Service Road" form are both taken from how the owners in this
+   export write their own addresses, so a defaulted address matches the rest. */
+var BUILDINGS = { "550": "L3M 0H9", "560": "L3M 0G3" };
+function unitAddress(unit) {
+  var u = String(unit || "").replace(/^\s+|\s+$/g, "");
+  var m = /^(550|560)[-–]?(.*)$/.exec(u);
+  if (!m || !BUILDINGS[m[1]]) return "";
+  var suffix = m[2] || "";
+  return (suffix ? suffix + " - " : "") + m[1] + " North Service Road\nGrimsby, ON  " + BUILDINGS[m[1]];
+}
+
+function importCSV(text) {
+  var rows = parseCSVText(text);
+  if (!rows.length) return { ok:false, msg:"That file is empty." };
+  var hi = -1;
+  for (var i = 0; i < Math.min(rows.length, 5); i++) {
+    if (rows[i].some(function (c) { return /^unit(\(s\))?$/i.test(cl(c)); })) { hi = i; break; }
+  }
+  if (hi < 0) return { ok:false, msg:"No Unit column in that file — expected a Unit Manager or User Manager export." };
+  var H = rows[hi].map(cl);
+  /* the User Manager export repeats "Email" and carries a second free-text block
+     at the tail, so a column is addressed by name AND occurrence */
+  function col(name, nth) {
+    var seen = 0;
+    for (var j = 0; j < H.length; j++) {
+      if (H[j].toLowerCase() === name.toLowerCase()) { if (seen === (nth || 0)) return j; seen++; }
+    }
+    return -1;
+  }
+  var data = rows.slice(hi + 1);
+  return col("Type(s)") >= 0 ? importUsers(data, col) : importUnits(data, col);
+}
+
+/* Unit Manager — creates the units and carries the whole unit record: who owns it,
+   who lives there, parking, lockers, and the standing entry-access instructions the
+   manager needs before sending anyone to a door. */
+function importUnits(data, col) {
+  var cU = col("Unit"), cO = col("Owner");
+  if (cU < 0 || cO < 0) return { ok:false, msg:"That Unit Manager export has no Unit/Owner column." };
+  var cT = col("Tenant"), cPk = col("Parking spot(s)"), cLk = col("Locker(s)"),
+      cE = col("Entry access"), cN = col("Notes"),
+      cEv = col("Emergency evacuation assistance");
+  var n = 0, skipped = 0;
+  data.forEach(function (r) {
+    var u = cl(r[cU]), o = ownerName(r[cO]);
+    if (!u || NON_UNIT.test(u) || !o) { skipped++; return; }
+    var ex = rosterFind(u);
+    if (!ex) { ex = { unit:u, owner:"", address:"", nonResident:false }; A.units.push(ex); }
+    ex.ownerOfRecord = o;
+    ex.tenant      = cl(r[cT]);
+    ex.parking     = cl(r[cPk]);
+    ex.locker      = cl(r[cLk]);
+    ex.entryAccess = clm(r[cE]);
+    ex.unitNotes   = clm(r[cN]);
+    ex.evac        = cl(r[cEv]);
+    /* the User Manager export gives a better-formed name, so do not overwrite one */
+    if (!ex.owner) ex.owner = o;
+    if (!ex.address) ex.address = unitAddress(u);
+    n++;
+  });
+  return { ok:true, kind:"Unit Manager", n:n, skipped:skipped };
+}
+
+/* User Manager — the better source: proper names, and the real mailing address
+   for owners who do not live in the building. One person per row, so a unit with
+   two owners is gathered back into one addressee. */
+function importUsers(data, col) {
+  var cT = col("Type(s)"), cF = col("First name"), cL = col("Last name"), cU = col("Unit"),
+      cA1 = col("Address 1"), cA2 = col("Address 2"), cC = col("City"),
+      cP = col("Province"), cZ = col("Postal code"),
+      cEm = col("Email"), cEm2 = col("Email", 1), cPh = col("Phone"), cCe = col("Cell phone"),
+      cOf = col("Office phone"), cRes = col("Is resident?"), cOpt = col("Email opt in"),
+      cGrp = col("User group(s)"), cVeh = col("Vehicle information"),
+      cPer = col("Accessible parking permit"), cEv = col("Emergency evacuation assistance"),
+      cEmg = col("Emergency contact information"), cCi = col("Contact info"), cNo = col("Notes");
+  if (cU < 0) return { ok:false, msg:"That User Manager export has no Unit column." };
+
+  var per = {}, notOwners = 0, people = 0;
+  data.forEach(function (r) {
+    var type = cl(r[cT]);
+    var isOwner = /owner/i.test(type);
+    if (!isOwner) notOwners++;
+    var nm = personName(r[cF], r[cL]);
+    /* Address 1 / Address 2 / City-Province-Postal are separate columns, so the
+       mailing address is assembled as real lines rather than one comma soup. */
+    var cityLine = [cl(r[cC]), [cl(r[cP]), cl(r[cZ])].filter(Boolean).join("  ")]
+      .filter(function (x) { return x; }).join(", ");
+    var addr = [cl(r[cA1]), cl(r[cA2]), cityLine].filter(function (x) { return x; }).join("\n");
+
+    var person = { role:type, name:nm, email:cl(r[cEm]), phone:cl(r[cPh]), cell:cl(r[cCe]),
+      office:cl(r[cOf]), address:addr, resident:cl(r[cRes]), optIn:cl(r[cOpt]),
+      groups:cl(r[cGrp]), vehicle:cl(r[cVeh]), permit:cl(r[cPer]), evac:cl(r[cEv]),
+      emergency:clm(r[cEmg]), altEmail:clm(cEm2 >= 0 ? r[cEm2] : ""),
+      contactInfo:clm(r[cCi]), notes:clm(r[cNo]) };
+    Object.keys(person).forEach(function (k) { if (!person[k]) delete person[k]; });
+    if (!person.name && !person.email) return;
+    people++;
+
+    var nonRes = /non-resident/i.test(type);
+    cl(r[cU]).split(/\s*,\s*/).forEach(function (u) {
+      if (!u || NON_UNIT.test(u)) return;
+      var e = per[unitKey(u)] || (per[unitKey(u)] = { unit:u, names:[], address:"", nonRes:false, people:[] });
+      e.people.push(person);
+      if (!isOwner) return;                    /* only owners address the letter */
+      if (nm && e.names.indexOf(nm) < 0) e.names.push(nm);
+      if (!e.address && addr) e.address = addr;
+      if (nonRes) e.nonRes = true;
+    });
+  });
+
+  var n = 0, derived = 0;
+  Object.keys(per).forEach(function (k) {
+    var e = per[k], addr = e.address;
+    if (!addr) { addr = unitAddress(e.unit); derived++; }
+    var ex = rosterFind(e.unit);
+    if (!ex) { ex = { unit:e.unit, owner:"", address:"", nonResident:false }; A.units.push(ex); }
+    if (e.names.length) ex.owner = joinNames(e.names);
+    ex.address = addr;
+    ex.nonResident = e.nonRes;
+    ex.people = e.people;
+    n++;
+  });
+  A.rosterPeople = people;
+  return { ok:true, kind:"User Manager", n:n, skipped:notOwners, derived:derived, people:people };
+}
+
+/* ---------------- the working batch ---------------- */
+function renderBatch() {
+  var card = $("batchCard"), optc = $("optCard");
+  if (!A.rows.length) { card.style.display = "none"; optc.style.display = "none"; return; }
+  card.style.display = ""; optc.style.display = "";
+
+  var h = ["<tr><th style='width:34px'></th><th style='width:80px'>Unit</th><th>Owner of record</th>" +
+           "<th class='num' style='width:120px'>Amount</th><th style='width:150px'>Already sent</th><th style='width:44px'></th></tr>"];
+  A.rows.forEach(function (r, i) {
+    var known = rosterFind(r.unit);
+    var prior = priorFor(r.unit);
+    var flag = !r.owner
+      ? '<span class="chip bad">name needed</span>'
+      : (!known ? '<span class="chip warn" title="This unit is not in the Units tab — the name and address here will not be remembered unless you add it">not in Units</span>'
+                : (r.nonResident ? '<span class="chip warn" title="Owner lives elsewhere — this goes to their mailing address, not the unit">non-resident</span>' : ""));
+    h.push('<tr class="' + (r.on ? "" : "off") + '">' +
+      '<td><input type="checkbox" data-on="' + i + '"' + (r.on ? " checked" : "") + '></td>' +
+      '<td><input type="text" data-b="' + i + '" data-k="unit" value="' + esc(r.unit) + '"></td>' +
+      '<td><input type="text" data-b="' + i + '" data-k="owner" value="' + esc(r.owner) + '" placeholder="Owner of record"> ' + flag + "</td>" +
+      '<td class="num"><input type="text" class="amt" data-b="' + i + '" data-k="amount" value="' + esc(money(r.amount)) + '"></td>' +
+      "<td>" + (prior.count
+        ? '<span class="chip">' + prior.count + " letter" + (prior.count === 1 ? "" : "s") + "</span>" +
+          '<br><span style="font-size:11px;color:var(--muted)">since ' + esc(fmtLongDate(prior.first)) + "</span>"
+        : '<span style="font-size:12px;color:var(--muted)">first letter</span>') + "</td>" +
+      '<td><button class="btn danger sm" data-brm="' + i + '" title="Drop this row">✕</button></td></tr>');
+  });
+  $("batchTbl").innerHTML = h.join("");
+
+  batchSummary();
+}
+
+/* One place decides whether a batch is ready to print: a letter needs somebody to
+   address and a figure to demand. A $0.00 notice of arrears is not a thing. */
+function batchSummary() {
+  var on = A.rows.filter(function (r) { return r.on; });
+  var tot = on.reduce(function (s, r) { return s + (Number(r.amount) || 0); }, 0);
+  var noName = on.filter(function (r) { return !r.owner; }).length;
+  var noAmt = on.filter(function (r) { return !(Number(r.amount) > 0); }).length;
+  var bits = [];
+  if (noName) bits.push(noName + " missing an owner name");
+  if (noAmt) bits.push(noAmt + " still to price");
+  $("batchSum").innerHTML = "<b>" + on.length + "</b> letter" + (on.length === 1 ? "" : "s") +
+    " · total outstanding <b>" + esc(money(tot)) + "</b>" +
+    (bits.length ? ' · <span style="color:var(--prio);font-weight:700">' + esc(bits.join(" · ")) + "</span>" : "");
+  $("btnGenerate").disabled = !on.length || !!noName || !!noAmt;
+}
+
+/* new units picked up from a batch get remembered */
+function absorbIntoRoster(rows) {
+  var added = 0;
+  rows.forEach(function (r) {
+    if (!r.owner) return;
+    var u = rosterFind(r.unit);
+    if (u) { if (!u.owner) { u.owner = r.owner; added++; } return; }
+    A.units.push({ unit: String(r.unit), owner: r.owner, address: r.address || "" });
+    added++;
+  });
+  if (added) {
+    A.units.sort(function (a, b) { return unitKey(a.unit).localeCompare(unitKey(b.unit), undefined, { numeric:true }); });
+    saveRoster(); renderRoster();
+  }
+}
+
+/* ---------------- templates ---------------- */
+function currentTpl() { return A.templates[A.tplIdx] || A.templates[0]; }
+function renderTplPickers() {
+  var opts = A.templates.map(function (t, i) {
+    return '<option value="' + i + '">' + esc(t.name) + "</option>";
+  }).join("");
+  $("tplPick").innerHTML = opts;
+  $("tplEdit").innerHTML = opts;
+  $("tplEdit").value = String(A.tplIdx);
+}
+function loadTplEditor() {
+  var t = currentTpl(); if (!t) return;
+  $("tplName").value = t.name;
+  $("tplBody").value = t.body;
+  renderTplPreview();
+}
+function renderTplPreview() {
+  var t = currentTpl(); if (!t) return;
+  var sample = { unit:"402", owner:"J. Smith", address:"550 Main Street West, Unit 402", amount:1234.56, on:true };
+  var f = fieldsFor(sample, { date: $("letterDate").value || isoToday(), dueDays: $("dueDays").value || 15 });
+  $("tplPreview").innerHTML = renderBody($("tplBody").value, f);
+}
+function saveTemplates() {
+  var t = currentTpl(); if (!t) return;
+  t.name = $("tplName").value || t.name;
+  t.body = $("tplBody").value;
+  A.db.doc(TPL_DOC).set({
+    templates: A.templates, updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    updatedBy: (A.user && A.user.email) || ""
+  }).then(function () { note("tplNote", "Saved."); renderTplPickers(); })
+    .catch(function (e) { note("tplNote", "Could not save (" + ((e && e.code) || "error") + ").", true); });
+}
+
+/* ---------------- history ---------------- */
+function renderHistory() {
+  var q = unitKey($("histFilter").value);
+  var rows = A.letters.filter(function (L) { return !q || unitKey(L.unit).indexOf(q) === 0; });
+  if (!rows.length) {
+    $("histTbl").innerHTML = '<tr><td class="empty">' +
+      (A.letters.length ? "No letters for that unit." : "Nothing yet — generated letters are recorded here.") + "</td></tr>";
+    return;
+  }
+  var h = ["<tr><th style='width:150px'>Sent</th><th style='width:70px'>Unit</th><th>Owner</th>" +
+           "<th>Letter</th><th class='num' style='width:110px'>Amount</th><th style='width:170px'>By</th></tr>"];
+  rows.forEach(function (L) {
+    var when = L.at && L.at.toDate ? L.at.toDate().toLocaleDateString("en-CA", { year:"numeric", month:"short", day:"numeric" })
+             : (L.dateISO || "—");
+    h.push("<tr" + (L.voided ? ' class="off"' : "") + ">" +
+      "<td>" + esc(when) + (L.voided ? ' <span class="chip bad">void</span>' : "") + "</td>" +
+      "<td>" + esc(L.unit) + "</td><td>" + esc(L.owner) + "</td>" +
+      "<td>" + esc(L.templateName) + "</td>" +
+      '<td class="num">' + esc(money(L.amount)) + "</td>" +
+      '<td style="font-size:12px;color:var(--muted)">' + esc(L.by) + "</td></tr>");
+  });
+  $("histTbl").innerHTML = h.join("");
+}
+
+/* ---------------- loading ---------------- */
+function loadLetters() {
+  return A.db.collection(LETTERS).orderBy("at", "desc").limit(1000).get().then(function (qs) {
+    A.letters = []; qs.forEach(function (d) { var v = d.data(); v._id = d.id; A.letters.push(v); });
+    renderHistory(); renderBatch();
+  }).catch(function (e) { console.warn("letters", e); });
+}
+function loadAll() {
+  var p1 = A.db.doc(ROSTER_DOC).get().then(function (s) {
+    A.units = (s.exists && s.data().units) || [];
+    renderRoster();
+  });
+  var p2 = A.db.doc(TPL_DOC).get().then(function (s) {
+    var t = s.exists && s.data().templates;
+    A.templates = (t && t.length) ? t : DEFAULT_TEMPLATES.slice();
+    renderTplPickers(); loadTplEditor();
+    if (!s.exists) saveTemplates();     /* seed the wording on first run */
+  });
+  return Promise.all([p1, p2, loadLetters()]).catch(function (e) {
+    alert("Could not load the data (" + ((e && e.code) || "error") + ").");
+  });
+}
+
+/* ---------------- small UI plumbing ---------------- */
+var noteTimers = {};
+function note(id, msg, bad) {
+  var el = $(id); if (!el) return;
+  el.textContent = msg;
+  el.style.color = bad ? "var(--prio)" : "var(--muted)";
+  clearTimeout(noteTimers[id]);
+  noteTimers[id] = setTimeout(function () { el.textContent = ""; }, bad ? 9000 : 4000);
+}
+var TABS = [["tabLetters","pLetters"],["tabRoster","pRoster"],["tabTpl","pTpl"],["tabHist","pHist"]];
+function setTab(which) {
+  TABS.forEach(function (t) {
+    $(t[0]).classList.toggle("on", t[0] === which);
+    $(t[1]).classList.toggle("on", t[0] === which);
+  });
+  window.scrollTo(0, 0);
+}
+TABS.forEach(function (t) { $(t[0]).onclick = function () { setTab(t[0]); }; });
+
+/* ---------------- auth ---------------- */
+function isEditor() {
+  return !!(A.user && EDITOR_EMAILS.indexOf(String(A.user.email || "").toLowerCase()) >= 0);
+}
+function showApp(on) {
+  $("gate").classList.toggle("off", !!on);
+  document.querySelector(".appbar").style.display = on ? "" : "none";
+  document.querySelector(".wrap").style.display = on ? "" : "none";
+}
+function authInit() {
+  firebase.initializeApp({
+    apiKey: "AIzaSyDj3v0HtJ6g8UzfMoftCyEl3KPxsaOzrIs",
+    authDomain: "quote-tracker-ce2ba.firebaseapp.com",
+    projectId: "quote-tracker-ce2ba",
+    storageBucket: "quote-tracker-ce2ba.firebasestorage.app",
+    appId: "1:1346683787:web:be618e56f3bb9b3b67a58e"
+  });
+  A.db = firebase.firestore();
+  firebase.auth().onAuthStateChanged(function (u) {
+    A.user = u || null;
+    if (!u) { showApp(false); $("gateErr").textContent = ""; return; }
+    if (!isEditor()) {
+      showApp(false);
+      $("gateErr").textContent = u.email + " is not on the property-manager list for this tool.";
+      firebase.auth().signOut();
+      return;
+    }
+    $("who").textContent = u.email;
+    showApp(true);
+    loadAll();
+  });
+}
+$("btnSignIn").onclick = function () {
+  firebase.auth().signInWithPopup(new firebase.auth.GoogleAuthProvider())
+    .catch(function (e) { $("gateErr").textContent = (e && e.message) || "Sign-in failed."; });
+};
+$("btnSignOut").onclick = function () { firebase.auth().signOut(); };
+
+/* ---------------- wiring: letters tab ---------------- */
+$("btnParse").onclick = function () {
+  var r = parseArrears($("paste").value);
+  if (!r.rows.length) {
+    note("parseNote", "Nothing read from that — give each line a unit and an amount, " +
+      "or paste just the unit numbers on their own.", true);
+    return;
+  }
+  A.rows = r.rows.map(function (x) {
+    var known = rosterFind(x.unit);
+    return { unit:x.unit, owner:(known && known.owner) || x.owner || "", address: known ? known.address : "",
+             nonResident: !!(known && known.nonResident), amount:x.amount, on:true };
+  });
+  note("parseNote", r.rows.length + " unit" + (r.rows.length === 1 ? "" : "s") + " read" +
+    (r.noAmount ? ", " + r.noAmount + " needing an amount" : "") +
+    (r.skipped ? ", " + r.skipped + " line" + (r.skipped === 1 ? "" : "s") + " skipped" : "") + ".");
+  renderBatch();
+  $("batchCard").scrollIntoView({ behavior:"smooth", block:"start" });
+};
+$("btnAddRow").onclick = function () {
+  A.rows.push({ unit:"", owner:"", address:"", amount:0, on:true });
+  renderBatch();
+};
+/* ---------------- unit typeahead ----------------
+   Typing "210" has to offer 550-210 and 560-210: nobody thinks of the building
+   prefix first, and there are two of every unit number across the two towers. */
+var AC = { el:null, row:-1, items:[], sel:-1, input:null };
+function acBox() {
+  if (AC.el) return AC.el;
+  var el = document.createElement("div");
+  el.className = "ac";
+  el.style.display = "none";
+  document.body.appendChild(el);
+  el.addEventListener("mousedown", function (e) {
+    var it = e.target.closest && e.target.closest("[data-ac]");
+    if (!it) return;
+    e.preventDefault();          /* keep focus, so focusout does not close us first */
+    acPick(+it.getAttribute("data-ac"));
+  });
+  AC.el = el;
+  return el;
+}
+function acHide() {
+  if (AC.el) AC.el.style.display = "none";
+  AC.items = []; AC.sel = -1; AC.row = -1; AC.input = null;
+}
+function acSearch(q) {
+  q = String(q || "").toUpperCase().replace(/\s+/g, "");
+  if (!q) return [];
+  var exact = [], suffix = [], loose = [];
+  A.units.forEach(function (u) {
+    var uk = unitKey(u.unit);
+    var m = /^(?:550|560)[-–]?(.*)$/.exec(uk);
+    var suf = m ? m[1] : uk;
+    var name = (u.owner || "").toUpperCase();
+    if (uk.indexOf(q) === 0) exact.push(u);
+    else if (suf.indexOf(q) === 0) suffix.push(u);
+    else if (uk.indexOf(q) >= 0 || name.indexOf(q) >= 0) loose.push(u);
+  });
+  return exact.concat(suffix, loose).slice(0, 8);
+}
+function acShow(input, rowIdx) {
+  var q = input.value;
+  if (!q) { acHide(); return; }
+  var items = acSearch(q);
+  AC.items = items; AC.row = rowIdx; AC.input = input; AC.sel = items.length ? 0 : -1;
+  var el = acBox();
+  if (!items.length) {
+    el.innerHTML = '<div class="acempty">No unit matches “' + esc(q) +
+      '”. You can still type it in full and letter it.</div>';
+  } else {
+    el.innerHTML = '<div class="achint">' + items.length + " matching unit" +
+      (items.length === 1 ? "" : "s") + "</div>" +
+      items.map(function (u, n) {
+        var occ = occupancyOf(u);
+        var meta = [occ.roles.join(", "), occ.tenantNames ? "Tenanted" : ""]
+          .filter(function (x) { return x; }).join(" · ");
+        return '<div class="acitem' + (n === AC.sel ? " on" : "") + '" data-ac="' + n + '">' +
+          '<span class="unitpill">' + esc(u.unit) + "</span>" +
+          '<span class="acbody"><span class="acname">' + esc(u.owner || "—") + "</span>" +
+          '<span class="acmeta">' + esc(meta || "—") + "</span></span></div>";
+      }).join("");
+  }
+  var r = input.getBoundingClientRect();
+  el.style.display = "block";
+  el.style.left = Math.round(r.left + window.scrollX) + "px";
+  el.style.top = Math.round(r.bottom + window.scrollY + 4) + "px";
+  el.style.minWidth = Math.max(300, Math.round(r.width)) + "px";
+}
+function acMove(d) {
+  if (!AC.items.length) return;
+  AC.sel = (AC.sel + d + AC.items.length) % AC.items.length;
+  var kids = AC.el.querySelectorAll("[data-ac]");
+  [].forEach.call(kids, function (k, n) { k.classList.toggle("on", n === AC.sel); });
+  if (kids[AC.sel] && kids[AC.sel].scrollIntoView) kids[AC.sel].scrollIntoView({ block:"nearest" });
+}
+function acPick(n) {
+  var u = AC.items[n], row = AC.row;
+  if (!u || row < 0) return;
+  var r = A.rows[row];
+  r.unit = u.unit; r.owner = u.owner; r.address = u.address; r.nonResident = !!u.nonResident;
+  acHide();
+  renderBatch();
+  /* land on the amount — the only thing still to type on that line */
+  var amt = document.querySelector('#batchTbl input.amt[data-b="' + row + '"]');
+  if (amt) { amt.focus(); amt.select(); }
+}
+$("batchTbl").addEventListener("keydown", function (e) {
+  var t = e.target;
+  if (!t.getAttribute || t.getAttribute("data-k") !== "unit") return;
+  if (e.key === "ArrowDown") { e.preventDefault(); acMove(1); }
+  else if (e.key === "ArrowUp") { e.preventDefault(); acMove(-1); }
+  else if (e.key === "Enter" && AC.sel >= 0 && AC.items.length) { e.preventDefault(); acPick(AC.sel); }
+  else if (e.key === "Escape") { acHide(); }
+});
+$("batchTbl").addEventListener("focusin", function (e) {
+  var t = e.target;
+  if (t.getAttribute && t.getAttribute("data-k") === "unit" && t.value) acShow(t, +t.getAttribute("data-b"));
+});
+$("batchTbl").addEventListener("focusout", function (e) {
+  var t = e.target;
+  if (t.getAttribute && t.getAttribute("data-k") === "unit") setTimeout(acHide, 130);
+});
+window.addEventListener("resize", acHide);
+
+$("batchTbl").addEventListener("input", function (e) {
+  var t = e.target, i = t.getAttribute("data-b");
+  if (i == null) return;
+  var r = A.rows[+i], k = t.getAttribute("data-k");
+  if (k === "amount") r.amount = parseMoney(t.value);
+  else {
+    r[k] = t.value;
+    if (k === "unit") {
+      acShow(t, +i);
+      /* an exact hit fills the name in place — a full re-render here would yank
+         focus out of the box mid-word */
+      var u = rosterFind(t.value);
+      if (u) {
+        r.owner = u.owner; r.address = u.address; r.nonResident = !!u.nonResident;
+        var oi = document.querySelector('#batchTbl input[data-b="' + i + '"][data-k="owner"]');
+        if (oi) oi.value = u.owner || "";
+      }
+    }
+  }
+  /* keep the summary honest without stealing focus from the field being typed in */
+  batchSummary();
+});
+$("batchTbl").addEventListener("change", function (e) {
+  var i = e.target.getAttribute("data-on");
+  if (i == null) return;
+  A.rows[+i].on = e.target.checked;
+  renderBatch();
+});
+$("batchTbl").addEventListener("click", function (e) {
+  var i = e.target.getAttribute("data-brm");
+  if (i == null) return;
+  A.rows.splice(+i, 1);
+  renderBatch();
+});
+$("tplPick").onchange = function () { A.tplIdx = +this.value; $("tplEdit").value = this.value; loadTplEditor(); };
+$("btnPreview").onclick = function () {
+  var on = A.rows.filter(function (r) { return r.on; });
+  if (!on.length) return;
+  previewLetters([on[0]], currentTpl(), opts());
+};
+$("btnGenerate").onclick = function () {
+  var on = A.rows.filter(function (r) { return r.on; });
+  var tpl = currentTpl();
+  if (!on.length || !tpl) return;
+  var tot = on.reduce(function (s, r) { return s + (Number(r.amount) || 0); }, 0);
+  if (!confirm("Generate " + on.length + " × “" + tpl.name + "”, totalling " + money(tot) + "?\n\n" +
+               "The batch is recorded in History as soon as it prints.")) return;
+  absorbIntoRoster(on);
+  printLetters(on, tpl, opts(), true);
+};
+$("btnPdf").onclick = function () {
+  var on = A.rows.filter(function (r) { return r.on; });
+  var tpl = currentTpl();
+  if (!on.length || !tpl) return;
+  downloadPdf(on, tpl, opts());
+};
+$("btnEmail").onclick = function () {
+  var on = A.rows.filter(function (r) { return r.on; });
+  var tpl = currentTpl();
+  if (!on.length || !tpl) return;
+  emailDrafts(on, tpl, opts());
+};
+$("pvPrint").onclick = function () {
+  document.body.classList.remove("previewing");
+  window.onafterprint = function () { restoreTitle(); window.onafterprint = null; };
+  window.print();
+  setTimeout(restoreTitle, 2000);
+};
+$("pvClose").onclick = closePreview;
+document.addEventListener("keydown", function (e) {
+  if (e.key === "Escape" && document.body.classList.contains("previewing")) closePreview();
+});
+function opts() { return { date: $("letterDate").value || isoToday(), dueDays: $("dueDays").value || 0 }; }
+
+/* ---------------- wiring: roster tab ---------------- */
+$("btnRosterAdd").onclick = function () {
+  A.units.push({ unit:"", owner:"", address:"", nonResident:false });
+  A.openUnit = A.units.length - 1;
+  if ($("rosterFind").value) { $("rosterFind").value = ""; }
+  renderRoster();
+  var row = document.querySelector("tr.u.open");
+  if (row && row.scrollIntoView) row.scrollIntoView({ behavior:"smooth", block:"center" });
+};
+$("rosterTbl").addEventListener("input", function (e) {
+  var i = e.target.getAttribute("data-r");
+  if (i == null) return;
+  A.units[+i][e.target.getAttribute("data-k")] = e.target.value;
+  A.dirtyRoster = true;
+  note("rosterNote", "Unsaved changes");
+});
+$("rosterTbl").addEventListener("click", function (e) {
+  /* sort when a column header is clicked; same column again flips direction */
+  var th = e.target.closest && e.target.closest("th[data-sort]");
+  if (th) {
+    var k = th.getAttribute("data-sort");
+    A.sortDir = (A.sortKey === k && A.sortDir !== -1) ? -1 : 1;
+    if (A.sortKey !== k) A.sortDir = 1;
+    A.sortKey = k;
+    renderRoster();
+    return;
+  }
+  /* the icons carry their own SVG children, so read the intent off the button */
+  var btn = e.target.closest && e.target.closest("[data-del],[data-edit],[data-full],[data-copy],[data-done],[data-det]");
+  if (!btn) {
+    if (/^(INPUT|TEXTAREA|SELECT|LABEL)$/.test(e.target.tagName)) return;
+    var tr = e.target.closest && e.target.closest("tr.u");
+    if (!tr) return;
+    openRow(+tr.getAttribute("data-det"));
+    return;
+  }
+  var del = btn.getAttribute("data-del");
+  if (del != null) {
+    var unit = A.units[+del];
+    if (!confirm("Remove unit " + (unit.unit || "?") + " from Units?\n\nAny letters already sent to it stay in History.")) return;
+    A.units.splice(+del, 1);
+    A.openUnit = -1; A.editUnit = -1; A.fullUnit = -1;
+    renderRoster(); saveRoster();
+    return;
+  }
+  var ed = btn.getAttribute("data-edit");
+  if (ed != null) {
+    A.openUnit = +ed; A.editUnit = +ed;
+    renderRoster();
+    var f = $("focusOwner"); if (f) { f.focus(); f.select(); }
+    return;
+  }
+  var done = btn.getAttribute("data-done");
+  if (done != null) { A.editUnit = -1; renderRoster(); return; }
+  var full = btn.getAttribute("data-full");
+  if (full != null) {
+    A.openUnit = +full;
+    A.fullUnit = (A.fullUnit === +full) ? -1 : +full;
+    renderRoster();
+    return;
+  }
+  var cp = btn.getAttribute("data-copy");
+  if (cp != null) {
+    var u = A.units[+cp];
+    var text = (u.owner || "") + "\n" + (u.address || "");
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text)
+        .then(function () { note("rosterNote", "Address for " + u.unit + " copied."); })
+        .catch(function () { note("rosterNote", "Could not copy — select the address and copy it.", true); });
+    } else {
+      note("rosterNote", "Copying is not available in this browser.", true);
+    }
+    return;
+  }
+  var d2 = btn.getAttribute("data-det");
+  if (d2 != null) openRow(+d2);
+});
+function openRow(d) {
+  A.openUnit = (A.openUnit === d) ? -1 : d;
+  if (A.openUnit !== d) { A.editUnit = -1; A.fullUnit = -1; }
+  renderRoster();
+}
+$("btnRosterSave").onclick = saveRoster;
+$("rosterFind").addEventListener("input", function () { A.openUnit = -1; renderRoster(); });
+
+/* toolbar and header icons */
+(function () {
+  var pairs = [["btnRosterAdd", ICON.plus], ["btnRosterCSV", ICON.upload], ["btnRosterImport", ICON.clip],
+               ["btnFilters", ICON.filter], ["btnRosterSave", ICON.save], ["btnGuide", ICON.file],
+               ["btnPdf", ICON.file], ["btnEmail", ICON.upload]];
+  pairs.forEach(function (p) {
+    var el = $(p[0]); if (!el) return;
+    var slot = el.querySelector(".i"); if (slot) slot.innerHTML = p[1];
+  });
+  var si = document.querySelector(".searchicon"); if (si) si.innerHTML = ICON.search;
+  var bi = document.querySelector(".banner .bico"); if (bi) bi.innerHTML = ICON.info;
+})();
+
+/* the banner is reference, not news — let it be dismissed, and brought back */
+$("bannerClose").onclick = function () { $("importBanner").style.display = "none"; };
+$("btnGuide").onclick = function () {
+  var b = $("importBanner");
+  b.style.display = (b.style.display === "none") ? "" : "none";
+  if (b.style.display !== "none" && b.scrollIntoView) b.scrollIntoView({ behavior:"smooth", block:"nearest" });
+};
+
+/* filters — the cuts that actually come up when chasing arrears */
+var FILTERS = [
+  ["tenanted",  "Tenanted",            function (u) { return peopleBy(u, /tenant/i).length || u.tenant; }],
+  ["occupied",  "Owner-occupied",      function (u) { return !(peopleBy(u, /tenant/i).length || u.tenant); }],
+  ["nonres",    "Non-resident owner",  function (u) { return u.nonResident; }],
+  ["noemail",   "No owner email",      function (u) { return !emailsOf(peopleBy(u, /owner/i)).length; }],
+  ["entry",     "Entry instructions",  function (u) { return !!u.entryAccess; }],
+  ["nopeople",  "No people on file",   function (u) { return !(u.people && u.people.length); }]
+];
+A.filters = {};
+function renderFilterBar() {
+  $("filterBar").innerHTML = FILTERS.map(function (f) {
+    return '<button class="fchip' + (A.filters[f[0]] ? " on" : "") + '" data-f="' + f[0] + '">' + f[1] + "</button>";
+  }).join("");
+}
+$("btnFilters").onclick = function () {
+  var b = $("filterBar");
+  b.style.display = (b.style.display === "none") ? "" : "none";
+  if (b.style.display !== "none") renderFilterBar();
+};
+$("filterBar").addEventListener("click", function (e) {
+  var k = e.target.getAttribute("data-f");
+  if (!k) return;
+  A.filters[k] = !A.filters[k];
+  A.openUnit = -1;
+  renderFilterBar(); renderRoster();
+});
+$("findClear").onclick = function () { $("rosterFind").value = ""; $("rosterFind").focus(); renderRoster(); };
+/* clicking a person jumps to their unit and opens it */
+$("peopleHits").addEventListener("click", function (e) {
+  var el = e.target.closest && e.target.closest("[data-hit]");
+  if (!el) return;
+  A.openUnit = +el.getAttribute("data-hit");
+  renderRoster();
+  var row = document.querySelector("tr.u.open");
+  if (row && row.scrollIntoView) row.scrollIntoView({ behavior:"smooth", block:"center" });
+});
+$("btnRosterCSV").onclick = function () { $("csvFile").click(); };
+/* Which export a file is, read off its header. Knowing this up front lets both
+   files be selected together and still applied Unit Manager first, so the User
+   Manager's better names and real mailing addresses are the ones that survive. */
+function csvKind(text) {
+  var rows = parseCSVText(text);
+  for (var i = 0; i < Math.min(rows.length, 5); i++) {
+    var H = rows[i].map(cl);
+    if (!H.some(function (c) { return /^unit(\(s\))?$/i.test(c); })) continue;
+    return H.some(function (c) { return /^type\(s\)$/i.test(c); }) ? "users" : "units";
+  }
+  return null;
+}
+function applyImports(texts) {
+  var jobs = [];
+  texts.forEach(function (t) { var k = csvKind(t); if (k) jobs.push({ text:t, kind:k }); });
+  if (!jobs.length) {
+    note("rosterNote", "Neither file looked like a Unit Manager or User Manager export.", true);
+    return;
+  }
+  jobs.sort(function (a, b) { return (a.kind === "units" ? 0 : 1) - (b.kind === "units" ? 0 : 1); });
+  var bad = null;
+  jobs.forEach(function (j) { var r = importCSV(j.text); if (!r.ok && !bad) bad = r.msg; });
+  if (bad) { note("rosterNote", bad, true); return; }
+
+  A.units.sort(function (a, b) {
+    return unitKey(a.unit).localeCompare(unitKey(b.unit), undefined, { numeric:true });
+  });
+  renderRoster(); saveRoster();
+
+  /* report what the roster now actually holds, not what each file claimed */
+  var ppl = countPeople();
+  var ten = A.units.filter(function (u) { return peopleBy(u, /tenant/i).length || u.tenant; }).length;
+  var mail = A.units.filter(function (u) { return emailsOf(peopleBy(u, /owner/i)).length; }).length;
+  if (!ppl) {
+    note("rosterNote", A.units.length + " units — but no people. Include the User Manager export too.", true);
+  } else {
+    note("rosterNote", A.units.length + " units · " + ppl + " people · " + ten +
+      " tenanted · " + mail + " with an owner email.");
+  }
+}
+$("csvFile").onchange = function () {
+  var files = [].slice.call(this.files || []);
+  this.value = "";                       /* so re-picking the same files fires again */
+  if (!files.length) return;
+  note("rosterNote", "Reading " + files.length + " file" + (files.length === 1 ? "" : "s") + "…");
+  var texts = [], done = 0;
+  files.forEach(function (f, idx) {
+    var rd = new FileReader();
+    rd.onload = function () { texts[idx] = String(rd.result || ""); finish(); };
+    rd.onerror = function () { texts[idx] = null; finish(); };
+    rd.readAsText(f);
+  });
+  function finish() {
+    if (++done < files.length) return;
+    var ok = texts.filter(function (t) { return t != null; });
+    if (!ok.length) { note("rosterNote", "Could not read those files.", true); return; }
+    applyImports(ok);
+  }
+};
+$("btnRosterImport").onclick = function () { $("importBox").style.display = ""; $("importText").focus(); };
+$("btnImportCancel").onclick = function () { $("importBox").style.display = "none"; $("importText").value = ""; };
+$("btnImportGo").onclick = function () {
+  var lines = $("importText").value.split(/\r?\n/), n = 0;
+  lines.forEach(function (raw) {
+    var line = raw.replace(/^\s+|\s+$/g, "");
+    if (!line) return;
+    var parts = line.split(/\s*[,\t]\s*/);
+    var unit = (parts.shift() || "").replace(/^unit\s*/i, "").replace(/^\s+|\s+$/g, "");
+    if (!unit) return;
+    var owner = (parts.shift() || "").replace(/^\s+|\s+$/g, "");
+    var address = parts.join(", ").replace(/^\s+|\s+$/g, "");
+    var ex = rosterFind(unit);
+    if (ex) { if (owner) ex.owner = owner; if (address) ex.address = address; }
+    else A.units.push({ unit:unit, owner:owner, address:address });
+    n++;
+  });
+  A.units.sort(function (a, b) { return unitKey(a.unit).localeCompare(unitKey(b.unit), undefined, { numeric:true }); });
+  renderRoster(); saveRoster();
+  $("importBox").style.display = "none"; $("importText").value = "";
+  note("rosterNote", n + " unit" + (n === 1 ? "" : "s") + " added or updated.");
+};
+
+/* ---------------- wiring: templates tab ---------------- */
+$("tplEdit").onchange = function () { A.tplIdx = +this.value; $("tplPick").value = this.value; loadTplEditor(); };
+$("tplBody").addEventListener("input", renderTplPreview);
+$("tplName").addEventListener("input", renderTplPreview);
+$("btnTplSave").onclick = saveTemplates;
+$("fieldChips").innerHTML = FIELD_LIST.map(function (f) {
+  return '<button data-f="' + f[0] + '" title="' + esc(f[1]) + '">{{' + f[0] + "}}</button>";
+}).join("");
+$("fieldChips").addEventListener("click", function (e) {
+  var f = e.target.getAttribute("data-f");
+  if (!f) return;
+  var ta = $("tplBody"), tag = "{{" + f + "}}";
+  var a = ta.selectionStart, b = ta.selectionEnd;
+  ta.value = ta.value.slice(0, a) + tag + ta.value.slice(b);
+  ta.focus();
+  ta.selectionStart = ta.selectionEnd = a + tag.length;
+  renderTplPreview();
+});
+
+/* ---------------- wiring: history tab ---------------- */
+$("histFilter").addEventListener("input", renderHistory);
+$("btnHistReload").onclick = function () { loadLetters(); };
+
+/* ---------------- go ---------------- */
+/* the sticky table header parks directly under the app bar, whatever height it is */
+function measureBar() {
+  var b = document.querySelector(".appbar");
+  if (b) document.documentElement.style.setProperty("--abh",
+    Math.round(b.getBoundingClientRect().height) + "px");
+}
+measureBar();
+window.addEventListener("resize", measureBar);
+if (!gmailConfigured()) {
+  $("btnEmail").disabled = true;
+  $("btnEmail").title = "Gmail is not connected yet — the OAuth client ID has not been set.";
+}
+$("letterDate").value = isoToday();
+$("letterDate").addEventListener("change", renderTplPreview);
+$("dueDays").addEventListener("input", renderTplPreview);
+if (ASSET_LOGO && ASSET_LOGO.indexOf("_LOGO_") < 0) {
+  $("gateLogo").src = ASSET_LOGO; $("gateLogo").style.display = "";
+  $("barLogo").src = ASSET_LOGO; $("barLogo").style.display = "";
+}
+showApp(false);
+window.addEventListener("beforeunload", function (e) {
+  if (A.dirtyRoster) { e.preventDefault(); e.returnValue = ""; }
+});
+authInit();
+</script>

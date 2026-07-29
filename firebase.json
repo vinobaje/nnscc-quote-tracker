@@ -1,18 +1,36 @@
 {
-  "hosting": {
-    "public": "public",
-    "headers": [
-      {
-        "source": "**",
-        "headers": [
-          {
-            "key": "Cache-Control",
-            "value": "no-cache"
-          }
-        ]
-      }
-    ]
-  },
+  "hosting": [
+    {
+      "site": "quote-report",
+      "public": "public",
+      "headers": [
+        {
+          "source": "**",
+          "headers": [
+            {
+              "key": "Cache-Control",
+              "value": "no-cache"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "site": "nnscc292",
+      "public": "arrears",
+      "headers": [
+        {
+          "source": "**",
+          "headers": [
+            {
+              "key": "Cache-Control",
+              "value": "no-cache"
+            }
+          ]
+        }
+      ]
+    }
+  ],
   "functions": [
     {
       "source": "functions",
