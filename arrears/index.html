@@ -43,6 +43,10 @@ a { color:var(--accent-ink); }
 .btn.ghost { background:transparent; }
 .btn.danger { color:var(--prio); background:var(--prio-soft); border-color:#E7CFCF; }
 .btn.sm { padding:5px 9px; font-size:12px; }
+/* the main action of the whole tool: emailing the letters */
+.btn.big { padding:12px 22px; font-size:15px; border-radius:7px; }
+.btn.big .i, .btn.big .i svg { width:17px; height:17px; }
+.btn.primary:disabled { background:#9FB2C6; border-color:#9FB2C6; color:#fff; }
 
 /* ---------- layout ---------- */
 header.pg { padding:26px 0 14px; border-bottom:3px double var(--line); margin-bottom:22px; }
@@ -529,16 +533,19 @@ td input.amt { text-align:right; font-variant-numeric:tabular-nums; }
         <input type="number" id="dueDays" value="15" min="0" max="120" style="width:80px"></label>
     </div>
     <div class="row" style="margin-top:18px">
-      <button class="btn primary" id="btnGenerate" style="padding:10px 18px;font-size:14px">Generate letters</button>
-      <button class="btn" id="btnPreview">Preview the first one</button>
-      <button class="btn ico" id="btnPdf"><span class="i"></span>Download PDF</button>
-      <button class="btn ico" id="btnEmail"><span class="i"></span>Email drafts</button>
-      <span class="barnote" id="genNote" style="color:var(--muted)"></span>
+      <button class="btn primary big ico" id="btnEmail"><span class="i"></span><span id="emailLabel">Email drafts</span></button>
+      <button class="btn ico" id="btnGenerate"><span class="i"></span><span id="printLabel">Print letters</span></button>
+      <span class="spacer"></span>
+      <button class="btn ghost" id="btnPreview">Preview the first</button>
+      <button class="btn ghost ico" id="btnPdf"><span class="i"></span>Download PDF</button>
     </div>
+    <div class="seclede" id="splitNote" style="margin:12px 0 0"></div>
+    <div class="barnote" id="genNote" style="color:var(--muted);margin-top:6px;min-height:17px"></div>
     <div class="note info" style="margin-bottom:0">
-      Generating opens a printable page — use your browser's <b>Print → Save as PDF</b>.
-      Each letter starts on its own page. The batch is written to the History tab at the
-      same time; nothing is emailed or sent for you.
+      <b>Email drafts</b> puts one draft per unit in Gmail, each with its PDF attached, and
+      sends nothing — you read each one and press Send there. <b>Print letters</b> opens a
+      printable page for the whole selection, one letter per sheet. Either way the batch is
+      recorded in History, so the next batch knows what has already gone out.
     </div>
   </div>
 </div>
@@ -780,7 +787,9 @@ var ICON = {
   note:     svg('<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/>'),
   building: svg('<path d="M3 21h18M5 21V7l7-4 7 4v14"/><path d="M9 9h.01M15 9h.01M9 13h.01M15 13h.01M9 17h.01M15 17h.01"/>'),
   alert:    svg('<path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/>'),
-  eye:      svg('<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/>')
+  eye:      svg('<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/>'),
+  printer:  svg('<path d="M6 9V3h12v6M6 18H4a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8" rx="1"/>'),
+  send:     svg('<path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z"/>')
 };
 function money(n) {
   var v = Number(n) || 0;
@@ -2124,7 +2133,42 @@ function batchSummary() {
   $("batchSum").innerHTML = "<b>" + on.length + "</b> letter" + (on.length === 1 ? "" : "s") +
     " · total outstanding <b>" + esc(money(tot)) + "</b>" +
     (bits.length ? ' · <span style="color:var(--prio);font-weight:700">' + esc(bits.join(" · ")) + "</span>" : "");
-  $("btnGenerate").disabled = !on.length || !!noName || !!noAmt;
+
+  /* Emailing is the point of the tool, so it leads — but not every owner can be
+     reached that way, and the buttons should say which is which before she clicks
+     rather than after. */
+  var ready = on.length && !noName && !noAmt;
+  var mailable = on.filter(function (r) { return emailableOwners(r.unit).length; }).length;
+  var postOnly = on.length - mailable;
+
+  $("emailLabel").textContent = mailable
+    ? "Email " + mailable + " draft" + (mailable === 1 ? "" : "s")
+    : "Email drafts";
+  $("printLabel").textContent = on.length
+    ? "Print " + on.length + " letter" + (on.length === 1 ? "" : "s")
+    : "Print letters";
+
+  $("btnEmail").disabled = !ready || !mailable || !gmailConfigured();
+  $("btnEmail").title = !gmailConfigured()
+    ? "Gmail is not connected yet."
+    : (!mailable && on.length ? "None of these owners has an email on file that has opted in." : "");
+  $("btnGenerate").disabled = !ready;
+  $("btnPdf").disabled = !ready;
+  $("btnPreview").disabled = !on.length;
+
+  var sn = $("splitNote");
+  if (!sn) return;
+  if (!on.length) { sn.textContent = ""; return; }
+  sn.innerHTML = mailable && postOnly
+    ? "<b>" + mailable + "</b> can be emailed. The other <b>" + postOnly + "</b> " +
+      (postOnly === 1 ? "has" : "have") + " no owner email on file that has opted in — " +
+      "those need printing and posting."
+    : (mailable
+        ? (mailable === 1 ? "This one can be emailed."
+                          : "All " + mailable + " can be emailed.")
+        : (on.length === 1
+            ? "This one cannot be emailed — it needs printing and posting."
+            : "None of these can be emailed — they need printing and posting."));
 }
 
 /* new units picked up from a batch get remembered */
@@ -2651,7 +2695,8 @@ $("rosterFind").addEventListener("input", function () { A.openUnit = -1; renderR
 (function () {
   var pairs = [["btnRosterAdd", ICON.plus], ["btnRosterCSV", ICON.upload], ["btnRosterImport", ICON.clip],
                ["btnFilters", ICON.filter], ["btnRosterSave", ICON.save], ["btnGuide", ICON.file],
-               ["btnPdf", ICON.file], ["btnEmail", ICON.upload], ["btnPrevPdf", ICON.eye]];
+               ["btnPdf", ICON.file], ["btnEmail", ICON.send], ["btnPrevPdf", ICON.eye],
+               ["btnGenerate", ICON.printer]];
   pairs.forEach(function (p) {
     var el = $(p[0]); if (!el) return;
     var slot = el.querySelector(".i"); if (slot) slot.innerHTML = p[1];
