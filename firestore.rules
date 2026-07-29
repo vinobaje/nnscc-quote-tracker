@@ -31,7 +31,9 @@ service cloud.firestore {
       allow read: if (docId == "board" && request.auth != null) || nnsccEditor() || nnsccBoard();
       allow write: if nnsccEditor();
       match /audit/{entryId} {
-        allow read: if nnsccEditor() || nnsccBoard();
+        // Who edited what is the property manager's own record. Board members
+        // read the report, not the keystrokes behind it.
+        allow read: if nnsccEditor();
         allow create: if nnsccEditor();
         allow update, delete: if false;
       }
@@ -91,6 +93,35 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // ---- ARREARS LETTERS (nnscc-arrears.web.app) ----
+    // Collection-notice tool for the property manager. EDITOR-ONLY throughout —
+    // owner names attached to debts are never public, never board-readable, and
+    // there is no passcode path in. Same editor allowlist as the quote tracker.
+
+    // Unit roster: unit number, owner of record, mailing address. One doc.
+    match /nnsccArrearsRoster/{docId} {
+      allow read, write: if nnsccEditor();
+    }
+
+    // Letter templates — the manager edits the wording herself. One doc.
+    match /nnsccArrearsTemplates/{docId} {
+      allow read, write: if nnsccEditor();
+    }
+
+    // The letter log — what was sent, to which unit, for how much, when.
+    // Append-only: this is the record the corporation relies on to show a
+    // demand was made and when, so a letter is never edited away or deleted.
+    // A letter generated in error may be marked void; the void is recorded
+    // ON the letter and the original figures stay readable underneath it.
+    match /nnsccArrearsLetters/{letterId} {
+      allow read, create: if nnsccEditor();
+      allow update: if nnsccEditor()
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['voided', 'voidReason', 'voidedBy', 'voidedAt'])
+        && request.resource.data.voided == true;
+      allow delete: if false;
+    }
+
     // ---- BETA PREVIEW sandbox (quote-report-beta.web.app) ----
     // Same permission model as production, separate data so testing never
     // touches the real report.
@@ -112,7 +143,8 @@ service cloud.firestore {
       allow read: if (docId == "board" && request.auth != null) || nnsccEditor() || nnsccBoardBeta();
       allow write: if nnsccEditor();
       match /audit/{entryId} {
-        allow read: if nnsccEditor() || nnsccBoardBeta();
+        // editors only, same as live
+        allow read: if nnsccEditor();
         allow create: if nnsccEditor();
         allow update, delete: if false;
       }

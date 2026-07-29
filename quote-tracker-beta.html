@@ -1537,7 +1537,7 @@ body[data-view="edit"] .wrap { max-width:none; }
       <option value="packet">Board packet</option>
     </select>
   </label>
-  <button class="btn" id="btnHistory" type="button">History</button>
+  <button class="btn" id="btnHistory" type="button" style="display:none">History</button>
   <button class="btn" id="btnDash" type="button" style="display:none" title="Totals across all report periods">📊 Dashboard</button>
   <button class="btn" id="btnVotes" type="button" style="display:none" title="Board voting on quoted jobs">🗳 <span id="votesLabel">Votes</span></button>
   <div class="spacer"></div>
@@ -2550,12 +2550,14 @@ function openJobDossier(id) {
     '<div class="jdcols"><div class="jdmain">' +
       '<div class="jdh">Timeline</div>' + jdTimelineHTML(j, ED) +
       '<div class="jdh">Quotes received</div>' + jdQuotesHTML(j, c) +
-      '<div class="jdh">Activity log</div><div id="jdLog"></div>' +
+      /* who edited what is the property manager's own record — the board sees
+         the report and the dates, not the keystrokes behind them */
+      (ED ? '<div class="jdh">Activity log</div><div id="jdLog"></div>' : "") +
     '</div><div class="jdside">' + jdSummaryHTML(j, c) + "</div></div>";
   document.getElementById("jdFoot").textContent =
     j.created ? "Job created " + jdDate(j.created) : "This job predates the tracker";
   document.getElementById("jobOverlay").classList.add("open");
-  jdLoadLog(j);
+  if (ED) jdLoadLog(j);
 }
 /* what a quick action does */
 function jdAction(what) {
@@ -5913,6 +5915,7 @@ function updateReportsButton() {
   var inArtifact = !!(window.claude && window.claude.downloads);
   function setDisp(id, show) { var el = document.getElementById(id); if (el) el.style.display = show ? "" : "none"; }
   setDisp("btnMemo", ed);        /* AI board memo — editor only */
+  setDisp("btnHistory", ed);     /* change history — the manager's own record */
   setDisp("btnDecLog", cv);      /* Decision log — board members + editors */
   setDisp("btnBackup", ed);      /* Backup / Restore / Reset — editor only */
   setDisp("btnRestore", ed);
