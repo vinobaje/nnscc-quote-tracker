@@ -2277,8 +2277,11 @@ function jdDate(iso) {
 function jdAgo(iso) {
   var s = String(iso || "").slice(0, 10);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return "";
-  var p = s.split("-");
-  var n = Math.round((Date.now() - new Date(+p[0], +p[1] - 1, +p[2]).getTime()) / 86400000);
+  var p = s.split("-"), now = new Date();
+  /* whole calendar days apart, not hours elapsed: a date stamped this morning
+     is "today" all day, not "yesterday" from noon onwards */
+  var today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  var n = Math.round((today - new Date(+p[0], +p[1] - 1, +p[2]).getTime()) / 86400000);
   if (n < 0) return "scheduled";
   if (n === 0) return "today";
   if (n === 1) return "yesterday";
