@@ -91,11 +91,14 @@ html { scroll-behavior:smooth; }
    bar stays ~40px whatever the section names are, and the active chip is
    scrolled into view as you pass through the report. */
 @media screen and (max-width:700px) {
-  .secnav { flex-wrap:nowrap; overflow-x:auto; overscroll-behavior-x:contain;
+  /* the top bar is position:static on a phone (it scrolls away), so holding
+     its height back as a sticky offset left this bar floating a third of the
+     way down the screen — it belongs at the very top */
+  .secnav { top:0; flex-wrap:nowrap; overflow-x:auto; overscroll-behavior-x:contain;
     -webkit-overflow-scrolling:touch; scrollbar-width:none; margin:12px -20px 4px; padding:8px 14px; }
   .secnav::-webkit-scrollbar { display:none; }
   .secnav a { flex:0 0 auto; white-space:nowrap; }
-  #report section { scroll-margin-top:calc(var(--abh, 48px) + 46px); }
+  #report section { scroll-margin-top:58px; }   /* just the nav strip now */
 }
 #report section { scroll-margin-top:calc(var(--abh, 48px) + 58px); }
 .editable-head { cursor:text; transition:outline-color .12s; }
