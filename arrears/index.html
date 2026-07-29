@@ -208,6 +208,37 @@ td .chip { margin-bottom:2px; }
 }
 .nowrap { white-space:nowrap; }
 
+/* ---------- awaiting send ---------- */
+.card.pend { border-left:3px solid var(--amber); }
+.pendhead b { font:600 15px Georgia,serif; color:var(--ink); }
+.pendrow { display:flex; gap:12px; align-items:center; padding:7px 0;
+  border-bottom:1px solid var(--line-soft); font-size:13px; }
+.pendrow:last-child { border-bottom:none; }
+.pendrow .pn { font-weight:600; color:var(--ink); min-width:160px; }
+.pendrow .pm { flex:1; color:var(--ink2); }
+.pendrow .pw { color:var(--muted); font-size:12px; white-space:nowrap; }
+@media (max-width:640px) {
+  .pendrow { flex-wrap:wrap; gap:6px; }
+  .pendrow .pn, .pendrow .pm { min-width:0; flex:1 1 100%; }
+}
+
+/* ---------- letter preview, shown rather than downloaded ----------
+   .overlay must be defined here: without it the box sits in normal document flow,
+   permanently visible and printed as a page of its own. */
+.overlay { position:fixed; inset:0; z-index:60; background:rgba(18,26,36,.55);
+  display:none; align-items:center; justify-content:center; padding:20px; }
+.overlay.open { display:flex; }
+.pdfbox { background:var(--card); border-radius:10px; box-shadow:0 18px 50px rgba(10,16,24,.45);
+  width:min(920px,95vw); height:min(92vh,1100px); display:flex; flex-direction:column; overflow:hidden; }
+.pdfhead { display:flex; align-items:center; gap:14px; padding:12px 16px;
+  border-bottom:1px solid var(--line); background:#F7F9FB; }
+.pdfwho { flex:1; font-size:13.5px; color:var(--ink2); min-width:0; }
+.pdfwho b { display:block; font-size:15px; color:var(--ink); font-family:Georgia,serif; }
+.pdfwho span { display:block; margin-top:2px; overflow-wrap:anywhere; }
+.pdfwho span.bad { color:var(--prio); font-weight:600; }
+.pdfbody { flex:1; background:#525659; }
+.pdfbody iframe { width:100%; height:100%; border:0; display:block; }
+
 /* ---------- unit typeahead (Letters tab) ---------- */
 .ac { position:absolute; z-index:200; background:var(--card); border:1px solid var(--line);
   border-radius:8px; box-shadow:0 12px 34px rgba(20,26,33,.24); overflow-y:auto;
@@ -274,7 +305,7 @@ td .chip { margin-bottom:2px; }
 @media print {
   @page { size:letter; margin:16mm 20mm 12mm; }
   html, body { background:#fff !important; margin:0 !important; padding:0 !important; }
-  .appbar, .wrap, .gate, .ac, .banner { display:none !important; }
+  .appbar, .wrap, .gate, .ac, .banner, .overlay { display:none !important; }
   #printArea { display:block !important; }
 }
 /* on-screen proof sheet: the same markup, shown at true page width */
@@ -395,6 +426,20 @@ td input.amt { text-align:right; font-variant-numeric:tabular-nums; }
       <button class="btn ghost" id="btnAddRow">Add a unit by hand</button>
       <span class="barnote" id="parseNote" style="color:var(--muted)"></span>
     </div>
+  </div>
+
+  <div class="card pend" id="pendCard" style="display:none">
+    <div class="row" style="margin-bottom:10px">
+      <span class="pendhead"><b id="pendCount"></b></span>
+      <span class="spacer"></span>
+      <span class="barnote" id="pendNote" style="color:var(--muted)"></span>
+      <button class="btn" id="btnCheckDrafts">Check Gmail</button>
+    </div>
+    <div id="pendList"></div>
+    <p class="seclede" style="margin:10px 0 0">These are drafted and attached but not yet
+      sent. <b>Check Gmail</b> clears any that have left the Drafts folder — with
+      drafts-only access the app can see a draft is gone, not whether it was sent or
+      deleted, so a cleared row means "no longer waiting", not "proven delivered".</p>
   </div>
 
   <div class="card" id="batchCard" style="display:none">
@@ -544,13 +589,15 @@ td input.amt { text-align:right; font-variant-numeric:tabular-nums; }
     <div class="kicker">History</div>
     <h2>Every letter that has gone out</h2>
     <p class="seclede">The record of what was demanded, from whom, and when. Letters cannot be
-      edited or deleted — one sent in error is marked void and stays on the record.</p>
+      edited or deleted — one sent in error is marked void and stays on the record, greyed out
+      and no longer counted against that unit. Voiding cannot be undone.</p>
   </header>
   <div class="card">
     <div class="row" style="margin-bottom:12px">
       <label class="fld">Filter by unit
-        <input type="text" id="histFilter" placeholder="e.g. 402" style="width:140px"></label>
+        <input type="text" id="histFilter" placeholder="e.g. 550-402" style="width:150px"></label>
       <span class="spacer"></span>
+      <span class="barnote" id="histNote" style="color:var(--muted)"></span>
       <button class="btn" id="btnHistReload">Refresh</button>
     </div>
     <table id="histTbl"></table>
@@ -559,7 +606,21 @@ td input.amt { text-align:right; font-variant-numeric:tabular-nums; }
 
 </div>
 
-<div class="pvbar" id="pvBar">
+<div class="overlay" id="pdfOverlay">
+  <div class="pdfbox">
+    <div class="pdfhead">
+      <div class="pdfwho">
+        <b id="pdfUnit"></b>
+        <span id="pdfTo"></span>
+      </div>
+      <button class="btn" id="pdfTab">Open in a tab</button>
+      <button class="btn" id="pdfClose">Close</button>
+    </div>
+    <div class="pdfbody"><iframe id="pdfFrame" title="Letter preview"></iframe></div>
+  </div>
+</div>
+
+<div class="pvbar" id="pvBar"
   <span class="lab" id="pvLabel"></span>
   <span class="fit" id="pvFit"></span>
   <button class="btn" id="pvPrint">Print / save as PDF</button>
@@ -652,7 +713,8 @@ var ICON = {
   users:    svg('<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>'),
   note:     svg('<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/>'),
   building: svg('<path d="M3 21h18M5 21V7l7-4 7 4v14"/><path d="M9 9h.01M15 9h.01M9 13h.01M15 13h.01M9 17h.01M15 17h.01"/>'),
-  alert:    svg('<path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/>')
+  alert:    svg('<path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/>'),
+  eye:      svg('<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/>')
 };
 function money(n) {
   var v = Number(n) || 0;
@@ -908,11 +970,22 @@ function standaloneLetterDoc(rows, tpl, opts) {
 }
 function renderPdf(rows, tpl, opts) {
   if (!firebase.functions) return Promise.reject(new Error("The PDF service is not loaded."));
+  /* For a single letter, name the unit so both sides can agree on what was made.
+     The renderer refuses a letter that does not mention it, or that mentions
+     somebody else's unit as well. */
+  var expect = rows.length === 1 ? String(rows[0].unit || "") : "";
+  var html = standaloneLetterDoc(rows, tpl, opts);
+  if (expect && html.indexOf(expect) < 0) {
+    return Promise.reject(new Error("The letter for unit " + expect + " does not name that unit."));
+  }
   var call = firebase.functions().httpsCallable("nnsccArrearsPdf", { timeout: 180000 });
-  return call({ html: standaloneLetterDoc(rows, tpl, opts) }).then(function (res) {
-    var b64 = res && res.data && res.data.pdf;
-    if (!b64) throw new Error("No PDF came back.");
-    return b64;
+  return call({ html: html, expectUnit: expect }).then(function (res) {
+    var d = (res && res.data) || {};
+    if (!d.pdf) throw new Error("No PDF came back.");
+    if (expect && d.unit !== expect) {
+      throw new Error("The renderer returned unit " + (d.unit || "?") + ", not " + expect + ".");
+    }
+    return d.pdf;
   });
 }
 function pdfBlob(b64) {
@@ -926,7 +999,8 @@ function pdfName(rows, tpl) {
   return (stem + " — " + tpl.name + ".pdf").replace(/[\\/:*?"<>|]/g, "-");
 }
 function downloadPdf(rows, tpl, opts) {
-  note("genNote", "Rendering " + rows.length + " letter" + (rows.length === 1 ? "" : "s") + "…");
+  note("genNote", "Rendering " + rows.length + " letter" + (rows.length === 1 ? "" : "s") +
+    "…  (the first can take a few seconds)", false, true);
   $("btnPdf").disabled = true;
   return renderPdf(rows, tpl, opts).then(function (b64) {
     var url = URL.createObjectURL(pdfBlob(b64));
@@ -1096,6 +1170,30 @@ function postDraft(token, raw) {
     });
   });
 }
+/* Last gate before a draft exists. Recipient, subject, attachment name and body
+   must all be about the same unit, and the recipient must still be the owner the
+   Units tab holds. Sending one resident another's arrears is the failure that
+   matters most here, so it is checked rather than assumed. */
+function assertOneUnit(row, o) {
+  var u = String(row.unit || "").replace(/^\s+|\s+$/g, "");
+  if (!u) throw new Error("a row with no unit number");
+  var expectTo = emailableOwners(u).join(", ");
+  if (!expectTo) throw new Error("no emailable owner for unit " + u);
+  if (o.to !== expectTo) {
+    throw new Error("recipient " + o.to + " is not the owner on file for unit " + u);
+  }
+  if (o.subject.indexOf(u) < 0) throw new Error("subject does not name unit " + u);
+  if (mimeFilename(o.filename).indexOf(u) < 0) throw new Error("attachment name does not name unit " + u);
+  if (o.body.indexOf(u) < 0) throw new Error("letter body does not name unit " + u);
+  /* And nobody else's unit anywhere in it. The lookahead is essential: the
+     Corporation's own address is "550-560 North Service Road", which otherwise
+     reads as unit 550-560 and fails every legitimate letter. */
+  var stray = (o.body + " " + o.subject).match(/\b5[56]0-[A-Za-z0-9]{1,6}\b(?!\s+North\b)/g) || [];
+  for (var i = 0; i < stray.length; i++) {
+    if (stray[i] !== u) throw new Error("unit " + u + "'s letter also mentions " + stray[i]);
+  }
+}
+
 function createGmailDraft(token, row, tpl, opts, pdfB64) {
   var base = {
     to: emailableOwners(row.unit).join(", "),
@@ -1104,6 +1202,7 @@ function createGmailDraft(token, row, tpl, opts, pdfB64) {
     filename: pdfName([row], tpl),
     pdfB64: pdfB64
   };
+  assertOneUnit(row, base);
   var withFrom = {}, k;
   for (k in base) withFrom[k] = base[k];
   withFrom.from = CORP.sendAs || "";
@@ -1129,8 +1228,11 @@ function emailDrafts(rows, tpl, opts) {
     note("genNote", "None of these owners has an email on file that has opted in — print those.", true);
     return;
   }
-  if (!confirm("Create " + can.length + " Gmail draft" + (can.length === 1 ? "" : "s") +
-      ", each with its PDF attached?" + (cannot ? "\n\n" + cannot + " have no emailable owner and are left for printing." : "") +
+  var ask = can.length === 1
+    ? "Create 1 Gmail draft with its PDF attached?"
+    : "Create " + can.length + " Gmail drafts, each with its PDF attached?";
+  if (!confirm(ask +
+      (cannot ? "\n\n" + cannot + " have no emailable owner and are left for printing." : "") +
       "\n\nNothing is sent — you review and send each one from Gmail.")) return;
 
   $("btnEmail").disabled = true;
@@ -1149,10 +1251,11 @@ function emailDrafts(rows, tpl, opts) {
         return;
       }
       var r = can[i];
-      note("genNote", "Drafting " + (i + 1) + " of " + can.length + " — Unit " + r.unit + "…");
+      note("genNote", "Drafting " + (i + 1) + " of " + can.length + " — Unit " + r.unit + "…" +
+        (i === 0 ? "  (the first can take a few seconds)" : ""), false, true);
       renderPdf([r], tpl, opts)
         .then(function (b64) { return createGmailDraft(token, r, tpl, opts, b64); })
-        .then(function () { made.push(r); })
+        .then(function (res) { r._draftId = (res && res.id) || null; made.push(r); })
         .catch(function (e) { failed.push((e && e.message) || "error"); })
         .then(function () { step(i + 1); });
     }
@@ -1160,6 +1263,138 @@ function emailDrafts(rows, tpl, opts) {
   }, function (msg) {
     $("btnEmail").disabled = false;
     note("genNote", msg, true);
+  });
+}
+
+/* Show the exact file, rather than describing it. Downloading to check a letter is
+   friction that gets skipped, and a check that gets skipped is not a check. */
+/* Chrome shows a blob: PDF inside an iframe perfectly well, and staying in the app
+   is the nicer check. Safari does not — it renders an empty grey panel — so there
+   only, the file opens in a tab and uses Safari's own viewer. */
+function isSafari() {
+  return /Apple/i.test(navigator.vendor || "") && !/CriOS|Chrome|Chromium/i.test(navigator.userAgent);
+}
+function previewUnitPdf(row, tpl, opts) {
+  /* When a tab is needed it must be reserved on the click itself: by the time the
+     render returns the user gesture has expired and window.open would be blocked. */
+  var tab = null;
+  if (isSafari()) { try { tab = window.open("", "_blank"); } catch (e) { tab = null; } }
+  if (tab) {
+    try {
+      tab.document.write('<!doctype html><meta charset="utf-8"><title>Unit ' +
+        esc(row.unit) + " — rendering…</title>" +
+        '<body style="font:15px -apple-system,Helvetica,Arial,sans-serif;color:#4A5866;' +
+        'display:flex;align-items:center;justify-content:center;height:90vh">' +
+        "Rendering the letter for Unit " + esc(row.unit) + "…");
+      tab.document.close();
+    } catch (e) { /* about:blank is fine on its own */ }
+  }
+  note("genNote", "Rendering the letter for Unit " + row.unit + "…", false, true);
+
+  renderPdf([row], tpl, opts).then(function (b64) {
+    if (A.pdfUrl) URL.revokeObjectURL(A.pdfUrl);
+    A.pdfUrl = URL.createObjectURL(pdfBlob(b64));
+    var to = emailableOwners(row.unit);
+    if (tab && !tab.closed) {
+      tab.location.href = A.pdfUrl;
+      note("genNote", "Unit " + row.unit + " opened in a new tab" +
+        (to.length ? " — emailing it would go to " + to.join(", ") : " — no emailable owner, prints only") + ".");
+      return;
+    }
+    /* Chrome, or Safari with pop-ups blocked: show it in the app */
+    $("pdfUnit").textContent = "Unit " + row.unit + " — " + (row.owner || "no owner name");
+    var el = $("pdfTo");
+    el.className = to.length ? "" : "bad";
+    el.textContent = to.length
+      ? "Emailing this would go to " + to.join(", ")
+      : "No owner email on file that has opted in — this one prints only.";
+    $("pdfFrame").src = A.pdfUrl;
+    $("pdfOverlay").classList.add("open");
+    note("genNote", "");
+  }).catch(function (e) {
+    if (tab && !tab.closed) { try { tab.close(); } catch (e2) { /* already gone */ } }
+    note("genNote", "Could not render it — " + ((e && e.message) || "error"), true);
+  });
+}
+function closePdfPreview() {
+  $("pdfOverlay").classList.remove("open");
+  $("pdfFrame").src = "about:blank";
+  if (A.pdfUrl) { URL.revokeObjectURL(A.pdfUrl); A.pdfUrl = null; }
+}
+
+/* ---------------- awaiting send ----------------
+   Drafts cannot live outside Gmail's Drafts folder — it is a system label, not a
+   folder — and a custom label would need read/write over the whole mailbox. So the
+   tracking lives here instead, which is better anyway: it says which arrears
+   letters have actually gone out, not merely which ones are grouped together.
+
+   One honest limit: with drafts-only access the app can see that a draft has left
+   Drafts, not whether it was sent or deleted. The wording says so. */
+function pendingDrafts() {
+  return A.letters.filter(function (L) { return L.draftId && !L.sent && !L.voided; });
+}
+function gmailDraftIds(token) {
+  var ids = {};
+  function page(pageToken) {
+    return fetch("https://gmail.googleapis.com/gmail/v1/users/me/drafts?maxResults=500" +
+        (pageToken ? "&pageToken=" + encodeURIComponent(pageToken) : ""),
+        { headers: { Authorization: "Bearer " + token } })
+      .then(function (r) {
+        if (!r.ok) throw new Error("Gmail returned HTTP " + r.status);
+        return r.json();
+      })
+      .then(function (j) {
+        (j.drafts || []).forEach(function (d) { ids[d.id] = true; });
+        return j.nextPageToken ? page(j.nextPageToken) : ids;
+      });
+  }
+  return page(null);
+}
+function renderPending() {
+  var card = $("pendCard");
+  if (!card) return;
+  var pend = pendingDrafts();
+  if (!pend.length) { card.style.display = "none"; return; }
+  card.style.display = "";
+  pend.sort(function (a, b) { return unitKey(a.unit).localeCompare(unitKey(b.unit), undefined, { numeric:true }); });
+  $("pendCount").textContent = pend.length + " draft" + (pend.length === 1 ? "" : "s") + " still in Gmail";
+  $("pendList").innerHTML = pend.map(function (L) {
+    var when = L.at && L.at.toDate ? L.at.toDate().toLocaleString("en-CA", { month:"short", day:"numeric", hour:"numeric", minute:"2-digit" }) : "";
+    return '<div class="pendrow"><span class="unitpill">' + esc(L.unit) + "</span>" +
+      '<span class="pn">' + esc(L.owner || "—") + "</span>" +
+      '<span class="pm">' + esc(L.templateName) + "</span>" +
+      '<span class="pw">' + esc(when) + "</span></div>";
+  }).join("");
+}
+function checkGmailDrafts() {
+  var pend = pendingDrafts();
+  if (!pend.length) { note("pendNote", "Nothing is waiting."); return; }
+  $("btnCheckDrafts").disabled = true;
+  note("pendNote", "Asking Gmail…", false, true);
+  gmailToken(function (token) {
+    gmailDraftIds(token).then(function (live) {
+      var gone = pend.filter(function (L) { return !live[L.draftId]; });
+      if (!gone.length) {
+        note("pendNote", "All " + pend.length + " are still sitting in Drafts.");
+        return null;
+      }
+      var batch = A.db.batch();
+      gone.forEach(function (L) {
+        batch.update(A.db.collection(LETTERS).doc(L._id), {
+          sent: true, sentAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+      });
+      return batch.commit().then(function () {
+        note("pendNote", gone.length + " of " + pend.length + " have left Drafts — " +
+          (pend.length - gone.length) + " still waiting.");
+        return loadLetters();
+      });
+    }).catch(function (e) {
+      note("pendNote", "Could not check Gmail — " + ((e && e.message) || "error"), true);
+    }).then(function () { $("btnCheckDrafts").disabled = false; });
+  }, function (msg) {
+    $("btnCheckDrafts").disabled = false;
+    note("pendNote", msg, true);
   });
 }
 
@@ -1196,13 +1431,17 @@ function logBatch(rows, tpl, opts, via) {
   var batchId = uid(), by = (A.user && A.user.email) || "", n = rows.length;
   var batch = A.db.batch();
   rows.forEach(function (r) {
-    batch.set(A.db.collection(LETTERS).doc(), {
+    var doc = {
       batchId: batchId, unit: String(r.unit || ""), unitKey: unitKey(r.unit),
       owner: r.owner || "", address: r.address || "", amount: Number(r.amount) || 0,
       templateId: tpl.id, templateName: tpl.name, dateISO: opts.date,
       dueDays: Number(opts.dueDays) || 0, by: by, via: via || "print",
       at: firebase.firestore.FieldValue.serverTimestamp(), voided: false
-    });
+    };
+    /* Keeping the Gmail draft id is what lets the app answer "which of these has
+       actually gone out?" later — a draft that has left the Drafts folder is done. */
+    if (r._draftId) { doc.draftId = r._draftId; doc.sent = false; }
+    batch.set(A.db.collection(LETTERS).doc(), doc);
   });
   return batch.commit().then(function () {
     note("genNote", n + " letter" + (n === 1 ? "" : "s") + " recorded in History.");
@@ -1741,7 +1980,10 @@ function renderBatch() {
         ? '<span class="chip">' + prior.count + " letter" + (prior.count === 1 ? "" : "s") + "</span>" +
           '<br><span style="font-size:11px;color:var(--muted)">since ' + esc(fmtLongDate(prior.first)) + "</span>"
         : '<span style="font-size:12px;color:var(--muted)">first letter</span>') + "</td>" +
-      '<td><button class="btn danger sm" data-brm="' + i + '" title="Drop this row">✕</button></td></tr>');
+      '<td class="nowrap">' +
+        '<button class="iconbtn" data-eye="' + i + '" title="See the exact PDF this unit would receive">' + ICON.eye + "</button>" +
+        '<button class="iconbtn del" data-brm="' + i + '" title="Drop this row">' + ICON.trash + "</button>" +
+      "</td></tr>");
   });
   $("batchTbl").innerHTML = h.join("");
 
@@ -1822,26 +2064,69 @@ function renderHistory() {
       (A.letters.length ? "No letters for that unit." : "Nothing yet — generated letters are recorded here.") + "</td></tr>";
     return;
   }
-  var h = ["<tr><th style='width:150px'>Sent</th><th style='width:70px'>Unit</th><th>Owner</th>" +
-           "<th>Letter</th><th class='num' style='width:110px'>Amount</th><th style='width:170px'>By</th></tr>"];
+  var h = ["<tr><th style='width:130px'>Sent</th><th style='width:86px'>Unit</th><th>Owner</th>" +
+           "<th>Letter</th><th style='width:74px'>How</th>" +
+           "<th class='num' style='width:104px'>Amount</th><th style='width:150px'>By</th>" +
+           "<th style='width:64px'></th></tr>"];
   rows.forEach(function (L) {
     var when = L.at && L.at.toDate ? L.at.toDate().toLocaleDateString("en-CA", { year:"numeric", month:"short", day:"numeric" })
              : (L.dateISO || "—");
+    var how = L.via === "email-draft" ? "Emailed" : "Printed";
     h.push("<tr" + (L.voided ? ' class="off"' : "") + ">" +
       "<td>" + esc(when) + (L.voided ? ' <span class="chip bad">void</span>' : "") + "</td>" +
-      "<td>" + esc(L.unit) + "</td><td>" + esc(L.owner) + "</td>" +
+      '<td><span class="unitpill">' + esc(L.unit) + "</span></td>" +
+      "<td>" + esc(L.owner) +
+        (L.voided && L.voidReason ? '<span class="sub">voided: ' + esc(L.voidReason) + "</span>" : "") +
+        (L.voided && L.voidedBy ? '<span class="sub">by ' + esc(L.voidedBy) + "</span>" : "") + "</td>" +
       "<td>" + esc(L.templateName) + "</td>" +
+      '<td><span class="chip' + (L.via === "email-draft" ? "" : " ok") + '">' + how + "</span>" +
+        (L.draftId && !L.voided
+          ? '<span class="sub">' + (L.sent ? "left Drafts" : "still in Drafts") + "</span>" : "") + "</td>" +
       '<td class="num">' + esc(money(L.amount)) + "</td>" +
-      '<td style="font-size:12px;color:var(--muted)">' + esc(L.by) + "</td></tr>");
+      '<td style="font-size:12px;color:var(--muted)">' + esc(L.by) + "</td>" +
+      "<td>" + (L.voided ? "" :
+        '<button class="iconbtn del" data-void="' + esc(L._id) +
+        '" title="Mark this letter void — it stays on the record but stops counting">' + ICON.trash + "</button>") +
+      "</td></tr>");
   });
   $("histTbl").innerHTML = h.join("");
 }
+
+/* Voiding is the only change a letter ever accepts, and it is one-way: the rules
+   permit setting voided/voidReason/voidedBy/voidedAt and nothing else, and only to
+   true. The figures stay readable underneath so the record is corrected, not
+   rewritten — and a voided letter stops counting toward the unit's tally. */
+$("histTbl").addEventListener("click", function (e) {
+  var btn = e.target.closest && e.target.closest("[data-void]");
+  if (!btn) return;
+  var id = btn.getAttribute("data-void"), L = null;
+  for (var i = 0; i < A.letters.length; i++) if (A.letters[i]._id === id) L = A.letters[i];
+  if (!L) return;
+  var reason = prompt("Void the “" + L.templateName + "” for Unit " + L.unit +
+    " (" + money(L.amount) + ")?\n\n" +
+    "It stays on the record marked void, and stops counting toward that unit's letter tally.\n" +
+    "This cannot be undone.\n\nReason:", "test entry");
+  if (reason === null) return;
+  btn.disabled = true;
+  A.db.collection(LETTERS).doc(id).update({
+    voided: true,
+    voidReason: String(reason).replace(/^\s+|\s+$/g, "").slice(0, 200) || "no reason given",
+    voidedBy: (A.user && A.user.email) || "",
+    voidedAt: firebase.firestore.FieldValue.serverTimestamp()
+  }).then(function () {
+    note("histNote", "Unit " + L.unit + " letter voided.");
+    loadLetters();
+  }).catch(function (err) {
+    btn.disabled = false;
+    note("histNote", "Could not void it (" + ((err && err.code) || "error") + ").", true);
+  });
+});
 
 /* ---------------- loading ---------------- */
 function loadLetters() {
   return A.db.collection(LETTERS).orderBy("at", "desc").limit(1000).get().then(function (qs) {
     A.letters = []; qs.forEach(function (d) { var v = d.data(); v._id = d.id; A.letters.push(v); });
-    renderHistory(); renderBatch();
+    renderHistory(); renderBatch(); renderPending();
   }).catch(function (e) { console.warn("letters", e); });
 }
 function loadAll() {
@@ -1862,11 +2147,14 @@ function loadAll() {
 
 /* ---------------- small UI plumbing ---------------- */
 var noteTimers = {};
-function note(id, msg, bad) {
+/* sticky is for progress: a message that clears itself after four seconds while
+   the work is still running reads as "nothing is happening" */
+function note(id, msg, bad, sticky) {
   var el = $(id); if (!el) return;
   el.textContent = msg;
   el.style.color = bad ? "var(--prio)" : "var(--muted)";
   clearTimeout(noteTimers[id]);
+  if (sticky) return;
   noteTimers[id] = setTimeout(function () { el.textContent = ""; }, bad ? 9000 : 4000);
 }
 var TABS = [["tabLetters","pLetters"],["tabRoster","pRoster"],["tabTpl","pTpl"],["tabHist","pHist"]];
@@ -2071,10 +2359,27 @@ $("batchTbl").addEventListener("change", function (e) {
   renderBatch();
 });
 $("batchTbl").addEventListener("click", function (e) {
-  var i = e.target.getAttribute("data-brm");
-  if (i == null) return;
-  A.rows.splice(+i, 1);
+  var eye = e.target.closest && e.target.closest("[data-eye]");
+  if (eye) {
+    var r = A.rows[+eye.getAttribute("data-eye")], t = currentTpl();
+    if (r && t) previewUnitPdf(r, t, opts());
+    return;
+  }
+  var rm = e.target.closest && e.target.closest("[data-brm]");
+  if (!rm) return;
+  A.rows.splice(+rm.getAttribute("data-brm"), 1);
   renderBatch();
+});
+/* escape hatch: if the inline view ever comes up blank, pop the same file out */
+$("btnCheckDrafts").onclick = checkGmailDrafts;
+$("pdfTab").onclick = function () {
+  if (!A.pdfUrl) return;
+  window.open(A.pdfUrl, "_blank");
+};
+$("pdfClose").onclick = closePdfPreview;
+$("pdfOverlay").addEventListener("click", function (e) { if (e.target === this) closePdfPreview(); });
+document.addEventListener("keydown", function (e) {
+  if (e.key === "Escape" && $("pdfOverlay").classList.contains("open")) closePdfPreview();
 });
 $("tplPick").onchange = function () { A.tplIdx = +this.value; $("tplEdit").value = this.value; loadTplEditor(); };
 $("btnPreview").onclick = function () {

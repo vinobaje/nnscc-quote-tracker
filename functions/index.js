@@ -420,6 +420,31 @@ exports.nnsccArrearsPdf = onCall(
       throw new HttpsError("invalid-argument", "That batch is too large to render in one go — split it.");
     }
 
+    // A single-unit letter says which unit it is for, and the caller says which unit
+    // it asked for. If those ever disagree, the wrong owner is about to be sent
+    // another resident's arrears — so refuse rather than render. Checked on this
+    // side of the wire too, so a client-side bug cannot talk its way past it.
+    const expectUnit = String((request.data && request.data.expectUnit) || "");
+    if (expectUnit) {
+      if (!/^[\w\- ]{1,20}$/.test(expectUnit)) {
+        throw new HttpsError("invalid-argument", "That is not a unit number.");
+      }
+      if (html.indexOf(expectUnit) < 0) {
+        throw new HttpsError("failed-precondition",
+          "Refusing to render: the letter does not mention unit " + expectUnit + ".");
+      }
+      // And it must not carry somebody else's unit as well. The lookahead is
+      // essential: the Corporation's own address is "550-560 North Service Road",
+      // which otherwise reads as unit 550-560 and rejects every real letter.
+      const others = (html.match(/\b5[56]0-[A-Za-z0-9]{1,6}\b(?!\s+North\b)/g) || [])
+        .filter((u) => u !== expectUnit);
+      if (others.length) {
+        throw new HttpsError("failed-precondition",
+          "Refusing to render: the letter for unit " + expectUnit +
+          " also mentions " + [...new Set(others)].join(", ") + ".");
+      }
+    }
+
     // puppeteer-core + @sparticuz/chromium rather than full puppeteer: the normal
     // package downloads a Chromium for whatever machine ran `npm install`, which
     // on a Mac means an arm64 binary that cannot execute on Cloud Run's linux/x64.
@@ -453,7 +478,8 @@ exports.nnsccArrearsPdf = onCall(
         printBackground: true,
         preferCSSPageSize: true,   // the letter's own @page rule wins
       });
-      return { pdf: Buffer.from(pdf).toString("base64") };
+      // echo the unit back so the caller can confirm it got the PDF it asked for
+      return { pdf: Buffer.from(pdf).toString("base64"), unit: expectUnit };
     } catch (e) {
       if (e instanceof HttpsError) throw e;
       throw new HttpsError("internal", "Could not render the letter: " + ((e && e.message) || "unknown error"));

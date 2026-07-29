@@ -113,12 +113,19 @@ service cloud.firestore {
     // demand was made and when, so a letter is never edited away or deleted.
     // A letter generated in error may be marked void; the void is recorded
     // ON the letter and the original figures stay readable underneath it.
+    // Exactly two corrections are permitted, both one-way, and neither can touch
+    // the unit, the owner, the amount or the date: marking a letter void, and
+    // recording that its Gmail draft has left the Drafts folder.
     match /nnsccArrearsLetters/{letterId} {
       allow read, create: if nnsccEditor();
-      allow update: if nnsccEditor()
-        && request.resource.data.diff(resource.data).affectedKeys()
-             .hasOnly(['voided', 'voidReason', 'voidedBy', 'voidedAt'])
-        && request.resource.data.voided == true;
+      allow update: if nnsccEditor() && (
+           (request.resource.data.diff(resource.data).affectedKeys()
+              .hasOnly(['voided', 'voidReason', 'voidedBy', 'voidedAt'])
+            && request.resource.data.voided == true)
+        || (request.resource.data.diff(resource.data).affectedKeys()
+              .hasOnly(['sent', 'sentAt'])
+            && request.resource.data.sent == true)
+      );
       allow delete: if false;
     }
 
