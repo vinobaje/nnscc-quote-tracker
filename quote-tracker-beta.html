@@ -86,6 +86,17 @@ html { scroll-behavior:smooth; }
   transition:background .15s, color .15s; }
 .secnav a:hover { background:var(--accent-soft); }
 .secnav a.active { background:var(--accent); border-color:var(--accent); color:#fff; }
+/* On a phone the five section chips wrapped onto five lines and, being sticky,
+   took half the screen with them. One row that scrolls sideways instead: the
+   bar stays ~40px whatever the section names are, and the active chip is
+   scrolled into view as you pass through the report. */
+@media screen and (max-width:700px) {
+  .secnav { flex-wrap:nowrap; overflow-x:auto; overscroll-behavior-x:contain;
+    -webkit-overflow-scrolling:touch; scrollbar-width:none; margin:12px -20px 4px; padding:8px 14px; }
+  .secnav::-webkit-scrollbar { display:none; }
+  .secnav a { flex:0 0 auto; white-space:nowrap; }
+  #report section { scroll-margin-top:calc(var(--abh, 48px) + 46px); }
+}
 #report section { scroll-margin-top:calc(var(--abh, 48px) + 58px); }
 .editable-head { cursor:text; transition:outline-color .12s; }
 .editable-head:hover { outline:1px dashed var(--accent); outline-offset:5px; border-radius:4px; }
@@ -3697,7 +3708,15 @@ function setupScrollSpy() {
       if (en.isIntersecting) {
         if (current) current.classList.remove("active");
         current = links[en.target.id] || null;
-        if (current) current.classList.add("active");
+        if (current) {
+          current.classList.add("active");
+          /* the nav is one scrolling row on a phone — bring the chip into it */
+          var nav = current.parentNode;
+          if (nav && nav.scrollWidth > nav.clientWidth + 4) {
+            var want = current.offsetLeft - (nav.clientWidth - current.offsetWidth) / 2;
+            nav.scrollTo({ left: Math.max(0, want), behavior: "smooth" });
+          }
+        }
       }
     });
   }, { rootMargin: "-12% 0px -80% 0px" });   /* highlight the section nearest the top of the viewport */
