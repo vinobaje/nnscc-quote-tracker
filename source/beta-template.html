@@ -2538,7 +2538,9 @@ function openJobDossier(id) {
   else if (fq) f.push(jdFactCard("cal", "First quoted", jdDate(fq), jdAgo(fq)));
   else f.push(jdFactCard("cal", "Date added", "Not recorded", "predates the tracker"));
   if (j.created && fq) f.push(jdFactCard("cal", "First quoted", jdDate(fq), jdAgo(fq)));
-  f.push(jdFactCard("cash", "Selected / lowest quote",
+  /* never "selected": nothing here has been chosen by the board, and a job may
+     not even be approved. The lowest quote is simply the one the totals count. */
+  f.push(jdFactCard("cash", carried && carried.override ? "Counted in totals" : "Lowest quote · in totals",
     c.cost ? money(c.cost) : "Pending", carried ? (carried.b.contractor || "").trim() : "no priced quote yet"));
   if (c.saving > 0)
     f.push(jdFactCard("save", "Savings on this job", money(c.saving), "vs. next-lowest quote", true));
@@ -2558,6 +2560,9 @@ function openJobDossier(id) {
 /* what a quick action does */
 function jdAction(what) {
   var j = findJob(jdJobId); if (!j) return;
+  /* the two that change data are the property manager's alone — the buttons
+     are only rendered for them, and this refuses if one is reached anyway */
+  if ((what === "note" || what === "edit") && !isEditor()) return;
   if (what === "files") {
     var all = [];
     j.bids.forEach(function (b) { ((b && b.files) || []).forEach(function (f) { all.push(f); }); });
@@ -5832,6 +5837,13 @@ document.getElementById("decLogOverlay").addEventListener("click", function (e) 
 
 /* ---------- toolbar ---------- */
 function setView(v) {
+  /* The Edit workspace is for signed-in, authorized property managers only.
+     The "Edit data" button checks before it calls, but every other route in
+     (a quick action, a restored view, anything added later) comes through
+     here — so this is the gate, and a board member or a passcode reader is
+     put back on the report. The Firestore rules are the real enforcement
+     behind it; this is what stops the editing UI ever being drawn. */
+  if (v === "edit" && !isEditor()) v = "report";
   document.body.dataset.view = v;
   document.getElementById("btnViewReport").classList.toggle("on", v === "report");
   document.getElementById("btnViewEdit").classList.toggle("on", v === "edit");
