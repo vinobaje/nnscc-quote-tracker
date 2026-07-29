@@ -2123,7 +2123,7 @@ function cloudPush(changes, jobIds) {
     updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
     updatedBy: cloud.user.email
   }, { merge: true }).then(function () {   /* merge keeps archived docs' createdAt/archivedAt intact */
-    if (changes && changes.length) {
+    if (changes && changes.length && loggedAccount()) {
       var entry = {
         at: firebase.firestore.FieldValue.serverTimestamp(),
         by: cloud.user.email,
@@ -2372,6 +2372,15 @@ function jrowAttrs(j, cls) {
    an email address tells a board member nothing — show the person's name, and
    fall back to the address for anyone not on the list. */
 var PEOPLE = { "nnscc292connect@cpomanagement.ca": "Sarah" };
+/* Accounts whose edits are NOT written to the change log. The log exists so a
+   board can see how the manager's report evolved; the condo super dipping in to
+   maintain the system would only muddy that. Their writes still go through the
+   same rules and still land in the report — only the log entry is skipped. */
+var LOG_EXEMPT = ["mvinobaje@gmail.com"];
+function loggedAccount() {
+  var e = String((cloud.user && cloud.user.email) || "").toLowerCase();
+  return !!e && LOG_EXEMPT.indexOf(e) < 0;
+}
 function personLabel(email) {
   var e = String(email || "").trim();
   return esc(PEOPLE[e.toLowerCase()] || e) || "unknown";
@@ -6209,6 +6218,12 @@ function parseMoney(s) {
   var n = Number(s);
   return isNaN(n) ? null : Math.round(n * 100) / 100;
 }
+/* Clicking into a field and out again must never count as a change. The typed
+   text is collapsed and trimmed, so a stored value carrying a stray space or a
+   double space would otherwise "differ" from itself and be logged as an edit. */
+function sameText(stored, typed) {
+  return String(stored == null ? "" : stored).replace(/\s+/g, " ").trim() === typed;
+}
 function commitEdit(el) {
   var path = el.dataset.edit; if (!path) return;
   var val = (el.textContent || "").replace(/\s+/g, " ").trim();
@@ -6217,18 +6232,18 @@ function commitEdit(el) {
     var key = p[1];
     if (!val && META_DEFAULTS[key]) val = META_DEFAULTS[key];   /* restore default if cleared (blank-able ledes stay blank) */
     state.meta = state.meta || Object.assign({}, META_DEFAULTS);
-    if ((state.meta[key] || "") === val) { el.textContent = val; return; }
+    if (sameText(state.meta[key], val)) { el.textContent = val; return; }
     state.meta[key] = val;
   } else if (p[0] === "job") {
     var j = findJob(p[1]);
     if (!j) return;
     if (!val) val = j.desc;                                     /* never allow an empty job name */
-    if ((j.desc || "") === val) { el.textContent = val; return; }
+    if (sameText(j.desc, val)) { el.textContent = val; return; }
     j.desc = val;
   } else if (p[0] === "ai") {
     if (!state.ai) return;
     var akey = p[1];
-    if ((state.ai[akey] || "") === val) { el.textContent = val; return; }
+    if (sameText(state.ai[akey], val)) { el.textContent = val; return; }
     state.ai[akey] = val;
   } else if (p[0] === "bid") {
     var jb = findJob(p[1]); if (!jb) return;
@@ -6243,16 +6258,16 @@ function commitEdit(el) {
       else { b.amount = num; b.hst = true; }
     } else if (f === "contractor") {
       if (!val && b.amount == null) { el.textContent = b.contractor || ""; return; }  /* don't let a pending row vanish */
-      if ((b.contractor || "") === val) { el.textContent = val; return; }
+      if (sameText(b.contractor, val)) { el.textContent = val; return; }
       b.contractor = val;
     } else if (f === "notes") {
-      if ((b.notes || "") === val) { el.textContent = val; return; }
+      if (sameText(b.notes, val)) { el.textContent = val; return; }
       b.notes = val;
     } else return;
   } else if (p[0] === "upd") {                                  /* progress-update text */
     var ju = findJob(p[1]); if (!ju || !ju.updates) return;
     var u = ju.updates[+p[2]]; if (!u) return;
-    if ((u.t || "") === val) { el.textContent = val; return; }
+    if (sameText(u.t, val)) { el.textContent = val; return; }
     u.t = val;
   } else return;
   persist();
