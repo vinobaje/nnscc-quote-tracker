@@ -933,6 +933,7 @@ var FIELD_LIST = [
   ["date",            "Date on the letter"],
   ["due_date",        "Pay-by date"],
   ["withdrawal_date", "Date of the PAP withdrawal"],
+  ["prior_notices",   "A whole sentence about earlier notices, or nothing"],
   ["prior_count",     "How many letters already sent"],
   ["first_notice",    "Date of the first letter"],
   ["condo",           "Waterview Condominium"],
@@ -960,8 +961,9 @@ function fieldsFor(row, opts) {
     amount:       esc(money(row.amount)),
     date:         esc(fmtLongDate(d)),
     due_date:     esc(fmtLongDate(addDays(d, Number(opts.dueDays) || 0))),
-    prior_count:  esc(String(prior.count)),
-    first_notice: esc(prior.first ? fmtLongDate(prior.first) : "—"),
+    prior_count:  esc(prior.count ? String(prior.count) : ""),
+    first_notice: esc(prior.first ? fmtLongDate(prior.first) : ""),
+    prior_notices: esc(priorSentence(prior)),
     condo:        esc(CORP.condo),
     corp_full:    esc(CORP.corpFull),
     reg_no:       esc(CORP.regNo),
@@ -995,9 +997,31 @@ function coLine(row, forHtml) {
   return (forHtml ? "C/O: " + esc(agent) : "C/O: " + agent) + "\n";
 }
 
+/* A whole sentence, or nothing at all. Never "0 previous notices, the first dated —". */
+function priorSentence(prior) {
+  if (!prior || !prior.count) return "";
+  if (prior.count === 1) {
+    return "Our records show one previous written notice to you regarding this account" +
+      (prior.first ? ", dated " + fmtLongDate(prior.first) : "") + ".";
+  }
+  return "Our records show " + prior.count + " previous written notices to you regarding this account" +
+    (prior.first ? ", the first dated " + fmtLongDate(prior.first) : "") + ".";
+}
+
 /* what the log already knows about this unit */
 function priorFor(unit) {
   var k = unitKey(unit), count = 0, first = null;
+  /* Notices sent before this tool existed. Without these a second notice reads
+     "0 previous written notices", which is worse than wrong — it tells the owner
+     the Corporation has no record of chasing them. */
+  var known = rosterFind(unit);
+  if (known) {
+    var base = Math.max(0, Math.floor(Number(known.priorCount) || 0));
+    if (base) {
+      count += base;
+      if (known.priorFirst) first = fromISO(known.priorFirst);
+    }
+  }
   for (var i = 0; i < A.letters.length; i++) {
     var L = A.letters[i];
     if (unitKey(L.unit) !== k || L.voided) continue;
@@ -1012,8 +1036,23 @@ function priorFor(unit) {
    The template text is escaped first, so everything below operates on text that
    can no longer carry markup, and the small set of markers we do honour is
    turned into HTML afterwards. */
+/* [[IF field]]…[[END]] keeps a passage only when that field has something to say.
+   Sarah sent these by hand for months, so the app's own history is legitimately
+   empty for most units — and "0 previous written notice(s), the first dated —" is
+   far worse than saying nothing at all. */
+function truthyField(fields, name) {
+  var v = fields[name];
+  if (v == null) return false;
+  v = String(v).replace(/<[^>]*>/g, "").replace(/^\s+|\s+$/g, "");
+  return !!v && v !== "0" && v !== "\u2014" && v !== "&mdash;";
+}
+function applyConditionals(s, fields) {
+  return s.replace(/\[\[IF\s+(\w+)\]\]([\s\S]*?)\[\[END\]\]/g, function (m, name, inner) {
+    return truthyField(fields, name) ? inner : "";
+  });
+}
 function renderBody(tplText, fields) {
-  var s = esc(tplText).replace(/\{\{(\w+)\}\}/g, function (m, k) {
+  var s = applyConditionals(esc(tplText), fields).replace(/\{\{(\w+)\}\}/g, function (m, k) {
     return Object.prototype.hasOwnProperty.call(fields, k) ? fields[k] : m;
   });
   var blocks = s.split(/\n\s*\n/), out = [];
@@ -1341,8 +1380,9 @@ function fieldsRaw(row, opts) {
     owner: row.owner || "Owner", unit: row.unit || "", address: row.address || "",
     amount: money(row.amount), date: fmtLongDate(d),
     due_date: fmtLongDate(addDays(d, Number(opts.dueDays) || 0)),
-    prior_count: String(prior.count),
-    first_notice: prior.first ? fmtLongDate(prior.first) : "—",
+    prior_count: prior.count ? String(prior.count) : "",
+    first_notice: prior.first ? fmtLongDate(prior.first) : "",
+    prior_notices: priorSentence(prior),
     condo: CORP.condo, corp_full: CORP.corpFull, reg_no: CORP.regNo,
     reg_no_short: CORP.regNoShort, manager: CORP.manager, buildings: CORP.buildings,
     office_addr: CORP.officeAddr, phone: CORP.phone, contact: CORP.contact,
@@ -1354,7 +1394,7 @@ function fieldsRaw(row, opts) {
 }
 function letterPlainText(row, tpl, opts) {
   var f = fieldsRaw(row, opts);
-  var s = String(tpl.body || "").replace(/\{\{(\w+)\}\}/g, function (m, k) {
+  var s = applyConditionals(String(tpl.body || ""), f).replace(/\{\{(\w+)\}\}/g, function (m, k) {
     return Object.prototype.hasOwnProperty.call(f, k) ? f[k] : m;
   });
   s = s.replace(/\*\*([^*]+)\*\*/g, "$1").replace(/^# /gm, "").replace(/^---$/gm, "");
@@ -1822,7 +1862,13 @@ function unitDetail(u, i) {
       '<label>Name a letter is addressed to' +
         '<input type="text" data-r="' + i + '" data-k="owner" value="' + esc(u.owner) + '" id="focusOwner"></label>' +
       '<label style="grid-column:1/-1">Mailing address a letter is sent to' +
-        '<textarea rows="3" data-r="' + i + '" data-k="address">' + esc(u.address) + "</textarea></label></div>" +
+        '<textarea rows="3" data-r="' + i + '" data-k="address">' + esc(u.address) + "</textarea></label>" +
+      '<label>Notices already sent, before this tool' +
+        '<input type="number" min="0" max="99" data-r="' + i + '" data-k="priorCount" value="' +
+        esc(u.priorCount === 0 || u.priorCount ? u.priorCount : "") + '" placeholder="0"></label>' +
+      '<label>Date of the first of those' +
+        '<input type="date" data-r="' + i + '" data-k="priorFirst" value="' +
+        esc(u.priorFirst || "") + '"></label></div>' +
       '<div class="row"><button class="btn primary sm" data-done="' + i + '">Done</button>' +
       '<span class="barnote" style="color:var(--muted)">Changes are kept when you press ' +
       "<b>Save changes</b>. A re-import will overwrite them.</span></div></div>";
@@ -2672,7 +2718,7 @@ function unzip(buf, wanted) {
 function colOf(ref) { return String(ref || "").replace(/[0-9]/g, ""); }
 function parseAging(xml, shared) {
   var doc = new DOMParser().parseFromString(xml, "application/xml");
-  var rows = doc.getElementsByTagName("row"), out = [], skipped = 0;
+  var rows = doc.getElementsByTagName("row"), out = [], skipped = [];
   for (var i = 0; i < rows.length; i++) {
     var cells = rows[i].getElementsByTagName("c");
     var label = null, current = 0, total = null, nums = [];
@@ -2696,7 +2742,13 @@ function parseAging(xml, shared) {
     if (!label || !nums.length) continue;
     /* only unit lines: the header, TOTAL and Customer Balance rows are not units */
     var um = /^\s*(5[56]0-[A-Za-z0-9]+)\s*(.*)$/.exec(label);
-    if (!um) { continue; }
+    if (!um) {
+      /* the report carries lines that are not units — a Customer Balance of $196.00
+         in the June file — and their money must not just quietly vanish */
+      var t = nums[nums.length - 1];
+      if (t && !/^\s*(total|current)\s*$/i.test(label)) skipped.push({ label: label, total: t });
+      continue;
+    }
     /* G if it is there, otherwise the last number on the line */
     if (total === null) total = nums[nums.length - 1];
     var overdue = total - current;
@@ -2706,6 +2758,7 @@ function parseAging(xml, shared) {
       total: total, current: current, overdue: overdue < 0.005 ? 0 : overdue
     });
   }
+  A.agingSkipped = skipped;
   return out;
 }
 function readSharedStrings(xml) {
@@ -2768,7 +2821,11 @@ function applyAging() {
       ? "<b>" + currentOnly.length + "</b> owe only current fees — nothing overdue" +
         (basis === "overdue" ? ", so they are left out." : ", but the whole balance includes them.") + " "
       : "") +
-    (credits.length ? "<b>" + credits.length + "</b> in credit, skipped. " : "");
+    (credits.length ? "<b>" + credits.length + "</b> in credit, skipped. " : "") +
+    (A.agingSkipped && A.agingSkipped.length
+      ? "Not lettered because they are not units: " +
+        A.agingSkipped.map(function (x) { return esc(x.label) + " (" + esc(money(x.total)) + ")"; }).join(", ") + "."
+      : "");
   note("parseNote", A.rows.length + " unit" + (A.rows.length === 1 ? "" : "s") + " ready.");
   if (A.rows.length) $("batchCard").scrollIntoView({ behavior:"smooth", block:"start" });
 }
@@ -3009,7 +3066,10 @@ $("btnRosterAdd").onclick = function () {
 $("rosterTbl").addEventListener("input", function (e) {
   var i = e.target.getAttribute("data-r");
   if (i == null) return;
-  A.units[+i][e.target.getAttribute("data-k")] = e.target.value;
+  var key = e.target.getAttribute("data-k");
+  A.units[+i][key] = (key === "priorCount")
+    ? (e.target.value === "" ? "" : Math.max(0, Math.floor(Number(e.target.value) || 0)))
+    : e.target.value;
   A.dirtyRoster = true;
   note("rosterNote", "Unsaved changes");
 });
