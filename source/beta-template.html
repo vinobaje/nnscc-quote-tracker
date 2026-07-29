@@ -2376,7 +2376,7 @@ var PEOPLE = { "nnscc292connect@cpomanagement.ca": "Sarah" };
    board can see how the manager's report evolved; the condo super dipping in to
    maintain the system would only muddy that. Their writes still go through the
    same rules and still land in the report — only the log entry is skipped. */
-var LOG_EXEMPT = ["mvinobaje@gmail.com"];
+var LOG_EXEMPT = ["mvinobaje@gmail.com", "vino@stoneycreekpm.ca", "vadim@cpomanagement.ca"];
 function loggedAccount() {
   var e = String((cloud.user && cloud.user.email) || "").toLowerCase();
   return !!e && LOG_EXEMPT.indexOf(e) < 0;
