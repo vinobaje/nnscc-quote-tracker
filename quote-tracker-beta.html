@@ -2308,9 +2308,24 @@ function jdMediaHTML(u) {
       : '<a href="' + esc(m.url) + '"' + d + ' title="View this photo"><img src="' + esc(m.url) + '" alt="" loading="lazy"></a>';
   }).join("") + "</div>";
 }
+/* the earliest date on any quote for this job — a real date from the paperwork,
+   and for jobs that predate the tracker the only one anyone has */
+function jdFirstQuote(j) {
+  var ds = (j.bids || []).map(function (b) { return b && b.qdate; })
+    .filter(Boolean).sort();
+  return ds[0] || "";
+}
 function jdTimelineHTML(j, ED) {
   var ev = [], st = j.status || "quoted";
   if (j.created) ev.push({ d: j.created, done: true, what: "<b>Added to the report</b>" });
+  /* every dated quote is an event: it is when the contractor actually priced it */
+  jobCalc(j).bids.forEach(function (x) {
+    if (!x.b.qdate) return;
+    ev.push({ d: x.b.qdate, done: true,
+      what: "<b>Quote received</b> — " + esc((x.b.contractor || "").trim() || "a contractor") +
+        (x.total != null ? " · " + money(x.total) : "") +
+        (x.b.qno ? ' <span class="jdwho">#' + esc(x.b.qno) + "</span>" : "") });
+  });
   if (st !== "quoted" && j.statusDate)
     ev.push({ d: j.statusDate, done: !!APPROVED_SET[st], stop: (st === "rejected" || st === "deferred"),
       what: "<b>Marked " + esc(statusLabel(st)) + "</b>" + (j.statusNote ? " — " + esc(j.statusNote) : "") });
@@ -2326,7 +2341,8 @@ function jdTimelineHTML(j, ED) {
   });
   ev.sort(function (a, b) { return String(a.d || "").localeCompare(String(b.d || "")); });
   if (!ev.length)
-    return '<p class="histempty">No dates recorded yet — this job is still at the quoting stage.</p>';
+    return '<p class="histempty">No dates on this job yet. Dating its quotes in Edit data ' +
+      "(each quote has a Quote date) puts them here.</p>";
   return '<ul class="jdtl">' + ev.map(function (e) {
     return '<li class="' + (e.issue ? "issue" : (e.done && !e.stop ? "done" : "")) + '">' +
       '<div class="jdwhen">' + esc(jdDate(e.d) || "date not recorded") +
@@ -2368,9 +2384,13 @@ function openJobDossier(id) {
   document.getElementById("jdSub").textContent =
     (j.priority ? "High priority · " : "") + statusLabel(j.status || "quoted") + " · " +
     c.priced + " of " + j.bids.length + " quote" + (j.bids.length === 1 ? "" : "s") + " in";
-  var f = [];
-  f.push(jdFact("Added", jdDate(j.created) || "Not recorded",
-    j.created ? jdAgo(j.created) : "in the report from the start"));
+  var f = [], fq = jdFirstQuote(j);
+  /* jobs raised before the tracker existed have no creation date anywhere —
+     the first quote is the earliest real date the paperwork gives us, so show
+     that rather than a blank or a date we would have had to invent */
+  if (j.created) f.push(jdFact("Added", jdDate(j.created), jdAgo(j.created)));
+  else if (fq) f.push(jdFact("First quoted", jdDate(fq), jdAgo(fq)));
+  else f.push(jdFact("Added", "Not recorded", "predates the tracker"));
   f.push(jdFact("In the report totals", c.cost ? money(c.cost) : "Pending",
     carried ? (carried.b.contractor || "").trim() : ""));
   if (c.saving > 0) f.push(jdFact("Saved on this job", money(c.saving), "against the next-lowest quote"));
