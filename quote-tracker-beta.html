@@ -1831,6 +1831,8 @@ function diffStates(oldS, newS) {
     if (!o) { put(j.id, "Added job " + j.no + " (" + (j.desc || "no description") + ")"); return; }
     var tag = "Job " + j.no + " (" + (j.desc || o.desc) + "): ";
     if (o.desc !== j.desc) put(j.id, tag + "description changed to “" + j.desc + "”");
+    if ((o.created || "") !== (j.created || ""))
+      put(j.id, tag + "date added set to " + (j.created || "—"));
     if (!!o.priority !== !!j.priority) put(j.id, tag + "priority set to " + (j.priority ? "High" : "Standard"));
     var oldBids = o.bids.slice();
     j.bids.forEach(function (b) {
@@ -2385,12 +2387,13 @@ function openJobDossier(id) {
     (j.priority ? "High priority · " : "") + statusLabel(j.status || "quoted") + " · " +
     c.priced + " of " + j.bids.length + " quote" + (j.bids.length === 1 ? "" : "s") + " in";
   var f = [], fq = jdFirstQuote(j);
-  /* jobs raised before the tracker existed have no creation date anywhere —
-     the first quote is the earliest real date the paperwork gives us, so show
-     that rather than a blank or a date we would have had to invent */
-  if (j.created) f.push(jdFact("Added", jdDate(j.created), jdAgo(j.created)));
-  else if (fq) f.push(jdFact("First quoted", jdDate(fq), jdAgo(fq)));
-  else f.push(jdFact("Added", "Not recorded", "predates the tracker"));
+  /* two different dates, both worth having: when the job was raised, and when
+     the first contractor priced it. Jobs that predate the tracker have no
+     creation date anywhere, so for those the first quote stands alone rather
+     than a blank or a date we would have had to invent. */
+  if (j.created) f.push(jdFact("Date added", jdDate(j.created), jdAgo(j.created)));
+  else if (!fq) f.push(jdFact("Date added", "Not recorded", "predates the tracker"));
+  if (fq) f.push(jdFact("First quoted", jdDate(fq), jdAgo(fq)));
   f.push(jdFact("In the report totals", c.cost ? money(c.cost) : "Pending",
     carried ? (carried.b.contractor || "").trim() : ""));
   if (c.saving > 0) f.push(jdFact("Saved on this job", money(c.saving), "against the next-lowest quote"));
@@ -3605,6 +3608,10 @@ function edJobCardHTML(j, ji) {
   }).join("");
   var pv = j.pct == null ? (j.status === "completed" ? 100 : 0) : j.pct;
   h.push('<div class="jbody"><div class="jctl">' +
+    /* set to today when the job is created; the manager can correct it to when
+       the work was actually raised */
+    '<div class="f"><label>Date added</label><input type="date" value="' + esc(j.created || "") +
+    '" data-f="created" title="When this job was raised"></div>' +
     '<div class="f"><label>Status</label><select data-f="status">' + sopts + "</select></div>" +
     '<div class="f"><label>Decision date</label><input type="date" value="' + esc(j.statusDate || "") + '" data-f="statusDate"></div>' +
     '<div class="f"><label>Awarded to</label><select data-f="awardedTo">' + awOpts + "</select></div>" +
@@ -3962,6 +3969,7 @@ document.getElementById("editor").addEventListener("change", function (e) {
     persist(null, ['Job ' + j.no + ' (' + (j.desc || "job") + ') marked ' + statusLabel(j.status)], j.id);
     renderEditor(); renderReport(); return;
   }
+  else if (f === "created") j.created = e.target.value;
   else if (f === "statusDate") j.statusDate = e.target.value;
   else if (f === "statusNote") j.statusNote = e.target.value;
   else if (f === "awardedTo") {
@@ -4494,7 +4502,7 @@ function aiIntakeCommit() {
   function gv(id) { var el = document.getElementById(id); return el ? el.value : ""; }
   function gc(id) { var el = document.getElementById(id); return !!(el && el.checked); }
   var amtRaw = gv("ipAmount").trim();
-  var nj = { id: genId(), no: 0, priority: gc("ipPri"),
+  var nj = { id: genId(), no: 0, priority: gc("ipPri"), created: todayISO(),
     desc: gv("ipDesc").trim() || "New job (from AI intake)", status: "quoted",
     bids: [{ contractor: gv("ipContractor").trim(), qno: gv("ipQno").trim(),
       amount: amtRaw === "" ? null : +amtRaw,
