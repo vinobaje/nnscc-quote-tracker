@@ -279,7 +279,6 @@ input:focus, select:focus { outline:2px solid var(--accent); outline-offset:-1px
 .histentry:first-child { border-top:none; }
 .histwho { font-size:12.5px; font-weight:650; color:var(--accent-ink); }
 .histwhen { font-size:12px; color:var(--muted); font-weight:400; }
-.whorole { font-weight:400; color:var(--muted); }
 .histentry ul { margin:4px 0 0; padding-left:18px; font-size:13px; color:var(--ink2); }
 .histentry li { margin:2px 0; }
 .histempty { color:var(--muted); font-size:13.5px; }
@@ -2300,14 +2299,12 @@ function jrowAttrs(j, cls) {
   return ' class="jrow' + (cls ? " " + cls : "") + '"' + jdData(j);
 }
 /* Who made a change, in words. The log records the account that signed in, but
-   an email address tells a board member nothing — show the person, with their
-   role, and fall back to the address for anyone not on the list. */
-var PEOPLE = { "nnscc292connect@cpomanagement.ca": { name: "Sarah", role: "property manager" } };
+   an email address tells a board member nothing — show the person's name, and
+   fall back to the address for anyone not on the list. */
+var PEOPLE = { "nnscc292connect@cpomanagement.ca": "Sarah" };
 function personLabel(email) {
   var e = String(email || "").trim();
-  var p = PEOPLE[e.toLowerCase()];
-  if (!p) return esc(e) || "unknown";
-  return esc(p.name) + (p.role ? ' <span class="whorole">(' + esc(p.role) + ")</span>" : "");
+  return esc(PEOPLE[e.toLowerCase()] || e) || "unknown";
 }
 function jdFact(label, val, sub) {
   return '<div class="jdfact"><b>' + esc(label) + "</b><span>" + esc(val) + "</span>" +
