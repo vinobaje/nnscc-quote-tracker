@@ -1104,7 +1104,8 @@ function priorFor(unit) {
   }
   for (var i = 0; i < A.letters.length; i++) {
     var L = A.letters[i];
-    if (unitKey(L.unit) !== k || L.voided) continue;
+    /* a test copy addressed to the person checking the tool is not a notice to anyone */
+    if (unitKey(L.unit) !== k || L.voided || L.test) continue;
     count++;
     var t = L.at && L.at.toDate ? L.at.toDate() : (L.dateISO ? fromISO(L.dateISO) : null);
     if (t && (!first || t < first)) first = t;
@@ -1568,11 +1569,15 @@ function postDraft(token, raw) {
    must all be about the same unit, and the recipient must still be the owner the
    Units tab holds. Sending one resident another's arrears is the failure that
    matters most here, so it is checked rather than assumed. */
-function assertOneUnit(row, o) {
+function assertOneUnit(row, o, expectTo) {
   var u = String(row.unit || "").replace(/^\s+|\s+$/g, "");
   if (!u) throw new Error("a row with no unit number");
-  var expectTo = emailableOwners(u).join(", ");
-  if (!expectTo) throw new Error("no emailable owner for unit " + u);
+  /* The owner on file, unless the caller is deliberately sending somewhere else and
+     says where — a test copy to the editor's own address. Either way the recipient is
+     stated up front and checked against what was actually built, never inferred from
+     it. */
+  if (!emailableOwners(u).length) throw new Error("no emailable owner for unit " + u);
+  if (expectTo == null) expectTo = emailableOwners(u).join(", ");
   if (o.to !== expectTo) {
     throw new Error("recipient " + o.to + " is not the owner on file for unit " + u);
   }
@@ -1589,14 +1594,28 @@ function assertOneUnit(row, o) {
 }
 
 function createGmailDraft(token, row, tpl, opts, pdfB64) {
+  /* A test copy goes to whoever is signed in to the app, never to the owner, and says
+     so in the subject and the first line of the body. The owner's real address is
+     named in that line rather than used, so the check is still a real check — the
+     letter, the PDF and the recipient it WOULD have gone to are all visible. */
+  var testTo = A.mailTest ? ((A.user && A.user.email) || "") : null;
+  var owner = emailableOwners(row.unit).join(", ");
   var base = {
-    to: emailableOwners(row.unit).join(", "),
-    subject: (tpl.name.replace(/\s*—.*$/, "")) + " — Unit " + row.unit + " — " + CORP.condo,
-    body: letterPlainText(row, tpl, opts),
+    to: testTo || owner,
+    subject: (A.mailTest ? "[TEST — not to the owner] " : "") +
+      (tpl.name.replace(/\s*—.*$/, "")) + " — Unit " + row.unit + " — " + CORP.condo,
+    body: (A.mailTest
+      ? "TEST COPY. This is the letter the app would send for Unit " + row.unit +
+        ". The owner on file is " + owner + " and has NOT been written to. " +
+        "It is addressed to you because Gmail is signed in to an account that cannot " +
+        "send as " + CORP.sendAs + ".\n\n" + "----------\n\n"
+      : "") + letterPlainText(row, tpl, opts),
     filename: pdfName([row], tplFor(row)),
     pdfB64: pdfB64
   };
-  assertOneUnit(row, base);
+  assertOneUnit(row, base, base.to);
+  /* a personal mailbox has no verified send-as for the Corporation, so do not pretend */
+  if (A.mailTest) return postDraft(token, b64url(mimeMessage(base)));
   var withFrom = {}, k;
   for (k in base) withFrom[k] = base[k];
   withFrom.from = CORP.sendAs || "";
@@ -1613,6 +1632,31 @@ function createGmailDraft(token, row, tpl, opts, pdfB64) {
   });
 }
 
+/* The mailbox cannot send as the Corporation — now what?
+   Refusing outright is right for a real letter and useless for checking the tool,
+   which somebody has to be able to do from their own account. So the offer is test
+   copies: same letter, same PDF, same per-unit checks, addressed to the person signed
+   in to the app instead of the owner, and marked as tests everywhere they land. */
+function offerTestMode(who) {
+  A.mailTest = false;
+  try {
+    assertOfficeMailbox(who);
+    return Promise.resolve(who);
+  } catch (e) {
+    var mine = (A.user && A.user.email) || "";
+    if (!mine) throw e;
+    if (!confirm("Gmail is signed in to " + who + ", which cannot send as " +
+        CORP.sendAs + ".\n\nDraft TEST copies to yourself instead?\n\n" +
+        "• every letter is addressed to " + mine + " — no owner is written to\n" +
+        "• subjects are marked [TEST] and the body says so\n" +
+        "• they are logged as tests and never count as a notice to a unit\n\n" +
+        "To send real letters, sign in to the office account first.")) {
+      throw e;
+    }
+    A.mailTest = true;
+    return Promise.resolve(who);
+  }
+}
 /* One draft per unit, each with that unit's own PDF. Sequential on purpose: it is
    a handful of letters a month, and a partial failure must be legible. */
 function emailDrafts(rows, tpl, opts) {
@@ -1635,7 +1679,8 @@ function emailDrafts(rows, tpl, opts) {
   gmailToken(function (token) {
     var made = [], failed = [];
     /* which mailbox this token belongs to, before a single letter is written into it */
-    gmailWhoami(token).then(assertOfficeMailbox).then(function () { step(0); },
+    gmailWhoami(token).then(function (who) { return offerTestMode(who); })
+      .then(function () { step(0); },
       function (e) {
         $("btnEmail").disabled = false;
         note("genNote", (e && e.message) || "Could not tell which Gmail account this is.", true);
@@ -1763,7 +1808,9 @@ function renderPending() {
   $("pendList").innerHTML = pend.map(function (L) {
     var when = L.at && L.at.toDate ? L.at.toDate().toLocaleString("en-CA", { month:"short", day:"numeric", hour:"numeric", minute:"2-digit" }) : "";
     return '<div class="pendrow"><span class="unitpill">' + esc(L.unit) + "</span>" +
-      '<span class="pn">' + esc(L.owner || "—") + "</span>" +
+      '<span class="pn">' + esc(L.owner || "—") +
+      (L.test ? ' <span class="chip warn" title="Addressed to ' + esc(L.testTo || "the drafter") +
+        ', not to the owner">test copy</span>' : "") + "</span>" +
       '<span class="pm">' + esc(L.templateName) + "</span>" +
       '<span class="pw">' + esc(when) + "</span></div>";
   }).join("");
@@ -1795,15 +1842,24 @@ function sendAllDrafts() {
   if (!pend.length) { note("pendNote", "Nothing is waiting."); return; }
   var names = pend.slice(0, 6).map(function (L) { return L.unit; }).join(", ") +
     (pend.length > 6 ? " and " + (pend.length - 6) + " more" : "");
-  if (!confirm("Send " + pend.length + " arrears letter" + (pend.length === 1 ? "" : "s") +
-      " now?\n\n" + names + "\n\nEach one goes to the owner on file for that unit, with " +
-      "its PDF attached. This cannot be undone.")) return;
+  var real = pend.filter(function (L) { return !L.test; });
+  var tests = pend.length - real.length;
+  if (!confirm("Send " + pend.length + " letter" + (pend.length === 1 ? "" : "s") +
+      " now?\n\n" + names + "\n\n" +
+      (real.length ? real.length + " go to the owner on file for that unit, with its PDF " +
+        "attached. This cannot be undone." : "") +
+      (tests ? (real.length ? "\n\n" : "") + tests + " " + (tests === 1 ? "is a test copy" : "are test copies") +
+        " addressed to whoever drafted them, not to an owner." : ""))) return;
 
   $("btnSendAll").disabled = true;
   $("btnCheckDrafts").disabled = true;
   gmailToken(function (token) {
     var done = 0, failed = [];
-    gmailWhoami(token).then(assertOfficeMailbox).then(function () { step(0); },
+    gmailWhoami(token).then(function (who) {
+      /* test copies go to the person who drafted them, so any mailbox may send those;
+         a real notice still has to leave from an address that is the Corporation's */
+      return real.length ? assertOfficeMailbox(who) : who;
+    }).then(function () { step(0); },
       function (e) {
         $("btnSendAll").disabled = false;
         $("btnCheckDrafts").disabled = false;
@@ -1961,6 +2017,10 @@ function logBatch(rows, tpl, opts, via) {
       dueDays: Number(opts.dueDays) || 0, by: by, via: via || "print",
       at: firebase.firestore.FieldValue.serverTimestamp(), voided: false
     };
+    /* A test copy went to whoever was checking the tool, not to the owner. It is
+       recorded, because a draft really was created and the log should not have holes
+       in it — but it is not a notice, and priorFor must never count it as one. */
+    if (A.mailTest && via === "email-draft") { doc.test = true; doc.testTo = by; }
     /* Keeping the Gmail draft id is what lets the app answer "which of these has
        actually gone out?" later — a draft that has left the Drafts folder is done. */
     if (r._draftId) { doc.draftId = r._draftId; doc.sent = false; }
@@ -2803,10 +2863,13 @@ function renderHistory() {
     var when = L.at && L.at.toDate ? L.at.toDate().toLocaleDateString("en-CA", { year:"numeric", month:"short", day:"numeric" })
              : (L.dateISO || "—");
     var how = L.via === "email-draft" ? "Emailed" : "Printed";
-    h.push("<tr" + (L.voided ? ' class="off"' : "") + ">" +
-      "<td>" + esc(when) + (L.voided ? ' <span class="chip bad">void</span>' : "") + "</td>" +
+    h.push("<tr" + (L.voided || L.test ? ' class="off"' : "") + ">" +
+      "<td>" + esc(when) + (L.voided ? ' <span class="chip bad">void</span>' : "") +
+        (L.test ? ' <span class="chip warn">test</span>' : "") + "</td>" +
       '<td><span class="unitpill">' + esc(L.unit) + "</span></td>" +
       "<td>" + esc(L.owner) +
+        (L.test ? '<span class="sub">test copy to ' + esc(L.testTo || "the drafter") +
+          " — the owner was not written to, and this does not count as a notice</span>" : "") +
         (L.voided && L.voidReason ? '<span class="sub">voided: ' + esc(L.voidReason) + "</span>" : "") +
         (L.voided && L.voidedBy ? '<span class="sub">by ' + esc(L.voidedBy) + "</span>" : "") + "</td>" +
       "<td>" + esc(L.templateName) + "</td>" +
