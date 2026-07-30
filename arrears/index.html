@@ -283,8 +283,11 @@ body[data-tab="tabRoster"] { --wrapw:1800px; }
 /* No align-items:start here. That shrinks the right column to the panel's own
    height, leaving position:sticky nothing to travel inside — the panel then scrolls
    away with the page. Stretching the column to the row height is what lets it pin. */
+/* The preview column was 26% and capped at 560px, which on a widescreen left the
+   letter at a third of the panel's width. More of the screen goes to it now — it is
+   the thing being checked, and the table beside it still has room for every column. */
 #batchCard.split { display:grid; gap:22px; align-items:stretch;
-  grid-template-columns:minmax(0,1fr) clamp(370px, 26%, 560px); }
+  grid-template-columns:minmax(0,1fr) clamp(370px, 33%, 780px); }
 #batchCard.split .prevcol { align-self:stretch; }
 #batchCard.split .bcol { min-width:0; }
 /* Below this the columns would start squeezing the unit number down to "55"
@@ -303,12 +306,14 @@ body[data-tab="tabRoster"] { --wrapw:1800px; }
 #batchTbl tr.brow:hover td { background:#F7FAFD; }
 #batchTbl tr.brow.sel td { background:var(--accent-soft); box-shadow:inset 3px 0 0 var(--accent); }
 
-/* Sticky only holds an element that is shorter than the viewport. The panel was
-   856px tall, so once the list got long it scrolled away like anything else. It now
-   fits the window and scrolls the letter inside itself instead. */
+/* Sticky only holds an element that is shorter than the viewport. The panel was 856px
+   tall, so once the list got long it scrolled away like anything else. Its height is
+   now derived from the window rather than capped at a number, which keeps sticky
+   working AND gives the letter every pixel a tall screen has — the 700px cap that was
+   here before was throwing away 300px of a 1100px display. */
 .prevcard { border:1px solid var(--line); border-radius:9px; overflow:hidden; position:sticky;
   top:calc(var(--abh,48px) + 12px); background:var(--card);
-  max-height:min(700px, calc(100vh - var(--abh,48px) - 26px));
+  max-height:calc(100vh - var(--abh,48px) - 26px);
   display:flex; flex-direction:column; }
 .prevcard .prevhead, .prevcard .prevfoot { flex:none; }
 .prevcard > .prevsec:first-of-type { flex:none; }
@@ -323,13 +328,25 @@ body[data-tab="tabRoster"] { --wrapw:1800px; }
 .envrow .ev { color:var(--ink); overflow-wrap:anywhere; }
 .envrow .ev.bad { color:var(--prio); font-weight:600; }
 .envrow .ev.mail { color:var(--accent-ink); font-weight:600; }
-/* the letter at true width, scaled to fit the column */
-.prevletter { flex:1 1 auto; min-height:170px; overflow-y:auto; overflow-x:hidden;
-  background:#EFF1F3; padding:10px; }
+/* The letter is laid out at its true page width and then scaled down, because that is
+   the only way the on-screen copy and the printed one can be the same thing.
+   The scale used to be a hard .55, which left the letter at 354px inside a 488px
+   column — a third of the panel unused, and the letter smaller than it needed to be.
+   It is now measured to fit the column it is actually in, and she can step it up from
+   there. */
+.prevletter { flex:1 1 auto; min-height:170px; overflow:auto;
+  background:#EFF1F3; padding:10px; --pvscale:.55; }
 .prevcard > .prevsec.grow { display:flex; flex-direction:column; min-height:0; flex:1 1 auto; }
-.prevletter .letterdoc { width:170mm; transform:scale(.55); transform-origin:top left;
+.prevletter .letterdoc { width:170mm; transform:scale(var(--pvscale)); transform-origin:top left;
   background:#fff; padding:10mm 8mm; box-shadow:0 1px 6px rgba(20,26,33,.18); }
-.prevletter .shrinkwrap { width:calc(170mm * 0.55); height:1px; }
+.prevletter .shrinkwrap { width:calc(170mm * var(--pvscale)); height:1px; }
+.zoomer { display:flex; align-items:center; gap:0; margin-right:auto; }
+.zoomer .btn { border-radius:0; padding:7px 10px; }
+.zoomer .btn:first-child { border-radius:6px 0 0 6px; }
+.zoomer .btn:last-child { border-radius:0 6px 6px 0; border-left:none; }
+.zoomer .btn + .btn { border-left:none; }
+.zoomer .zlab { font-size:11.5px; color:var(--muted); padding:0 9px; min-width:52px;
+  text-align:center; font-variant-numeric:tabular-nums; }
 .prevfoot { padding:11px 14px; display:flex; gap:8px; }
 .prevempty { padding:28px 16px; text-align:center; color:var(--muted); font-size:13px; }
 
@@ -650,6 +667,11 @@ td input.amt { text-align:right; font-variant-numeric:tabular-nums; }
               <div class="shrinkwrap"></div></div>
           </div>
           <div class="prevfoot">
+            <div class="zoomer">
+              <button class="btn" id="btnZoomOut" title="Smaller">&minus;</button>
+              <span class="zlab" id="zoomLab">Fit</span>
+              <button class="btn" id="btnZoomIn" title="Bigger">+</button>
+            </div>
             <button class="btn ico" id="btnPrevPdf"><span class="i"></span>Show the real PDF</button>
           </div>
         </div>
@@ -2024,10 +2046,30 @@ function renderPreview() {
   $("prevEnv").innerHTML = env.join("");
 
   $("prevLetter").innerHTML = letterHtml(r, tpl, o);
-  /* keep the scaled sheet's real height so the scroller can reach the bottom */
+  fitPreview();
+}
+/* How big the letter can be shown at. The sheet is laid out at its true page width
+   whatever happens — 170mm, the same markup the PDF is rendered from — so "bigger"
+   means measuring the column and scaling to it rather than picking a number and
+   hoping. A.pvZoom is a multiplier she sets on top of the fit, so 100% means "as
+   large as this panel allows" and anything above that scrolls. */
+function fitPreview() {
+  var box = document.querySelector(".prevletter");
   var sheet = $("prevLetter");
-  var wrapEl = sheet.parentNode.querySelector(".shrinkwrap");
+  if (!box || !sheet) return;
+  var pad = 20;                                  /* the .prevletter padding, both sides */
+  var avail = box.clientWidth - pad;
+  var natural = sheet.offsetWidth || 643;        /* layout width; transform does not change it */
+  var fit = avail > 40 ? avail / natural : 0.55;
+  var scale = Math.max(0.3, Math.min(2, fit * (A.pvZoom || 1)));
+  box.style.setProperty("--pvscale", scale.toFixed(4));
+  /* the sheet is transformed, not resized, so the scroller needs the real height told
+     to it or it stops short of the signature */
+  var wrapEl = box.querySelector(".shrinkwrap");
   if (wrapEl) wrapEl.style.height = Math.round(sheet.getBoundingClientRect().height) + "px";
+  var lab = $("zoomLab");
+  if (lab) lab.textContent = (A.pvZoom && A.pvZoom !== 1)
+    ? Math.round(fit * A.pvZoom * 100) + "%" : "Fit";
 }
 function selectRow(i) {
   A.selRow = (A.selRow === i) ? -1 : i;
@@ -4134,6 +4176,18 @@ $("btnPrevPdf").onclick = function () {
   var t = currentTpl();
   if (r && t) previewUnitPdf(r, t, opts());
 };
+/* Bigger and smaller, around whatever "fits the panel" currently means. Stepping past
+   the fit is allowed — sometimes the point is to read one line, not see the page. */
+function zoomPreview(mult) {
+  A.pvZoom = Math.max(0.6, Math.min(2.4, (A.pvZoom || 1) * mult));
+  if (Math.abs(A.pvZoom - 1) < 0.02) A.pvZoom = 1;
+  fitPreview();
+}
+$("btnZoomIn").onclick = function () { zoomPreview(1.2); };
+$("btnZoomOut").onclick = function () { zoomPreview(1 / 1.2); };
+$("zoomLab").onclick = function () { A.pvZoom = 1; fitPreview(); };
+$("zoomLab").title = "Back to fitting the panel";
+$("zoomLab").style.cursor = "pointer";
 /* escape hatch: if the inline view ever comes up blank, pop the same file out */
 $("btnCheckDrafts").onclick = checkGmailDrafts;
 $("pdfTab").onclick = function () {
@@ -4533,7 +4587,7 @@ function measureBar() {
     Math.round(b.getBoundingClientRect().height) + "px");
 }
 measureBar();
-window.addEventListener("resize", measureBar);
+window.addEventListener("resize", function () { measureBar(); fitPreview(); });
 /* setTab only ran on click, so on first load body carried no data-tab and the
    Letters layout never widened — the table sat crushed in a 1000px column. */
 document.body.dataset.tab = "tabLetters";
