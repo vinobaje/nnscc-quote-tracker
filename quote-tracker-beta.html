@@ -2057,6 +2057,17 @@ function cloudInit() {
       appId: "1:1346683787:web:be618e56f3bb9b3b67a58e"
     });
     cloud.db = firebase.firestore();
+    /* Safari only: force the long-polling transport. The SDK already tries to
+       detect when its streaming channel is unusable, but in Safari — tracking
+       prevention, suspended tabs — a request can stall for ever instead of
+       failing, which is what left the change history loading. Long polling is
+       chattier, so Chrome and the rest keep the faster streaming channel.
+       settings() must be called before the database is used. */
+    try {
+      var ua = navigator.userAgent;
+      if (/Safari/.test(ua) && !/Chrome|Chromium|Edg|OPR/.test(ua))
+        cloud.db.settings({ experimentalForceLongPolling: true });
+    } catch (e) {}
     try { cloud.fns = firebase.app().functions("us-central1"); } catch (e) { cloud.fns = null; }
     try { cloud.store = (firebase.storage ? firebase.storage() : null); } catch (e) { cloud.store = null; }
     try { cloud.db.enablePersistence({ synchronizeTabs: true }).catch(function(){}); } catch (e) {}
