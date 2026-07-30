@@ -2735,14 +2735,13 @@ function jdLoadLog(j) {
   var el = document.getElementById("jdLog"); if (!el) return;
   if (!cloud.on) { el.innerHTML = '<p class="histempty">Changes are recorded on the live site only.</p>'; return; }
   el.innerHTML = '<p class="histempty">Loading…</p>';
-  jdFetchLog().then(function (entries) {
+  withTimeout(jdFetchLog(), 8000).then(function (entries) {
     if (jdJobId !== j.id) return;              /* the reader has moved on */
     jdRenderLog(j, entries);
   }).catch(function (err) {
-    var code = (err && err.code) || "";
-    el.innerHTML = '<p class="histempty">' + (code === "permission-denied"
-      ? "The edit log is open to the board and the property manager."
-      : "Could not load the changes (" + esc(code || "error") + ").") + "</p>";
+    if (window.console) console.error("job activity log:", err);
+    jdAudit.cache = null;                      /* a failed fetch must not be cached */
+    el.innerHTML = loadFailedHTML(err, 'data-jdretry="1"');
   });
 }
 function closeJobDossier() {
@@ -2776,6 +2775,10 @@ document.addEventListener("keydown", function (e) {
 });
 document.addEventListener("click", function (e) {
   if (!e.target || !e.target.closest) return;
+  if (e.target.closest("[data-jdretry]")) {
+    var jr = findJob(jdJobId); if (jr) jdLoadLog(jr);
+    return;
+  }
   if (e.target.closest("[data-jdmore]")) {
     var jm = findJob(jdJobId);
     if (jm) { jdShowAllLog = true; jdFetchLog().then(function (es) { jdRenderLog(jm, es); }); }
@@ -6366,6 +6369,28 @@ document.getElementById("report").addEventListener("focusout", function (e) {
 });
 
 /* ---------- change-history panel ---------- */
+/* Firestore's get() waits indefinitely when the connection has gone stale —
+   a tab left open overnight, a dropped network, a blocked channel. Waiting
+   for ever behind a "Loading…" tells the reader nothing, so give up after a
+   few seconds and say what to do about it. */
+function withTimeout(p, ms) {
+  return new Promise(function (res, rej) {
+    var done = false;
+    var t = setTimeout(function () { if (!done) { done = true; rej({ code: "timeout" }); } }, ms || 8000);
+    p.then(function (v) { if (!done) { done = true; clearTimeout(t); res(v); } },
+           function (e) { if (!done) { done = true; clearTimeout(t); rej(e); } });
+  });
+}
+function loadFailedHTML(err, retryAttr) {
+  var code = (err && err.code) || "error";
+  var msg = code === "timeout"
+    ? "Could not reach the server. The page may have been open a while — reload it, or try again."
+    : (code === "permission-denied"
+        ? "This account is not allowed to read the change history."
+        : "Could not load the history (" + esc(code) + ").");
+  return '<p class="histempty">' + msg + ' <a class="jdmore" role="button" tabindex="0" ' + retryAttr +
+    ">Try again</a></p>";
+}
 document.getElementById("btnHistory").onclick = function () {
   var list = document.getElementById("histList");
   document.getElementById("histOverlay").classList.add("open");
@@ -6374,7 +6399,7 @@ document.getElementById("btnHistory").onclick = function () {
     return;
   }
   list.innerHTML = '<p class="histempty">Loading…</p>';
-  cloud.db.doc(reportPath()).collection("audit").orderBy("at", "desc").limit(50).get()
+  withTimeout(cloud.db.doc(reportPath()).collection("audit").orderBy("at", "desc").limit(50).get(), 8000)
     .then(function (qs) {
       if (qs.empty) { list.innerHTML = '<p class="histempty">No changes recorded yet.</p>'; return; }
       var h = [];
@@ -6389,9 +6414,15 @@ document.getElementById("btnHistory").onclick = function () {
       list.innerHTML = h.join("");
     })
     .catch(function (err) {
-      list.innerHTML = '<p class="histempty">Could not load history (' + esc(err && err.code || "error") + ').</p>';
+      if (window.console) console.error("change history:", err);
+      list.innerHTML = loadFailedHTML(err, 'data-histretry="1"');
     });
 };
+/* the retry link inside that message */
+document.addEventListener("click", function (e) {
+  var r = e.target && e.target.closest ? e.target.closest("[data-histretry]") : null;
+  if (r) document.getElementById("btnHistory").onclick();
+});
 document.getElementById("histClose").onclick = function () {
   document.getElementById("histOverlay").classList.remove("open");
 };
