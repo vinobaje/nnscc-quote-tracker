@@ -551,12 +551,16 @@ td input.amt { text-align:right; font-variant-numeric:tabular-nums; }
       <span class="spacer"></span>
       <span class="barnote" id="pendNote" style="color:var(--muted)"></span>
       <button class="btn" id="btnCheckDrafts">Check Gmail</button>
+      <button class="btn primary ico" id="btnSendAll"><span class="i"></span><span id="sendAllLabel">Send them all</span></button>
     </div>
     <div id="pendList"></div>
     <p class="seclede" style="margin:10px 0 0">These are drafted and attached but not yet
-      sent. <b>Check Gmail</b> clears any that have left the Drafts folder — with
-      drafts-only access the app can see a draft is gone, not whether it was sent or
-      deleted, so a cleared row means "no longer waiting", not "proven delivered".</p>
+      sent. Review them in Gmail, then <b>Send them all</b> — the app sends every draft
+      listed here, so they do not have to be opened one at a time. <b>Check Gmail</b>
+      clears any that left the Drafts folder some other way; with drafts-only access the
+      app can see a draft is gone, not whether it was sent or deleted, so a cleared row
+      means "no longer waiting", not "proven delivered". Ones it sends itself are
+      recorded as sent, because it did the sending.</p>
   </div>
 
   <div class="card split" id="batchCard" style="display:none">
@@ -1364,7 +1368,7 @@ function downloadPdf(rows, tpl, opts) {
    this is a browser implicit-token flow, and nothing server-side exchanges a code. */
 var GMAIL_CLIENT_ID = "790649941023-o10djlqd3vnhb4s442sfu6gotfvireve.apps.googleusercontent.com";
 var GMAIL_SCOPE = "https://www.googleapis.com/auth/gmail.compose";
-var GM = { token:null, expires:0, client:null, pending:null };
+var GM = { token:null, expires:0, client:null, pending:null, who:null };
 
 function gmailConfigured() { return !!GMAIL_CLIENT_ID; }
 function gmailLoaded() {
@@ -1387,12 +1391,51 @@ function gmailToken(cb, onFail) {
         }
         GM.token = resp.access_token;
         GM.expires = Date.now() + (Number(resp.expires_in || 3600) * 1000);
+        GM.who = null;            /* a fresh token may be a different account */
         if (f) f(GM.token);
       }
     });
   }
   GM.pending = cb; GM.onFail = onFail;
-  GM.client.requestAccessToken({ prompt: GM.token ? "" : "consent" });
+  /* Empty prompt, always. Asking for "consent" put the whole authorisation screen —
+     including "Google hasn't verified this app" — in front of her on every single page
+     load. With no prompt requested, Google issues the token silently when the access
+     has already been granted in that browser, and only shows the screen when there is
+     genuinely nothing to go on.
+
+     The access is granted per Google account, so which account granted it now matters:
+     see gmailWhoami, which is checked before anything is drafted. */
+  GM.client.requestAccessToken({ prompt: "" });
+}
+/* Which mailbox the app is actually holding — the drafts land wherever the token came
+   from, and a silent token comes from whichever account the browser is signed in to.
+   A draft created in the wrong mailbox would carry a resident's arrears into a
+   stranger's Gmail, so the mailbox is read back and checked by name. */
+function gmailWhoami(token) {
+  if (GM.who) return Promise.resolve(GM.who);
+  return fetch("https://gmail.googleapis.com/gmail/v1/users/me/profile",
+      { headers: { Authorization: "Bearer " + token } })
+    .then(function (r) {
+      if (!r.ok) throw new Error("Gmail returned HTTP " + r.status);
+      return r.json();
+    })
+    .then(function (j) {
+      GM.who = (j && j.emailAddress) || "";
+      return GM.who;
+    });
+}
+/* The office domain, or a hard stop. Sarah's own cpomanagement.ca account is the one
+   that carries nnscc292connect as a verified "send mail as"; any other account cannot
+   send as the Corporation anyway, so drafting into it is only a way to leak. */
+function assertOfficeMailbox(who) {
+  var dom = String(who || "").split("@")[1] || "";
+  var want = String(CORP.sendAs).split("@")[1];
+  if (dom.toLowerCase() !== want.toLowerCase()) {
+    throw new Error("Gmail granted access to " + (who || "an unknown account") +
+      ", which is not a " + want + " mailbox. Sign in to the office account before " +
+      "drafting — a letter must not be created in a personal mailbox.");
+  }
+  return who;
 }
 
 /* base64 of a UTF-8 string, chunked so a long letter cannot blow the call stack */
@@ -1584,17 +1627,25 @@ function emailDrafts(rows, tpl, opts) {
     : "Create " + can.length + " Gmail drafts, each with its PDF attached?";
   if (!confirm(ask +
       (cannot ? "\n\n" + cannot + " have no emailable owner and are left for printing." : "") +
-      "\n\nNothing is sent — you review and send each one from Gmail.")) return;
+      "\n\nNothing is sent yet — you review them in Gmail, then send them all from " +
+      "the waiting list here.")) return;
 
   $("btnEmail").disabled = true;
   A.sendAsRejected = false;
   gmailToken(function (token) {
     var made = [], failed = [];
+    /* which mailbox this token belongs to, before a single letter is written into it */
+    gmailWhoami(token).then(assertOfficeMailbox).then(function () { step(0); },
+      function (e) {
+        $("btnEmail").disabled = false;
+        note("genNote", (e && e.message) || "Could not tell which Gmail account this is.", true);
+      });
     function step(i) {
       if (i >= can.length) {
         $("btnEmail").disabled = false;
         if (made.length) logBatch(made, tpl, opts, "email-draft");
-        note("genNote", made.length + " draft" + (made.length === 1 ? "" : "s") + " waiting in Gmail" +
+        note("genNote", made.length + " draft" + (made.length === 1 ? "" : "s") +
+          " waiting in Gmail — read them there, then send them all from the list below" +
           (A.sendAsRejected ? " — sent from your own address, not " + CORP.sendAs +
             " (that send-as is not verified in this Gmail account)" : "") +
           (failed.length ? " · " + failed.length + " failed (" + failed[0] + ")" : "") +
@@ -1610,7 +1661,6 @@ function emailDrafts(rows, tpl, opts) {
         .catch(function (e) { failed.push((e && e.message) || "error"); })
         .then(function () { step(i + 1); });
     }
-    step(0);
   }, function (msg) {
     $("btnEmail").disabled = false;
     note("genNote", msg, true);
@@ -1709,6 +1759,7 @@ function renderPending() {
   card.style.display = "";
   pend.sort(function (a, b) { return unitKey(a.unit).localeCompare(unitKey(b.unit), undefined, { numeric:true }); });
   $("pendCount").textContent = pend.length + " draft" + (pend.length === 1 ? "" : "s") + " still in Gmail";
+  $("sendAllLabel").textContent = pend.length === 1 ? "Send it" : "Send all " + pend.length;
   $("pendList").innerHTML = pend.map(function (L) {
     var when = L.at && L.at.toDate ? L.at.toDate().toLocaleString("en-CA", { month:"short", day:"numeric", hour:"numeric", minute:"2-digit" }) : "";
     return '<div class="pendrow"><span class="unitpill">' + esc(L.unit) + "</span>" +
@@ -1716,6 +1767,82 @@ function renderPending() {
       '<span class="pm">' + esc(L.templateName) + "</span>" +
       '<span class="pw">' + esc(when) + "</span></div>";
   }).join("");
+}
+/* ---- sending the whole batch ----
+   The scope the app already asks for covers sending a draft, not only creating one,
+   so the drafts do not have to be opened one at a time. The order is deliberate:
+   draft everything, let her read them in Gmail, then send the lot. Nothing is sent
+   that she has not had the chance to see.
+
+   Sent one at a time on purpose. Gmail has no batch send, and one failure in twenty
+   must not lose the other nineteen or leave the log claiming a letter went out when
+   it did not — so each send is recorded on its own, and whatever fails stays in the
+   list to be tried again. */
+function sendDraft(token, id) {
+  return fetch("https://gmail.googleapis.com/gmail/v1/users/me/drafts/send", {
+    method: "POST",
+    headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
+    body: JSON.stringify({ id: id })
+  }).then(function (r) {
+    if (r.ok) return r.json();
+    return r.json().then(function (j) {
+      throw new Error((j && j.error && j.error.message) || ("HTTP " + r.status));
+    }, function () { throw new Error("HTTP " + r.status); });
+  });
+}
+function sendAllDrafts() {
+  var pend = pendingDrafts();
+  if (!pend.length) { note("pendNote", "Nothing is waiting."); return; }
+  var names = pend.slice(0, 6).map(function (L) { return L.unit; }).join(", ") +
+    (pend.length > 6 ? " and " + (pend.length - 6) + " more" : "");
+  if (!confirm("Send " + pend.length + " arrears letter" + (pend.length === 1 ? "" : "s") +
+      " now?\n\n" + names + "\n\nEach one goes to the owner on file for that unit, with " +
+      "its PDF attached. This cannot be undone.")) return;
+
+  $("btnSendAll").disabled = true;
+  $("btnCheckDrafts").disabled = true;
+  gmailToken(function (token) {
+    var done = 0, failed = [];
+    gmailWhoami(token).then(assertOfficeMailbox).then(function () { step(0); },
+      function (e) {
+        $("btnSendAll").disabled = false;
+        $("btnCheckDrafts").disabled = false;
+        note("pendNote", (e && e.message) || "Could not tell which Gmail account this is.", true);
+      });
+    function step(i) {
+      if (i >= pend.length) return finish();
+      var L = pend[i];
+      note("pendNote", "Sending " + (i + 1) + " of " + pend.length + " — unit " + L.unit + "…",
+        false, true);
+      return sendDraft(token, L.draftId)
+        .then(function () {
+          /* recorded one at a time, so a failure halfway through leaves a log that
+             matches what actually left the building */
+          return A.db.collection(LETTERS).doc(L._id).update({
+            sent: true, sentAt: firebase.firestore.FieldValue.serverTimestamp()
+          }).then(function () { done++; }, function () {
+            /* it went out; only the record failed, and that must be visible */
+            failed.push(L.unit + " (sent, but not recorded)");
+          });
+        }, function (e) {
+          failed.push(L.unit + " (" + ((e && e.message) || "failed") + ")");
+        })
+        .then(function () { return step(i + 1); });
+    }
+    function finish() {
+      return loadLetters().then(function () {
+        $("btnSendAll").disabled = false;
+        $("btnCheckDrafts").disabled = false;
+        note("pendNote", done + " sent" +
+          (failed.length ? ". NOT sent: " + failed.join("; ") : "."), failed.length > 0,
+          failed.length > 0);
+      });
+    }
+  }, function (msg) {
+    $("btnSendAll").disabled = false;
+    $("btnCheckDrafts").disabled = false;
+    note("pendNote", msg, true);
+  });
 }
 function checkGmailDrafts() {
   var pend = pendingDrafts();
@@ -4271,6 +4398,11 @@ $("fieldChips").addEventListener("click", function (e) {
 /* ---------------- wiring: history tab ---------------- */
 $("histFilter").addEventListener("input", renderHistory);
 $("btnHistReload").onclick = function () { loadLetters(); };
+$("btnSendAll").onclick = sendAllDrafts;
+(function () {
+  var slot = $("btnSendAll").querySelector(".i");
+  if (slot) slot.innerHTML = ICON.send;
+})();
 
 /* ---------------- go ---------------- */
 /* the sticky table header parks directly under the app bar, whatever height it is */
