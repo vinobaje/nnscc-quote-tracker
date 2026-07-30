@@ -262,10 +262,24 @@ select.rowtpl { width:100%; font-size:12px; padding:4px; border-radius:5px; back
    has. A 17-inch laptop and a widescreen should both be usable, so the width is
    fluid rather than a fixed cap with empty margins either side of it. */
 body[data-tab="tabLetters"] { --wrapw:2000px; }
-body[data-tab="tabLetters"] #pLetters > header,
-body[data-tab="tabLetters"] #pLetters > .card:not(#batchCard),
-body[data-tab="tabLetters"] #pLetters > .note { max-width:1040px; }
 body[data-tab="tabRoster"] { --wrapw:1800px; }
+/* Every card on the tab shares the page's edges, so there is one left margin and one
+   right margin down the whole page. Capping step 1 at 1040px while step 2 took the
+   whole width gave the page two different right-hand edges and read as a mistake.
+   What is capped is the writing inside it, which is the thing that gets unreadable
+   when it runs long — not the frame around it. */
+#step1Card .s1col:first-child { max-width:1040px; }
+/* The width a wide screen gives step 1 goes to the aging report's summary, beside the
+   paste box rather than under it, which also stops it pushing the table down the page.
+   The second column only exists when there is a summary to put in it, and the paste box
+   keeps its 1040px either way — a text field two thirds of a widescreen wide is not
+   easier to type into, it is just bigger. */
+#step1Card.split1 { display:grid; gap:22px; align-items:start;
+  grid-template-columns:minmax(0,1040px) minmax(320px,1fr); }
+@media (max-width:1080px) {
+  #step1Card.split1 { display:block; }
+  #step1Card.split1 #agingBox { margin-top:14px; }
+}
 /* No align-items:start here. That shrinks the right column to the panel's own
    height, leaving position:sticky nothing to travel inside — the panel then scrolls
    away with the page. Stretching the column to the row height is what lets it pin. */
@@ -558,22 +572,24 @@ td input.amt { text-align:right; font-variant-numeric:tabular-nums; }
       and print. Every letter is recorded so the next batch knows what has already gone out.</p>
   </header>
 
-  <div class="card">
-    <div class="step"><span class="stepno">1</span><h3>Paste the arrears list</h3></div>
-    <p class="seclede" style="margin-top:0">One unit per line. Unit number first, dollar amount last —
-      a name in between is optional. Commas, tabs, dashes and <code>$</code> are all fine.
-      Copying straight out of a spreadsheet works.<br>
-      Or paste just the unit numbers — <code>550-210, 560-811, 560-406</code> — and type the
-      amounts into the table below.</p>
-    <textarea id="paste" class="mono" rows="7" placeholder="402   1,234.56&#10;510, J. Smith, 680.00&#10;Unit 1108 — $2,415.90"></textarea>
-    <div class="row" style="margin-top:10px">
-      <button class="btn primary" id="btnParse">Read the list</button>
-      <button class="btn ico" id="btnAging"><span class="i"></span>Import the A/R aging report</button>
-      <input type="file" id="agingFile" accept=".xlsx" style="display:none">
-      <button class="btn ghost" id="btnAddRow">Add a unit by hand</button>
-      <span class="barnote" id="parseNote" style="color:var(--muted)"></span>
+  <div class="card" id="step1Card">
+    <div class="s1col">
+      <div class="step"><span class="stepno">1</span><h3>Paste the arrears list</h3></div>
+      <p class="seclede" style="margin-top:0">One unit per line. Unit number first, dollar amount last —
+        a name in between is optional. Commas, tabs, dashes and <code>$</code> are all fine.
+        Copying straight out of a spreadsheet works.<br>
+        Or paste just the unit numbers — <code>550-210, 560-811, 560-406</code> — and type the
+        amounts into the table below.</p>
+      <textarea id="paste" class="mono" rows="7" placeholder="402   1,234.56&#10;510, J. Smith, 680.00&#10;Unit 1108 — $2,415.90"></textarea>
+      <div class="row" style="margin-top:10px">
+        <button class="btn primary" id="btnParse">Read the list</button>
+        <button class="btn ico" id="btnAging"><span class="i"></span>Import the A/R aging report</button>
+        <input type="file" id="agingFile" accept=".xlsx" style="display:none">
+        <button class="btn ghost" id="btnAddRow">Add a unit by hand</button>
+        <span class="barnote" id="parseNote" style="color:var(--muted)"></span>
+      </div>
     </div>
-    <div id="agingBox" style="display:none;margin-top:12px">
+    <div class="s1col" id="agingBox" style="display:none">
       <div class="note info" style="margin:0">
         <div id="agingSummary"></div>
         <div class="row" style="margin-top:10px">
@@ -3502,6 +3518,7 @@ function applyAging() {
   renderBatch();
 
   $("agingBox").style.display = "";
+  $("step1Card").classList.add("split1");     /* the summary now has a column to sit in */
   $("btnUseOverdue").classList.toggle("on", basis === "overdue");
   $("btnUseTotal").classList.toggle("on", basis === "total");
   var sum = A.rows.reduce(function (s, r) { return s + r.amount; }, 0);
