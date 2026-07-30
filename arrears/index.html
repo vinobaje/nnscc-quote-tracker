@@ -241,6 +241,12 @@ select.rowtpl { width:100%; font-size:12px; padding:4px; border-radius:5px; back
 #batchTbl td { padding:8px; }
 #batchTbl th { padding:0 8px 7px; }
 #batchTbl td input[type=text] { padding:5px 6px; }
+#batchTbl th.sortable { cursor:pointer; user-select:none; white-space:nowrap; }
+#batchTbl th.sortable:hover { color:var(--accent-ink); }
+#batchTbl th.sortable .arw { opacity:0; margin-left:4px; font-size:9px; }
+#batchTbl th.sortable:hover .arw { opacity:.4; }
+#batchTbl th.sortable.on { color:var(--accent-ink); }
+#batchTbl th.sortable.on .arw { opacity:1; }
 
 /* ---------- Letters tab: list beside a live preview ----------
    The reading columns stay narrow; only the checking step takes the extra width,
@@ -263,7 +269,7 @@ body[data-tab="tabRoster"] .wrap { max-width:min(1800px, 96vw); }
 /* Below this the columns would start squeezing the unit number down to "55"
    again, so the table keeps its floor and the column scrolls instead. */
 #batchCard.split .bcol:first-child { overflow-x:auto; }
-#batchTbl { min-width:690px; }
+#batchTbl { min-width:820px; }
 #batchTbl td:nth-child(2) input { min-width:74px; }
 @media (max-width:1080px) {
   body[data-tab="tabLetters"] .wrap { max-width:min(1000px, 96vw); }
@@ -2379,6 +2385,54 @@ function importUsers(data, col) {
 }
 
 /* ---------------- the working batch ---------------- */
+/* How far behind this unit is: the age of its OLDEST unpaid money, and how much of
+   the balance is sitting that far back. The oldest band is what matters — a unit with
+   $80 in 91+ and $1,200 in 1-30 is a unit that has been ignoring the Corporation
+   since April, and the $80 is the part that says so. */
+function ageCell(r) {
+  if (r.oldest == null || r.oldest < 0) {
+    return '<span style="font-size:12px;color:var(--muted)">' +
+      (r.bands === null && r.total != null ? "nothing overdue" : "not from the report") + "</span>";
+  }
+  var band = AGE_BANDS[r.oldest], bands = r.bands || [];
+  var detail = AGE_BANDS.map(function (b, k) {
+    return bands[k] > 0.005 ? b.label + "  " + money(bands[k]) : "";
+  }).filter(function (x) { return x; }).join("\n");
+  return '<span class="chip' + (band.tone ? " " + band.tone : "") + '" title="' +
+    esc("How the balance ages:\n" + detail +
+      (r.current > 0.005 ? "\nthis month  " + money(r.current) + " (not yet late)" : "")) +
+    '">' + esc(band.chip) + "</span>" +
+    '<br><span style="font-size:11px;color:var(--muted)">' + esc(money(bands[r.oldest])) +
+    " this old</span>";
+}
+/* Sorting reorders the batch itself rather than just the view, because every input in
+   the table is addressed by its position in it. The selected row is followed by unit
+   so the preview does not jump to somebody else. */
+var BATCH_SORT = {
+  unit:   function (r) { return unitKey(r.unit); },
+  amount: function (r) { return Number(r.amount) || 0; },
+  age:    function (r) { return (r.oldest == null ? -1 : r.oldest); },
+  prior:  function (r) { return priorFor(r.unit).count; }
+};
+function sortBatch(key) {
+  var dir = (A.batchSort === key && A.batchDir !== -1) ? -1 : 1;
+  if (A.batchSort !== key) dir = (key === "unit") ? 1 : -1;   /* worst first, units A-Z */
+  var sel = (A.selRow >= 0 && A.rows[A.selRow]) ? A.rows[A.selRow].unit : null;
+  var get = BATCH_SORT[key] || BATCH_SORT.unit;
+  A.rows.sort(function (a, b) {
+    var x = get(a), y = get(b), c;
+    if (typeof x === "string") c = x.localeCompare(y, undefined, { numeric:true });
+    else c = x - y;
+    if (!c) c = unitKey(a.unit).localeCompare(unitKey(b.unit), undefined, { numeric:true });
+    return c * dir;
+  });
+  A.batchSort = key; A.batchDir = dir;
+  if (sel != null) {
+    A.selRow = -1;
+    for (var i = 0; i < A.rows.length; i++) if (A.rows[i].unit === sel) { A.selRow = i; break; }
+  }
+  renderBatch();
+}
 function renderBatch() {
   var card = $("batchCard"), optc = $("optCard");
   if (!A.rows.length) { card.style.display = "none"; optc.style.display = "none"; return; }
@@ -2387,10 +2441,22 @@ function renderBatch() {
   /* Chargeback letters name what the charge is for, so the column only appears when
      the chosen wording actually uses it. */
   var wantsDesc = A.rows.some(function (r) { return /\{\{description\}\}/.test((tplFor(r) || {}).body || ""); });
-  var h = ["<tr><th style='width:30px'></th><th style='width:108px'>Unit</th>" +
+  /* the age column only exists when the report brought ages with it — a pasted list
+     has none, and an empty column would just be a column */
+  var wantsAge = A.rows.some(function (r) { return r.oldest != null && r.oldest >= 0; });
+  function sh(key, label, width, cls) {
+    var on = A.batchSort === key;
+    return "<th class='sortable" + (cls ? " " + cls : "") + (on ? " on" : "") +
+      "' data-bsort='" + key + "' style='width:" + width + "' title='Sort by " +
+      label.toLowerCase() + "'>" + label +
+      "<span class='arw'>" + (on && A.batchDir === -1 ? "▲" : "▼") + "</span></th>";
+  }
+  var h = ["<tr><th style='width:30px'></th>" + sh("unit", "Unit", "108px") +
            "<th style='width:150px'>Letter</th><th>Owner of record</th>" +
            (wantsDesc ? "<th style='width:19%'>What the charge is for</th>" : "") +
-           "<th class='num' style='width:104px'>Amount</th><th style='width:112px'>Already sent</th>" +
+           sh("amount", "Amount", "104px", "num") +
+           (wantsAge ? sh("age", "How far behind", "132px") : "") +
+           sh("prior", "Already sent", "112px") +
            "<th style='width:62px'></th></tr>"];
   A.rows.forEach(function (r, i) {
     var known = rosterFind(r.unit);
@@ -2408,6 +2474,7 @@ function renderBatch() {
       (wantsDesc ? '<td><input type="text" data-b="' + i + '" data-k="description" value="' +
          esc(r.description || "") + '" placeholder="e.g. replacement of smoke detectors"></td>' : "") +
       '<td class="num"><input type="text" class="amt" data-b="' + i + '" data-k="amount" value="' + esc(money(r.amount)) + '"></td>' +
+      (wantsAge ? "<td>" + ageCell(r) + "</td>" : "") +
       "<td>" + (prior.count
         ? '<span class="chip">' + prior.count + " letter" + (prior.count === 1 ? "" : "s") + "</span>" +
           '<br><span style="font-size:11px;color:var(--muted)">since ' + esc(fmtLongDate(prior.first)) + "</span>"
@@ -2512,13 +2579,37 @@ function tplById(id) {
   return null;
 }
 function tplFor(r) { return (r && tplById(r.tplId)) || currentTpl() || A.templates[0]; }
-/* A sensible starting point rather than a decision: what has already gone out to
-   this unit picks the stage, and she overrides whatever looks wrong. */
-function suggestTplId(unit) {
-  var n = priorFor(unit).count;
-  var order = ["arrears-email", "outstanding-fee", "outstanding-fee"];
-  var want = order[Math.min(n, order.length - 1)];
+/* A sensible starting point rather than a decision: how far behind the unit is and
+   what has already gone out to it both push the stage up, and she overrides whatever
+   looks wrong.
+
+   Three stages, because that is as far as the Corporation's own letters go: first
+   contact, formal demand, and the last letter before the file leaves the office. No
+   final/lien letter exists among the four in use, so stage 2 lands on the formal
+   demand and the 91+ flag in the batch list is what says a different letter — or the
+   solicitor — is needed. If a template named as the final or lien notice is ever
+   added, stage 2 will start using it on its own. */
+function escalationTpl(stage) {
+  if (stage >= 2) {
+    var last = A.templates.filter(function (t) {
+      return /final|lien|s\.?\s?85|legal|solicitor/i.test(t.name || "");
+    })[0];
+    if (last) return last.id;
+  }
+  var want = stage >= 1 ? "outstanding-fee" : "arrears-email";
   return tplById(want) ? want : ((A.templates[0] || {}).id || "");
+}
+function suggestTplId(unit, oldest) {
+  var n = priorFor(unit).count;
+  var stage = n >= 2 ? 2 : (n >= 1 ? 1 : 0);
+  /* Age overrides a low letter count but never lowers it: a unit 91 days behind that
+     has never been written to still needs the formal demand, not a friendly first
+     email — and one already written to twice does not go back to stage 1 because
+     part of its balance is recent. */
+  if (oldest != null && oldest >= 0) {
+    stage = Math.max(stage, oldest >= 3 ? 2 : (oldest >= 1 ? 1 : 0));
+  }
+  return escalationTpl(stage);
 }
 function rowTplSelect(r, i) {
   var cur = tplFor(r);
@@ -2816,27 +2907,105 @@ function unzip(buf, wanted) {
   return Promise.all(jobs).then(function () { return out; });
 }
 function colOf(ref) { return String(ref || "").replace(/[0-9]/g, ""); }
+/* How far behind, in the report's own four columns. These are days past due, so the
+   last one holding money is the age of the oldest unpaid amount — which is the part
+   that decides what letter a unit should be getting. */
+var AGE_BANDS = [
+  { label:"1–30 days",  chip:"1–30 days",  tone:"" },
+  { label:"31–60 days", chip:"31–60 days", tone:"" },
+  { label:"61–90 days", chip:"61–90 days", tone:"warn" },
+  { label:"91+ days",   chip:"91+ days",   tone:"bad" }
+];
+function oldestBand(bands) {
+  for (var i = bands.length - 1; i >= 0; i--) if (bands[i] > 0.005) return i;
+  return -1;
+}
+/* One row of the sheet as text by column letter, shared strings resolved. */
+function rowCells(row, shared) {
+  var cells = row.getElementsByTagName("c"), out = {};
+  for (var j = 0; j < cells.length; j++) {
+    var c = cells[j];
+    var vEl = c.getElementsByTagName("v")[0], isEl = c.getElementsByTagName("is")[0];
+    var txt = isEl ? isEl.textContent : (vEl ? vEl.textContent : "");
+    if (txt == null || txt === "") continue;
+    var t = c.getAttribute("t");
+    if (t === "s") {
+      var ix = parseInt(txt, 10);
+      txt = (shared && shared[ix] != null) ? shared[ix] : txt;
+    }
+    out[colOf(c.getAttribute("r"))] = { text: cl(txt), isText: (t === "s" || t === "str" || t === "inlineStr") };
+  }
+  return out;
+}
+/* Which column is which, read off the report's own heading row instead of assumed.
+   QuickBooks writes "Current", "1 - 30", "31 - 60", "61 - 90", "91 and over",
+   "TOTAL", and taking them by name is what makes the ages trustworthy: a report with
+   an extra column in front of them still reads correctly, and a report whose
+   headings we cannot find reports no ages at all rather than labelling this month's
+   fees as ninety days overdue. */
+var AGING_HEAD = [
+  ["current", /^current$/i],
+  ["b0", /^1\s*[-–—]\s*30\b/],
+  ["b1", /^31\s*[-–—]\s*60\b/],
+  ["b2", /^61\s*[-–—]\s*90\b/],
+  ["b3", /^(91\b|>\s*90\b|91\+)/],
+  ["total", /^total$/i]
+];
+function agingColumns(rows, shared) {
+  for (var i = 0; i < rows.length && i < 12; i++) {
+    var t = rowCells(rows[i], shared), cols = Object.keys(t), map = { headRow: i }, hits = 0;
+    for (var k = 0; k < cols.length; k++) {
+      if (!t[cols[k]].isText) continue;
+      for (var h = 0; h < AGING_HEAD.length; h++) {
+        if (!map[AGING_HEAD[h][0]] && AGING_HEAD[h][1].test(t[cols[k]].text)) {
+          map[AGING_HEAD[h][0]] = cols[k]; hits++; break;
+        }
+      }
+    }
+    if (map.current && map.total && map.b0 && map.b3) {
+      /* the label column is whatever text column sits left of the money */
+      for (var m = 0; m < cols.length; m++) {
+        var isMoney = AGING_HEAD.some(function (hh) { return map[hh[0]] === cols[m]; });
+        if (!isMoney && t[cols[m]].isText) { map.label = cols[m]; break; }
+      }
+      if (!map.label) map.label = "A";
+      return map;
+    }
+  }
+  return null;
+}
 function parseAging(xml, shared) {
   var doc = new DOMParser().parseFromString(xml, "application/xml");
   var rows = doc.getElementsByTagName("row"), out = [], skipped = [];
+  var reconciled = 0, unreconciled = 0;
+  var cols = agingColumns(rows, shared);
+  /* No recognisable heading: the amounts still read the way they always have, but
+     nothing is claimed about how old anything is. */
+  var labelCol = cols ? cols.label : "A";
+  var curCol = cols ? cols.current : "B";
+  var totCol = cols ? cols.total : "G";
+  A.agingCols = cols;
   for (var i = 0; i < rows.length; i++) {
-    var cells = rows[i].getElementsByTagName("c");
-    var label = null, current = 0, total = null, nums = [];
-    for (var j = 0; j < cells.length; j++) {
-      var c = cells[j], col = colOf(c.getAttribute("r"));
-      var vEl = c.getElementsByTagName("v")[0];
-      var isEl = c.getElementsByTagName("is")[0];
-      var txt = isEl ? isEl.textContent : (vEl ? vEl.textContent : "");
-      if (!txt) continue;
-      if (c.getAttribute("t") === "s") {
-        var ix = parseInt(txt, 10);
-        txt = (shared && shared[ix] != null) ? shared[ix] : txt;
-      }
-      if (col === "A") { label = String(txt); continue; }
-      var f = parseFloat(txt);
+    if (cols && i <= cols.headRow) continue;      /* the heading is not a unit */
+    var cellMap = rowCells(rows[i], shared);
+    var keys = Object.keys(cellMap);
+    var label = null, current = 0, total = null, nums = [], bands = [0, 0, 0, 0];
+    for (var j = 0; j < keys.length; j++) {
+      var col = keys[j], cell = cellMap[col];
+      if (col === labelCol) { label = cell.text; continue; }
+      /* Text is text. "91 and over" reads as the number 91 to parseFloat, which is
+         how a heading row used to arrive in the report as a line owing $91.00. */
+      if (cell.isText) continue;
+      var f = parseFloat(cell.text);
       if (!isFinite(f)) continue;
-      if (col === "B") current = f;
-      if (col === "G") total = f;          /* the Total column, formula B+C+D+E+F */
+      if (col === curCol) current = f;
+      if (col === totCol) total = f;
+      if (cols) {
+        if (col === cols.b0) bands[0] = f;   /* 1-30 days past due */
+        if (col === cols.b1) bands[1] = f;   /* 31-60 */
+        if (col === cols.b2) bands[2] = f;   /* 61-90 */
+        if (col === cols.b3) bands[3] = f;   /* 91 and over */
+      }
       nums.push(f);
     }
     if (!label || !nums.length) continue;
@@ -2849,16 +3018,31 @@ function parseAging(xml, shared) {
       if (t && !/^\s*(total|current)\s*$/i.test(label)) skipped.push({ label: label, total: t });
       continue;
     }
-    /* G if it is there, otherwise the last number on the line */
+    /* the Total column if it is there, otherwise the last number on the line */
     if (total === null) total = nums[nums.length - 1];
     var overdue = total - current;
+    /* Second gate, on top of reading the headings: the ages have to add up to the
+       total the report itself states, because that sum is the formula in the sheet.
+       A row that fails it is a row we have read wrongly, and saying "91+ days" off a
+       column we have read wrongly would be inventing an escalation. */
+    var bandSum = current + bands[0] + bands[1] + bands[2] + bands[3];
+    var aged = !!cols && Math.abs(bandSum - total) < 0.011;
+    if (cols) { if (aged) reconciled++; else unreconciled++; }
     out.push({
       unit: um[1],
       name: String(um[2] || "").replace(/^\s*OLD\s+/i, "").replace(/\s+/g, " ").replace(/^\s+|\s+$/g, ""),
-      total: total, current: current, overdue: overdue < 0.005 ? 0 : overdue
+      total: total, current: current, overdue: overdue < 0.005 ? 0 : overdue,
+      bands: aged ? bands : null, oldest: aged ? oldestBand(bands) : -1
     });
   }
   A.agingSkipped = skipped;
+  /* One odd row is one odd row; a report where the ages do not add up is a report
+     laid out differently from the one this was written against, and then the ages
+     mean nothing. */
+  A.agingAged = !!cols && reconciled > 0 && reconciled >= unreconciled * 4;
+  if (!A.agingAged) {
+    out.forEach(function (L) { L.bands = null; L.oldest = -1; });
+  }
   return out;
 }
 function readSharedStrings(xml) {
@@ -3023,6 +3207,46 @@ function importAging(file) {
       note("parseNote", "Could not read it — " + ((e && e.message) || "error"), true);
     });
 }
+/* The census by age, worst first. This is the part of the report the board actually
+   needs: not what is owed, but how long it has been owed, because that is what runs
+   out. A lien under s.85 of the Condominium Act expires three months after the
+   default it arises from unless a certificate is registered in that time — so the
+   61-90 column is a deadline arriving, and 91+ is one that has arrived. Stated as
+   fact and pointed at the solicitor; the app does not offer an opinion on it. */
+function agingAgeNote(lines) {
+  if (!A.agingAged) {
+    return "<br><span style=\"color:var(--muted)\">" + (A.agingCols
+      ? "The 1-30 / 31-60 / 61-90 / 91+ columns in this file did not add up to its own " +
+        "totals, so how far behind each unit is has been left out rather than guessed."
+      : "This file has no Current / 1-30 / 31-60 / 61-90 / 91-and-over headings, so how " +
+        "far behind each unit is could not be read. The amounts are unaffected.") +
+      "</span>";
+  }
+  var byBand = [0, 0, 0, 0], moneyBand = [0, 0, 0, 0], any = 0;
+  lines.forEach(function (L) {
+    if (L.oldest == null || L.oldest < 0) return;
+    byBand[L.oldest]++;
+    moneyBand[L.oldest] += L.bands[L.oldest];
+    any++;
+  });
+  if (!any) return "";
+  var bits = [];
+  for (var i = AGE_BANDS.length - 1; i >= 0; i--) {
+    if (byBand[i]) bits.push("<b>" + byBand[i] + "</b> at " + AGE_BANDS[i].label);
+  }
+  var out = "<br>Oldest unpaid amount: " + bits.join(" · ") + ".";
+  if (byBand[3]) {
+    out += '<br><span style="color:var(--prio)"><b>' + byBand[3] + " unit" +
+      (byBand[3] === 1 ? " is" : "s are") + " more than 90 days behind</b> (" +
+      esc(money(moneyBand[3])) + " that old).</span> A lien under s.85 expires three " +
+      "months after the default it arises from unless a certificate of lien is " +
+      "registered — worth putting in front of the Corporation's solicitor.";
+  } else if (byBand[2]) {
+    out += "<br><b>" + byBand[2] + " at 61-90 days</b> — the three-month mark arrives " +
+      "within the month.";
+  }
+  return out;
+}
 function applyAging() {
   var lines = A.aging || [];
   var basis = A.agingBasis === "total" ? "total" : "overdue";
@@ -3039,7 +3263,8 @@ function applyAging() {
       nonResident: !!(known && known.nonResident),
       amount: Math.round(L[basis] * 100) / 100,
       total: L.total, current: L.current, overdue: L.overdue,
-      description: "", tplId: suggestTplId(L.unit), on: true
+      bands: L.bands, oldest: L.oldest == null ? -1 : L.oldest,
+      description: "", tplId: suggestTplId(L.unit, L.oldest), on: true
     };
   });
   A.selRow = null;
@@ -3056,14 +3281,16 @@ function applyAging() {
       ? " (the amount past due, excluding this month's fees)"
       : " (the whole balance, including this month's fees)") + ".<br>" +
     (currentOnly.length
-      ? "<b>" + currentOnly.length + "</b> owe only current fees — nothing overdue" +
+      ? "<b>" + currentOnly.length + "</b> owe" + (currentOnly.length === 1 ? "s" : "") +
+        " only current fees — nothing overdue" +
         (basis === "overdue" ? ", so they are left out." : ", but the whole balance includes them.") + " "
       : "") +
     (credits.length ? "<b>" + credits.length + "</b> in credit, skipped. " : "") +
     (A.agingSkipped && A.agingSkipped.length
       ? "Not lettered because they are not units: " +
         A.agingSkipped.map(function (x) { return esc(x.label) + " (" + esc(money(x.total)) + ")"; }).join(", ") + "."
-      : "");
+      : "") +
+    agingAgeNote(lines);
   note("parseNote", A.rows.length + " unit" + (A.rows.length === 1 ? "" : "s") + " ready.");
   if (A.rows.length) $("batchCard").scrollIntoView({ behavior:"smooth", block:"start" });
 }
@@ -3630,6 +3857,8 @@ $("batchTbl").addEventListener("change", function (e) {
   renderBatch();
 });
 $("batchTbl").addEventListener("click", function (e) {
+  var th = e.target.closest && e.target.closest("th[data-bsort]");
+  if (th) { sortBatch(th.getAttribute("data-bsort")); return; }
   var eye = e.target.closest && e.target.closest("[data-eye]");
   if (eye) {
     var r = A.rows[+eye.getAttribute("data-eye")], t = currentTpl();
