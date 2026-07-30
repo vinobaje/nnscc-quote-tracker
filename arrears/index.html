@@ -131,6 +131,31 @@ td .chip { margin-bottom:2px; }
 .statrow .vsep { width:1px; height:16px; background:var(--line); }
 .inbox { padding:0 16px 14px; }
 
+/* the letter-log preview — every row of it seen before a single figure is written */
+.lgstat { display:flex; gap:16px; flex-wrap:wrap; font-size:12.5px; color:var(--muted);
+  margin:12px 0 6px; }
+.lgstat b { color:var(--ink); font-size:14px; }
+table.lg { width:100%; border-collapse:separate; border-spacing:0; font-size:12.5px; }
+table.lg th { position:sticky; top:0; z-index:2; background:#FAFBFC; text-align:left;
+  white-space:nowrap; padding:8px 11px; font-size:10px; letter-spacing:.06em;
+  text-transform:uppercase; color:var(--muted); font-weight:700;
+  border-bottom:1px solid var(--line-soft); }
+table.lg td { padding:8px 11px; border-bottom:1px solid var(--line-soft); vertical-align:top;
+  line-height:1.4; }
+table.lg tr:last-child td { border-bottom:none; }
+table.lg tr.off td { background:#FCFAF7; color:var(--ink2); }
+label.ck { display:inline-flex; align-items:center; gap:7px; font-size:12.5px;
+  color:var(--ink2); font-weight:500; }
+label.ck input { width:auto; margin:0; }
+
+/* where a unit's earlier letters came from */
+.prov { margin:10px 0 2px; padding:9px 11px; background:#F7FAFD; border:1px solid #DCE7F2;
+  border-radius:7px; font-size:12px; color:var(--ink2); line-height:1.55; }
+.prov b { color:var(--ink); }
+.prov .pv-src { color:var(--muted); font-size:11.5px; }
+.linkbtn { background:none; border:none; padding:0; font:inherit; font-weight:600;
+  color:var(--accent-ink); cursor:pointer; text-decoration:underline; }
+
 /* people matches, shown above the table while searching */
 .hits { background:var(--card); border:1px solid var(--line); border-radius:8px;
   box-shadow:0 1px 3px rgba(30,40,51,.06); margin-bottom:12px; overflow:hidden; }
@@ -625,6 +650,8 @@ td input.amt { text-align:right; font-variant-numeric:tabular-nums; }
       <button class="btn primary ico" id="btnRosterAdd"><span class="i"></span>Add unit</button>
       <button class="btn ico" id="btnRosterCSV"><span class="i"></span>Import CSVs</button>
       <input type="file" id="csvFile" accept=".csv,text/csv" multiple style="display:none">
+      <button class="btn ico" id="btnLogImport"><span class="i"></span>Import letter log</button>
+      <input type="file" id="logFile" accept=".xlsx,.csv,.tsv,.txt" multiple style="display:none">
       <button class="btn ico" id="btnRosterImport"><span class="i"></span>Bulk paste</button>
       <div class="searchwrap">
         <span class="searchicon"></span>
@@ -650,6 +677,25 @@ td input.amt { text-align:right; font-variant-numeric:tabular-nums; }
         <button class="btn primary sm" id="btnImportGo">Add them</button>
         <button class="btn ghost sm" id="btnImportCancel">Cancel</button>
       </div>
+    </div>
+
+    <div id="logBox" style="display:none" class="inbox">
+      <p class="seclede" style="margin-top:0">
+        <b>The letters you have already sent.</b> Choose the spreadsheet you keep them in —
+        <b>.xlsx</b> or <b>.csv</b>, several files or several tabs at once — or paste the rows
+        straight out of Excel. The columns can be in any order and headings are optional; it looks
+        for the unit numbers and works out the rest. You see every row before anything is saved,
+        and importing the same sheet twice changes nothing.</p>
+      <div class="row" style="margin-bottom:8px">
+        <button class="btn primary sm" id="btnLogFile">Choose spreadsheet…</button>
+        <button class="btn ghost sm" id="btnLogPaste">Read what I pasted below</button>
+        <span class="spacer"></span>
+        <span class="barnote" id="logNote"></span>
+        <button class="btn ghost sm" id="btnLogClose">Close</button>
+      </div>
+      <textarea id="logText" class="mono" rows="4"
+        placeholder="550-1201&#9;First notice&#9;2026-03-03&#10;550-1201&#9;Second notice&#9;2026-05-11&#10;560-406&#9;First notice&#9;2026-04-18"></textarea>
+      <div id="logPreview"></div>
     </div>
 
     <div id="peopleHits"></div>
@@ -835,7 +881,8 @@ var ICON = {
   alert:    svg('<path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/>'),
   eye:      svg('<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/>'),
   printer:  svg('<path d="M6 9V3h12v6M6 18H4a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8" rx="1"/>'),
-  send:     svg('<path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z"/>')
+  send:     svg('<path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z"/>'),
+  history:  svg('<path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l4 2"/>')
 };
 function money(n) {
   var v = Number(n) || 0;
@@ -849,10 +896,17 @@ function fmtLongDate(d) {
   try { return d.toLocaleDateString("en-CA", { year:"numeric", month:"long", day:"numeric" }); }
   catch (e) { return d.toDateString(); }
 }
-function isoToday() {
-  var d = new Date(), p = function (n) { return (n < 10 ? "0" : "") + n; };
+/* a list of a dozen dates in one table cell needs the shorter form */
+function fmtShortDate(d) {
+  try { return d.toLocaleDateString("en-CA", { year:"numeric", month:"short", day:"numeric" }); }
+  catch (e) { return d.toDateString(); }
+}
+function isoOf(d) {
+  if (!d || !d.getFullYear) return "";
+  var p = function (n) { return (n < 10 ? "0" : "") + n; };
   return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate());
 }
+function isoToday() { return isoOf(new Date()); }
 /* an ISO yyyy-mm-dd read as a LOCAL date — new Date("2026-07-28") is UTC midnight,
    which lands on the 27th west of Greenwich and would misdate every letter */
 function fromISO(s) {
@@ -936,6 +990,7 @@ var FIELD_LIST = [
   ["prior_notices",   "A whole sentence about earlier notices, or nothing"],
   ["prior_count",     "How many letters already sent"],
   ["first_notice",    "Date of the first letter"],
+  ["last_notice",     "Date of the most recent letter"],
   ["condo",           "Waterview Condominium"],
   ["corp_full",       "Niagara North Standard Condominium Corporation No. 292"],
   ["reg_no",          "NNSCC No. 292"],
@@ -963,6 +1018,7 @@ function fieldsFor(row, opts) {
     due_date:     esc(fmtLongDate(addDays(d, Number(opts.dueDays) || 0))),
     prior_count:  esc(prior.count ? String(prior.count) : ""),
     first_notice: esc(prior.first ? fmtLongDate(prior.first) : ""),
+    last_notice:  esc(prior.last ? fmtLongDate(prior.last) : ""),
     prior_notices: esc(priorSentence(prior)),
     condo:        esc(CORP.condo),
     corp_full:    esc(CORP.corpFull),
@@ -1004,22 +1060,36 @@ function priorSentence(prior) {
     return "Our records show one previous written notice to you regarding this account" +
       (prior.first ? ", dated " + fmtLongDate(prior.first) : "") + ".";
   }
+  if (prior.first && prior.last) {
+    return "Our records show " + prior.count + " previous written notices to you regarding this " +
+      "account, the first dated " + fmtLongDate(prior.first) +
+      " and the most recent " + fmtLongDate(prior.last) + ".";
+  }
   return "Our records show " + prior.count + " previous written notices to you regarding this account" +
     (prior.first ? ", the first dated " + fmtLongDate(prior.first) : "") + ".";
 }
 
-/* what the log already knows about this unit */
+/* What this unit has already been sent — both halves of the record: the letters
+   this tool sent, and the ones Sarah sent by hand before it existed.
+
+   Without the second half a second notice reads "0 previous written notices", which
+   is worse than wrong — it tells an owner the Corporation has no record of chasing
+   them. The hand-sent ones arrive either as dates imported from her own log or as a
+   count she typed; the larger of the two wins, so importing a log never quietly
+   lowers a number she put in herself. */
 function priorFor(unit) {
-  var k = unitKey(unit), count = 0, first = null;
-  /* Notices sent before this tool existed. Without these a second notice reads
-     "0 previous written notices", which is worse than wrong — it tells the owner
-     the Corporation has no record of chasing them. */
+  var k = unitKey(unit), count = 0, first = null, last = null, imported = 0;
   var known = rosterFind(unit);
   if (known) {
-    var base = Math.max(0, Math.floor(Number(known.priorCount) || 0));
-    if (base) {
-      count += base;
+    var dates = (known.priorDates || []).filter(function (d) { return /^\d{4}-\d{2}-\d{2}$/.test(d); }).sort();
+    imported = dates.length;
+    count = Math.max(dates.length, Math.max(0, Math.floor(Number(known.priorCount) || 0)));
+    if (dates.length) {
+      first = fromISO(dates[0]);
+      last = fromISO(dates[dates.length - 1]);
+    } else if (count) {
       if (known.priorFirst) first = fromISO(known.priorFirst);
+      if (known.priorLast) last = fromISO(known.priorLast);
     }
   }
   for (var i = 0; i < A.letters.length; i++) {
@@ -1028,8 +1098,11 @@ function priorFor(unit) {
     count++;
     var t = L.at && L.at.toDate ? L.at.toDate() : (L.dateISO ? fromISO(L.dateISO) : null);
     if (t && (!first || t < first)) first = t;
+    if (t && (!last || t > last)) last = t;
   }
-  return { count: count, first: first };
+  if (last && first && last <= first) last = null;
+  return { count: count, first: first, last: last, imported: imported,
+           source: (known && known.priorSource) || "" };
 }
 
 /* ---------------- template rendering ----------------
@@ -1382,6 +1455,7 @@ function fieldsRaw(row, opts) {
     due_date: fmtLongDate(addDays(d, Number(opts.dueDays) || 0)),
     prior_count: prior.count ? String(prior.count) : "",
     first_notice: prior.first ? fmtLongDate(prior.first) : "",
+    last_notice: prior.last ? fmtLongDate(prior.last) : "",
     prior_notices: priorSentence(prior),
     condo: CORP.condo, corp_full: CORP.corpFull, reg_no: CORP.regNo,
     reg_no_short: CORP.regNoShort, manager: CORP.manager, buildings: CORP.buildings,
@@ -1839,6 +1913,24 @@ function dRow(label, val, cls) {
   return '<div class="d-row"><span class="d-lab">' + esc(label) + '</span>' +
     '<span class="d-val' + (cls ? " " + cls : "") + '">' + esc(val).split("\n").join("<br>") + "</span></div>";
 }
+/* Where a unit's earlier letters came from. A number that changes what a letter
+   says should never be anonymous — if it was imported, this says from what, on what
+   date, and for which letters, and lets it be taken straight back out. */
+function priorProvenance(u, i) {
+  var dates = u.priorDates || [];
+  if (!dates.length && !u.priorSource) return "";
+  var listed = dates.map(function (d) { return fmtShortDate(fromISO(d)); }).join(" · ");
+  return '<div class="prov">' +
+    "<b>" + dates.length + " letter" + (dates.length === 1 ? "" : "s") + " imported</b>" +
+    (listed ? " — " + esc(listed) : "") +
+    (u.priorLabels && u.priorLabels.length ? "<br>" + esc(u.priorLabels.join(", ")) : "") +
+    (u.priorSource ? '<br><span class="pv-src">' + esc(u.priorSource) + "</span>" : "") +
+    (dates.length
+      ? '<br><span class="pv-src">Counted from these dates. A larger number typed above wins.</span>'
+      : "") +
+    ' <button class="linkbtn" data-unimport="' + i + '">Remove the imported dates</button>' +
+    "</div>";
+}
 function personCard(p) {
   var head = '<div class="p-head"><b>' + esc(p.name || "—") + "</b>" +
     (p.role ? ' <span class="chip' + (/non-resident/i.test(p.role) ? " warn" : (/owner/i.test(p.role) ? " ok" : "")) + '">' +
@@ -1869,6 +1961,7 @@ function unitDetail(u, i) {
       '<label>Date of the first of those' +
         '<input type="date" data-r="' + i + '" data-k="priorFirst" value="' +
         esc(u.priorFirst || "") + '"></label></div>' +
+      priorProvenance(u, i) +
       '<div class="row"><button class="btn primary sm" data-done="' + i + '">Done</button>' +
       '<span class="barnote" style="color:var(--muted)">Changes are kept when you press ' +
       "<b>Save changes</b>. A re-import will overwrite them.</span></div></div>";
@@ -1901,6 +1994,13 @@ function unitDetail(u, i) {
     esc(u.unitNotes).split("\n").join("<br>") + "</span></div>");
   if (u.evac) notes.push('<div class="eline flag">' + ICON.alert +
     "<span>Evacuation assistance: " + esc(u.evac) + "</span></div>");
+  var pr = priorFor(u.unit);
+  if (pr.count) {
+    notes.push('<div class="eline">' + ICON.history + "<span>" + pr.count + " arrears letter" +
+      (pr.count === 1 ? "" : "s") + " already sent" +
+      (pr.first ? ", the first " + esc(fmtShortDate(pr.first)) : "") +
+      (pr.last ? ", the most recent " + esc(fmtShortDate(pr.last)) : "") + "</span></div>");
+  }
   var pk = [u.parking ? "Parking " + u.parking : "", u.locker ? "Locker " + u.locker : ""]
     .filter(function (x) { return x; }).join(" · ");
   if (pk) notes.push('<div class="eline">' + ICON.building + "<span>" + esc(pk) + "</span></div>");
@@ -2702,7 +2802,7 @@ function unzip(buf, wanted) {
     var lho = d.getUint32(p + 42, true);
     var name = new TextDecoder().decode(u8.subarray(p + 46, p + 46 + nameLen));
     p += 46 + nameLen + extraLen + cmtLen;
-    if (wanted.indexOf(name) < 0) continue;
+    if (typeof wanted === "function" ? !wanted(name) : wanted.indexOf(name) < 0) continue;
     var lnLen = d.getUint16(lho + 26, true), lxLen = d.getUint16(lho + 28, true);
     var start = lho + 30 + lnLen + lxLen;
     var raw = u8.subarray(start, start + csize);
@@ -2768,6 +2868,144 @@ function readSharedStrings(xml) {
   for (var i = 0; i < si.length; i++) out.push(si[i].textContent);
   return out;
 }
+
+/* ---------------- reading any worksheet ----------------
+   The aging report has one fixed layout, so it is read by column letter. Anything
+   else Sarah has — her own letter log above all — is laid out however she found
+   convenient, so it is read as a plain grid of cells and worked out afterwards.
+
+   A date in a spreadsheet is not a date. It is a number counting days, and the only
+   thing that says "this number is the 3rd of March" is the cell's number format. So
+   the format table is read first, and a number is only ever called a date when its
+   own style says so. */
+var XL_DATE_FMT = { 14:1, 15:1, 16:1, 17:1, 18:1, 19:1, 20:1, 21:1, 22:1, 27:1, 28:1,
+  29:1, 30:1, 31:1, 32:1, 33:1, 34:1, 35:1, 36:1, 45:1, 46:1, 47:1, 50:1, 51:1, 52:1,
+  53:1, 54:1, 55:1, 56:1, 57:1, 58:1 };
+function dateStyles(xml) {
+  var out = {};
+  if (!xml) return out;
+  var doc = new DOMParser().parseFromString(xml, "application/xml");
+  var custom = {}, nf = doc.getElementsByTagName("numFmt");
+  for (var i = 0; i < nf.length; i++) {
+    var code = nf[i].getAttribute("formatCode") || "";
+    /* quoted literals and [Red]-style sections carry letters of their own, and
+       "$"#,##0.00 must not be read as a date because of the d in "USD" */
+    var bare = code.replace(/"[^"]*"/g, "").replace(/\[[^\]]*\]/g, "").replace(/\\./g, "");
+    custom[nf[i].getAttribute("numFmtId")] = /[dy]/i.test(bare);
+  }
+  var xfs = doc.getElementsByTagName("cellXfs")[0];
+  if (!xfs) return out;
+  var xf = xfs.getElementsByTagName("xf");
+  for (var j = 0; j < xf.length; j++) {
+    var id = xf[j].getAttribute("numFmtId") || "0";
+    out[j] = XL_DATE_FMT[+id] ? true : !!custom[id];
+  }
+  return out;
+}
+/* Excel counts days from 1900-01-00 and believes 1900 was a leap year, so serial 60
+   is a day that never existed and every date after it is one too many. Mac files
+   count from 1904 instead. */
+function fromSerial(n, epoch1904) {
+  var v = Math.floor(Number(n));
+  if (!isFinite(v) || v < 1 || v > 80000) return null;
+  if (epoch1904) v += 1462; else if (v >= 60) v -= 1;
+  var d = new Date(Date.UTC(1899, 11, 31) + v * 86400000);
+  return new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+}
+function colIdx(ref) {
+  var s = String(ref || "").replace(/[^A-Za-z]/g, "").toUpperCase(), n = 0;
+  for (var i = 0; i < s.length; i++) n = n * 26 + (s.charCodeAt(i) - 64);
+  return n - 1;
+}
+/* One worksheet as rows of cells, each cell knowing what it actually is. Gaps are
+   preserved by position: a blank cell is a blank cell, not the next one along. */
+function readGrid(xml, shared, styles, epoch1904) {
+  var doc = new DOMParser().parseFromString(xml, "application/xml");
+  var rows = doc.getElementsByTagName("row"), out = [];
+  for (var i = 0; i < rows.length; i++) {
+    var cells = rows[i].getElementsByTagName("c"), r = [], any = false;
+    for (var j = 0; j < cells.length; j++) {
+      var c = cells[j], t = c.getAttribute("t");
+      var vEl = c.getElementsByTagName("v")[0], isEl = c.getElementsByTagName("is")[0];
+      var txt = isEl ? isEl.textContent : (vEl ? vEl.textContent : "");
+      if (txt == null || txt === "") continue;
+      if (t === "s") {
+        var ix = parseInt(txt, 10);
+        txt = (shared && shared[ix] != null) ? shared[ix] : txt;
+      }
+      var cell = { text: cl(txt), num: null, date: null };
+      if (t !== "s" && t !== "str" && t !== "inlineStr") {
+        var f = parseFloat(txt);
+        if (isFinite(f) && /^[\s\-+0-9.eE]+$/.test(txt)) {
+          cell.num = f;
+          if (styles[+(c.getAttribute("s") || 0)]) {
+            cell.date = fromSerial(f, epoch1904);
+            if (cell.date) cell.text = fmtLongDate(cell.date);
+          }
+        }
+      }
+      var at = colIdx(c.getAttribute("r"));
+      r[at >= 0 ? at : r.length] = cell;
+      any = true;
+    }
+    if (any) out.push(r);
+  }
+  return out;
+}
+/* Every sheet in the book, in the order the tabs appear, with the names on the tabs.
+   Sarah may well keep a tab per year, and all of them count. */
+function workbookSheets(parts) {
+  var wb = parts["xl/workbook.xml"], rels = parts["xl/_rels/workbook.xml.rels"];
+  var epoch1904 = /date1904="(1|true)"/.test(wb || "");
+  var map = {};
+  if (rels) {
+    var rd = new DOMParser().parseFromString(rels, "application/xml");
+    var rl = rd.getElementsByTagName("Relationship");
+    for (var i = 0; i < rl.length; i++) {
+      var tgt = rl[i].getAttribute("Target") || "";
+      map[rl[i].getAttribute("Id")] = tgt.charAt(0) === "/" ? tgt.slice(1)
+        : (tgt.indexOf("xl/") === 0 ? tgt : "xl/" + tgt.replace(/^\.\//, ""));
+    }
+  }
+  var out = [];
+  if (wb) {
+    var d = new DOMParser().parseFromString(wb, "application/xml");
+    var sh = d.getElementsByTagName("sheet");
+    for (var j = 0; j < sh.length; j++) {
+      var rid = sh[j].getAttribute("r:id") || sh[j].getAttributeNS &&
+        sh[j].getAttributeNS("http://schemas.openxmlformats.org/officeDocument/2006/relationships", "id");
+      var path = map[rid];
+      if (path && parts[path]) out.push({ name: sh[j].getAttribute("name") || ("Sheet " + (j + 1)), path: path });
+    }
+  }
+  if (!out.length) {
+    /* a book whose relationships we could not follow still has its worksheets */
+    Object.keys(parts).forEach(function (k) {
+      if (/^xl\/worksheets\/[^/]+\.xml$/.test(k)) out.push({ name: k.split("/").pop().replace(/\.xml$/, ""), path: k });
+    });
+    out.sort(function (a, b) { return a.path.localeCompare(b.path, undefined, { numeric: true }); });
+  }
+  return { sheets: out, epoch1904: epoch1904 };
+}
+function readWorkbook(file) {
+  return file.arrayBuffer()
+    .then(function (buf) {
+      return unzip(buf, function (name) {
+        return name === "xl/workbook.xml" || name === "xl/_rels/workbook.xml.rels" ||
+          name === "xl/sharedStrings.xml" || name === "xl/styles.xml" ||
+          /^xl\/worksheets\/[^/]+\.xml$/.test(name);
+      });
+    })
+    .then(function (parts) {
+      var info = workbookSheets(parts);
+      if (!info.sheets.length) throw new Error("no worksheets in that file");
+      var shared = readSharedStrings(parts["xl/sharedStrings.xml"]);
+      var styles = dateStyles(parts["xl/styles.xml"]);
+      return info.sheets.map(function (s) {
+        return { name: s.name, grid: readGrid(parts[s.path], shared, styles, info.epoch1904) };
+      });
+    });
+}
 function importAging(file) {
   note("parseNote", "Reading " + file.name + "…", false, true);
   return file.arrayBuffer()
@@ -2828,6 +3066,431 @@ function applyAging() {
       : "");
   note("parseNote", A.rows.length + " unit" + (A.rows.length === 1 ? "" : "s") + " ready.");
   if (A.rows.length) $("batchCard").scrollIntoView({ behavior:"smooth", block:"start" });
+}
+
+/* ---------------- Sarah's own letter log ----------------
+   Every letter sent before this tool existed is in a spreadsheet Sarah keeps by
+   hand, and it is the only record of them. Without it a second notice introduces
+   itself as a first, the escalation to a lien has no history behind it, and the
+   owner reading it can fairly say the Corporation never wrote to them.
+
+   Her sheet was never designed to be read by a program, so nothing about its shape
+   is assumed. The unit column is found by looking for values that are units — not
+   by trusting a heading — and everything else is worked out from there. Four
+   layouts are recognised, because these are the four ways a person actually keeps
+   this kind of list:
+
+     log      one row per letter          Unit | Date sent | Type
+     matrix   one row per unit            Unit | 1st notice | 2nd notice | Final
+     ticks    one row per unit, dated columns, a mark in the cell
+     count    one row per unit            Unit | Letters sent | First letter
+
+   Nothing is written until she has seen a row-by-row preview of it, because a
+   number arriving here changes what her letters say. */
+var LOG_MONTHS = { jan:0, feb:1, mar:2, apr:3, may:4, jun:5, jul:6, aug:7, sep:8, oct:9, nov:10, dec:11 };
+function yr4(y) { return y >= 100 ? y : (y < 70 ? 2000 + y : 1900 + y); }
+function mkDate(y, m, d) {
+  if (!(y >= 1990 && y <= 2100) || !(m >= 0 && m <= 11) || !(d >= 1 && d <= 31)) return null;
+  var x = new Date(y, m, d);
+  return (x.getMonth() === m && x.getDate() === d) ? x : null;
+}
+/* A date typed as text, which is how a hand-kept sheet usually holds one. Day-first
+   and month-first are told apart per column rather than per cell: 03/07/2026 alone
+   is ambiguous, but one 13/07 anywhere in the column settles the whole column. */
+function textDate(s, dayFirst) {
+  var t = cl(s).replace(/^[A-Za-z]{3,9},\s*/, ""), m, mo;
+  if ((m = /^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})$/.exec(t))) return mkDate(+m[1], +m[2] - 1, +m[3]);
+  if ((m = /^([A-Za-z]{3,9})\.?\s+(\d{1,2})(?:st|nd|rd|th)?,?\s*(\d{2,4})$/.exec(t))) {
+    mo = LOG_MONTHS[m[1].slice(0, 3).toLowerCase()];
+    return mo == null ? null : mkDate(yr4(+m[3]), mo, +m[2]);
+  }
+  if ((m = /^(\d{1,2})(?:st|nd|rd|th)?[-\/.\s]([A-Za-z]{3,9})\.?[-\/.\s](\d{2,4})$/.exec(t))) {
+    mo = LOG_MONTHS[m[2].slice(0, 3).toLowerCase()];
+    return mo == null ? null : mkDate(yr4(+m[3]), mo, +m[1]);
+  }
+  if ((m = /^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{2,4})$/.exec(t))) {
+    var a = +m[1], b = +m[2], y = yr4(+m[3]);
+    return dayFirst ? mkDate(y, b - 1, a) : mkDate(y, a - 1, b);
+  }
+  return null;
+}
+function cellAt(row, c) { return (row && row[c]) || null; }
+function cellText(row, c) { var x = cellAt(row, c); return x ? x.text : ""; }
+function cellDate(cell, dayFirst) {
+  if (!cell) return null;
+  if (cell.date) return cell.date;               /* the spreadsheet said so itself */
+  return cell.num === null ? textDate(cell.text, dayFirst) : null;
+}
+/* Does this column write 13/07 anywhere? Then it is day-first throughout. */
+function columnDayFirst(grid, c, from) {
+  for (var i = from; i < grid.length; i++) {
+    var m = /^(\d{1,2})[-\/.](\d{1,2})[-\/.]\d{2,4}$/.exec(cellText(grid[i], c));
+    if (m && +m[1] > 12 && +m[2] <= 12) return true;
+  }
+  return false;
+}
+/* What unit a cell names. "550-1201" is plain enough. A bare "1201" is not — both
+   towers have one, and picking the wrong tower puts a stranger's arrears in front
+   of somebody. So a bare number is resolved against the Units list, and when both
+   towers answer to it the row is held back for Sarah to settle rather than guessed. */
+function unitFromCell(text) {
+  var t = cl(text).replace(/^unit\s*#?\s*/i, "").replace(/[–—]/g, "-");
+  if (!t || /^[A-Za-z .]+$/.test(t)) return null;
+  var m = /^(5[56]0)[-\s]?([A-Za-z0-9]{1,6})$/.exec(t);
+  if (m) return { unit: m[1] + "-" + m[2].toUpperCase(), sure: true };
+  if (/^\d{2,4}[A-Za-z]?$/.test(t)) {
+    var hits = A.units.filter(function (u) {
+      return unitKey(u.unit).replace(/^5[56]0-/, "") === unitKey(t);
+    });
+    if (hits.length === 1) return { unit: hits[0].unit, sure: true };
+    if (hits.length > 1) {
+      return { unit: t, sure: false, choices: hits.map(function (u) { return u.unit; }) };
+    }
+  }
+  return null;
+}
+var LOG_HEAD = {
+  date:  /date|sent|mail|deliver|issued|posted|served|when/i,
+  count: /^\s*(#|no\.?|num\w*|count|qty|how many|letters?|notices?|total|sent)\b|\b(count|sent|letters?|notices?)\s*$/i,
+  kind:  /letter|notice|type|stage|level|status|kind|reason|categ|remark|comment|note/i,
+  name:  /name|owner|resident|tenant|occupant/i
+};
+function tickCell(t) {
+  var s = cl(t).toLowerCase();
+  if (!s) return false;
+  return /^(x|xx|y|yes|✓|✔|√|done|sent|1|true)$/.test(s) || !!textDate(s, false) || s.length > 1;
+}
+/* Work out what the sheet is before reading anything out of it. */
+function scanSheet(grid) {
+  var best = -1, bestHits = 0, c, i;
+  var width = grid.reduce(function (n, r) { return Math.max(n, r.length); }, 0);
+  for (c = 0; c < width; c++) {
+    var hits = 0, filled = 0;
+    for (i = 0; i < grid.length; i++) {
+      var t = cellText(grid[i], c);
+      if (!t) continue;
+      filled++;
+      if (unitFromCell(t)) hits++;
+    }
+    /* One unit is enough to find the column — a sheet may hold a single row, and
+       refusing to read it would be refusing the only record of that letter. What
+       keeps a column of amounts from being mistaken for units is the proportion:
+       most of what is in this column has to be a unit. */
+    if (hits >= 1 && hits / filled >= 0.4 && hits > bestHits) { bestHits = hits; best = c; }
+  }
+  if (best < 0) return { ok:false, msg:"no column of unit numbers in it" };
+
+  var firstData = 0;
+  for (i = 0; i < grid.length; i++) {
+    if (unitFromCell(cellText(grid[i], best))) { firstData = i; break; }
+  }
+  /* the heading is the last line above the data that reads like a heading */
+  var headRow = -1;
+  for (i = firstData - 1; i >= 0 && i >= firstData - 3; i--) {
+    var texts = 0;
+    for (c = 0; c < width; c++) if (cellText(grid[i], c)) texts++;
+    if (texts >= 2) { headRow = i; break; }
+  }
+  function label(col) {
+    var t = headRow >= 0 ? cellText(grid[headRow], col) : "";
+    return t || "Column " + String.fromCharCode(65 + Math.min(col, 25));
+  }
+
+  /* dated column headings mean the marks underneath them are the letters */
+  var tickCols = [];
+  if (headRow >= 0) {
+    for (c = 0; c < width; c++) {
+      if (c === best) continue;
+      var hd = cellAt(grid[headRow], c);
+      var hdd = hd && (hd.date || textDate(hd.text, false));
+      if (hdd) tickCols.push({ c:c, label:label(c), when:hdd });
+    }
+  }
+
+  var dateCols = [], countCol = -1, kindCol = -1, nameCol = -1;
+  for (c = 0; c < width; c++) {
+    if (c === best) continue;
+    var isTick = tickCols.some(function (t) { return t.c === c; });
+    var dayFirst = columnDayFirst(grid, c, firstData);
+    var nd = 0, nf = 0, ints = 0, texty = 0;
+    for (i = firstData; i < grid.length; i++) {
+      var cell = cellAt(grid[i], c);
+      if (!cell || !cell.text) continue;
+      nf++;
+      if (cellDate(cell, dayFirst)) nd++;
+      else if (cell.num !== null && cell.num === Math.floor(cell.num) && cell.num >= 0 && cell.num <= 40) ints++;
+      else if (cell.num === null) texty++;
+    }
+    if (!nf) continue;
+    var lab = label(c);
+    /* A column of dates, or a column where every single thing in it is a date. The
+       second case matters: "Final notice" may hold two dates in a sheet of forty
+       units, and those two are precisely the units closest to a lien. */
+    if (!isTick && ((nd >= 2 && nd / nf >= 0.6) || (nd >= 1 && nd === nf))) {
+      dateCols.push({ c:c, label:lab, dayFirst:dayFirst });
+      continue;
+    }
+    if (countCol < 0 && !isTick && ints / nf >= 0.6 && (LOG_HEAD.count.test(lab) || headRow < 0)) countCol = c;
+    if (kindCol < 0 && texty / nf >= 0.6 && (LOG_HEAD.kind.test(lab) ||
+        /notice|letter|final|demand|lien|reminder|nsf|chargeback|pap|arrear/i.test(cellText(grid[firstData], c)))) kindCol = c;
+    /* A name column is worth finding only for the cross-check: one surname that the
+       Units list does not know is how a mistyped unit number gives itself away. */
+    if (nameCol < 0 && c !== kindCol && texty / nf >= 0.6 && LOG_HEAD.name.test(lab)) nameCol = c;
+  }
+
+  var shape = tickCols.length >= 2 ? "ticks"
+    : dateCols.length >= 2 ? "matrix"
+    : dateCols.length === 1 ? "log"
+    : countCol >= 0 ? "count" : null;
+  if (!shape) {
+    return { ok:false, msg:"found the unit column but no dates and no count of letters beside it" };
+  }
+  return { ok:true, shape:shape, unitCol:best, headRow:headRow, firstData:firstData,
+           dateCols:dateCols, tickCols:tickCols, countCol:countCol, kindCol:kindCol,
+           nameCol:nameCol, unitLabel:label(best) };
+}
+/* One sheet, read into per-unit notices. Merged into `into` so a workbook with a
+   tab per year adds up instead of the last tab winning. */
+function readLogSheet(grid, s, sheetName, into, report) {
+  var i, j;
+  function slot(unit) {
+    var k = unitKey(unit);
+    return into[k] || (into[k] = { unit:unit, dates:[], labels:[], extra:0, names:[], sheets:[] });
+  }
+  for (i = s.firstData; i < grid.length; i++) {
+    var row = grid[i];
+    var raw = cellText(row, s.unitCol);
+    if (!raw) continue;
+    var u = unitFromCell(raw);
+    if (!u) { report.skipped++; continue; }
+    if (!u.sure) {
+      if (!report.ambiguous.some(function (a) { return a.raw === raw; })) {
+        report.ambiguous.push({ raw:raw, choices:u.choices });
+      }
+      continue;
+    }
+    var e = slot(u.unit);
+    if (e.sheets.indexOf(sheetName) < 0) e.sheets.push(sheetName);
+    if (s.nameCol >= 0) {
+      var nm = cellText(row, s.nameCol);
+      if (nm && e.names.indexOf(nm) < 0) e.names.push(nm);
+    }
+    var kind = s.kindCol >= 0 ? cellText(row, s.kindCol) : "";
+    var found = 0;
+
+    if (s.shape === "ticks") {
+      for (j = 0; j < s.tickCols.length; j++) {
+        var tc = s.tickCols[j];
+        if (!tickCell(cellText(row, tc.c))) continue;
+        addNotice(e, tc.when, cellText(row, tc.c).length > 1 ? cellText(row, tc.c) : tc.label);
+        found++;
+      }
+    } else {
+      var cols = s.shape === "log" || s.shape === "matrix" ? s.dateCols : [];
+      for (j = 0; j < cols.length; j++) {
+        var d = cellDate(cellAt(row, cols[j].c), cols[j].dayFirst);
+        if (!d) continue;
+        addNotice(e, d, kind || (s.shape === "matrix" ? cols[j].label : ""));
+        found++;
+      }
+    }
+    if (s.countCol >= 0) {
+      var n = cellAt(row, s.countCol);
+      var want = n && n.num !== null ? Math.floor(n.num) : 0;
+      /* a stated count larger than the dates we could read is still a letter sent */
+      if (want > found) e.extra = Math.max(e.extra, want - found);
+    } else if (!found && s.shape === "log") {
+      e.extra++;                 /* a logged letter whose date cell is empty */
+      report.undated++;
+    }
+    report.rows++;
+  }
+}
+function addNotice(e, when, label) {
+  var iso = isoOf(when);
+  if (!iso) return;
+  if (e.dates.indexOf(iso) >= 0) return;         /* the same letter listed twice */
+  e.dates.push(iso);
+  if (label && e.labels.indexOf(label) < 0) e.labels.push(cl(label).slice(0, 40));
+}
+/* A grid of plain text, for a CSV or a paste out of Excel. */
+function textGrid(text) {
+  var tabbed = text.indexOf("\t") >= 0;
+  var rows = tabbed
+    ? text.replace(/\r/g, "").split("\n").map(function (l) { return l.split("\t"); })
+    : parseCSVText(text);
+  return rows.map(function (r) {
+    return r.map(function (v) {
+      var t = cl(v), n = null;
+      if (t && /^-?\$?\s?[\d,]+(\.\d+)?$/.test(t)) n = parseMoney(t);
+      return { text:t, num:n, date:null };
+    });
+  }).filter(function (r) { return r.some(function (c) { return c.text; }); });
+}
+/* Read a set of sheets and hold the result for review. Nothing is written here. */
+function stageLog(sheets, source) {
+  var into = {}, report = { rows:0, skipped:0, undated:0, ambiguous:[], used:[], failed:[] };
+  sheets.forEach(function (sh) {
+    if (!sh.grid.length) return;
+    var s = scanSheet(sh.grid);
+    if (!s.ok) { report.failed.push({ name:sh.name, msg:s.msg }); return; }
+    readLogSheet(sh.grid, s, sh.name, into, report);
+    report.used.push({ name:sh.name, shape:s.shape, unitLabel:s.unitLabel,
+      cols:(s.shape === "ticks" ? s.tickCols : s.dateCols).map(function (x) { return x.label; }),
+      countCol:s.countCol >= 0 });
+  });
+  var units = Object.keys(into).map(function (k) { return into[k]; });
+  units.forEach(function (e) { e.dates.sort(); });
+  units.sort(function (a, b) {
+    return unitKey(a.unit).localeCompare(unitKey(b.unit), undefined, { numeric:true });
+  });
+  if (!units.length) {
+    var why = report.failed.length
+      ? report.failed.map(function (f) { return "“" + f.name + "”: " + f.msg; }).join("; ")
+      : "no unit numbers in it";
+    A.logPending = null;
+    renderLogPreview();
+    note("logNote", "Could not read a letter log out of that — " + why + ".", true);
+    return;
+  }
+  A.logPending = { units:units, report:report, source:source };
+  renderLogPreview();
+  note("logNote", units.length + " unit" + (units.length === 1 ? "" : "s") + " read. " +
+    "Nothing is saved until you press Apply.");
+}
+function logTotal(e) { return e.dates.length + e.extra; }
+/* Surnames only, and only to catch a mis-keyed unit number: the log naming Chan
+   against a unit the roster says is Smith is the one mistake that puts a letter in
+   front of the wrong person. */
+function nameClash(e, known) {
+  if (!known || !e.names.length || !known.owner) return "";
+  var have = (known.owner + " " + (known.ownerOfRecord || "")).toLowerCase();
+  var miss = e.names.filter(function (n) {
+    var parts = cl(n).toLowerCase().split(/[\s,]+/).filter(function (w) { return w.length > 2; });
+    return parts.length && !parts.some(function (w) { return have.indexOf(w) >= 0; });
+  });
+  return miss.length ? miss.join(", ") : "";
+}
+function renderLogPreview() {
+  var box = $("logPreview"), p = A.logPending;
+  if (!p) { box.innerHTML = ""; return; }
+  var addMissing = $("logAddMissing") && $("logAddMissing").checked;
+  var known = 0, missing = 0, clashes = 0, letters = 0;
+  var h = [];
+  p.units.forEach(function (e) {
+    var k = rosterFind(e.unit);
+    if (k) known++; else missing++;
+    letters += logTotal(e);
+    var clash = nameClash(e, k);
+    if (clash) clashes++;
+    var now = k ? priorFor(e.unit) : null;
+    h.push("<tr" + (k ? "" : ' class="off"') + "><td><b>" + esc(e.unit) + "</b>" +
+      (k ? "" : ' <span class="chip warn">not in Units</span>') + "</td>" +
+      "<td>" + esc((k && k.owner) || e.names.join(", ") || "—") +
+      (clash ? ' <span class="chip bad" title="The log names someone the Units list does not — check the unit number">log says ' +
+        esc(clash) + "</span>" : "") + "</td>" +
+      '<td class="num"><b>' + logTotal(e) + "</b>" +
+      (e.extra ? ' <span class="chip">' + e.extra + " with no date</span>" : "") + "</td>" +
+      "<td>" + (e.dates.length
+        ? esc(e.dates.map(function (d) { return fmtShortDate(fromISO(d)); }).join(" · "))
+        : '<span style="color:var(--muted)">no dates in the log</span>') + "</td>" +
+      "<td>" + (now && now.count
+        ? esc(now.count + " on file")
+        : '<span style="color:var(--muted)">nothing on file</span>') + "</td></tr>");
+  });
+  var used = p.report.used.map(function (u) {
+    return "<b>" + esc(u.name) + "</b> read as " + esc(SHAPE_WORDS[u.shape] || u.shape) +
+      (u.cols.length ? " (" + esc(u.cols.slice(0, 6).join(", ")) + ")" : "") +
+      (u.countCol && u.shape !== "count" ? ", plus a stated count" : "");
+  }).join("; ");
+  var warn = [];
+  if (p.report.ambiguous.length) {
+    warn.push("<b>" + p.report.ambiguous.length + " unit number" +
+      (p.report.ambiguous.length === 1 ? " is in both towers and was" : "s are in both towers and were") +
+      " left out</b> — " +
+      p.report.ambiguous.slice(0, 8).map(function (a) {
+        return esc(a.raw) + " (" + esc(a.choices.join(" or ")) + ")";
+      }).join(", ") + ". Write the building in front of them in your sheet and import again.");
+  }
+  if (clashes) {
+    warn.push("<b>" + clashes + (clashes === 1 ? " row names" : " rows name") +
+      " somebody the Units list does not.</b> Usually a mistyped unit number. " +
+      "Check those before applying — they are the ones that would send a letter to the wrong owner.");
+  }
+  if (missing && !addMissing) {
+    warn.push("<b>" + missing + " unit" + (missing === 1 ? " is" : "s are") +
+      " not on the Units list</b> and will be skipped. Tick the box below to add them.");
+  }
+  if (p.report.failed.length) {
+    warn.push("Not read: " + p.report.failed.map(function (f) {
+      return "“" + esc(f.name) + "” (" + esc(f.msg) + ")";
+    }).join(", ") + ".");
+  }
+  box.innerHTML =
+    '<div class="lgstat">' +
+      "<span><b>" + p.units.length + "</b> units</span>" +
+      "<span><b>" + letters + "</b> letters</span>" +
+      "<span><b>" + known + "</b> on the Units list</span>" +
+      (missing ? "<span><b>" + missing + "</b> not on it</span>" : "") +
+      (p.report.skipped ? "<span>" + p.report.skipped + " row" +
+        (p.report.skipped === 1 ? "" : "s") + " skipped</span>" : "") +
+    "</div>" +
+    '<p class="seclede" style="margin:0 0 8px">' + used + ". Source: " + esc(p.source) + ".</p>" +
+    (warn.length ? '<div class="note warn" style="margin-bottom:8px">' + warn.join("<br>") + "</div>" : "") +
+    '<div style="max-height:320px;overflow:auto;border:1px solid var(--line);border-radius:8px">' +
+    "<table class=\"lg\"><tr><th>Unit</th><th>Owner</th><th class='num'>Letters</th>" +
+    "<th>Dated</th><th>Now on file</th></tr>" + h.join("") + "</table></div>" +
+    '<div class="row" style="margin-top:10px">' +
+      '<button class="btn primary sm" id="btnLogApply">Apply to ' +
+        (addMissing ? p.units.length : known) + " unit" +
+        ((addMissing ? p.units.length : known) === 1 ? "" : "s") + "</button>" +
+      '<label class="ck"><input type="checkbox" id="logAddMissing"' + (addMissing ? " checked" : "") +
+        "> Add the units that are not on the list</label>" +
+      '<span class="spacer"></span>' +
+      '<button class="btn ghost sm" id="btnLogDiscard">Discard</button>' +
+    "</div>";
+  $("btnLogApply").onclick = applyLog;
+  $("btnLogDiscard").onclick = function () { A.logPending = null; renderLogPreview(); note("logNote", ""); };
+  $("logAddMissing").onchange = renderLogPreview;
+}
+var SHAPE_WORDS = {
+  log: "one row per letter", matrix: "one row per unit, a column per letter",
+  ticks: "one row per unit, a column per mailing date", count: "a count per unit"
+};
+function applyLog() {
+  var p = A.logPending;
+  if (!p) return;
+  var addMissing = $("logAddMissing") && $("logAddMissing").checked;
+  var stamp = "Sarah's letter log — " + p.source + ", imported " + fmtLongDate(new Date());
+  var n = 0, added = 0, skipped = 0;
+  p.units.forEach(function (e) {
+    var ex = rosterFind(e.unit);
+    if (!ex) {
+      if (!addMissing) { skipped++; return; }
+      ex = { unit:e.unit, owner:e.names[0] || "", address:unitAddress(e.unit), nonResident:false };
+      A.units.push(ex);
+      added++;
+    }
+    /* replaced, never added to, so importing the same sheet twice is harmless */
+    ex.priorCount = logTotal(e);
+    ex.priorDates = e.dates.slice(0, 40);
+    ex.priorFirst = e.dates[0] || "";
+    ex.priorLast = e.dates[e.dates.length - 1] || "";
+    ex.priorLabels = e.labels.slice(0, 8);
+    ex.priorSource = stamp;
+    n++;
+  });
+  A.units.sort(function (a, b) {
+    return unitKey(a.unit).localeCompare(unitKey(b.unit), undefined, { numeric:true });
+  });
+  A.logPending = null;
+  renderLogPreview();
+  renderRoster();
+  saveRoster();
+  if (A.rows.length) renderBatch();          /* the letters change the moment this lands */
+  note("logNote", n + " unit" + (n === 1 ? "" : "s") + " updated" +
+    (added ? ", " + added + " added" : "") +
+    (skipped ? ", " + skipped + " skipped for not being on the list" : "") + ".");
 }
 
 /* ---------------- unit typeahead ----------------
@@ -3085,7 +3748,7 @@ $("rosterTbl").addEventListener("click", function (e) {
     return;
   }
   /* the icons carry their own SVG children, so read the intent off the button */
-  var btn = e.target.closest && e.target.closest("[data-del],[data-edit],[data-full],[data-copy],[data-done],[data-det]");
+  var btn = e.target.closest && e.target.closest("[data-del],[data-edit],[data-full],[data-copy],[data-done],[data-unimport],[data-det]");
   if (!btn) {
     if (/^(INPUT|TEXTAREA|SELECT|LABEL)$/.test(e.target.tagName)) return;
     var tr = e.target.closest && e.target.closest("tr.u");
@@ -3111,6 +3774,18 @@ $("rosterTbl").addEventListener("click", function (e) {
   }
   var done = btn.getAttribute("data-done");
   if (done != null) { A.editUnit = -1; renderRoster(); return; }
+  var un = btn.getAttribute("data-unimport");
+  if (un != null) {
+    var uu = A.units[+un];
+    if (!confirm("Remove the imported letter history from unit " + (uu.unit || "?") + "?\n\n" +
+        "Its letters will read as though nothing was sent before this tool, unless you " +
+        "type a count in yourself.")) return;
+    delete uu.priorDates; delete uu.priorLabels; delete uu.priorSource; delete uu.priorLast;
+    uu.priorCount = ""; uu.priorFirst = "";
+    renderRoster(); saveRoster();
+    if (A.rows.length) renderBatch();
+    return;
+  }
   var full = btn.getAttribute("data-full");
   if (full != null) {
     A.openUnit = +full;
@@ -3145,6 +3820,7 @@ $("rosterFind").addEventListener("input", function () { A.openUnit = -1; renderR
 /* toolbar and header icons */
 (function () {
   var pairs = [["btnRosterAdd", ICON.plus], ["btnRosterCSV", ICON.upload], ["btnRosterImport", ICON.clip],
+               ["btnLogImport", ICON.history],
                ["btnFilters", ICON.filter], ["btnRosterSave", ICON.save], ["btnGuide", ICON.file],
                ["btnPdf", ICON.file], ["btnEmail", ICON.send], ["btnPrevPdf", ICON.eye],
                ["btnGenerate", ICON.printer], ["btnAging", ICON.upload]];
@@ -3261,6 +3937,52 @@ $("csvFile").onchange = function () {
     applyImports(ok);
   }
 };
+/* ---- the letter log ---- */
+$("btnLogImport").onclick = function () {
+  var b = $("logBox");
+  b.style.display = (b.style.display === "none") ? "" : "none";
+  if (b.style.display !== "none" && b.scrollIntoView) b.scrollIntoView({ behavior:"smooth", block:"nearest" });
+};
+$("btnLogClose").onclick = function () {
+  $("logBox").style.display = "none";
+  A.logPending = null; renderLogPreview(); note("logNote", "");
+};
+$("btnLogFile").onclick = function () { $("logFile").click(); };
+$("btnLogPaste").onclick = function () {
+  var t = $("logText").value;
+  if (!/\S/.test(t)) { note("logNote", "Nothing pasted yet.", true); return; }
+  stageLog([{ name:"pasted rows", grid:textGrid(t) }], "pasted rows");
+};
+$("logFile").onchange = function () {
+  var files = [].slice.call(this.files || []);
+  this.value = "";
+  if (!files.length) return;
+  note("logNote", "Reading " + files.length + " file" + (files.length === 1 ? "" : "s") + "…", false, true);
+  Promise.all(files.map(function (f) {
+    if (/\.xlsx$/i.test(f.name)) {
+      return readWorkbook(f).then(function (sheets) {
+        /* one file, several tabs: name them so the preview can say where a row came from */
+        return sheets.map(function (s) {
+          return { name: files.length > 1 ? f.name + " › " + s.name : s.name, grid: s.grid };
+        });
+      });
+    }
+    if (/\.xls$/i.test(f.name)) {
+      return Promise.reject(new Error(f.name + " is the old .xls format — open it in Excel and " +
+        "save as .xlsx, or save it as .csv"));
+    }
+    return f.text().then(function (t) { return [{ name:f.name, grid:textGrid(t) }]; });
+  }))
+    .then(function (lists) {
+      var sheets = [];
+      lists.forEach(function (l) { sheets = sheets.concat(l); });
+      stageLog(sheets, files.map(function (f) { return f.name; }).join(", "));
+    })
+    .catch(function (e) {
+      note("logNote", "Could not read it — " + ((e && e.message) || "error"), true);
+    });
+};
+
 $("btnRosterImport").onclick = function () { $("importBox").style.display = ""; $("importText").focus(); };
 $("btnImportCancel").onclick = function () { $("importBox").style.display = "none"; $("importText").value = ""; };
 $("btnImportGo").onclick = function () {
