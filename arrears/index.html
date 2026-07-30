@@ -10,9 +10,14 @@
   --amber:#B0700F; --amber-soft:#F8EFDD;
 }
 html { background:var(--paper); color-scheme:light; }
-body { font:15px/1.55 -apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; color:var(--ink);
-  background:var(--paper); margin:0; padding:0 20px 80px; }
-.wrap { max-width:1000px; margin:0 auto; }
+/* ---------- how wide the page is allowed to be ----------
+   One number per tab, read by BOTH the app bar and the content. They used to be set
+   separately, so on a wide screen the bar's buttons sat centred in 1000px over a page
+   using 1920px of it. */
+body { --wrapw:1000px; --pad:20px;
+  font:15px/1.55 -apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; color:var(--ink);
+  background:var(--paper); margin:0; padding:0 var(--pad) 80px; }
+.wrap { max-width:min(var(--wrapw), 100%); margin:0 auto; }
 h1,h2,h3 { font-family:Georgia,"Iowan Old Style","Times New Roman",serif; font-weight:600; text-wrap:balance; }
 h2 { font-size:21px; margin:0 0 4px; }
 h3 { font-size:16px; margin:0 0 6px; }
@@ -22,9 +27,11 @@ a { color:var(--accent-ink); }
 
 /* ---------- app bar ---------- */
 .appbar { position:sticky; top:0; z-index:30; background:linear-gradient(90deg,#1B2634 0%,#25405E 100%);
-  box-shadow:0 2px 12px rgba(15,22,31,.35); margin:0 -20px; }
-.appbar-inner { max-width:1000px; margin:0 auto; padding:9px 20px; display:flex; gap:8px;
-  align-items:center; flex-wrap:wrap; }
+  box-shadow:0 2px 12px rgba(15,22,31,.35); margin:0 calc(-1 * var(--pad)); }
+/* its padding is added back so the bar's contents line up with the page's, whatever
+   width the tab has asked for */
+.appbar-inner { max-width:min(calc(var(--wrapw) + var(--pad) * 2), 100%); margin:0 auto;
+  padding:9px var(--pad); display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
 .appbrand { display:flex; align-items:center; gap:9px; font-family:Georgia,serif; font-size:15.5px;
   font-weight:600; color:#fff; margin-right:6px; white-space:nowrap; }
 .appbrand img { height:24px; display:block; }
@@ -107,7 +114,7 @@ td .chip { margin-bottom:2px; }
 .panelcard { background:var(--card); border:1px solid var(--line); border-radius:10px;
   box-shadow:0 1px 3px rgba(30,40,51,.07); overflow:visible; }
 .toolbar { display:flex; gap:8px; align-items:center; flex-wrap:wrap; padding:14px 16px 12px; }
-.searchwrap { position:relative; flex:1 1 260px; min-width:200px; }
+.searchwrap { position:relative; flex:1 1 260px; min-width:min(200px, 100%); }
 .searchwrap input { width:100%; box-sizing:border-box; padding:9px 30px 9px 34px; font-size:13.5px;
   border-radius:8px; background:#FBFCFD; }
 .searchicon { position:absolute; left:11px; top:50%; transform:translateY(-50%);
@@ -254,11 +261,11 @@ select.rowtpl { width:100%; font-size:12px; padding:4px; border-radius:5px; back
 /* Prose stays at a readable width; the checking step takes whatever the screen
    has. A 17-inch laptop and a widescreen should both be usable, so the width is
    fluid rather than a fixed cap with empty margins either side of it. */
-body[data-tab="tabLetters"] .wrap { max-width:min(2000px, 96vw); }
+body[data-tab="tabLetters"] { --wrapw:2000px; }
 body[data-tab="tabLetters"] #pLetters > header,
 body[data-tab="tabLetters"] #pLetters > .card:not(#batchCard),
 body[data-tab="tabLetters"] #pLetters > .note { max-width:1040px; }
-body[data-tab="tabRoster"] .wrap { max-width:min(1800px, 96vw); }
+body[data-tab="tabRoster"] { --wrapw:1800px; }
 /* No align-items:start here. That shrinks the right column to the panel's own
    height, leaving position:sticky nothing to travel inside — the panel then scrolls
    away with the page. Stretching the column to the row height is what lets it pin. */
@@ -272,7 +279,7 @@ body[data-tab="tabRoster"] .wrap { max-width:min(1800px, 96vw); }
 #batchTbl { min-width:820px; }
 #batchTbl td:nth-child(2) input { min-width:74px; }
 @media (max-width:1080px) {
-  body[data-tab="tabLetters"] .wrap { max-width:min(1000px, 96vw); }
+  body[data-tab="tabLetters"] { --wrapw:1000px; }
   #batchCard.split { display:block; }
   #batchCard.split .prevcol { margin-top:18px; }
   .prevcard { position:static; max-height:none; }
@@ -326,6 +333,40 @@ body[data-tab="tabRoster"] .wrap { max-width:min(1800px, 96vw); }
   .pendrow .pn, .pendrow .pm { min-width:0; flex:1 1 100%; }
 }
 
+/* ---------- small screens ----------
+   Measured rather than guessed, because guessing is what produced this. At 393px the
+   Units table is 665px wide inside a 351px panel that does not scroll, so it pushed
+   the whole PAGE out to 686px and every paragraph on every tab ran off the right
+   edge — which is what a phone was actually showing. History did the same at 721px.
+
+   The rule the page now keeps: a table wider than the screen scrolls inside its own
+   box. The page itself never scrolls sideways. */
+.tscroll { overflow-x:visible; }
+@media (max-width:900px) {
+  .tscroll { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+  /* A sticky heading inside a scroller pins to the scroller instead of the window, so
+     it stops being a heading and becomes a bar floating over the middle of the table. */
+  #rosterTbl th, #histTbl th { position:static; }
+}
+@media (max-width:760px) {
+  body { --pad:12px; }
+  /* The bar was 88px and three rows deep on a phone, with half the tabs off-screen.
+     One row that scrolls, and the signed-in address gives up its space to the tabs. */
+  .appbar-inner { flex-wrap:nowrap; overflow-x:auto; gap:6px; scrollbar-width:none; }
+  .appbar-inner::-webkit-scrollbar { display:none; }
+  .appbar .spacer { flex:0 0 8px; }
+  #who { display:none; }
+  .card { padding:14px; }
+  .toolbar { padding:12px 12px 10px; }
+  .statrow, .inbox { padding-left:12px; padding-right:12px; }
+  h2 { font-size:19px; }
+  .seclede { font-size:13.5px; }
+}
+@media (max-width:520px) {
+  .appbrand .bt { display:none; }         /* the mark is enough; the tabs need the room */
+  .appbrand { margin-right:0; }
+}
+
 /* ---------- letter preview, shown rather than downloaded ----------
    .overlay must be defined here: without it the box sits in normal document flow,
    permanently visible and printed as a page of its own. */
@@ -346,7 +387,7 @@ body[data-tab="tabRoster"] .wrap { max-width:min(1800px, 96vw); }
 /* ---------- unit typeahead (Letters tab) ---------- */
 .ac { position:absolute; z-index:200; background:var(--card); border:1px solid var(--line);
   border-radius:8px; box-shadow:0 12px 34px rgba(20,26,33,.24); overflow-y:auto;
-  max-height:270px; min-width:290px; padding:4px; }
+  max-height:270px; min-width:min(290px, calc(100vw - 24px)); padding:4px; }
 .acitem { display:flex; gap:9px; align-items:center; padding:7px 8px; cursor:pointer;
   border-radius:6px; }
 .acitem.on, .acitem:hover { background:var(--accent-soft); }
@@ -495,7 +536,7 @@ td input.amt { text-align:right; font-variant-numeric:tabular-nums; }
 
 <div class="appbar">
   <div class="appbar-inner">
-    <span class="appbrand"><img id="barLogo" src="" alt="" style="display:none">Arrears Letters</span>
+    <span class="appbrand"><img id="barLogo" src="" alt="" style="display:none"><span class="bt">Arrears Letters</span></span>
     <button class="btn on" id="tabLetters">Letters</button>
     <button class="btn" id="tabRoster">Units</button>
     <button class="btn" id="tabTpl">Templates</button>
@@ -604,7 +645,7 @@ td input.amt { text-align:right; font-variant-numeric:tabular-nums; }
     <div class="step"><span class="stepno">3</span><h3>Choose the letter</h3></div>
     <div class="row" style="gap:16px">
       <label class="fld">Template
-        <select id="tplPick" style="min-width:260px"></select></label>
+        <select id="tplPick" style="width:100%;max-width:260px"></select></label>
       <label class="fld">Date on the letter
         <input type="date" id="letterDate"></label>
       <label class="fld">Days to pay
@@ -709,7 +750,7 @@ td input.amt { text-align:right; font-variant-numeric:tabular-nums; }
     </div>
 
     <div id="peopleHits"></div>
-    <table id="rosterTbl"></table>
+    <div class="tscroll"><table id="rosterTbl"></table></div>
   </div>
 </div>
 
@@ -732,14 +773,14 @@ td input.amt { text-align:right; font-variant-numeric:tabular-nums; }
   <div class="card">
     <div class="row" style="margin-bottom:12px">
       <label class="fld">Editing
-        <select id="tplEdit" style="min-width:300px"></select></label>
+        <select id="tplEdit" style="width:100%;max-width:300px"></select></label>
       <span class="spacer"></span>
       <span class="barnote" id="tplNote" style="color:var(--muted)"></span>
       <button class="btn ghost" id="btnTplReset">Load the standard letters</button>
       <button class="btn primary" id="btnTplSave">Save</button>
     </div>
     <label class="fld" style="margin-bottom:8px">Name of this template
-      <input type="text" id="tplName" style="max-width:400px"></label>
+      <input type="text" id="tplName" style="width:100%;max-width:400px"></label>
     <div class="fields" id="fieldChips"></div>
     <textarea id="tplBody" class="mono" rows="20"></textarea>
     <p class="seclede" style="margin:10px 0 0">
@@ -773,7 +814,7 @@ td input.amt { text-align:right; font-variant-numeric:tabular-nums; }
       <span class="barnote" id="histNote" style="color:var(--muted)"></span>
       <button class="btn" id="btnHistReload">Refresh</button>
     </div>
-    <table id="histTbl"></table>
+    <div class="tscroll"><table id="histTbl"></table></div>
   </div>
 </div>
 
