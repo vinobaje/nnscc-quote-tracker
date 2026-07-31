@@ -1030,7 +1030,10 @@ var DEFAULT_TEMPLATES = [
 "If you have any questions or would like to discuss a payment plan, please contact us directly by replying to this email or calling us at {{phone}}.\n\n" +
 "Attached are the notification and a one-time PAP payment Authorization letter.\n\n" +
 "Thank you for your immediate attention to this important matter.\n\n" +
-"[[SIGNATURE]]"
+"[[SIGNATURE]]\n\n" +
+/* The letter promises an authorization form, so it carries one. .padform breaks to a
+   new sheet on its own, and the plain-text email says which sheet to look on. */
+"[[PAD_FORM]]"
 },
 {
   id: "outstanding-fee", name: "Outstanding common expense fee",
@@ -2103,9 +2106,15 @@ function previewLetters(rows, tpl, opts) {
   var most = Math.max.apply(null, pages);
   $("pvLabel").textContent = rows.length + " letter" + (rows.length === 1 ? "" : "s") +
     " · " + batchTplName(rows);
+  /* A second sheet is either expected or a problem, and which one it is depends on
+     whether the letter carries the authorization form — not on what the template
+     happens to be called. The first notice carries it now and is not named for it. */
+  var carriesForm = rows.some(function (r) {
+    return String((tplFor(r) || {}).body || "").indexOf("[[PAD_FORM]]") >= 0;
+  });
   $("pvFit").textContent = most === 1
     ? "one page each"
-    : most + " pages each — " + (/pre-authorized/i.test(tpl.name)
+    : most + " pages each — " + (carriesForm
         ? "the authorization form is its own sheet"
         : "check the break before printing");
   window.scrollTo(0, 0);
