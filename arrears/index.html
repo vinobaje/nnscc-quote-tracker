@@ -477,6 +477,14 @@ body[data-tab="tabRoster"] { --wrapw:1800px; }
 .letterdoc .pf-fixed { border-bottom:1px solid #26333f; height:16px; font-weight:700; font-size:11pt; }
 .letterdoc .pf-t { font-size:8.5pt; line-height:1.4; color:#3a4450; margin:6px 0; }
 .letterdoc .pf-void { font-size:9pt; margin-top:9px; }
+/* the part the Corporation fills in: stated, not left blank */
+.letterdoc .pf-s { font:700 9pt Georgia,serif; color:#16273f; margin:11px 0 5px;
+  padding-bottom:2px; border-bottom:1px solid #d3dae2; }
+.letterdoc .pf-d { display:flex; gap:10px; font-size:9.5pt; line-height:1.45; margin:2px 0; }
+.letterdoc .pf-dl { flex:none; width:132px; color:#5a6472; }
+.letterdoc .pf-dv { color:#16273f; }
+.letterdoc .pf-reply { margin-top:10px; padding:7px 9px; background:#f2f6fa;
+  border:1px solid #d3dae2; border-radius:4px; font-size:9pt; }
 .letterdoc .foot { margin-top:16px; border-top:1px solid #cdd5df; padding-top:6px; font-size:8pt;
   color:#7a838f; display:flex; justify-content:space-between; break-inside:avoid; }
 
@@ -1062,18 +1070,24 @@ var DEFAULT_TEMPLATES = [
 },
 {
   id: "pap-onetime", name: "One-time PAP payment authorization",
+  /* Sarah's own authorization form. It asks for assent, not for bank details:
+     every owner it goes to is already on the monthly PAP plan, so the account is
+     on file and only the extra withdrawal needs authorizing. */
   body:
-"# {{corp_full}}\n\n" +
-"# Chargeback Authorization Form\n\n" +
-"**Unit information**\nUnit number: {{unit}}\nOwner's name: {{owner}}\n{{co_line}}Located at: {{office_addr}}\n\n" +
-"**Chargeback details**\nAmount authorized: **{{amount}}**\nDescription: {{description}}\nDate of withdrawal: {{withdrawal_date}}\n\n" +
-"**Authorization**\n\n" +
-"I, the undersigned, hereby authorize {{manager}} on behalf of {{reg_no_short}} to withdraw the above noted amount from my bank account currently on file under the Pre-Authorized Payment (PAP) plan.\n\n" +
-"This authorization applies to a one-time chargeback transaction only and does not alter or affect my ongoing monthly condominium fee withdrawals.\n\n" +
-"I understand that sufficient funds must be available in my account on the specified withdrawal date, and I will be responsible for any fees related to insufficient funds.\n\n" +
-"**Acknowledgment and consent**\n\n" +
-"By signing below, I confirm that I have read, understood, and agree to the terms of this authorization.\n\n" +
-"[[SIGN_LINES]]"
+"# One-Time Pre-Authorized Payment Authorization\n" +
+"\n" +
+"Dear {{owner}},\n" +
+"\n" +
+"{{co_line}}\n" +
+"Further to the notice sent to you regarding Unit {{unit}}, this authorizes the Corporation to collect **{{amount}}** by a single withdrawal from the bank account already on file under your monthly Pre-Authorized Payment (PAP) plan. It authorizes **one withdrawal only** and does not change or replace your monthly payments.\n" +
+"\n" +
+"No banking information is needed. The Corporation has completed the form below from its own records — all that is missing is your assent.\n" +
+"\n" +
+"[[PAD_FORM]]\n" +
+"\n" +
+"If any detail above is wrong, or you would rather arrange payment another way, reply to this email or call the office at {{phone}} before the withdrawal date and nothing will be taken.\n" +
+"\n" +
+"[[SIGNATURE]"
 },
 {
   id: "chargeback-consent", name: "Chargeback consent acknowledgement",
@@ -1299,30 +1313,60 @@ function signatureBlock() {
    details, the amount, the recourse statement and the cancellation terms. The
    banking numbers are left blank ON PURPOSE — the owner writes them in and hands
    the paper back. Nothing in this tool ever collects an account number. */
+/* The authorization form as the Corporation actually uses it.
+
+   It asked for a transit number, an institution number, an account number and a VOID
+   cheque — the form you would use to set somebody up from scratch. That is not what
+   this is. Every owner it goes to is already on the monthly Pre-Authorized Payment
+   plan, so the Corporation HAS the account; what it needs authorized is one extra
+   withdrawal from it. Asking again put a resident's banking details into an email
+   reply for no reason at all.
+
+   So it now mirrors Sarah's own document: the Corporation fills in everything it
+   already knows — unit, owner, agent, amount, what for, and when — and the only thing
+   left blank is the owner's assent. */
+function padDetail(label, value) {
+  if (!value) return "";
+  return '<div class="pf-d"><span class="pf-dl">' + label + "</span>" +
+    '<span class="pf-dv">' + value + "</span></div>";
+}
 function padFormBlock(f) {
-  function line(label, w) {
-    return '<div class="pf-l" style="flex:' + (w || 1) + '"><span class="pf-lab">' + label + "</span><span class=\"pf-rule\"></span></div>";
-  }
+  var agent = String(f.co_line || "").replace(/^C\/O:\s*/, "").replace(/\n$/, "");
   return '<div class="padform">' +
-    '<div class="pf-h">One-Time (Sporadic) Pre-Authorized Debit — Payor\'s Authorization</div>' +
-    '<div class="pf-row">' + line("Payor name (as it appears on the account)") + "</div>" +
-    '<div class="pf-row">' + line("Address") + "</div>" +
-    '<div class="pf-row">' + line("Financial institution") + line("Branch address") + "</div>" +
-    '<div class="pf-row">' + line("Transit no. (5 digits)") + line("Institution no. (3)") + line("Account no.") + "</div>" +
-    '<div class="pf-row"><div class="pf-l" style="flex:1"><span class="pf-lab">Amount of the single withdrawal</span>' +
-      '<span class="pf-fixed">' + f.amount + "</span></div>" + line("To be withdrawn on or after") + "</div>" +
-    '<p class="pf-t">I authorize ' + f.condo + " (" + f.reg_no + "), and the financial institution named above, to debit the account identified above " +
-    "for the single amount shown, on or after the date shown. This is a one-time (sporadic) Pre-Authorized Debit for personal use. " +
-    "I understand that this authorization is for one withdrawal only and does not create a recurring pre-authorized debit plan.</p>" +
-    '<p class="pf-t">I waive the right to receive pre-notification of the amount and date of this one-time debit.</p>' +
-    '<p class="pf-t">I have certain recourse rights if any debit does not comply with this agreement. For example, I have the right to receive ' +
-    "reimbursement for any debit that is not authorized or is not consistent with this authorization. To obtain more information on my recourse rights, " +
-    "I may contact my financial institution or visit payments.ca.</p>" +
-    '<p class="pf-t">I may revoke this authorization at any time up to ten (10) business days before the withdrawal date by giving written notice to the ' +
-    "property manager at " + esc(CORP.officeAddr) + " (telephone " + esc(CORP.phone) + ", " + esc(CORP.contact) +
-    "). Revoking this authorization does not affect my obligation to pay the amount owing.</p>" +
-    '<div class="pf-row" style="margin-top:14px">' + line("Signature of payor") + line("Date") + "</div>" +
-    '<p class="pf-t pf-void">Please attach a cheque marked <strong>VOID</strong> drawn on the account above.</p>' +
+    '<div class="pf-h">One-Time Pre-Authorized Payment — Authorization</div>' +
+
+    '<div class="pf-s">Unit information</div>' +
+    padDetail("Unit number", f.unit) +
+    padDetail("Owner's name", f.owner) +
+    padDetail("C/O", agent) +
+    padDetail("Located at", esc(CORP.officeAddr)) +
+
+    '<div class="pf-s">Payment details</div>' +
+    padDetail("Amount authorized", "<b>" + f.amount + "</b>") +
+    padDetail("Description", f.description) +
+    padDetail("Date of withdrawal", f.withdrawal_date) +
+
+    '<div class="pf-s">Authorization</div>' +
+    '<p class="pf-t">I, the undersigned, hereby authorize ' + esc(CORP.manager) + " on behalf of " +
+    esc(CORP.regNoShort) + " to withdraw the above noted amount from my bank account currently " +
+    "on file under the Pre-Authorized Payment (PAP) plan.</p>" +
+    '<p class="pf-t">This authorization applies to a one-time transaction only and does not alter ' +
+    "or affect my ongoing monthly condominium fee withdrawals.</p>" +
+    '<p class="pf-t">I understand that sufficient funds must be available in my account on the ' +
+    "specified withdrawal date, and I will be responsible for any fees related to insufficient funds.</p>" +
+
+    '<div class="pf-s">Acknowledgment &amp; consent</div>' +
+    '<p class="pf-t">By signing below, I confirm that I have read, understood, and agree to the ' +
+    "terms of this authorization.</p>" +
+    signLines(f) +
+    /* The route almost everyone will actually take. Rule H1 lets a PAD be authorized
+       by e-mail; what it wants is that the terms were shown and that a copy can be
+       produced afterwards, both of which a reply quoting this letter satisfies. */
+    '<p class="pf-t pf-reply"><b>Or authorize by reply.</b> You do not have to print this. ' +
+    "Reply to the email this came with" +
+    (f.owner_email && f.owner_email.indexOf("____") < 0 ? " from " + f.owner_email : "") +
+    ", quoting it, with the words <b>I AUTHORIZE</b>. Your reply is your authorization and " +
+    "is kept on file with this form.</p>" +
     "</div>";
 }
 
@@ -1728,7 +1772,9 @@ function assertOneUnit(row, o, expectTo) {
    or id, so renaming the template cannot quietly detach it. */
 function padTemplate() {
   for (var i = 0; i < A.templates.length; i++) {
-    if (/\[\[PAD_FORM\]\]/.test(A.templates[i].body || "")) return A.templates[i];
+    /* either marker: the whole pre-filled block, or just the ruled lines under wording
+       she has laid out herself */
+    if (/\[\[(PAD_FORM|SIGN_LINES)\]\]/.test(A.templates[i].body || "")) return A.templates[i];
   }
   return null;
 }
