@@ -1013,15 +1013,22 @@ function unitKey(u) { return String(u == null ? "" : u).trim().toUpperCase().rep
 var DEFAULT_TEMPLATES = [
 {
   id: "arrears-email", name: "Arrears notification — covering email",
+  /* CPO's own wording, as supplied, with the unit, the amount and the office number
+     turned into fields so nothing has to be retyped per resident. One word added: the
+     original read "the total overdue amount is $237.30  amount represents", which has
+     lost a "This" somewhere between drafts. */
   body:
-"Dear {{owner}},\n\n" +
-"This letter formally notifies you that the account for your property, Unit {{unit}}, is currently in arrears.\n\n" +
-"Our records indicate that the total overdue amount is **{{amount}}**. This amount represents outstanding fees, payments and/or chargebacks that are past their due date.\n\n" +
-"We understand that oversights can happen, but prompt payment is required to maintain the financial health and compliance of the building.\n\n" +
-"**Required action.** Please remit the full amount of {{amount}} immediately to bring your account into good standing. If payment is not received within five (5) business days of this notice, we may be required to take further action as outlined in the Corporation's governing documents.\n\n" +
-"If you have already made this payment, please disregard this notice and contact us with proof of payment so we can update our records.\n\n" +
-"Acceptable payment methods: one-time Pre-Authorized Payment, cheque, or bank draft. **We do not accept e-transfers or credit cards.**\n\n" +
-"If you have any questions or would like to discuss a payment plan, please contact us by replying to this notice or by calling {{phone}}.\n\n" +
+"Dear Resident,\n\n" +
+"This email formally notifies you that the account for your property, Unit {{unit}}, is currently in arrears.\n\n" +
+"Our records indicate that the total overdue amount is **{{amount}}**. This amount represents outstanding fees/payments and/or chargebacks that are past their due date.\n\n" +
+"We understand that oversights can happen, but prompt payment is required to maintain the financial health and compliance of our community/building.\n\n" +
+"**Required Action:**\n" +
+"Please remit the full amount of {{amount}} immediately to bring your account up to good standing. If payment is not received within 5 days of this notice, we may be required to take further action as outlined in our governing documents.\n" +
+"If you have already made this payment, please disregard this notice and contact us with proof of payment so we can update our records.\n" +
+"Acceptable payment methods: one-time Pre-Authorized Payment, Cheque or Bank Draft.\n" +
+"We do not accept e-transfers or credit cards.\n\n" +
+"If you have any questions or would like to discuss a payment plan, please contact us directly by replying to this email or calling us at {{phone}}.\n\n" +
+"Attached are the notification and a one-time PAP payment Authorization letter.\n\n" +
 "Thank you for your immediate attention to this important matter.\n\n" +
 "[[SIGNATURE]]"
 },
@@ -1615,8 +1622,12 @@ function letterPlainText(row, tpl, opts) {
   s = s.replace(/\[\[SIGNATURE\]\]/g,
     "Yours truly,\n\n" + CORP.signer + "\n" + CORP.signerTitle + ", " + CORP.manager + "\n" +
     CORP.agentLine + "\n" + CORP.condoFull + "\n" + CORP.officeAddr + "\nPhone: " + CORP.phone);
-  return s.replace(/\n{3,}/g, "\n\n").replace(/^\s+|\s+$/g, "") +
-    "\n\nA copy of this notice is attached as a PDF.";
+  var out = s.replace(/\n{3,}/g, "\n\n").replace(/^\s+|\s+$/g, "");
+  /* The wording may already say what is attached — CPO's own first notice does. Saying
+     it a second time in the app's words reads like a machine talking over her. */
+  return /\battach(ed|ment|ments)\b/i.test(out)
+    ? out
+    : out + "\n\nA copy of this notice is attached as a PDF.";
 }
 
 /* owners only, opted in only — a tenant must never receive the owner's arrears */
