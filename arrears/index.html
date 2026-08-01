@@ -491,7 +491,10 @@ body[data-tab="tabRoster"] { --wrapw:1800px; }
 .letterdoc .pf-dv { color:#16273f; }
 .letterdoc .pf-reply { margin-top:7px; padding:5px 8px; background:#f2f6fa;
   border:1px solid #d3dae2; border-radius:4px; font-size:8.5pt; }
-.letterdoc .foot { margin-top:10px; border-top:1px solid #cdd5df; padding-top:5px; font-size:8pt;
+/* where to write back to, in place of a signature */
+.letterdoc .office { margin-top:20px; padding-top:7px; border-top:1.2px solid #26333f;
+  font-size:9pt; line-height:1.45; color:#3a4450; break-inside:avoid; }
+.letterdoc .foot { margin-top:6px; padding-top:0; font-size:8pt;
   color:#7a838f; display:flex; justify-content:space-between; break-inside:avoid; }
 
 @media print {
@@ -1055,10 +1058,10 @@ var DEFAULT_TEMPLATES = [
 "We do not accept e-transfers or credit cards.\n\n" +
 "If you have any questions or would like to discuss a payment plan, please contact us directly by replying to this email or calling us at {{phone}}.\n\n" +
 "Attached are the notification and a one-time PAP payment Authorization letter.\n\n" +
-"Thank you for your immediate attention to this important matter.\n\n" +
-/* No [[PAD_FORM]] here on purpose. The letter says two documents are attached, so two
-   documents are sent: this one, and the authorization letter rendered on its own. */
-"[[SIGNATURE]]"
+/* No [[PAD_FORM]] here on purpose: the letter says two documents are attached, so two
+   are sent — this one, and the authorization rendered as its own letter. And no
+   [[SIGNATURE]]: these go out over the office, not over a person's name. */
+"Thank you for your immediate attention to this important matter."
 },
 {
   id: "outstanding-fee", name: "Outstanding common expense fee",
@@ -1071,8 +1074,7 @@ var DEFAULT_TEMPLATES = [
 "According to the Condominium Act, Section 85 (1), if an owner defaults in the obligation to contribute to the common expenses, the Corporation may register a lien against the owner's unit and its appurtenant common interest for the unpaid amount, together with all interest owing and all reasonable legal costs and reasonable expenses incurred by the Corporation in connection with the collection or attempted collection of the unpaid amount.\n\n" +
 "Acceptable payment methods: one-time Pre-Authorized Payment, cheque, or bank draft. **We do not accept e-transfers or credit cards.**\n\n" +
 "Kindly remit your payment within five (5) business days. Your cheque should be made payable to **{{reg_no_short}}** and delivered to the management office in the amenities building.\n\n" +
-"Please contact the Property Manager at {{contact}} in order to reconcile your account.\n\n" +
-"[[SIGNATURE]]"
+"Please contact the Property Manager at {{contact}} in order to reconcile your account."
 },
 {
   id: "pap-onetime", name: "One-time PAP payment authorization",
@@ -1085,9 +1087,7 @@ var DEFAULT_TEMPLATES = [
 "{{co_line}}\n" +
 "Further to the notice sent to you regarding Unit {{unit}}, this authorizes **one withdrawal** of **{{amount}}** from the bank account already on file under your monthly Pre-Authorized Payment (PAP) plan. Your monthly payments are unchanged. If any detail below is wrong, or you would rather pay another way, reply or call {{phone}} before that date and nothing will be taken.\n" +
 "\n" +
-"[[PAD_FORM]]\n" +
-"\n" +
-"[[SIGNATURE]"
+"[[PAD_FORM]]"
 },
 {
   id: "chargeback-consent", name: "Chargeback consent acknowledgement",
@@ -1258,6 +1258,8 @@ function renderBody(tplText, fields) {
     var b = blocks[i].replace(/^\s+|\s+$/g, "");
     if (!b) continue;
     if (b === "---") { out.push("<hr>"); continue; }
+    /* still honoured, just not used by any of the standard letters any more: type
+       [[SIGNATURE]] into a template and a named sign-off comes back */
     if (b === "[[SIGNATURE]]") { out.push(signatureBlock()); continue; }
     if (b === "[[PAD_FORM]]") { out.push(padFormBlock(fields)); continue; }
     if (b === "[[SIGN_LINES]]") { out.push(signLines(fields)); continue; }
@@ -1342,10 +1344,9 @@ function padFormBlock(f) {
   return '<div class="padform">' +
     '<div class="pf-h">One-Time Pre-Authorized Payment — Authorization</div>' +
 
-    /* No "Located at" row: the building's address is already in the letterhead above
-       and the signature below, and a third copy of it cost the page its signature. */
     '<div class="pf-s">Unit information</div>' +
-    padDetails([["Unit number", f.unit], ["Owner's name", f.owner], ["C/O", agent]]) +
+    padDetails([["Unit number", f.unit], ["Owner's name", f.owner], ["C/O", agent],
+                ["Located at", esc(CORP.officeAddr)]]) +
 
     '<div class="pf-s">Payment details</div>' +
     padDetails([["Amount authorized", "<b>" + f.amount + "</b>"],
@@ -1363,9 +1364,7 @@ function padFormBlock(f) {
     '<p class="pf-t">I understand that sufficient funds must be available in my account on the ' +
     "specified withdrawal date, and I will be responsible for any fees related to insufficient funds.</p>" +
 
-    /* Her "Acknowledgment & consent" heading sat above a single sentence that says the
-       same thing. The sentence is what carries the meaning, so it stays and the heading
-       goes — which is also what keeps the signature off a second sheet. */
+    '<div class="pf-s">Acknowledgment &amp; consent</div>' +
     '<p class="pf-t">By signing below, I confirm that I have read, understood, and agree to the ' +
     "terms of this authorization.</p>" +
     signLines(f) +
@@ -1402,6 +1401,12 @@ function letterHtml(row, tpl, opts) {
   h.push('<div class="addr"><span class="nm">' + f.owner + "</span>" +
     (row.address ? "<br>" + esc(row.address).split("\n").join("<br>") : "") + "</div>");
   h.push(renderBody(tpl.body, f));
+  /* The letters are not signed by a person. That makes the footer the only place the
+     reader is told who to contact, so it carries the office rather than just a
+     reference line — a demand for money with no way to reply to it is not one worth
+     sending. */
+  h.push('<div class="office">' + esc(CORP.manager) + " · " + esc(CORP.agentLine) +
+    "<br>" + esc(CORP.officeAddr) + " · " + esc(CORP.phone) + " · " + esc(CORP.contact) + "</div>");
   h.push('<div class="foot"><span>' + esc(CORP.condo) + " · Unit " + f.unit +
     "</span><span>" + esc(tpl.name) + "</span></div>");
   h.push("</div>");
@@ -1696,8 +1701,9 @@ function letterPlainText(row, tpl, opts) {
   });
   s = s.replace(/\*\*([^*]+)\*\*/g, "$1").replace(/^# /gm, "").replace(/^---$/gm, "");
   s = s.replace(/\[\[PAD_FORM\]\]/g,
-    "The authorization form is on the second page of the attached letter. " +
-    "Please print it, complete it, sign it and return it to the property manager.");
+    "The authorization form is the second document attached to this email. You do not " +
+    "have to print it: reply to this email, quoting it, with the words I AUTHORIZE and " +
+    "your reply is your authorization.");
   s = s.replace(/\[\[SIGN_LINES\]\]/g,
     "Signature of owner: ______________________   Date: ______________\n" +
     "Printed name: ____________________________   Email: " + (f.owner_email || "______________"));
@@ -1709,6 +1715,11 @@ function letterPlainText(row, tpl, opts) {
   s = s.replace(/\[\[SIGNATURE\]\]/g,
     "Yours truly,\n\n" + CORP.signer + "\n" + CORP.signerTitle + ", " + CORP.manager + "\n" +
     CORP.agentLine + "\n" + CORP.condoFull + "\n" + CORP.officeAddr + "\nPhone: " + CORP.phone);
+  /* The letters carry no personal signature, so the email closes the way the PDF
+     does — with the office, not with nothing. */
+  s += "\n\n--\n" + CORP.condo + " · " + CORP.regNo + "\n" +
+    CORP.manager + " · " + CORP.agentLine + "\n" +
+    CORP.officeAddr + "\n" + CORP.phone + " · " + CORP.contact;
   var out = s.replace(/\n{3,}/g, "\n\n").replace(/^\s+|\s+$/g, "");
   /* The wording may already say what is attached — CPO's own first notice does. Saying
      it a second time in the app's words reads like a machine talking over her. */
