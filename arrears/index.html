@@ -450,42 +450,48 @@ body[data-tab="tabRoster"] { --wrapw:1800px; }
 .letterdoc .lh .corp { flex:1; }
 .letterdoc .lh .cn { font:700 15.5pt/1.15 Georgia,serif; color:#16273f; letter-spacing:.2px; }
 .letterdoc .lh .cs { font-size:9.5pt; color:#4a5566; margin-top:2px; }
-.letterdoc .dt { margin:14px 0 10px; font-size:10.5pt; color:#4a5566; }
-.letterdoc .addr { font-size:11pt; line-height:1.4; margin-bottom:15px; }
+.letterdoc .dt { margin:11px 0 8px; font-size:10.5pt; color:#4a5566; }
+.letterdoc .addr { font-size:11pt; line-height:1.36; margin-bottom:11px; }
 .letterdoc .addr .nm { font-weight:700; }
 .letterdoc h2 { font:600 12.5pt Georgia,serif; letter-spacing:1px; text-transform:uppercase;
   text-align:center; margin:0 0 12px; break-after:avoid; page-break-after:avoid; }
 .letterdoc p { margin:8px 0; orphans:2; widows:2; }
 .letterdoc hr { border:none; border-top:1px solid #b7c0cc; margin:13px 0; }
-.letterdoc .sig { margin-top:18px; break-inside:avoid; page-break-inside:avoid; }
-.letterdoc .sigline { border-bottom:1.2px solid #26333f; width:62mm; height:28px; margin:3px 0 5px; }
-.letterdoc .signame { font-size:10.5pt; margin:0; line-height:1.4; }
+.letterdoc .sig { margin-top:8px; break-inside:avoid; page-break-inside:avoid; }
+.letterdoc .sigline { border-bottom:1.2px solid #26333f; width:62mm; height:22px; margin:2px 0 4px; }
+.letterdoc .signame { font-size:10.5pt; margin:0; line-height:1.32; }
 /* The authorization is a form to sign and send back, so it starts its own sheet:
    the covering letter explains, page two is the thing that gets returned. Left to
    fall naturally it is too tall for the space under the letter and jumps anyway,
    stranding half a blank page behind it. */
-.letterdoc .padform { border:1.5px solid #16273f; border-radius:5px; padding:13px 15px; margin:14px 0;
-  break-inside:avoid; page-break-inside:avoid;
-  break-before:page; page-break-before:always; }
-.letterdoc .padform:first-child { break-before:auto; page-break-before:auto; }
+/* No forced page break. It used to be a second sheet folded into the notice, so it
+   broke to a page of its own; it is its own letter now and belongs directly under the
+   two lines that introduce it. */
+.letterdoc .padform { border:1.5px solid #16273f; border-radius:5px; padding:9px 12px; margin:9px 0 8px;
+  break-inside:avoid; page-break-inside:avoid; }
 .letterdoc .pf-h { font:700 10.5pt Georgia,serif; color:#16273f; text-transform:uppercase;
   letter-spacing:.6px; border-bottom:1px solid #b7c0cc; padding-bottom:5px; margin-bottom:11px; }
-.letterdoc .pf-row { display:flex; gap:14px; margin-bottom:14px; }
+.letterdoc .pf-row { display:flex; gap:14px; margin-bottom:10px; }
 .letterdoc .pf-l { display:flex; flex-direction:column-reverse; }
 .letterdoc .pf-lab { font:8.5pt/1.2 -apple-system,Helvetica,Arial,sans-serif; color:#5a6472; margin-top:3px; }
-.letterdoc .pf-rule { border-bottom:1px solid #26333f; height:16px; }
-.letterdoc .pf-fixed { border-bottom:1px solid #26333f; height:16px; font-weight:700; font-size:11pt; }
-.letterdoc .pf-t { font-size:8.5pt; line-height:1.4; color:#3a4450; margin:6px 0; }
+.letterdoc .pf-rule { border-bottom:1px solid #26333f; height:13px; }
+.letterdoc .pf-fixed { border-bottom:1px solid #26333f; height:13px; font-weight:700; font-size:11pt; }
+.letterdoc .pf-t { font-size:8.5pt; line-height:1.32; color:#3a4450; margin:3px 0; }
 .letterdoc .pf-void { font-size:9pt; margin-top:9px; }
-/* the part the Corporation fills in: stated, not left blank */
-.letterdoc .pf-s { font:700 9pt Georgia,serif; color:#16273f; margin:11px 0 5px;
+/* The part the Corporation fills in: stated, not left blank. Tight on purpose — this
+   is a one-page document in Sarah's own file and it should stay one page here, or the
+   signature ends up alone on a second sheet with nothing else on it. */
+.letterdoc .pf-s { font:700 8.5pt Georgia,serif; color:#16273f; margin:6px 0 2px;
   padding-bottom:2px; border-bottom:1px solid #d3dae2; }
-.letterdoc .pf-d { display:flex; gap:10px; font-size:9.5pt; line-height:1.45; margin:2px 0; }
-.letterdoc .pf-dl { flex:none; width:132px; color:#5a6472; }
+.letterdoc .pf-grid { display:grid; grid-template-columns:1fr 1fr; column-gap:16px; }
+.letterdoc .pf-d { display:flex; gap:8px; font-size:9pt; line-height:1.3; margin:0; }
+.letterdoc .pf-wide { margin-top:1px; }
+.letterdoc .pf-dl { flex:none; width:104px; color:#5a6472; }
+.letterdoc .pf-dv { overflow-wrap:anywhere; }
 .letterdoc .pf-dv { color:#16273f; }
-.letterdoc .pf-reply { margin-top:10px; padding:7px 9px; background:#f2f6fa;
-  border:1px solid #d3dae2; border-radius:4px; font-size:9pt; }
-.letterdoc .foot { margin-top:16px; border-top:1px solid #cdd5df; padding-top:6px; font-size:8pt;
+.letterdoc .pf-reply { margin-top:7px; padding:5px 8px; background:#f2f6fa;
+  border:1px solid #d3dae2; border-radius:4px; font-size:8.5pt; }
+.letterdoc .foot { margin-top:10px; border-top:1px solid #cdd5df; padding-top:5px; font-size:8pt;
   color:#7a838f; display:flex; justify-content:space-between; break-inside:avoid; }
 
 @media print {
@@ -1070,22 +1076,16 @@ var DEFAULT_TEMPLATES = [
 },
 {
   id: "pap-onetime", name: "One-time PAP payment authorization",
-  /* Sarah's own authorization form. It asks for assent, not for bank details:
-     every owner it goes to is already on the monthly PAP plan, so the account is
-     on file and only the extra withdrawal needs authorizing. */
+  /* Sarah's own authorization form. It asks for assent, not for bank details: every
+     owner it goes to is already on the monthly PAP plan, so the account is on file and
+     only the extra withdrawal needs authorizing. Kept to one page. */
   body:
-"# One-Time Pre-Authorized Payment Authorization\n" +
-"\n" +
 "Dear {{owner}},\n" +
 "\n" +
 "{{co_line}}\n" +
-"Further to the notice sent to you regarding Unit {{unit}}, this authorizes the Corporation to collect **{{amount}}** by a single withdrawal from the bank account already on file under your monthly Pre-Authorized Payment (PAP) plan. It authorizes **one withdrawal only** and does not change or replace your monthly payments.\n" +
-"\n" +
-"No banking information is needed. The Corporation has completed the form below from its own records — all that is missing is your assent.\n" +
+"Further to the notice sent to you regarding Unit {{unit}}, this authorizes **one withdrawal** of **{{amount}}** from the bank account already on file under your monthly Pre-Authorized Payment (PAP) plan. Your monthly payments are unchanged. If any detail below is wrong, or you would rather pay another way, reply or call {{phone}} before that date and nothing will be taken.\n" +
 "\n" +
 "[[PAD_FORM]]\n" +
-"\n" +
-"If any detail above is wrong, or you would rather arrange payment another way, reply to this email or call the office at {{phone}} before the withdrawal date and nothing will be taken.\n" +
 "\n" +
 "[[SIGNATURE]"
 },
@@ -1325,26 +1325,34 @@ function signatureBlock() {
    So it now mirrors Sarah's own document: the Corporation fills in everything it
    already knows — unit, owner, agent, amount, what for, and when — and the only thing
    left blank is the owner's assent. */
-function padDetail(label, value) {
-  if (!value) return "";
-  return '<div class="pf-d"><span class="pf-dl">' + label + "</span>" +
-    '<span class="pf-dv">' + value + "</span></div>";
+/* Two to a row. Six of these stacked single-file cost 96px of a 950px page and pushed
+   the signature onto a second sheet with nothing else on it. Empty ones drop out, so a
+   unit with no agent simply has one fewer. */
+function padDetails(pairs) {
+  var out = [];
+  for (var i = 0; i < pairs.length; i++) {
+    if (!pairs[i][1]) continue;
+    out.push('<div class="pf-d"><span class="pf-dl">' + pairs[i][0] + "</span>" +
+      '<span class="pf-dv">' + pairs[i][1] + "</span></div>");
+  }
+  return out.length ? '<div class="pf-grid">' + out.join("") + "</div>" : "";
 }
 function padFormBlock(f) {
   var agent = String(f.co_line || "").replace(/^C\/O:\s*/, "").replace(/\n$/, "");
   return '<div class="padform">' +
     '<div class="pf-h">One-Time Pre-Authorized Payment — Authorization</div>' +
 
+    /* No "Located at" row: the building's address is already in the letterhead above
+       and the signature below, and a third copy of it cost the page its signature. */
     '<div class="pf-s">Unit information</div>' +
-    padDetail("Unit number", f.unit) +
-    padDetail("Owner's name", f.owner) +
-    padDetail("C/O", agent) +
-    padDetail("Located at", esc(CORP.officeAddr)) +
+    padDetails([["Unit number", f.unit], ["Owner's name", f.owner], ["C/O", agent]]) +
 
     '<div class="pf-s">Payment details</div>' +
-    padDetail("Amount authorized", "<b>" + f.amount + "</b>") +
-    padDetail("Description", f.description) +
-    padDetail("Date of withdrawal", f.withdrawal_date) +
+    padDetails([["Amount authorized", "<b>" + f.amount + "</b>"],
+                ["Date of withdrawal", f.withdrawal_date]]) +
+    /* on its own line: it is a sentence, not a field */
+    (f.description ? '<div class="pf-d pf-wide"><span class="pf-dl">Description</span>' +
+      '<span class="pf-dv">' + f.description + "</span></div>" : "") +
 
     '<div class="pf-s">Authorization</div>' +
     '<p class="pf-t">I, the undersigned, hereby authorize ' + esc(CORP.manager) + " on behalf of " +
@@ -1355,7 +1363,9 @@ function padFormBlock(f) {
     '<p class="pf-t">I understand that sufficient funds must be available in my account on the ' +
     "specified withdrawal date, and I will be responsible for any fees related to insufficient funds.</p>" +
 
-    '<div class="pf-s">Acknowledgment &amp; consent</div>' +
+    /* Her "Acknowledgment & consent" heading sat above a single sentence that says the
+       same thing. The sentence is what carries the meaning, so it stays and the heading
+       goes — which is also what keeps the signature off a second sheet. */
     '<p class="pf-t">By signing below, I confirm that I have read, understood, and agree to the ' +
     "terms of this authorization.</p>" +
     signLines(f) +
