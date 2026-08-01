@@ -474,8 +474,14 @@ body[data-tab="tabRoster"] { --wrapw:1800px; }
 .letterdoc .pf-row { display:flex; gap:14px; margin-bottom:10px; }
 .letterdoc .pf-l { display:flex; flex-direction:column-reverse; }
 .letterdoc .pf-lab { font:8.5pt/1.2 -apple-system,Helvetica,Arial,sans-serif; color:#5a6472; margin-top:3px; }
-.letterdoc .pf-rule { border-bottom:1px solid #26333f; height:13px; }
-.letterdoc .pf-fixed { border-bottom:1px solid #26333f; height:13px; font-weight:700; font-size:11pt; }
+.letterdoc .pf-rule { border-bottom:1px solid #26333f; height:15px; }
+/* A field the Corporation has already filled in. It is a box with a rule under it, so
+   the box has to be tall enough for its own text — at 13px with 11pt type the address
+   overflowed and the rule struck straight through it. Sized from the line height now,
+   and set at the same 9.5pt as every other filled-in value on the form. */
+.letterdoc .pf-fixed { border-bottom:1px solid #26333f; color:#16273f;
+  font:700 9.5pt/1.5 Georgia,"Times New Roman",serif;
+  padding-bottom:2px; overflow-wrap:anywhere; }
 .letterdoc .pf-t { font-size:8.5pt; line-height:1.32; color:#3a4450; margin:3px 0; }
 .letterdoc .pf-void { font-size:9pt; margin-top:9px; }
 /* The part the Corporation fills in: stated, not left blank. Tight on purpose — this
