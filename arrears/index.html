@@ -1765,6 +1765,13 @@ function assertOneUnit(row, o, expectTo) {
      stated up front and checked against what was actually built, never inferred from
      it. */
   if (!emailableOwners(u).length) throw new Error("no emailable owner for unit " + u);
+  /* A formal demand for $0.00 is not a letter anybody should receive. The button that
+     starts a batch is disabled when a row has no amount, but a disabled button is a
+     courtesy and this is the guarantee — it is checked here, where the letter is
+     actually built, for the same reason the unit is. */
+  if (!(Number(row.amount) > 0)) {
+    throw new Error("unit " + u + " has no amount — a notice cannot demand " + money(0));
+  }
   if (expectTo == null) expectTo = emailableOwners(u).join(", ");
   if (o.to !== expectTo) {
     throw new Error("recipient " + o.to + " is not the owner on file for unit " + u);
@@ -1810,8 +1817,17 @@ function promisesPadForm(tpl) {
 function padDocFor(row, opts) {
   var pad = padTemplate();
   if (!pad) return Promise.resolve(null);
-  return renderPdf([row], pad, opts).then(function (b64) {
-    return { filename: pdfName([row], pad), pdfB64: b64 };
+  /* Every helper in here resolves a row's letter with tplFor(row) — which reads the
+     row, not the template argument beside it. Handing them the form template while the
+     row still said "first notice" got the first notice rendered twice, under the same
+     filename, and attached to itself. So the row is copied and the copy asks for the
+     form; then the renderer, the filename and the page title all agree without any of
+     them needing to be told twice. */
+  var asForm = {}, k;
+  for (k in row) if (Object.prototype.hasOwnProperty.call(row, k)) asForm[k] = row[k];
+  asForm.tplId = pad.id;
+  return renderPdf([asForm], pad, opts).then(function (b64) {
+    return { filename: pdfName([asForm], pad), pdfB64: b64 };
   });
 }
 function createGmailDraft(token, row, tpl, opts, pdfB64, extraFiles) {
@@ -1903,12 +1919,12 @@ function emailDrafts(rows, tpl, opts) {
     gmailWhoami(token).then(function (who) { return offerTestMode(who); })
       .then(function () { step(0); },
       function (e) {
-        $("btnEmail").disabled = false;
+        batchSummary();   /* derive the button state, never assume it */
         note("genNote", (e && e.message) || "Could not tell which Gmail account this is.", true);
       });
     function step(i) {
       if (i >= can.length) {
-        $("btnEmail").disabled = false;
+        batchSummary();   /* derive the button state, never assume it */
         if (made.length) logBatch(made, tpl, opts, "email-draft");
         note("genNote", made.length + " draft" + (made.length === 1 ? "" : "s") +
           " waiting in Gmail — read them there, then send them all from the list below" +
@@ -1937,7 +1953,7 @@ function emailDrafts(rows, tpl, opts) {
         .then(function () { step(i + 1); });
     }
   }, function (msg) {
-    $("btnEmail").disabled = false;
+    batchSummary();   /* derive the button state, never assume it */
     note("genNote", msg, true);
   });
 }
