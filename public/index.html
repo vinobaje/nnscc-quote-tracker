@@ -1951,6 +1951,23 @@ try {
 function deepCopy(o) { return JSON.parse(JSON.stringify(o)); }
 
 /* ---------- change descriptions for the audit trail ---------- */
+/* How a job is named in the log and in confirmations. A job with no
+   description used to come out as the bare word "job" — "Deleted “job”
+   permanently" tells a reader nothing about what went. Always carry the
+   number, and when there is no title yet, say so and add whatever else
+   identifies it: who quoted, for how much. */
+function jobLabel(j) {
+  if (!j) return "a job";
+  var d = String(j.desc || "").trim();
+  var who = (j.bids || []).map(function (b) { return ((b && b.contractor) || "").trim(); })
+    .filter(Boolean);
+  var num = j.archived ? "the archived job" : "Job " + j.no;
+  if (d) return num + " “" + d + "”";
+  var bits = [];
+  if (who.length) bits.push("quote from " + who.join(", "));
+  try { var c = jobCalc(j); if (c.cost) bits.push(money(c.cost)); } catch (e) {}
+  return num + " (untitled" + (bits.length ? " — " + bits.join(", ") : ", no quotes yet") + ")";
+}
 var lastSaved = null;   /* baseline for diffing; set after load/sync/save */
 function bidLabel(b) { return (b.contractor || "unnamed contractor").trim() || "unnamed contractor"; }
 function amtLabel(b) {
@@ -1982,12 +1999,12 @@ function diffStates(oldS, newS) {
   oldS.jobs.forEach(function (j) { oldBy[j.id] = j; });
   newS.jobs.forEach(function (j) { newBy[j.id] = j; });
   oldS.jobs.forEach(function (j) {
-    if (!(j.id in newBy)) put(j.id, "Deleted job " + j.no + " (" + j.desc + ")");
+    if (!(j.id in newBy)) put(j.id, "Deleted " + jobLabel(j));
   });
   newS.jobs.forEach(function (j) {
     var o = oldBy[j.id];
-    if (!o) { put(j.id, "Added job " + j.no + " (" + (j.desc || "no description") + ")"); return; }
-    var tag = "Job " + j.no + " (" + (j.desc || o.desc) + "): ";
+    if (!o) { put(j.id, "Added " + jobLabel(j)); return; }
+    var tag = jobLabel(j.desc ? j : o) + ": ";
     if (o.desc !== j.desc) put(j.id, tag + "description changed to “" + j.desc + "”");
     if ((o.created || "") !== (j.created || ""))
       put(j.id, tag + "date added set to " + (j.created || "—"));
@@ -4335,7 +4352,7 @@ document.getElementById("editor").addEventListener("change", function (e) {
     j.status = e.target.value;
     if (!j.statusDate && j.status !== "quoted") j.statusDate = todayISO();
     if (j.status === "completed") j.pct = 100;   /* finished work is 100% by definition */
-    persist(null, ['Job ' + j.no + ' (' + (j.desc || "job") + ') marked ' + statusLabel(j.status)], j.id);
+    persist(null, [jobLabel(j) + " marked " + statusLabel(j.status)], j.id);
     renderEditor(); renderReport(); return;
   }
   else if (f === "created") j.created = e.target.value;
@@ -4345,8 +4362,8 @@ document.getElementById("editor").addEventListener("change", function (e) {
     j.awardedTo = e.target.value;
     if (j.awardedTo && !j.awardDate) j.awardDate = todayISO();
     persist(null, [j.awardedTo
-      ? 'Job ' + j.no + ' (' + (j.desc || "job") + ') awarded to ' + j.awardedTo
-      : 'Job ' + j.no + ' (' + (j.desc || "job") + ') award cleared'], j.id);
+      ? jobLabel(j) + " awarded to " + j.awardedTo
+      : jobLabel(j) + " award cleared"], j.id);
     renderEditor(); renderReport(); return;
   }
   else if (f === "awardDate") j.awardDate = e.target.value;
@@ -4392,7 +4409,7 @@ document.getElementById("editor").addEventListener("click", function (e) {
     if (!nb || !!nb.priority !== !!mj.priority) return;   /* stay within the same group */
     state.jobs[mi] = nb; state.jobs[mi + dir] = mj;
     orderJobs(state.jobs);
-    persist(null, ['Moved “' + (mj.desc || "job") + '” ' + (dir < 0 ? "up" : "down")], mj.id);
+    persist(null, ["Moved " + jobLabel(mj) + " " + (dir < 0 ? "up" : "down")], mj.id);
     renderEditor(); renderReport();
     var moved = document.querySelector('#editor .ecard[data-jid="' + mj.id + '"]');
     if (moved) moved.scrollIntoView({ block: "nearest" });
@@ -4582,7 +4599,7 @@ function edWorkspaceAction(act, el, e) {
       if (auto === bi) { delete pj.pick; persist(null, ['Job ' + pj.no + ': carrying the lowest quote again'], pj.id); }
       else {
         pj.pick = bi;
-        persist(null, ['Job ' + pj.no + ' (' + (pj.desc || "job") + '): carrying ' +
+        persist(null, [jobLabel(pj) + ": carrying " +
           ((bd.contractor || "").trim() || "a higher quote") + " " + money(bidTotal(bd)) +
           " instead of the lowest quote"], pj.id);
       }
@@ -4621,31 +4638,31 @@ function edWorkspaceAction(act, el, e) {
       state.jobs.splice(dj.i + 1, 0, copy);
       orderJobs(state.jobs);
       edSel = copy.id; edOpen[copy.id] = true;
-      persist(null, ['Duplicated “' + (dj.j.desc || "job") + '” as job ' + copy.no], copy.id);
+      persist(null, ["Duplicated " + jobLabel(dj.j) + " as job " + copy.no], copy.id);
       renderEditor(); renderReport(); return true;
     }
     case "jarchive": {
       var aj2 = edJobById(edSel); if (!aj2) return true;
-      if (!confirm("Archive “" + (aj2.j.desc || "this job") + "”?\n\nIt comes off the report and out of every total. " +
+      if (!confirm("Archive " + jobLabel(aj2.j) + "?\n\nIt comes off the report and out of every total. " +
         "You can restore it from the Archived list at any time.")) return true;
       aj2.j.archived = true;
       orderJobs(state.jobs);
       edArchOpen = true;
-      persist(null, ['Archived “' + (aj2.j.desc || "job") + '” — removed from the report and its totals'], aj2.j.id);
+      persist(null, ["Archived " + jobLabel(aj2.j) + " — removed from the report and its totals"], aj2.j.id);
       renderEditor(); renderReport(); return true;
     }
     case "jrestore": {
       var rj = edJobById(edSel); if (!rj) return true;
       delete rj.j.archived;
       orderJobs(state.jobs);
-      persist(null, ['Restored “' + (rj.j.desc || "job") + '” to the report as job ' + rj.j.no], rj.j.id);
+      persist(null, ["Restored " + jobLabel(rj.j) + " to the report as job " + rj.j.no], rj.j.id);
       renderEditor(); renderReport(); return true;
     }
     /* the trash icon on a job card's own header */
     case "jdelrow": {
       var dc = el.closest(".jcard"); if (!dc) return true;
       var dj = findJob(dc.dataset.jid); if (!dj) return true;
-      if (!confirm("Delete “" + (dj.desc || "this job") + "” permanently?\n\n" +
+      if (!confirm("Delete " + jobLabel(dj) + " permanently?\n\n" +
         "This cannot be undone — archive it instead if you may need it later.")) return true;
       var di = state.jobs.indexOf(dj);
       if (di < 0) return true;
@@ -4653,17 +4670,17 @@ function edWorkspaceAction(act, el, e) {
       orderJobs(state.jobs);
       if (edSel === dj.id) edSel = null;
       delete edOpen[dj.id];
-      persist(null, ['Deleted “' + (dj.desc || "job") + '” permanently'], dj.id);
+      persist(null, ["Deleted " + jobLabel(dj) + " permanently"], dj.id);
       renderEditor(); renderReport(); return true;
     }
     case "jdelete": {
       var xj = edJobById(edSel); if (!xj) return true;
-      if (!confirm("Delete “" + (xj.j.desc || "this job") + "” permanently?\n\n" +
+      if (!confirm("Delete " + jobLabel(xj.j) + " permanently?\n\n" +
         "This cannot be undone — archive it instead if you may need it later.")) return true;
       state.jobs.splice(xj.i, 1);
       orderJobs(state.jobs);
       edSel = null;
-      persist(null, ['Deleted “' + (xj.j.desc || "job") + '” permanently'], xj.j.id);
+      persist(null, ["Deleted " + jobLabel(xj.j) + " permanently"], xj.j.id);
       renderEditor(); renderReport(); return true;
     }
   }
@@ -4737,7 +4754,7 @@ document.getElementById("editor").addEventListener("drop", function (e) {
   if (from < to) to--;                        /* account for the removed element */
   state.jobs.splice(to, 0, moved);
   orderJobs(state.jobs);                       /* re-sort priority-first + renumber */
-  persist(null, ['Moved “' + (moved.desc || "job") + '” to position ' + moved.no], moved.id);
+  persist(null, ["Moved " + jobLabel(moved) + " to position " + moved.no], moved.id);
   renderEditor(); renderReport();
   var m = document.querySelector('#editor .ecard[data-jid="' + moved.id + '"]');
   if (m) m.scrollIntoView({ block: "nearest" });
@@ -4989,7 +5006,7 @@ document.getElementById("progSave").onclick = function () {
     if (document.getElementById("progIssue").checked) u.issue = true;
     j.updates = j.updates || [];
     j.updates.push(u);
-    var msgs = ['Progress update on job ' + j.no + ' (' + (j.desc || "job") + ')' +
+    var msgs = ["Progress update on " + jobLabel(j) +
       (u.issue ? " — issue/delay reported" : "") + (media.length ? " with " + media.length + " file(s)" : "")];
     if (j.status === "inprogress") {
       var np = Math.max(0, Math.min(100, Math.round(+document.getElementById("progPct").value || 0)));
@@ -5064,7 +5081,7 @@ document.getElementById("fileAttach").addEventListener("change", function () {
     .then(function (url) {
       if (!Array.isArray(b.files)) b.files = [];
       b.files.push({ name: f.name, url: url, path: path, size: f.size });
-      persist(null, ['Attached “' + f.name + '” to a bid on “' + (j.desc || "job") + '”'], j.id);
+      persist(null, ["Attached “" + f.name + "” to a quote on " + jobLabel(j)], j.id);
       renderEditor(); renderReport();
     })
     .catch(function (e) { alert("Upload failed (" + ((e && e.code) || "error") + ")."); });
