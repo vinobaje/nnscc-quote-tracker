@@ -1201,6 +1201,19 @@ body[data-view="edit"] .wrap { max-width:none; }
 .jtitle:focus { border-color:var(--accent); background:var(--card); outline:none; }
 .jchip { flex:none; font-size:11px; font-weight:700; border-radius:99px; padding:3px 10px; white-space:nowrap; }
 .jchip.prio { color:var(--prio); background:var(--prio-soft); }
+.jchip.match { color:var(--amber); background:var(--amber-soft); font-weight:650;
+  max-width:260px; overflow:hidden; text-overflow:ellipsis; }
+/* the search bar that sits above the cards */
+.ed-search { display:flex; align-items:center; gap:8px; margin:0 0 12px; background:var(--card);
+  border:1px solid var(--line); border-radius:9px; padding:2px 10px; }
+.ed-search:focus-within { border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft); }
+.ed-search .edmag { flex:none; font-size:13px; opacity:.65; }
+.ed-search input { flex:1 1 auto; min-width:0; border:0; background:none; outline:none;
+  font:15px/1.4 inherit; color:var(--ink); padding:9px 0; }
+.ed-search .edclear { flex:none; border:0; background:none; color:var(--muted); cursor:pointer;
+  font-size:13px; padding:4px 6px; border-radius:6px; }
+.ed-search .edclear:hover { background:var(--paper); color:var(--ink); }
+.ed-search .edhits { flex:none; font-size:12px; color:var(--muted); font-variant-numeric:tabular-nums; }
 .jchip.st-quoted { color:var(--accent-ink); background:var(--accent-soft); }
 .jchip.st-approved, .jchip.st-completed { color:var(--good); background:var(--good-soft); }
 .jchip.st-inprogress, .jchip.st-scheduled { color:var(--amber); background:var(--amber-soft); }
@@ -3839,13 +3852,50 @@ function edTopHTML(M) {
 }
 
 /* ---------- Jobs & Bids ---------- */
+/* Everything on a job worth searching by: what it is, who quoted it, the
+   paperwork numbers, the notes people actually write things in. Returns the
+   field that matched so the card can say why it is in the list — searching a
+   contractor otherwise shows job titles with no sign of the name typed. */
+function edSearchHit(j, q) {
+  if (!q) return null;
+  function has(v) { return String(v == null ? "" : v).toLowerCase().indexOf(q) >= 0; }
+  if (has(j.desc)) return { where: "", what: "" };
+  if (String(j.no) === q) return { where: "Job number", what: "#" + j.no };
+  if (has(statusLabel(j.status || "quoted"))) return { where: "Status", what: statusLabel(j.status || "quoted") };
+  if (has(j.awardedTo)) return { where: "Awarded to", what: j.awardedTo };
+  if (has(j.statusNote)) return { where: "Decision note", what: j.statusNote };
+  for (var i = 0; i < j.bids.length; i++) {
+    var b = j.bids[i] || {};
+    if (has(b.contractor)) return { where: "Quote from", what: (b.contractor || "").trim() };
+    if (has(b.qno)) return { where: "Quote #", what: b.qno };
+    if (has(b.notes)) return { where: "Scope note", what: b.notes };
+    var files = b.files || [];
+    for (var k = 0; k < files.length; k++)
+      if (has(files[k].name)) return { where: "Attachment", what: files[k].name };
+  }
+  var ups = j.updates || [];
+  for (var u = 0; u < ups.length; u++)
+    if (has(ups[u].t)) return { where: "Site update", what: ups[u].t };
+  return null;
+}
 function edJobMatches(j) {
   if (edFilter.prio && !j.priority) return false;
   if (edFilter.st && (j.status || "quoted") !== edFilter.st) return false;
   var q = edFilter.q.trim().toLowerCase();
   if (!q) return true;
-  if (String(j.desc || "").toLowerCase().indexOf(q) >= 0) return true;
-  return j.bids.some(function (b) { return String(b.contractor || "").toLowerCase().indexOf(q) >= 0; });
+  return !!edSearchHit(j, q);
+}
+/* why this card is in a search result, when the search term is not in its
+   title — "Quote from MC Mechanical", "Quote #35517", "Attachment …" */
+function edMatchChip(j) {
+  var q = edFilter.q.trim().toLowerCase();
+  if (!q) return "";
+  var hit = edSearchHit(j, q);
+  if (!hit || !hit.where) return "";
+  var what = String(hit.what || "").replace(/\s+/g, " ").trim();
+  if (what.length > 34) what = what.slice(0, 33) + "…";
+  return '<span class="jchip match" title="' + esc(hit.where + ": " + hit.what) + '">\u{1F50D} ' +
+    esc(hit.where) + " " + esc(what) + "</span>";
 }
 function edJobsHTML() {
   var live = [], arch = [];
@@ -3859,16 +3909,23 @@ function edJobsHTML() {
     (live.length === 1 ? "" : "s") + (shown.length !== live.length ? " · " + shown.length + " shown" : "") + "</span>" +
     '<button class="edbtn" type="button" data-act="edfilter">⚙ Filter</button><span class="spacer"></span>' +
     '<button class="edbtn" type="button" data-act="edexpand">' + (anyOpen ? "Collapse all" : "Expand all") + "</button></div>");
+  /* the search sits above the cards, always there — not folded inside a panel */
+  h.push('<div class="ed-search"><span class="edmag">\u{1F50D}</span>' +
+    '<input type="search" id="edFilterQ" autocomplete="off" value="' + esc(edFilter.q) +
+    '" placeholder="Search jobs, contractors, quote numbers, notes…">' +
+    (edFilter.q ? '<button class="edclear" type="button" data-act="edsearchclear" title="Clear the search">✕</button>' +
+      '<span class="edhits">' + shown.length + " of " + live.length + "</span>" : "") + "</div>");
   if (edFilter.on) {
     var sopt = '<option value="">Any status</option>' + STATUSES.map(function (st) {
       return '<option value="' + st[0] + '"' + (edFilter.st === st[0] ? " selected" : "") + ">" + st[1] + "</option>";
     }).join("");
-    h.push('<div class="ed-filters"><input type="search" id="edFilterQ" placeholder="Search job or contractor…" value="' +
-      esc(edFilter.q) + '"><select id="edFilterSt">' + sopt + "</select>" +
+    h.push('<div class="ed-filters"><select id="edFilterSt">' + sopt + "</select>" +
       '<label><input type="checkbox" id="edFilterPrio"' + (edFilter.prio ? " checked" : "") + "> High priority only</label>" +
       '<button class="edbtn" type="button" data-act="edfilterclear">Clear</button></div>');
   }
-  if (!shown.length) h.push('<p class="updempty">' + (live.length ? "No jobs match this filter." : "No jobs yet — use “+ Add job”.") + "</p>");
+  if (!shown.length) h.push('<p class="updempty">' + (live.length
+    ? (edFilter.q ? "Nothing matches “" + esc(edFilter.q) + "”." : "No jobs match this filter.")
+    : "No jobs yet — use “+ Add job”.") + "</p>");
   shown.forEach(function (r) { h.push(edJobCardHTML(r.j, r.ji)); });
   if (arch.length) {
     h.push('<div class="ed-listhead" style="margin-top:18px"><h2>Archived</h2><span class="ed-count">' + arch.length +
@@ -3896,7 +3953,8 @@ function edJobCardHTML(j, ji) {
     '<span class="jno">' + (j.archived ? "—" : esc(j.no)) + "</span>" +
     '<input class="jtitle" type="text" value="' + esc(j.desc) + '" data-f="desc" placeholder="Job description">' +
     (j.priority ? '<span class="jchip prio">↑ High priority</span>' : "") +
-    '<span class="jchip st-' + esc(j.status || "quoted") + '">' + esc(statusLabel(j.status || "quoted")) + "</span>");
+    '<span class="jchip st-' + esc(j.status || "quoted") + '">' + esc(statusLabel(j.status || "quoted")) + "</span>" +
+    edMatchChip(j));
   if (!open) {
     h.push('<span class="jsum">' + (j.awardedTo ? '<span class="who">' + esc(j.awardedTo) + "</span>" : "") +
       (sg.overall == null ? "" : '<span class="jbar"><span style="width:' + sg.overall + '%"></span></span><span>' +
@@ -4482,7 +4540,8 @@ function edWorkspaceAction(act, el, e) {
       persist("Saved " + new Date().toLocaleTimeString());
       edSaved = true; return true;
     case "edfilter": edFilter.on = !edFilter.on; renderEditor(); return true;
-    case "edfilterclear": edFilter = { on: true, q: "", st: "", prio: false }; renderEditor(); return true;
+    case "edfilterclear": edFilter = { on: true, q: edFilter.q, st: "", prio: false }; renderEditor(); return true;
+    case "edsearchclear": edFilter.q = ""; renderEditor(); return true;
     case "edarch": edArchOpen = !edArchOpen; renderEditor(); return true;
     case "edexpand": {
       var any = state.jobs.some(function (j) { return edOpen[j.id]; });
