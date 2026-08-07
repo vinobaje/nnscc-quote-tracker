@@ -1213,6 +1213,11 @@ body[data-view="edit"] .wrap { max-width:none; }
 .jtog { flex:none; background:none; border:0; color:var(--muted); font-size:15px; cursor:pointer;
   padding:4px 6px; border-radius:6px; }
 .jtog:hover { background:var(--paper); color:var(--ink); }
+/* delete on the card itself. Visible rather than hover-only — a phone has no
+   hover — but quiet, and it turns red only when you are on it. */
+.jdel { flex:none; background:none; border:0; color:var(--muted); font-size:14px; cursor:pointer;
+  padding:4px 6px; border-radius:6px; opacity:.5; transition:opacity .15s, background .15s, color .15s; }
+.jdel:hover, .jdel:focus-visible { opacity:1; background:var(--prio-soft); color:var(--prio); }
 .jbody { border-top:1px solid var(--line-soft); padding:4px 15px 15px; }
 .jctl { display:flex; gap:14px; flex-wrap:wrap; align-items:flex-end; padding:13px 0 15px;
   border-bottom:1px solid var(--line-soft); }
@@ -1338,7 +1343,8 @@ body[data-view="edit"] .wrap { max-width:none; }
   /* job header: [handle][no] … [chevron] / title / chips + progress */
   .jhead { flex-wrap:wrap; row-gap:9px; padding:11px 12px; gap:9px; }
   .jhead .draghandle, .jno { order:1; }
-  .jtog { order:1; margin-left:auto; }
+  .jdel { order:1; margin-left:auto; }
+  .jtog { order:1; }
   .jtitle { order:2; flex:1 1 100%; min-width:0; font-size:14.5px; }
   .jchip { order:3; }
   .jsum { order:4; flex:1 1 100%; }
@@ -3896,7 +3902,10 @@ function edJobCardHTML(j, ji) {
       (sg.overall == null ? "" : '<span class="jbar"><span style="width:' + sg.overall + '%"></span></span><span>' +
         sg.overall + "%</span>") + "</span>");
   }
-  h.push('<button class="jtog" type="button" title="' + (open ? "Collapse" : "Expand") + '">' + (open ? "⌃" : "⌄") + "</button></div>");
+  /* delete without hunting for the summary rail — asks first, same as the rail */
+  h.push('<button class="jdel" type="button" data-act="jdelrow" title="Delete this job permanently"' +
+    ' aria-label="Delete this job permanently">\u{1F5D1}</button>' +
+    '<button class="jtog" type="button" title="' + (open ? "Collapse" : "Expand") + '">' + (open ? "⌃" : "⌄") + "</button></div>");
   if (!open) return h.join("") + "</div>";
 
   /* ---- controls ---- */
@@ -4571,6 +4580,21 @@ function edWorkspaceAction(act, el, e) {
       delete rj.j.archived;
       orderJobs(state.jobs);
       persist(null, ['Restored “' + (rj.j.desc || "job") + '” to the report as job ' + rj.j.no], rj.j.id);
+      renderEditor(); renderReport(); return true;
+    }
+    /* the trash icon on a job card's own header */
+    case "jdelrow": {
+      var dc = el.closest(".jcard"); if (!dc) return true;
+      var dj = findJob(dc.dataset.jid); if (!dj) return true;
+      if (!confirm("Delete “" + (dj.desc || "this job") + "” permanently?\n\n" +
+        "This cannot be undone — archive it instead if you may need it later.")) return true;
+      var di = state.jobs.indexOf(dj);
+      if (di < 0) return true;
+      state.jobs.splice(di, 1);
+      orderJobs(state.jobs);
+      if (edSel === dj.id) edSel = null;
+      delete edOpen[dj.id];
+      persist(null, ['Deleted “' + (dj.desc || "job") + '” permanently'], dj.id);
       renderEditor(); renderReport(); return true;
     }
     case "jdelete": {
