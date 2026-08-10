@@ -374,6 +374,12 @@ exports.nnsccStamp = onCall(
 // plaintext, never client-readable — the config doc is `allow read: if false`)
 // and verified server-side, with throttling to blunt brute-force attempts.
 const GATE_REPORT = { live: "nnsccQuoteTracker/main", beta: "nnsccQuoteTrackerBeta/main" };
+// The contract register travels with the report: a board member reading with the
+// passcode sees the agreements alongside the quotes, the same as every other
+// card. The signed PDFs stay behind the same passcode — they are handed out by
+// this function (below), never by a public link.
+const GATE_CONTRACTS = { live: "nnsccQuoteTracker/contracts", beta: "nnsccQuoteTrackerBeta/contracts" };
+const CONTRACT_BUCKET = (process.env.GCLOUD_PROJECT || "") + ".firebasestorage.app";
 function gateFields(beta) {
   return beta
     ? { hash: "viewHashBeta", salt: "viewSaltBeta", fails: "viewFailsBeta", until: "viewLockBeta" }
@@ -391,6 +397,30 @@ function masterFields(beta) {
 }
 function scryptHex(passcode, saltHex) {
   return crypto.scryptSync(String(passcode), Buffer.from(saltHex, "hex"), 32).toString("hex");
+}
+
+// Check a passcode against this building's own and the all-buildings one, with
+// one rate limiter behind both. Returns the config on success; throws otherwise.
+async function gateVerify(cfgRef, beta, pass) {
+  const f = gateFields(beta), mv = masterFields(beta);
+  const cfgSnap = await cfgRef.get();
+  const cfg = cfgSnap.exists ? cfgSnap.data() : {};
+  if (!cfg[f.hash] && !cfg[mv.hash]) {
+    throw new HttpsError("failed-precondition", "Viewing isn’t protected yet — ask the manager to set a passcode.");
+  }
+  const now = Date.now();
+  if ((cfg[f.until] || 0) > now) throw new HttpsError("resource-exhausted", "Too many attempts — try again in a minute.");
+  const matches = (hash, salt) => hash && salt && pass.length > 0 &&
+    crypto.timingSafeEqual(Buffer.from(scryptHex(pass, salt), "hex"), Buffer.from(hash, "hex"));
+  if (!matches(cfg[f.hash], cfg[f.salt]) && !matches(cfg[mv.hash], cfg[mv.salt])) {
+    const fails = (cfg[f.fails] || 0) + 1;
+    const upd = { [f.fails]: fails };
+    if (fails >= 5) { upd[f.until] = now + 60 * 1000; upd[f.fails] = 0; }   // 5 wrong tries → 60s lock
+    await cfgRef.set(upd, { merge: true });
+    throw new HttpsError("permission-denied", "That passcode isn’t right.");
+  }
+  await cfgRef.set({ [f.fails]: 0, [f.until]: 0 }, { merge: true });
+  return cfg;
 }
 
 exports.nnsccGate = onCall(
@@ -433,28 +463,44 @@ exports.nnsccGate = onCall(
 
     // ----- public: verify passcode and return the report data -----
     if (data.view === true) {
-      const cfgSnap = await cfgRef.get();
-      const cfg = cfgSnap.exists ? cfgSnap.data() : {};
-      const mv = masterFields(beta);
-      if (!cfg[f.hash] && !cfg[mv.hash]) throw new HttpsError("failed-precondition", "Viewing isn’t protected yet — ask the manager to set a passcode.");
-      const now = Date.now();
-      if ((cfg[f.until] || 0) > now) throw new HttpsError("resource-exhausted", "Too many attempts — try again in a minute.");
-      const pass = String(data.passcode || "");
-      // either this building's passcode or the all-buildings one opens the report
-      const matches = (hash, salt) => hash && salt && pass.length > 0 &&
-        crypto.timingSafeEqual(Buffer.from(scryptHex(pass, salt), "hex"), Buffer.from(hash, "hex"));
-      const ok = matches(cfg[f.hash], cfg[f.salt]) || matches(cfg[mv.hash], cfg[mv.salt]);
-      if (!ok) {
-        const fails = (cfg[f.fails] || 0) + 1;
-        const upd = { [f.fails]: fails };
-        if (fails >= 5) { upd[f.until] = now + 60 * 1000; upd[f.fails] = 0; } // 5 wrong tries → 60s lock
-        await cfgRef.set(upd, { merge: true });
-        throw new HttpsError("permission-denied", "That passcode isn’t right.");
-      }
-      await cfgRef.set({ [f.fails]: 0, [f.until]: 0 }, { merge: true });
-      const rep = await db.doc(beta ? GATE_REPORT.beta : GATE_REPORT.live).get();
+      await gateVerify(cfgRef, beta, String(data.passcode || ""));
+      const [rep, con] = await Promise.all([
+        db.doc(beta ? GATE_REPORT.beta : GATE_REPORT.live).get(),
+        db.doc(beta ? GATE_CONTRACTS.beta : GATE_CONTRACTS.live).get(),
+      ]);
       const d = rep.exists ? rep.data() : {};
-      return { ok: true, report: { jobs: d.jobs || [], meta: d.meta || null, ai: d.ai || null, reportName: d.reportName || null } };
+      const cl = con.exists && Array.isArray(con.data().list) ? con.data().list : [];
+      return {
+        ok: true,
+        report: { jobs: d.jobs || [], meta: d.meta || null, ai: d.ai || null, reportName: d.reportName || null },
+        contracts: cl,
+      };
+    }
+
+    // ----- public: hand over one signed contract, passcode first -----
+    // The file is fetched here with the project's own credentials and sent on,
+    // so nothing in Storage is ever public and no shareable link exists. Only a
+    // path the register itself lists can be asked for, which stops the passcode
+    // from being used to walk the bucket.
+    if (data.doc === true) {
+      const path = String(data.path || "");
+      if (!path) throw new HttpsError("invalid-argument", "No document was named.");
+      await gateVerify(cfgRef, beta, String(data.passcode || ""));
+      const con = await db.doc(beta ? GATE_CONTRACTS.beta : GATE_CONTRACTS.live).get();
+      const list = con.exists && Array.isArray(con.data().list) ? con.data().list : [];
+      let named = null;
+      list.forEach((c) => (c.files || []).forEach((fl) => { if (fl && fl.path === path) named = fl; }));
+      if (!named) throw new HttpsError("not-found", "That document is not on any contract in the register.");
+      let buf;
+      try {
+        [buf] = await admin.storage().bucket(CONTRACT_BUCKET).file(path).download();
+      } catch (e) {
+        throw new HttpsError("not-found", "That document is no longer in the file store.");
+      }
+      if (buf.length > 9 * 1024 * 1024) {
+        throw new HttpsError("failed-precondition", "That document is too large to open this way — sign in to read it.");
+      }
+      return { ok: true, name: named.name || "contract.pdf", b64: buf.toString("base64") };
     }
 
     throw new HttpsError("invalid-argument", "Unknown request.");

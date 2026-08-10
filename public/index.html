@@ -2162,7 +2162,7 @@ var cloud = { on: false, db: null, user: null, docExists: null, denied: false, b
 var CURRENT_PATH = "nnsccQuoteTracker/main";      /* the live/current report */
 var REPORTS_COLL = "nnsccQuoteReports";           /* archived past-period reports */
 var CONTRACTORS_PATH = "nnsccQuoteTracker/contractors";  /* shared contractor directory */
-var CONTRACTS_PATH = "nnsccQuoteTracker/contracts";      /* the contract register — signed-in readers only */
+var CONTRACTS_PATH = "nnsccQuoteTracker/contracts";      /* the contract register — read with the report */
 var SNAPSHOTS_COLL = "nnsccQuoteSnapshots";               /* a copy of the report, kept each day it changes */
 var VIEW_BETA = CURRENT_PATH.indexOf("Beta") >= 0;   /* which report the passcode gate reads/protects */
 /* path of the report currently on screen */
@@ -3163,7 +3163,7 @@ function statCards(d) {
     { k: "pending", c: "pd", ic: "⏳", v: String(d.pendingCount), l: "Bids pending", s: "open for quotes" },
     { k: "approved", c: "ap", ic: "✅", v: money(d.approvedTotal), l: "Board approved", s: "approved spend" }
   ];
-  /* contracts are for signed-in readers, so is the figure that counts them */
+  /* the figure only means something once there is a register to count */
   if (canSeeContracts() && conState.list.length) {
     var nAtt = conAttentionCount();
     cards.push({ k: "contracts", c: nAtt ? "pd" : "tt", ic: "📄",
@@ -3529,10 +3529,10 @@ function renderPacketReport() {
     '<a href="#secD">' + pkIcon("spend") + ' Contractor spend</a>' +
     '<a href="#secE">' + pkIcon("open") + ' Open items</a>' +
     '<a href="#" data-arch="1">' + pkIcon("arch") + ' Reports archive</a>' +
-    /* not a section of the report — the corporation's agreements, and only
-       for someone who signed in. Kept apart from the run of report sections. */
+    /* not a section of the report — the corporation's standing agreements,
+       kept apart from the run of report sections */
     (canSeeContracts()
-      ? '<div class="pk-navsep">Private to the board</div>' +
+      ? '<div class="pk-navsep">Under contract</div>' +
         '<a class="pk-navcon" href="#secF">' + pkIcon("open") + ' Contracts</a>'
       : "") + "</nav>");
   h.push('<div class="pk-side-foot"><span class="av">' + (ctx.ED ? "🛠" : (isBoardMember() ? "🗳" : "👤")) +
@@ -3599,7 +3599,7 @@ function renderPacketReport() {
     '</section>');
   h.push('<section id="secE" class="panel"><h3>Open items for the board</h3>' + secEBlocks(d, M, ctx.ED) + '</section>');
   h.push('</div>');
-  /* contracts: only for readers who signed in */
+  /* the corporation's standing agreements, read alongside the report */
   if (canSeeContracts())
     h.push('<section id="secF" class="panel"><h3>Contracts with contractors</h3>' +
       '<p class="seclede">What the corporation is committed to, and until when. Soonest to end first.</p>' +
@@ -5161,9 +5161,27 @@ function conGetBlob(url, tok) {
     return conXhrBlob(url, tok);          /* fetch never reached the network */
   });
 }
+/* no Google account, but the passcode was accepted: the document comes back
+   through the same gate that handed over the report, so nothing in the file
+   store is public and no shareable link to a signed contract ever exists */
+function conGateDoc(path) {
+  if (!conGate.pass || !cloud.fns) return Promise.reject({ code: "not-signed-in" });
+  return cloud.fns.httpsCallable("nnsccGate")({
+    doc: true, path: path, passcode: conGate.pass, beta: VIEW_BETA
+  }).then(function (res) {
+    var d = res.data || {};
+    if (!d.b64) throw { code: "not-found" };
+    var bin = atob(d.b64), arr = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+    return new Blob([arr], {
+      type: /\.pdf$/i.test(d.name || "") ? "application/pdf" : "application/octet-stream" });
+  }, function (e) {
+    throw { code: String((e && e.code) || "").replace("functions/", "") || "error", message: e && e.message };
+  });
+}
 function conBlobData(path) {
   var u = cloud.user;
-  if (!u || !cloud.store) return Promise.reject({ code: "not-signed-in" });
+  if (!u || !cloud.store) return conGateDoc(path);
   return u.getIdToken().then(function (tok) {
     var bucket = cloud.store.ref().bucket || (firebase.app().options.storageBucket || "");
     var url = "https://firebasestorage.googleapis.com/v0/b/" + encodeURIComponent(bucket) +
@@ -5192,8 +5210,11 @@ function conOpenFiles(cid, startIdx) {
     openFileViewer(files, startIdx || 0, (c.contractor || "Contract") + " — " + (c.title || "agreement"));
   }).catch(function (e) {
     var code = (e && e.code) || "error";
-    var msg = code === "permission-denied" || code === "not-signed-in"
-      ? "That document is only open to the board and the property manager — sign in to read it."
+    var msg = code === "permission-denied"
+      ? (cloud.user ? "That document is not open to this account."
+                    : "The passcode has changed since this page was opened — reload the report and enter it again.")
+      : code === "not-signed-in"
+      ? "Open the report with the passcode, or sign in, to read the document."
       : code === "not-found"
       ? "The document is no longer in the file store — attach it again from Edit data → Contracts."
       : code === "no-connection"
@@ -5468,6 +5489,9 @@ document.addEventListener("click", function (e) {
    document so a passcode reader never receives it: signing in is the price of
    seeing the agreements, and the same goes for the signed PDFs in Storage. */
 var conState = { list: [] }, conUnsub = null;
+/* a reader who came in with the passcode rather than a Google account: the
+   register travels with the report, and the passcode fetches the PDFs too */
+var conGate = { pass: "" };
 function conSave() {
   if (!cloud.on || !isEditor()) return;
   cloud.db.doc(CONTRACTS_PATH).set({ list: conState.list.map(function (c) {
@@ -5483,7 +5507,8 @@ function conSave() {
 }
 function conSubscribe() {
   if (conUnsub) { conUnsub(); conUnsub = null; }
-  if (!cloud.on || !cloud.user) { conState = { list: [] }; return; }
+  /* signed out: keep whatever the passcode gate handed over, if anything */
+  if (!cloud.on || !cloud.user) { if (!conGate.pass) conState = { list: [] }; return; }
   conUnsub = cloud.db.doc(CONTRACTS_PATH).onSnapshot(function (snap) {
     var mine = !!(snap.metadata && snap.metadata.hasPendingWrites);
     conState = (snap.exists && Array.isArray(snap.data().list)) ? { list: snap.data().list } : { list: [] };
@@ -5492,7 +5517,7 @@ function conSubscribe() {
        would take the cursor out of the field being typed in */
     if (mine) return;
     if (document.body.dataset.view === "edit") renderEditor(); else renderReport();
-  }, function () { conState = { list: [] }; });   /* not on the list: no contracts, no noise */
+  }, function () { if (!conGate.pass) conState = { list: [] }; });   /* denied: no contracts, no noise */
 }
 var CON_PERIODS = [["month", "a month"], ["year", "a year"], ["visit", "per visit"], ["fixed", "fixed price"]];
 function conPeriodLabel(p) {
@@ -5607,8 +5632,12 @@ function conDir(name) {
     if (String(dirState.list[i].name || "").trim().toLowerCase() === n) return dirState.list[i];
   return null;
 }
-/* Contracts are for people who signed in — the board and the manager. */
-function canSeeContracts() { return isEditor() || isBoardMember(); }
+/* The register is part of the report: whoever may read the report may read the
+   agreements behind it — the manager, the board, and anyone the board gave the
+   link and the passcode to. The signed PDFs sit behind that same passcode. */
+function canSeeContracts() {
+  return isEditor() || isBoardMember() || conState.list.length > 0;
+}
 
 /* ---------- contractor directory (beta) ---------- */
 var dirState = { list: [] };
@@ -6262,6 +6291,10 @@ function submitViewGate(pass, silent) {
       if (!r) { viewGateMsg("Could not load the report."); return; }
       state = normState({ jobs: r.jobs, meta: r.meta, ai: r.ai, reportName: r.reportName });
       lastSaved = deepCopy(state);
+      /* the agreements come with the report, and the passcode opens their PDFs */
+      conGate.pass = pass;
+      conState = { list: Array.isArray(res.data.contracts) ? res.data.contracts : [] };
+      conState.list.forEach(function (c) { if (!c.id) c.id = genId(); });
       try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) {}
       try { sessionStorage.setItem("nnsccView", pass); } catch (e) {}
       document.getElementById("viewGateOverlay").classList.remove("open");
