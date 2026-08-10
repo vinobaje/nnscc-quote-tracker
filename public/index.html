@@ -5057,6 +5057,33 @@ function conSectionHTML(ED) {
    use forever; this route goes through the storage rules every time, so a
    contract is readable only while you are signed in and on the list. */
 var conBlobs = {};                               /* path -> object URL, this session only */
+/* Ask the file store for one document, signed as the reader. fetch() is tried
+   first; Safari with a strict content blocker in front of it can reject that
+   call before it ever leaves the browser, so the same request is retried the
+   old way with XMLHttpRequest before giving up. Every failure comes back with
+   a code, so the reader is told which of the two happened. */
+function conHttpErr(status) {
+  return { code: status === 403 ? "permission-denied" : status === 404 ? "not-found" : "http-" + status };
+}
+function conXhrBlob(url, tok) {
+  return new Promise(function (res, rej) {
+    var x = new XMLHttpRequest();
+    x.open("GET", url, true);
+    x.responseType = "blob";
+    x.setRequestHeader("Authorization", "Bearer " + tok);
+    x.onload = function () { x.status < 300 ? res(x.response) : rej(conHttpErr(x.status)); };
+    x.onerror = function () { rej({ code: "no-connection" }); };
+    x.send();
+  });
+}
+function conGetBlob(url, tok) {
+  return fetch(url, { headers: { Authorization: "Bearer " + tok } }).then(function (r) {
+    if (!r.ok) throw conHttpErr(r.status);
+    return r.blob();
+  }, function () {
+    return conXhrBlob(url, tok);          /* fetch never reached the network */
+  });
+}
 function conFileURL(path) {
   if (conBlobs[path]) return Promise.resolve(conBlobs[path]);
   var u = cloud.user;
@@ -5065,10 +5092,7 @@ function conFileURL(path) {
     var bucket = cloud.store.ref().bucket || (firebase.app().options.storageBucket || "");
     var url = "https://firebasestorage.googleapis.com/v0/b/" + encodeURIComponent(bucket) +
       "/o/" + encodeURIComponent(path) + "?alt=media";
-    return fetch(url, { headers: { Authorization: "Bearer " + tok } });
-  }).then(function (r) {
-    if (!r.ok) throw { code: r.status === 403 ? "permission-denied" : "http-" + r.status };
-    return r.blob();
+    return conGetBlob(url, tok);
   }).then(function (blob) {
     conBlobs[path] = URL.createObjectURL(blob);
     return conBlobs[path];
@@ -5087,9 +5111,14 @@ function conOpenFiles(cid, startIdx) {
     if (note) note.textContent = "";
     openFileViewer(files, startIdx || 0, (c.contractor || "Contract") + " — " + (c.title || "agreement"));
   }).catch(function (e) {
-    var msg = (e && e.code) === "permission-denied"
+    var code = (e && e.code) || "error";
+    var msg = code === "permission-denied" || code === "not-signed-in"
       ? "That document is only open to the board and the property manager — sign in to read it."
-      : "Could not open the document (" + esc((e && e.code) || "error") + ").";
+      : code === "not-found"
+      ? "The document is no longer in the file store — attach it again from Edit data → Contracts."
+      : code === "no-connection"
+      ? "The document could not be downloaded — check the connection and try again."
+      : "Could not open the document (" + esc(code) + "). Try again in a moment.";
     if (note) note.textContent = msg; else alert(msg);
   });
 }
@@ -5713,11 +5742,14 @@ function fvSize(n) {
 }
 function fvKind(f) {
   if (f && f.type === "video") return "vid";
-  var s = ((f && f.name) || "") + " " + ((f && f.url) || "");
-  if (/\.pdf(\?|$|%3F)/i.test(s)) return "pdf";
-  if (/\.(png|jpe?g|webp|gif|bmp|svg)(\?|$|%3F)/i.test(s)) return "img";
-  if (/\.(mp4|mov|m4v|webm)(\?|$|%3F)/i.test(s)) return "vid";
-  if (/\.(heic|heif)(\?|$|%3F)/i.test(s)) return "heic";
+  /* the name and the address are tested apart: a contract is handed over as a
+     blob: address that carries no extension, so only its name says what it is */
+  var name = (f && f.name) || "", url = (f && f.url) || "";
+  function is(re) { return re.test(name) || re.test(url); }
+  if (is(/\.pdf(\?|$|%3F)/i)) return "pdf";
+  if (is(/\.(png|jpe?g|webp|gif|bmp|svg)(\?|$|%3F)/i)) return "img";
+  if (is(/\.(mp4|mov|m4v|webm)(\?|$|%3F)/i)) return "vid";
+  if (is(/\.(heic|heif)(\?|$|%3F)/i)) return "heic";
   return "other";
 }
 /* file lists that don't live on a bid (progress photos, archived periods)
