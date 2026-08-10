@@ -3914,7 +3914,7 @@ function renderEditor() {
     "Agreements with contractors — what they cover, until when, and what they cost. " +
     "The board sees these on the report once signed in; a passcode reader never does.") + conCardHTML());
   else if (edNav === "contractors") h.push(edSecHead("Contractors",
-    "Contact details, insurance and WSIB expiry. Expiring cover is flagged on the report’s open-items section.") + dirCardHTML());
+    "Contact details and insurance expiry. Lapsing cover is flagged beside that contractor’s contracts.") + dirCardHTML());
   else if (edNav === "board") h.push(edSecHead("Board &amp; voting",
     "Who can open the report, vote on a job and sign the resolution.") + boardCardHTML() + edVotingHTML());
   else if (edNav === "settings") h.push(edSettingsHTML(M));
@@ -4060,7 +4060,7 @@ function edJobsHTML() {
   h.push("</div>" + edRailHTML() + "</div>");
   h.push('<div class="ed-shorts">' +
     '<div class="ed-short"><span class="si">👷</span><span><b>Contractor directory</b>' +
-    "<small>Contacts, insurance &amp; WSIB expiry</small></span><span class=\"spacer\"></span>" +
+    "<small>Contacts &amp; insurance expiry</small></span><span class=\"spacer\"></span>" +
     '<button class="edbtn" type="button" data-act="ednav" data-nav="contractors">View all</button></div>' +
     '<div class="ed-short"><span class="si">🗳</span><span><b>Board members</b>' +
     "<small>Voting access &amp; signatures</small></span><span class=\"spacer\"></span>" +
@@ -5189,7 +5189,7 @@ function conCalc(c) {
   else { state2 = "active"; label = "Active"; }
   return { days: days, notice: notice, noticeDays: nDays, state: state2, label: label, annual: conAnnual(c) };
 }
-/* Insurance and WSIB clearance, read from the contractor directory the manager
+/* The contractor's insurance expiry, read from the directory the manager
    already keeps. A lapsed certificate on a contractor who is on site every
    week is as much of a problem as a lapsed agreement, and until now it was
    only visible inside the manager's own screen. */
