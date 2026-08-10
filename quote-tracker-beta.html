@@ -533,7 +533,7 @@ tr.jlink td:first-child::after { content:" ›"; color:var(--muted); }
 .budgetwrap { margin:14px 0 0; max-width:560px; }
 .budgetwrap .blabel { width:auto; margin-right:10px; }
 .pipelineline { margin-top:12px; font-size:13px; color:var(--ink2); }
-.dirgrid { display:grid; grid-template-columns:1.2fr 1fr 1.4fr auto auto auto; gap:6px; align-items:center; }
+.dirgrid { display:grid; grid-template-columns:1.2fr 1fr 1.4fr auto auto; gap:6px; align-items:center; }
 .dirgrid input { padding:5px 7px; font-size:12.5px; }
 .dirhdr { font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; }
 
@@ -1354,6 +1354,13 @@ body[data-view="edit"] .wrap { max-width:none; }
 .connotice { font-size:14px; line-height:1.5; margin-top:8px; background:var(--amber-soft);
   color:#6d4a0d; border-radius:7px; padding:8px 11px; }
 .connotice.past { background:var(--prio-soft); color:#7a2020; }
+.concerts { display:flex; flex-wrap:wrap; gap:7px; margin-top:9px; }
+.concert { font-size:12.5px; font-weight:650; border-radius:99px; padding:3px 10px;
+  background:var(--good-soft); color:var(--good); }
+.concert.soon { background:var(--amber-soft); color:var(--amber); }
+.concert.expired { background:var(--prio-soft); color:var(--prio); }
+.concert.none { background:var(--paper); color:var(--muted); font-weight:400; }
+.conDue li.cert { color:#7a2020; }
 .connote { font-size:14px; color:var(--ink2); margin-top:8px; }
 .confoot { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-top:12px; }
 .conbtn { font:650 14px/1.2 inherit; color:#fff; background:var(--accent); border:0; border-radius:8px;
@@ -3109,11 +3116,11 @@ function statCards(d) {
   ];
   /* contracts are for signed-in readers, so is the figure that counts them */
   if (canSeeContracts() && conState.list.length) {
-    var due = conRenewals(90);
-    cards.push({ k: "contracts", c: due.length ? "pd" : "tt", ic: "📄",
-      v: due.length ? String(due.length) : money(conTotalAnnual()),
-      l: due.length ? "Contracts to decide" : "Under contract",
-      s: due.length ? "within 90 days" : "committed each year" });
+    var nAtt = conAttentionCount();
+    cards.push({ k: "contracts", c: nAtt ? "pd" : "tt", ic: "📄",
+      v: nAtt ? String(nAtt) : money(conTotalAnnual()),
+      l: nAtt ? "Contracts need attention" : "Under contract",
+      s: nAtt ? "within 90 days" : "committed each year" });
   }
   return '<div class="statgrid">' + cards.map(function (k) {
     return '<div class="statcard statlink ' + k.c + '" data-stat="' + k.k +
@@ -3678,9 +3685,9 @@ function renderClassicReport() {
   tile("approved", "", money(d.approvedTotal), "Board approved", ' style="border-top-color:#137333"', ' style="color:#137333"');
   tile("pending", "pd", String(d.pendingCount), "Bids pending");
   if (canSeeContracts() && conState.list.length) {
-    var conDue = conRenewals(90);
-    tile("contracts", conDue.length ? "pd" : "", conDue.length ? String(conDue.length) : money(conTotalAnnual()),
-      conDue.length ? "Contracts to decide (90 days)" : "Committed each year under contract");
+    var nAtt2 = conAttentionCount();
+    tile("contracts", nAtt2 ? "pd" : "", nAtt2 ? String(nAtt2) : money(conTotalAnnual()),
+      nAtt2 ? "Contracts needing attention (90 days)" : "Committed each year under contract");
   }
   h.push("</div>");
   /* pipeline: where every job sits in the lifecycle */
@@ -4539,7 +4546,7 @@ document.getElementById("editor").addEventListener("click", function (e) {
   if (act === "intake-cancel") { aiIntakeCancel(); return; }
   if (act === "viewpass-set") { viewPassSet(); return; }
   if (act === "dir-add") {
-    dirState.list.push({ name: "", phone: "", email: "", insuranceExp: "", wsibExp: "" });
+    dirState.list.push({ name: "", phone: "", email: "", insuranceExp: "" });
     dirSave(); renderEditor(); return;
   }
   if (act === "dir-del") {
@@ -4937,6 +4944,11 @@ function conCardHTML() {
         }).join("") +
         '<button class="edbtn" type="button" data-act="conattach">\u{1F4CE} Attach a document</button></div>' +
         (k.notice ? '<p class="rephint">Notice deadline: ' + esc(jdDate(k.notice)) + "</p>" : "") + "</div>" +
+      '<div class="f wide"><label>Insurance</label>' +
+        (conDir(c.contractor) ? conCertChips(c.contractor) +
+          '<p class="rephint">From the contractor directory — change the date under <strong>Contractors</strong>.</p>'
+          : '<p class="rephint">Add ' + esc((c.contractor || "this contractor").trim() || "this contractor") +
+            " to <strong>Contractors</strong> to track their insurance expiry here.</p>") + "</div>" +
       "</div></div></div>");
   });
   h.push('<p class="conNote" id="conNote"></p></div></div>');
@@ -4959,9 +4971,15 @@ function conSectionHTML(ED) {
   var total = conTotalAnnual();
   var due = conRenewals(90);
   var h = [];
-  if (due.length) {
-    h.push('<div class="conDue"><div class="conDueHead">\u{26A0} Coming up — ' + due.length +
-      " agreement" + (due.length === 1 ? "" : "s") + " needing a decision in the next 90 days</div><ul>");
+  var certs = conCertAlerts();
+  if (due.length || certs.length) {
+    var n = due.length + certs.length;
+    h.push('<div class="conDue"><div class="conDueHead">\u{26A0} Coming up — ' + n + " item" +
+      (n === 1 ? "" : "s") + " needing attention in the next 90 days</div><ul>");
+    certs.forEach(function (x) {
+      h.push('<li class="cert"><strong>' + esc(x.nm) + "</strong> — " + esc(x.what) + " " +
+        esc(x.st.label) + (x.st.state === "expired" ? " — no new work should be awarded until it is renewed" : "") + "</li>");
+    });
     due.forEach(function (c) {
       var k = conCalc(c), when;
       if (k.notice && k.noticeDays != null && k.noticeDays < 0)
@@ -5004,6 +5022,7 @@ function conSectionHTML(ED) {
               "</strong>" + (k.noticeDays != null ? " — " + (k.noticeDays === 0 ? "today" : k.noticeDays + " days away") : "") +
               ", otherwise it renews automatically.</div>")
         : (c.renew ? '<div class="connotice">Renews automatically.</div>' : "")) +
+      conCertChips(c.contractor) +
       (c.notes ? '<div class="connote">' + esc(c.notes) + "</div>" : "") +
       '<div class="confoot">' +
         (files ? '<button class="conbtn" type="button" data-confile="' + esc(c.id) + ':0">\u{1F4C4} Read the contract' +
@@ -5170,6 +5189,46 @@ function conCalc(c) {
   else { state2 = "active"; label = "Active"; }
   return { days: days, notice: notice, noticeDays: nDays, state: state2, label: label, annual: conAnnual(c) };
 }
+/* Insurance and WSIB clearance, read from the contractor directory the manager
+   already keeps. A lapsed certificate on a contractor who is on site every
+   week is as much of a problem as a lapsed agreement, and until now it was
+   only visible inside the manager's own screen. */
+function conCertState(iso) {
+  if (!iso) return { state: "none", label: "not recorded", days: null };
+  var days = conDaysUntil(iso);
+  if (days == null) return { state: "none", label: "not recorded", days: null };
+  if (days < 0) return { state: "expired", label: "expired " + jdDate(iso), days: days };
+  if (days <= 60) return { state: "soon", label: "expires " + jdDate(iso) + " — " + days + " day" + (days === 1 ? "" : "s"), days: days };
+  return { state: "ok", label: "to " + jdDate(iso), days: days };
+}
+function conCerts(name) {
+  var d = conDir(name);
+  return { has: !!d, ins: conCertState(d && d.insuranceExp) };
+}
+function conCertChips(name) {
+  var c = conCerts(name);
+  if (!c.has) return "";
+  return '<div class="concerts">' +
+    '<span class="concert ' + c.ins.state + '">Insurance ' + esc(c.ins.label) + "</span></div>";
+}
+
+/* Lapsed or lapsing cover on a contractor who currently holds a contract.
+   Counted alongside the renewals so the figure on the summary and the list in
+   the section can never disagree. */
+function conCertAlerts() {
+  var out = [], seen = {};
+  conSorted().forEach(function (c) {
+    var nm = (c.contractor || "").trim();
+    if (!nm || seen[nm.toLowerCase()] || conCalc(c).state === "expired") return;
+    seen[nm.toLowerCase()] = 1;
+    var cc = conCerts(nm);
+    if (cc.ins.state === "expired" || cc.ins.state === "soon")
+      out.push({ nm: nm, what: "insurance certificate", st: cc.ins });
+  });
+  return out;
+}
+function conAttentionCount() { return conRenewals(90).length + conCertAlerts().length; }
+
 /* Contracts needing a decision within the window: ending soon, or with a
    notice deadline about to pass — the deadline matters more than the end date,
    because missing it commits the corporation to another whole term. */
@@ -5213,28 +5272,26 @@ function dirSave() {
   if (!cloud.on || !isEditor()) return;
   cloud.db.doc(CONTRACTORS_PATH).set({ list: dirState.list.map(function (r) { return {
     name: r.name || "", phone: r.phone || "", email: r.email || "",
-    insuranceExp: r.insuranceExp || "", wsibExp: r.wsibExp || "" }; }) })
+    insuranceExp: r.insuranceExp || "" }; }) })
     .catch(function () {});
 }
 function dateLapsed(dstr) { return dstr && dstr < todayISO(); }
 function dirCardHTML() {
   var h = [];
   h.push('<div class="ecard esettings" id="dirCard"><div class="ehead"><strong>Contractor directory</strong>' +
-    '<span style="font-size:12.5px;color:var(--ink2)">— contacts &amp; insurance/WSIB expiry (not printed on the report)</span></div><div class="ebids">');
+    '<span style="font-size:12.5px;color:var(--ink2)">— contacts &amp; insurance expiry (not printed on the report)</span></div><div class="ebids">');
   h.push('<div class="dirgrid"><div class="dirhdr">Contractor</div><div class="dirhdr">Phone</div>' +
-    '<div class="dirhdr">Email</div><div class="dirhdr">Insurance exp.</div><div class="dirhdr">WSIB exp.</div><div></div>');
+    '<div class="dirhdr">Email</div><div class="dirhdr">Insurance exp.</div><div></div>');
   dirState.list.forEach(function (r, di) {
     h.push('<input type="text" value="' + esc(r.name) + '" data-dirf="name" data-di="' + di + '" placeholder="name">' +
       '<input type="text" value="' + esc(r.phone) + '" data-dirf="phone" data-di="' + di + '" placeholder="phone">' +
       '<input type="text" value="' + esc(r.email) + '" data-dirf="email" data-di="' + di + '" placeholder="email">' +
       '<input type="date" value="' + esc(r.insuranceExp) + '" data-dirf="insuranceExp" data-di="' + di + '"' +
         (dateLapsed(r.insuranceExp) ? ' class="expired" title="Insurance certificate has lapsed!"' : "") + ">" +
-      '<input type="date" value="' + esc(r.wsibExp) + '" data-dirf="wsibExp" data-di="' + di + '"' +
-        (dateLapsed(r.wsibExp) ? ' class="expired" title="WSIB clearance has lapsed!"' : "") + ">" +
       '<button class="xbtn" data-act="dir-del" data-di="' + di + '" title="Remove">✕</button>');
   });
   h.push("</div>");
-  var lapsed = dirState.list.filter(function (r) { return dateLapsed(r.insuranceExp) || dateLapsed(r.wsibExp); });
+  var lapsed = dirState.list.filter(function (r) { return dateLapsed(r.insuranceExp); });
   if (lapsed.length)
     h.push('<p class="edithint" style="margin:8px 0 0"><span class="expired">⚠ Lapsed coverage:</span> ' +
       lapsed.map(function (r) { return esc(r.name || "unnamed"); }).join(", ") +
