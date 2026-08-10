@@ -668,6 +668,9 @@ body:has(#report.tpl-packet) .wrap { max-width:1560px; }
   display:flex; align-items:center; justify-content:center; }
 .tpl-packet .pk-nav a .ni svg { width:16px; height:16px; display:block; }
 .tpl-packet .pk-nav a:hover { background:rgba(255,255,255,.09); color:#fff; }
+.tpl-packet .pk-navsep { margin:14px 0 6px; padding-top:12px; border-top:1px solid rgba(255,255,255,.14);
+  font-size:10.5px; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color:rgba(255,255,255,.45); }
+.tpl-packet .pk-nav a.pk-navcon .ni { background:rgba(226,192,122,.28); }
 .tpl-packet .pk-nav a.active { background:linear-gradient(90deg,#2a8a5c 0%,#1f7350 100%); color:#fff;
   border-color:rgba(150,220,185,.55); box-shadow:0 2px 8px rgba(0,0,0,.28); }
 .tpl-packet .pk-nav a.active .ni { background:rgba(255,255,255,.22); }
@@ -1327,6 +1330,11 @@ body[data-view="edit"] .wrap { max-width:none; }
   border-radius:9px; padding:12px 15px; margin:0 0 14px; }
 .conTotal .v { font-size:25px; font-weight:700; color:var(--accent-ink); font-variant-numeric:tabular-nums; }
 .conTotal .l { font-size:13.5px; color:var(--ink2); }
+.conDue { background:var(--amber-soft); border:1px solid #e6cf9a; border-radius:9px;
+  padding:12px 15px; margin:0 0 14px; }
+.conDueHead { font-size:14px; font-weight:700; color:#6d4a0d; }
+.conDue ul { margin:7px 0 0; padding-left:20px; }
+.conDue li { font-size:14.5px; line-height:1.55; color:var(--ink); margin:3px 0; }
 .conlist { display:grid; gap:12px; }
 .concard { border:1px solid var(--line); border-left:5px solid var(--good); border-radius:10px;
   padding:14px 16px; background:var(--card); }
@@ -2420,6 +2428,12 @@ function creditHTML() {
    A board member's first question about a total is always "which jobs?", and
    the answer used to mean scrolling the sections and adding up by hand. */
 function openStatBreakdown(kind) {
+  if (kind === "contracts") {                    /* not a job figure — take them to the agreements */
+    var sec = document.getElementById("secF");
+    if (sec) { sec.scrollIntoView({ block: "start", behavior: "smooth" });
+      sec.classList.add("pk-flash"); setTimeout(function () { sec.classList.remove("pk-flash"); }, 1600); }
+    return;
+  }
   var d = computeAll(), rows = [], title = "", lede = "", total = null, cols = ["Job", "Contractor", "Amount (incl. HST)"];
   function jobRow(x) {
     var names = [];
@@ -3093,9 +3107,17 @@ function statCards(d) {
     { k: "pending", c: "pd", ic: "⏳", v: String(d.pendingCount), l: "Bids pending", s: "open for quotes" },
     { k: "approved", c: "ap", ic: "✅", v: money(d.approvedTotal), l: "Board approved", s: "approved spend" }
   ];
+  /* contracts are for signed-in readers, so is the figure that counts them */
+  if (canSeeContracts() && conState.list.length) {
+    var due = conRenewals(90);
+    cards.push({ k: "contracts", c: due.length ? "pd" : "tt", ic: "📄",
+      v: due.length ? String(due.length) : money(conTotalAnnual()),
+      l: due.length ? "Contracts to decide" : "Under contract",
+      s: due.length ? "within 90 days" : "committed each year" });
+  }
   return '<div class="statgrid">' + cards.map(function (k) {
     return '<div class="statcard statlink ' + k.c + '" data-stat="' + k.k +
-      '" role="button" tabindex="0" title="See the jobs behind this figure"><div class="sv-ic">' + k.ic + '</div><div class="sv-body">' +
+      '" role="button" tabindex="0" title="' + (k.k === "contracts" ? "Go to the contracts" : "See the jobs behind this figure") + '"><div class="sv-ic">' + k.ic + '</div><div class="sv-body">' +
       '<div class="sv-v">' + k.v + '</div><div class="sv-l">' + k.l + '</div>' +
       (k.s ? '<div class="sv-s">' + k.s + '</div>' : '') + '</div></div>';
   }).join("") + '</div>';
@@ -3450,8 +3472,13 @@ function renderPacketReport() {
     '<a href="#secProg">' + pkIcon("prog") + ' Work in progress</a>' +
     '<a href="#secD">' + pkIcon("spend") + ' Contractor spend</a>' +
     '<a href="#secE">' + pkIcon("open") + ' Open items</a>' +
-    (canSeeContracts() ? '<a href="#secF">' + pkIcon("open") + ' Contracts</a>' : "") +
-    '<a href="#" data-arch="1">' + pkIcon("arch") + ' Reports archive</a></nav>');
+    '<a href="#" data-arch="1">' + pkIcon("arch") + ' Reports archive</a>' +
+    /* not a section of the report — the corporation's agreements, and only
+       for someone who signed in. Kept apart from the run of report sections. */
+    (canSeeContracts()
+      ? '<div class="pk-navsep">Private to the board</div>' +
+        '<a class="pk-navcon" href="#secF">' + pkIcon("open") + ' Contracts</a>'
+      : "") + "</nav>");
   h.push('<div class="pk-side-foot"><span class="av">' + (ctx.ED ? "🛠" : (isBoardMember() ? "🗳" : "👤")) +
     '</span><span><b>' + role + '</b>' +
     (cloud.user ? '<a class="so js-signout">Sign out</a>' : '<small>' + esc(M.manager) + '</small>') +
@@ -3650,6 +3677,11 @@ function renderClassicReport() {
   tile("saved", "sv", money(d.savings), "Saved via competing bids");
   tile("approved", "", money(d.approvedTotal), "Board approved", ' style="border-top-color:#137333"', ' style="color:#137333"');
   tile("pending", "pd", String(d.pendingCount), "Bids pending");
+  if (canSeeContracts() && conState.list.length) {
+    var conDue = conRenewals(90);
+    tile("contracts", conDue.length ? "pd" : "", conDue.length ? String(conDue.length) : money(conTotalAnnual()),
+      conDue.length ? "Contracts to decide (90 days)" : "Committed each year under contract");
+  }
   h.push("</div>");
   /* pipeline: where every job sits in the lifecycle */
   var pl = [];
@@ -4925,7 +4957,25 @@ function conSectionHTML(ED) {
     return '<p class="seclede" style="margin:0">No contracts recorded yet' +
       (ED ? " — add them under <strong>Contracts</strong> in Edit data." : ".") + "</p>";
   var total = conTotalAnnual();
+  var due = conRenewals(90);
   var h = [];
+  if (due.length) {
+    h.push('<div class="conDue"><div class="conDueHead">\u{26A0} Coming up — ' + due.length +
+      " agreement" + (due.length === 1 ? "" : "s") + " needing a decision in the next 90 days</div><ul>");
+    due.forEach(function (c) {
+      var k = conCalc(c), when;
+      if (k.notice && k.noticeDays != null && k.noticeDays < 0)
+        when = "notice deadline passed " + jdDate(k.notice) + " — renews for another term";
+      else if (k.notice && k.noticeDays != null)
+        when = "give notice by " + jdDate(k.notice) + (k.noticeDays === 0 ? " (today)" : " — " + k.noticeDays + " days");
+      else if (k.days != null)
+        when = "ends " + jdDate(c.end) + (k.days === 0 ? " (today)" : " — " + k.days + " days");
+      else when = "ends " + jdDate(c.end);
+      h.push('<li><strong>' + esc((c.contractor || "").trim() || "Contractor not named") + "</strong>" +
+        (c.title ? " · " + esc(c.title) : "") + " — " + esc(when) + "</li>");
+    });
+    h.push("</ul></div>");
+  }
   if (total) h.push('<div class="conTotal"><span class="v">' + money(total) +
     '</span><span class="l">Committed each year under contract</span></div>');
   h.push('<div class="conlist">');
@@ -5119,6 +5169,18 @@ function conCalc(c) {
   else if (days <= 90) { state2 = "soon"; label = "Ends in " + days + " day" + (days === 1 ? "" : "s"); }
   else { state2 = "active"; label = "Active"; }
   return { days: days, notice: notice, noticeDays: nDays, state: state2, label: label, annual: conAnnual(c) };
+}
+/* Contracts needing a decision within the window: ending soon, or with a
+   notice deadline about to pass — the deadline matters more than the end date,
+   because missing it commits the corporation to another whole term. */
+function conRenewals(days) {
+  var win = days || 90;
+  return conSorted().filter(function (c) {
+    var k = conCalc(c);
+    if (k.state === "expired") return false;
+    if (k.noticeDays != null && k.noticeDays <= win) return true;
+    return k.days != null && k.days <= win;
+  });
 }
 function conSorted() {
   return conState.list.slice().sort(function (a4, b4) {
