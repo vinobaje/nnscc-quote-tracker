@@ -1322,6 +1322,56 @@ body[data-view="edit"] .wrap { max-width:none; }
 .statlink:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
 .tile.statlink:hover .v, .statcard.statlink:hover .sv-v { text-decoration:underline; text-underline-offset:3px; }
 
+/* ---------- contracts: written for a board reading on a phone ---------- */
+.conTotal { display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; background:var(--accent-soft);
+  border-radius:9px; padding:12px 15px; margin:0 0 14px; }
+.conTotal .v { font-size:25px; font-weight:700; color:var(--accent-ink); font-variant-numeric:tabular-nums; }
+.conTotal .l { font-size:13.5px; color:var(--ink2); }
+.conlist { display:grid; gap:12px; }
+.concard { border:1px solid var(--line); border-left:5px solid var(--good); border-radius:10px;
+  padding:14px 16px; background:var(--card); }
+.concard.soon { border-left-color:var(--amber); }
+.concard.expired { border-left-color:var(--prio); }
+.concard.open { border-left-color:var(--muted); }
+.conhead { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+.conwho { font:600 19px/1.25 Georgia,serif; color:var(--ink); }
+.conwhat { font-size:15px; color:var(--ink2); margin-top:2px; }
+.conchip { flex:none; font-size:12px; font-weight:700; border-radius:99px; padding:4px 11px;
+  background:var(--good-soft); color:var(--good); white-space:nowrap; }
+.conchip.soon { background:var(--amber-soft); color:var(--amber); }
+.conchip.expired { background:var(--prio-soft); color:var(--prio); }
+.conchip.open { background:var(--paper); color:var(--muted); }
+.conterm { font-size:15px; margin-top:9px; }
+.concost { font-size:17px; font-weight:700; margin-top:4px; }
+.connotice { font-size:14px; line-height:1.5; margin-top:8px; background:var(--amber-soft);
+  color:#6d4a0d; border-radius:7px; padding:8px 11px; }
+.connotice.past { background:var(--prio-soft); color:#7a2020; }
+.connote { font-size:14px; color:var(--ink2); margin-top:8px; }
+.confoot { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-top:12px; }
+.conbtn { font:650 14px/1.2 inherit; color:#fff; background:var(--accent); border:0; border-radius:8px;
+  padding:10px 14px; cursor:pointer; }
+.conbtn:hover { background:var(--accent-ink); }
+.conno { font-size:13px; color:var(--muted); font-style:italic; }
+.concontact { font-size:13.5px; color:var(--ink2); }
+.conNote { font-size:13.5px; color:var(--ink2); min-height:18px; margin:10px 0 0; }
+@media print { .conbtn { display:none !important; } .concard { break-inside:avoid; } }
+@media screen and (max-width:600px) {
+  .concard { padding:12px 13px; }
+  .conwho { font-size:17px; }
+  .conchip { order:3; }
+  .conbtn { width:100%; text-align:center; }
+}
+/* the manager's side */
+.conedit { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:11px; }
+.conedit .f { display:flex; flex-direction:column; gap:4px; min-width:0; }
+.conedit label { font-size:11.5px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); }
+.conedit input, .conedit select, .conedit textarea { font:14px/1.4 inherit; color:var(--ink);
+  border:1px solid var(--line); border-radius:7px; padding:8px 9px; background:var(--card); width:100%; box-sizing:border-box; }
+.conedit .wide { grid-column:1 / -1; }
+.confiles { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-top:4px; }
+.confile { display:inline-flex; align-items:center; gap:6px; font-size:12.5px; background:var(--paper);
+  border:1px solid var(--line); border-radius:7px; padding:5px 9px; }
+.confile .fx { color:var(--prio); cursor:pointer; font-weight:700; }
 /* Condo Super credit — closes the report on screen and on paper */
 .cscredit { margin:26px 0 6px; padding-top:12px; border-top:1px solid var(--line-soft);
   text-align:center; font-size:12px; color:var(--muted); letter-spacing:.01em; }
@@ -2050,6 +2100,7 @@ var cloud = { on: false, db: null, user: null, docExists: null, denied: false, b
 var CURRENT_PATH = "nnsccQuoteTracker/main";      /* the live/current report */
 var REPORTS_COLL = "nnsccQuoteReports";           /* archived past-period reports */
 var CONTRACTORS_PATH = "nnsccQuoteTracker/contractors";  /* shared contractor directory */
+var CONTRACTS_PATH = "nnsccQuoteTracker/contracts";      /* the contract register — signed-in readers only */
 var VIEW_BETA = CURRENT_PATH.indexOf("Beta") >= 0;   /* which report the passcode gate reads/protects */
 /* path of the report currently on screen */
 function reportPath() {
@@ -2121,7 +2172,8 @@ function cloudInit() {
   firebase.auth().onAuthStateChanged(function (u) {
     cloud.user = u || null;
     cloud.denied = false;                       /* fresh sign-in clears any prior denial */
-    subscribeBoard(u);                          /* board list + open-vote count (board/editors only) */
+    subscribeBoard(u);
+  conSubscribe();          /* the register is for signed-in readers */                          /* board list + open-vote count (board/editors only) */
     /* Firestore TERMINATES a listener that hits permission-denied — it does not
        retry it when credentials arrive. The first read of a page load happens
        before Firebase has restored a saved session, so without this the report
@@ -3398,6 +3450,7 @@ function renderPacketReport() {
     '<a href="#secProg">' + pkIcon("prog") + ' Work in progress</a>' +
     '<a href="#secD">' + pkIcon("spend") + ' Contractor spend</a>' +
     '<a href="#secE">' + pkIcon("open") + ' Open items</a>' +
+    (canSeeContracts() ? '<a href="#secF">' + pkIcon("open") + ' Contracts</a>' : "") +
     '<a href="#" data-arch="1">' + pkIcon("arch") + ' Reports archive</a></nav>');
   h.push('<div class="pk-side-foot"><span class="av">' + (ctx.ED ? "🛠" : (isBoardMember() ? "🗳" : "👤")) +
     '</span><span><b>' + role + '</b>' +
@@ -3463,6 +3516,11 @@ function renderPacketReport() {
     '</section>');
   h.push('<section id="secE" class="panel"><h3>Open items for the board</h3>' + secEBlocks(d, M, ctx.ED) + '</section>');
   h.push('</div>');
+  /* contracts: only for readers who signed in */
+  if (canSeeContracts())
+    h.push('<section id="secF" class="panel"><h3>Contracts with contractors</h3>' +
+      '<p class="seclede">What the corporation is committed to, and until when. Soonest to end first.</p>' +
+      conSectionHTML(ctx.ED) + '</section>');
   h.push(creditHTML());
   h.push('</main></div>');
   document.getElementById("report").innerHTML = h.join("");
@@ -3562,7 +3620,8 @@ function renderClassicReport() {
     '<a href="#secB">B · ' + esc(shortLabel(M.headB)) + "</a>" +
     '<a href="#secC">C · ' + esc(shortLabel(M.headC)) + "</a>" +
     '<a href="#secD">D · ' + esc(shortLabel(M.headD)) + "</a>" +
-    '<a href="#secE">E · ' + esc(shortLabel(M.headE)) + "</a></nav>");
+    '<a href="#secE">E · ' + esc(shortLabel(M.headE)) + "</a>" +
+    (canSeeContracts() ? '<a href="#secF">F · Contracts</a>' : "") + "</nav>");
   if (canVoteView() && votesCache.open > 0)
     h.push('<div class="votebanner">🗳 <strong>' + votesCache.open + '</strong> board vote' +
       (votesCache.open > 1 ? "s are" : " is") + ' open — your review is requested. ' +
@@ -3719,6 +3778,11 @@ function renderClassicReport() {
   }
   h.push("</section>");
 
+  if (canSeeContracts())
+    h.push('<section id="secF"><div class="kicker">Section F</div><h2>Contracts with contractors</h2>' +
+      '<p class="seclede">What the corporation is committed to, and until when. Soonest to end first. ' +
+      'Visible to the board and the property manager only.</p>' + conSectionHTML(EDITOR) + "</section>");
+
   h.push('<div class="foot"><p><strong>Data notes.</strong> All totals include 13% HST; quotes received exclusive of HST are grossed up. ' +
     "Where multiple priced bids exist, only the lowest is counted in totals (tied lowest bids are all counted); pending quotes are excluded. " +
     "Report generated " + esc(todayStr()) + ".</p>" +
@@ -3798,6 +3862,7 @@ var edSaved = true;           /* false while an edit is on its way to the cloud 
 
 var ED_SECTIONS = [
   ["jobs", "💼", "Jobs &amp; Bids"], ["overview", "📊", "Overview"],
+  ["contracts", "📄", "Contracts"],
   ["contractors", "👷", "Contractors"], ["board", "🗳", "Board &amp; Voting"],
   ["settings", "⚙️", "Settings"]
 ];
@@ -3806,6 +3871,9 @@ function renderEditor() {
   var M = state.meta || META_DEFAULTS;
   var h = ['<div class="ed-shell">', edSideHTML(M), '<div class="ed-main">', edTopHTML(M), '<div class="ed-body">'];
   if (edNav === "overview") h.push(edOverviewHTML(M));
+  else if (edNav === "contracts") h.push(edSecHead("Contracts",
+    "Agreements with contractors — what they cover, until when, and what they cost. " +
+    "The board sees these on the report once signed in; a passcode reader never does.") + conCardHTML());
   else if (edNav === "contractors") h.push(edSecHead("Contractors",
     "Contact details, insurance and WSIB expiry. Expiring cover is flagged on the report’s open-items section.") + dirCardHTML());
   else if (edNav === "board") h.push(edSecHead("Board &amp; voting",
@@ -4658,6 +4726,38 @@ function edWorkspaceAction(act, el, e) {
       persist(null, ["Restored " + jobLabel(rj.j) + " to the report as job " + rj.j.no], rj.j.id);
       renderEditor(); renderReport(); return true;
     }
+    /* ---- contracts ---- */
+    case "conadd": {
+      conState.list.push({ id: genId(), contractor: "", title: "", start: todayISO(), end: "",
+        renew: false, noticeDays: "", amount: "", period: "year", notes: "", files: [] });
+      conSave(); renderEditor(); return true;
+    }
+    case "condel": {
+      var cc = el.closest("[data-cid]"); if (!cc) return true;
+      var cd = conById(cc.dataset.cid); if (!cd) return true;
+      if (!confirm("Delete the contract with " + ((cd.contractor || "this contractor")) +
+        (cd.title ? " for " + cd.title : "") + "?\n\nThe attached documents are removed too. This cannot be undone.")) return true;
+      (cd.files || []).forEach(function (f) {
+        if (cloud.store && f.path) cloud.store.ref(f.path).delete().catch(function () {});
+      });
+      conState.list = conState.list.filter(function (x) { return x.id !== cd.id; });
+      conSave(); renderEditor(); renderReport(); return true;
+    }
+    case "conattach": {
+      var ca = el.closest("[data-cid]"); if (!ca) return true;
+      conAttachId = ca.dataset.cid;
+      document.getElementById("conFile").click(); return true;
+    }
+    case "confiledel": {
+      var cf = el.closest("[data-cid]"); if (!cf) return true;
+      var cdel = conById(cf.dataset.cid); if (!cdel) return true;
+      var fi = +el.getAttribute("data-fi");
+      var gone = (cdel.files || [])[fi]; if (!gone) return true;
+      if (!confirm("Remove “" + gone.name + "” from this contract?")) return true;
+      if (cloud.store && gone.path) cloud.store.ref(gone.path).delete().catch(function () {});
+      cdel.files.splice(fi, 1);
+      conSave(); renderEditor(); return true;
+    }
     /* the trash icon on a job card's own header */
     case "jdelrow": {
       var dc = el.closest(".jcard"); if (!dc) return true;
@@ -4759,6 +4859,291 @@ document.getElementById("editor").addEventListener("drop", function (e) {
   var m = document.querySelector('#editor .ecard[data-jid="' + moved.id + '"]');
   if (m) m.scrollIntoView({ block: "nearest" });
 });
+
+/* ---------- the manager's side of the register ---------- */
+function conCardHTML() {
+  var h = ['<div class="ecard esettings"><div class="ehead"><strong>Contract register</strong>' +
+    '<span class="spacer"></span><button class="edbtn prim" type="button" data-act="conadd">+ Add contract</button></div>' +
+    '<div class="ebids">'];
+  if (!conState.list.length)
+    h.push('<p class="updempty">No contracts yet. Add one for each agreement in force — ' +
+      "the board sees them on the report, soonest to end first.</p>");
+  conSorted().forEach(function (c) {
+    var k = conCalc(c);
+    var names = dirState.list.map(function (r) { return r.name; }).filter(Boolean);
+    if (c.contractor && names.indexOf(c.contractor) < 0) names.unshift(c.contractor);
+    var opts = '<option value="">— choose a contractor —</option>' + names.map(function (n) {
+      return '<option value="' + esc(n) + '"' + (c.contractor === n ? " selected" : "") + ">" + esc(n) + "</option>";
+    }).join("");
+    var pOpts = CON_PERIODS.map(function (pp) {
+      return '<option value="' + pp[0] + '"' + ((c.period || "year") === pp[0] ? " selected" : "") + ">" + pp[1] + "</option>";
+    }).join("");
+    h.push('<div class="ecard" style="margin:0 0 12px" data-cid="' + esc(c.id) + '">' +
+      '<div class="jhead" style="cursor:default"><span class="jchip ' +
+        (k.state === "expired" ? "prio" : (k.state === "soon" ? "st-scheduled" : "st-approved")) + '">' + esc(k.label) + "</span>" +
+      '<strong style="flex:1 1 auto;min-width:0">' + esc((c.contractor || "New contract")) + "</strong>" +
+      '<button class="jdel" type="button" data-act="condel" title="Delete this contract">\u{1F5D1}</button></div>' +
+      '<div class="jbody"><div class="conedit">' +
+      '<div class="f wide"><label>Contractor</label><select data-conf="contractor">' + opts + "</select></div>" +
+      '<div class="f wide"><label>What it covers</label><input type="text" data-conf="title" value="' +
+        esc(c.title || "") + '" placeholder="e.g. Generator maintenance, 550 &amp; 560"></div>' +
+      '<div class="f"><label>Start date</label><input type="date" data-conf="start" value="' + esc(c.start || "") + '"></div>' +
+      '<div class="f"><label>End date</label><input type="date" data-conf="end" value="' + esc(c.end || "") + '"></div>' +
+      '<div class="f"><label>Amount</label><input type="text" inputmode="decimal" data-conf="amount" value="' +
+        esc(c.amount === "" || c.amount == null ? "" : c.amount) + '" placeholder="1450.00"></div>' +
+      '<div class="f"><label>Charged</label><select data-conf="period">' + pOpts + "</select></div>" +
+      '<div class="f"><label>Renews automatically</label><label class="echk" style="margin:0;font-weight:400">' +
+        '<input type="checkbox" data-conf="renew"' + (c.renew ? " checked" : "") + "> yes</label></div>" +
+      '<div class="f"><label>Notice needed (days)</label><input type="text" inputmode="numeric" data-conf="noticeDays" value="' +
+        esc(c.noticeDays === "" || c.noticeDays == null ? "" : c.noticeDays) + '" placeholder="60"></div>' +
+      '<div class="f wide"><label>Notes for the board</label><input type="text" data-conf="notes" value="' +
+        esc(c.notes || "") + '" placeholder="anything the board should know"></div>' +
+      '<div class="f wide"><label>Signed contract (PDF)</label><div class="confiles">' +
+        (c.files || []).map(function (f, fi) {
+          return '<span class="confile"><a href="#" data-confile="' + esc(c.id) + ":" + fi + '">\u{1F4C4} ' +
+            esc(f.name) + '</a><span class="fx" data-act="confiledel" data-fi="' + fi + '" title="Remove">✕</span></span>';
+        }).join("") +
+        '<button class="edbtn" type="button" data-act="conattach">\u{1F4CE} Attach a document</button></div>' +
+        (k.notice ? '<p class="rephint">Notice deadline: ' + esc(jdDate(k.notice)) + "</p>" : "") + "</div>" +
+      "</div></div></div>");
+  });
+  h.push('<p class="conNote" id="conNote"></p></div></div>');
+  h.push('<input type="file" id="conFile" accept="application/pdf,image/*" style="display:none">');
+  return h.join("");
+}
+function conById(id) {
+  for (var i = 0; i < conState.list.length; i++) if (conState.list[i].id === id) return conState.list[i];
+  return null;
+}
+
+/* ---------- what the board reads ----------
+   One card per agreement, soonest to end first, in the plain terms a board
+   asks in the room: who, what for, until when, and what it costs a year. */
+function conSectionHTML(ED) {
+  var list = conSorted();
+  if (!list.length)
+    return '<p class="seclede" style="margin:0">No contracts recorded yet' +
+      (ED ? " — add them under <strong>Contracts</strong> in Edit data." : ".") + "</p>";
+  var total = conTotalAnnual();
+  var h = [];
+  if (total) h.push('<div class="conTotal"><span class="v">' + money(total) +
+    '</span><span class="l">Committed each year under contract</span></div>');
+  h.push('<div class="conlist">');
+  list.forEach(function (c) {
+    var k = conCalc(c), d = conDir(c.contractor);
+    var term = [];
+    if (c.start) term.push("Started " + jdDate(c.start));
+    term.push(c.end ? "Ends " + jdDate(c.end) : "No end date recorded");
+    var cost = "";
+    if (c.amount !== "" && c.amount != null && !isNaN(Number(c.amount))) {
+      cost = money(Number(c.amount)) + " " + conPeriodLabel(c.period);
+      if (k.annual && c.period === "month") cost += " · " + money(k.annual) + " a year";
+    }
+    var files = (c.files || []).length;
+    h.push('<div class="concard ' + k.state + '">' +
+      '<div class="conhead"><div><div class="conwho">' + esc((c.contractor || "").trim() || "Contractor not named") + "</div>" +
+        '<div class="conwhat">' + esc(c.title || "Agreement") + "</div></div>" +
+        '<span class="conchip ' + k.state + '">' + esc(k.label) + "</span></div>" +
+      '<div class="conterm">' + esc(term.join(" · ")) + "</div>" +
+      (cost ? '<div class="concost">' + esc(cost) + "</div>" : "") +
+      (k.notice
+        ? (k.noticeDays != null && k.noticeDays < 0
+            ? '<div class="connotice past">The deadline to give notice passed on <strong>' + esc(jdDate(k.notice)) +
+              "</strong> — this agreement renews for another term.</div>"
+            : '<div class="connotice">To end it, notice must be given by <strong>' + esc(jdDate(k.notice)) +
+              "</strong>" + (k.noticeDays != null ? " — " + (k.noticeDays === 0 ? "today" : k.noticeDays + " days away") : "") +
+              ", otherwise it renews automatically.</div>")
+        : (c.renew ? '<div class="connotice">Renews automatically.</div>' : "")) +
+      (c.notes ? '<div class="connote">' + esc(c.notes) + "</div>" : "") +
+      '<div class="confoot">' +
+        (files ? '<button class="conbtn" type="button" data-confile="' + esc(c.id) + ':0">\u{1F4C4} Read the contract' +
+          (files > 1 ? " (" + files + " documents)" : "") + "</button>" : '<span class="conno">No document attached yet</span>') +
+        (d && (d.phone || d.email) ? '<span class="concontact">' + esc([d.phone, d.email].filter(Boolean).join(" · ")) + "</span>" : "") +
+      "</div></div>");
+  });
+  h.push('</div><p class="conNote" id="conNote"></p>');
+  return h.join("");
+}
+
+/* A contract PDF is fetched with the reader's own credentials rather than a
+   public download URL. Firebase's getDownloadURL() mints a token anyone can
+   use forever; this route goes through the storage rules every time, so a
+   contract is readable only while you are signed in and on the list. */
+var conBlobs = {};                               /* path -> object URL, this session only */
+function conFileURL(path) {
+  if (conBlobs[path]) return Promise.resolve(conBlobs[path]);
+  var u = cloud.user;
+  if (!u || !cloud.store) return Promise.reject({ code: "not-signed-in" });
+  return u.getIdToken().then(function (tok) {
+    var bucket = cloud.store.ref().bucket || (firebase.app().options.storageBucket || "");
+    var url = "https://firebasestorage.googleapis.com/v0/b/" + encodeURIComponent(bucket) +
+      "/o/" + encodeURIComponent(path) + "?alt=media";
+    return fetch(url, { headers: { Authorization: "Bearer " + tok } });
+  }).then(function (r) {
+    if (!r.ok) throw { code: r.status === 403 ? "permission-denied" : "http-" + r.status };
+    return r.blob();
+  }).then(function (blob) {
+    conBlobs[path] = URL.createObjectURL(blob);
+    return conBlobs[path];
+  });
+}
+/* open every document on one contract in the in-page viewer */
+function conOpenFiles(cid, startIdx) {
+  var c = null;
+  conState.list.forEach(function (x) { if (x.id === cid) c = x; });
+  if (!c || !(c.files || []).length) return;
+  var note = document.getElementById("conNote");
+  if (note) note.textContent = "Opening the document…";
+  Promise.all(c.files.map(function (f) {
+    return conFileURL(f.path).then(function (url) { return { name: f.name, url: url, size: f.size }; });
+  })).then(function (files) {
+    if (note) note.textContent = "";
+    openFileViewer(files, startIdx || 0, (c.contractor || "Contract") + " — " + (c.title || "agreement"));
+  }).catch(function (e) {
+    var msg = (e && e.code) === "permission-denied"
+      ? "That document is only open to the board and the property manager — sign in to read it."
+      : "Could not open the document (" + esc((e && e.code) || "error") + ").";
+    if (note) note.textContent = msg; else alert(msg);
+  });
+}
+document.addEventListener("click", function (e) {
+  var el = e.target && e.target.closest ? e.target.closest("[data-confile]") : null;
+  if (!el) return;
+  e.preventDefault();
+  var p2 = String(el.getAttribute("data-confile")).split(":");
+  conOpenFiles(p2[0], +(p2[1] || 0));
+});
+
+var conAttachId = null;
+/* typing in a contract field */
+document.getElementById("editor").addEventListener("change", function (e) {
+  var f = e.target.getAttribute && e.target.getAttribute("data-conf"); if (!f) return;
+  var card = e.target.closest("[data-cid]"); if (!card) return;
+  var c = conById(card.dataset.cid); if (!c) return;
+  c[f] = (f === "renew") ? e.target.checked : e.target.value;
+  conSave();
+  if (f === "end" || f === "renew" || f === "noticeDays" || f === "contractor") renderEditor();
+  renderReport();
+});
+document.getElementById("editor").addEventListener("input", function (e) {
+  var f = e.target.getAttribute && e.target.getAttribute("data-conf");
+  if (!f || f === "renew") return;
+  var card = e.target.closest("[data-cid]"); if (!card) return;
+  var c = conById(card.dataset.cid); if (!c) return;
+  c[f] = e.target.value;
+  clearTimeout(conSave._t); conSave._t = setTimeout(conSave, 400);
+});
+/* the signed document. Stored under a path only — no public download URL is
+   ever minted, so reading it always goes through the storage rules. */
+document.addEventListener("change", function (e) {
+  if (e.target.id !== "conFile") return;
+  var file = e.target.files[0]; e.target.value = "";
+  var c = conById(conAttachId); conAttachId = null;
+  var note = document.getElementById("conNote");
+  if (!file || !c) return;
+  if (!cloud.store || !isEditor()) { if (note) note.textContent = "Sign in as the property manager to attach a document."; return; }
+  if (file.size > 20 * 1024 * 1024) { if (note) note.textContent = "That file is over 20 MB — attach a smaller copy."; return; }
+  if (note) note.textContent = "Uploading “" + file.name + "”…";
+  var path = "contractFiles/" + c.id + "/" + Date.now() + "-" + file.name.replace(/[^\w.\-() ]+/g, "_");
+  cloud.store.ref(path).put(file).then(function () {
+    c.files = c.files || [];
+    c.files.push({ name: file.name, path: path, size: file.size });
+    conSave();
+    if (note) note.textContent = "";
+    renderEditor(); renderReport();
+  }).catch(function (err) {
+    if (note) note.textContent = "Upload failed (" + ((err && err.code) || "error") + ") — nothing was saved.";
+  });
+});
+
+/* ---------- contract register ----------
+   What the corporation is committed to, and until when. Held in its own
+   document so a passcode reader never receives it: signing in is the price of
+   seeing the agreements, and the same goes for the signed PDFs in Storage. */
+var conState = { list: [] }, conUnsub = null;
+function conSave() {
+  if (!cloud.on || !isEditor()) return;
+  cloud.db.doc(CONTRACTS_PATH).set({ list: conState.list.map(function (c) {
+    return { id: c.id || genId(), contractor: c.contractor || "", title: c.title || "",
+      start: c.start || "", end: c.end || "", renew: !!c.renew,
+      noticeDays: c.noticeDays == null ? "" : c.noticeDays,
+      amount: c.amount == null ? "" : c.amount, period: c.period || "year",
+      notes: c.notes || "", files: (c.files || []).map(function (f) {
+        return { name: f.name || "", path: f.path || "", size: f.size || 0 }; }) };
+  }) }).catch(function () {});
+}
+function conSubscribe() {
+  if (conUnsub) { conUnsub(); conUnsub = null; }
+  if (!cloud.on || !cloud.user) { conState = { list: [] }; return; }
+  conUnsub = cloud.db.doc(CONTRACTS_PATH).onSnapshot(function (snap) {
+    conState = (snap.exists && Array.isArray(snap.data().list)) ? { list: snap.data().list } : { list: [] };
+    conState.list.forEach(function (c) { if (!c.id) c.id = genId(); });
+    if (document.body.dataset.view === "edit") renderEditor(); else renderReport();
+  }, function () { conState = { list: [] }; });   /* not on the list: no contracts, no noise */
+}
+var CON_PERIODS = [["month", "a month"], ["year", "a year"], ["visit", "per visit"], ["fixed", "fixed price"]];
+function conPeriodLabel(p) {
+  for (var i = 0; i < CON_PERIODS.length; i++) if (CON_PERIODS[i][0] === p) return CON_PERIODS[i][1];
+  return "a year";
+}
+function conDaysUntil(iso) {
+  var s2 = String(iso || "").slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s2)) return null;
+  var p2 = s2.split("-"), now = new Date();
+  var today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  return Math.round((new Date(+p2[0], +p2[1] - 1, +p2[2]).getTime() - today) / 86400000);
+}
+/* the date that actually matters on a renewing contract: the last day notice
+   can be given before it rolls over for another term */
+function conNoticeBy(c) {
+  if (!c.renew || !c.end || !(+c.noticeDays > 0)) return "";
+  var p3 = String(c.end).slice(0, 10).split("-");
+  if (p3.length !== 3) return "";
+  var d = new Date(+p3[0], +p3[1] - 1, +p3[2]);
+  d.setDate(d.getDate() - Math.round(+c.noticeDays));
+  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+}
+function conAnnual(c) {
+  var a3 = Number(c.amount);
+  if (!a3 || isNaN(a3)) return null;
+  if (c.period === "month") return a3 * 12;
+  if (c.period === "year") return a3;
+  return null;                                  /* per visit / fixed price: not a yearly commitment */
+}
+function conCalc(c) {
+  var days = conDaysUntil(c.end), notice = conNoticeBy(c), nDays = conDaysUntil(notice);
+  var state2, label;
+  if (!c.end) { state2 = "open"; label = "No end date"; }
+  else if (days < 0) { state2 = "expired"; label = "Expired " + jdDate(c.end); }
+  else if (days === 0) { state2 = "soon"; label = "Ends today"; }
+  else if (days <= 90) { state2 = "soon"; label = "Ends in " + days + " day" + (days === 1 ? "" : "s"); }
+  else { state2 = "active"; label = "Active"; }
+  return { days: days, notice: notice, noticeDays: nDays, state: state2, label: label, annual: conAnnual(c) };
+}
+function conSorted() {
+  return conState.list.slice().sort(function (a4, b4) {
+    var da = conDaysUntil(a4.end), db = conDaysUntil(b4.end);
+    if (da == null && db == null) return String(a4.contractor || "").localeCompare(String(b4.contractor || ""));
+    if (da == null) return 1;
+    if (db == null) return -1;
+    return da - db;                              /* soonest to end, first */
+  });
+}
+function conTotalAnnual() {
+  return conState.list.reduce(function (t, c) {
+    var v = conAnnual(c);
+    return t + ((v && conCalc(c).state !== "expired") ? v : 0);
+  }, 0);
+}
+/* the contractor's own row in the directory — phone, email, cover expiry */
+function conDir(name) {
+  var n = String(name || "").trim().toLowerCase();
+  for (var i = 0; i < dirState.list.length; i++)
+    if (String(dirState.list[i].name || "").trim().toLowerCase() === n) return dirState.list[i];
+  return null;
+}
+/* Contracts are for people who signed in — the board and the manager. */
+function canSeeContracts() { return isEditor() || isBoardMember(); }
 
 /* ---------- contractor directory (beta) ---------- */
 var dirState = { list: [] };

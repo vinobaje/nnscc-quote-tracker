@@ -96,6 +96,33 @@ service firebase.storage {
       allow create, update: if nnsccStorageEditor() && request.resource.size < 15 * 1024 * 1024;
       allow delete: if nnsccStorageEditor();
     }
+    // Signed contracts with contractors. Unlike a quote attachment, these are
+    // NOT public: read is restricted to the property manager and the board,
+    // and the client never mints a download token — it fetches with the
+    // reader's own credentials, so every read comes back through here.
+    match /contractFiles/{allPaths=**} {
+      function conSignedIn() {
+        return request.auth != null
+          && request.auth.token.get('email_verified', false) == true
+          && request.auth.token.email != null;
+      }
+      function conEditor() {
+        return conSignedIn()
+          && ( request.auth.token.email.lower() == 'mvinobaje@gmail.com'
+            || request.auth.token.email.lower() == 'nnscc292connect@cpomanagement.ca'
+            || request.auth.token.email.lower() in
+               firestore.get(/databases/(default)/documents/nnsccQuoteTrackerConfig/main).data.get('editors', []) );
+      }
+      function conBoard() {
+        return conSignedIn()
+          && request.auth.token.email.lower() in
+             firestore.get(/databases/(default)/documents/nnsccQuoteTracker/board).data.get('members', []);
+      }
+      allow read: if conEditor() || conBoard();
+      allow create, update: if conEditor() && request.resource.size < 20 * 1024 * 1024;
+      allow delete: if conEditor();
+    }
+
     match /{allPaths=**} { allow read, write: if false; }
   }
 }

@@ -33,6 +33,7 @@ const LIVE_SWAPS = [
   ['"nnsccQuoteTrackerBeta/main"', '"nnsccQuoteTracker/main"'],
   ['"nnsccQuoteReportsBeta"', '"nnsccQuoteReports"'],
   ['"nnsccQuoteTrackerBeta/contractors"', '"nnsccQuoteTracker/contractors"'],
+  ['"nnsccQuoteTrackerBeta/contracts"', '"nnsccQuoteTracker/contracts"'],
   ['"nnsccQuoteTrackerBeta/board"', '"nnsccQuoteTracker/board"'],
   ['"nnsccBoardVotesBeta"', '"nnsccBoardVotes"'],
   ['"nnsccDecisionLogBeta"', '"nnsccDecisionLog"'],
