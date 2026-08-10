@@ -296,6 +296,9 @@ input:focus, select:focus { outline:2px solid var(--accent); outline-offset:-1px
 .histentry ul { margin:4px 0 0; padding-left:18px; font-size:13px; color:var(--ink2); }
 .histentry li { margin:2px 0; }
 .histempty { color:var(--muted); font-size:13.5px; }
+.versrow { display:flex; align-items:center; justify-content:space-between; gap:12px;
+  border-top:1px solid var(--line-soft); padding:10px 2px; font-size:14px; }
+.versrow:first-child { border-top:none; }
 /* One job's dossier — when it arrived, what it costs, what has happened since */
 /* ---------- one job's panel: header, facts, timeline + summary rail ---------- */
 .jdbox { width:min(1060px, 96vw); box-sizing:border-box; padding:0; overflow:hidden;
@@ -1704,8 +1707,8 @@ body[data-view="edit"] .wrap { max-width:none; }
       <button id="btnDecLog" type="button" style="display:none">📜 Decision log</button>
       <button id="btnBackup" type="button" style="display:none">Backup data (JSON)</button>
       <button id="btnRestore" type="button" style="display:none">Restore a backup…</button>
+      <button id="btnVersions" type="button" style="display:none">Earlier versions…</button>
       <button id="btnPortable" type="button" style="display:none">Download portable copy</button>
-      <button id="btnReset" type="button" class="ddanger" style="display:none">Reset to original…</button>
     </div>
   </div>
   <input type="file" id="fileRestore" accept=".json,application/json" style="display:none">
@@ -1798,6 +1801,16 @@ body[data-view="edit"] .wrap { max-width:none; }
     <p id="statLede" class="histempty" style="margin:0 0 10px"></p>
     <div id="statBody" class="histlist" style="max-height:min(520px,66vh)"></div>
     <div class="row"><button class="btn ghost" id="statClose" type="button">Close</button></div>
+  </div>
+</div>
+
+<div class="overlay" id="versOverlay" role="dialog" aria-modal="true" aria-label="Earlier versions">
+  <div class="pinbox histbox">
+    <h3>Earlier versions</h3>
+    <p class="histempty" style="margin:0 0 10px">A copy of the whole report is kept the first time it is saved each
+      day. Restoring one is itself undoable — today's copy stays in the list.</p>
+    <div id="versList" class="histlist"></div>
+    <div class="row"><button class="btn ghost" id="versClose" type="button">Close</button></div>
   </div>
 </div>
 
@@ -2116,6 +2129,7 @@ var CURRENT_PATH = "nnsccQuoteTrackerBeta/main";      /* BETA sandbox — live/c
 var REPORTS_COLL = "nnsccQuoteReportsBeta";           /* BETA sandbox — archived reports */
 var CONTRACTORS_PATH = "nnsccQuoteTrackerBeta/contractors";  /* shared contractor directory */
 var CONTRACTS_PATH = "nnsccQuoteTrackerBeta/contracts";      /* the contract register — signed-in readers only */
+var SNAPSHOTS_COLL = "nnsccQuoteSnapshotsBeta";               /* a copy of the report, kept each day it changes */
 var VIEW_BETA = CURRENT_PATH.indexOf("Beta") >= 0;   /* which report the passcode gate reads/protects */
 /* path of the report currently on screen */
 function reportPath() {
@@ -2306,6 +2320,7 @@ function cloudPush(changes, jobIds) {
     updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
     updatedBy: cloud.user.email
   }, { merge: true }).then(function () {   /* merge keeps archived docs' createdAt/archivedAt intact */
+    snapMaybeWrite();                      /* one copy of the report per day */
     if (changes && changes.length && loggedAccount()) {
       var entry = {
         at: firebase.firestore.FieldValue.serverTimestamp(),
@@ -3965,10 +3980,10 @@ function edTopHTML(M) {
     '<button type="button" data-act="edproxy" data-target="btnDecLog">📜 Decision log</button>' +
     '<button type="button" data-act="edproxy" data-target="btnMemo">✨ AI board memo</button>' +
     '<button type="button" data-act="edproxy" data-target="btnReports">🗂 Reports archive</button><hr>' +
+    '<button type="button" data-act="edproxy" data-target="btnVersions">🕓 Earlier versions…</button>' +
     '<button type="button" data-act="edproxy" data-target="btnBackup">⬇ Backup data (JSON)</button>' +
     '<button type="button" data-act="edproxy" data-target="btnRestore">⬆ Restore a backup…</button>' +
     '<button type="button" data-act="edproxy" data-target="btnPortable">📦 Download portable copy</button><hr>' +
-    '<button type="button" class="ddanger" data-act="edproxy" data-target="btnReset">Reset to original…</button>' +
     "</div></div>" +
     '<button class="edbtn dark" type="button" data-act="edsave">💾 Save</button>' +
     '<button class="edbtn prim" type="button" id="btnAddJob">+ Add job</button></div></div>');
@@ -4309,7 +4324,10 @@ function edSettingsHTML(M) {
     '<button class="edbtn" type="button" data-act="edproxy" data-target="btnRestore">⬆ Restore a backup…</button>' +
     '<button class="edbtn" type="button" data-act="edproxy" data-target="btnPortable">📦 Download portable copy</button>' +
     '<button class="edbtn" type="button" data-act="edproxy" data-target="btnHistory">🕘 Change history</button>' +
-    '<button class="edbtn danger" type="button" data-act="edproxy" data-target="btnReset">Reset to original…</button></p></div></div>');
+    '<button class="edbtn" type="button" data-act="edproxy" data-target="btnVersions">\u{1F553} Earlier versions…</button></p>' +
+    '<p class="rephint" style="margin:10px 0 0">A copy of the whole report is kept every day it changes, and the ' +
+    'database itself is backed up nightly and weekly by Firebase. Nothing here can be lost by one wrong click.</p>' +
+    "</div></div>");
   return h.join("");
 }
 
@@ -5123,6 +5141,98 @@ document.addEventListener("change", function (e) {
   }).catch(function (err) {
     if (note) note.textContent = "Upload failed (" + ((err && err.code) || "error") + ") — nothing was saved.";
   });
+});
+
+/* ---------- earlier versions ----------
+   A copy of the whole report is written the first time it is saved on any day,
+   and thirty of them are kept. Restoring one is a normal save, so a restore is
+   itself undoable — the version you were on a moment ago is still in the list. */
+var snapState = { newest: null, checked: false };
+function snapMaybeWrite() {
+  if (!cloud.on || !cloud.user || !isEditor() || cloud.active.kind !== "current") return;
+  var today = todayISO();
+  if (snapState.newest === today) return;            /* already kept one today */
+  var coll = cloud.db.collection(SNAPSHOTS_COLL);
+  var go = function () {
+    if (snapState.newest === today) return;
+    snapState.newest = today;                        /* claim it before the write */
+    coll.doc(today).set({
+      at: firebase.firestore.FieldValue.serverTimestamp(),
+      by: cloud.user.email, day: today,
+      reportName: state.reportName || defaultPeriodName(),
+      jobs: deepCopy(state.jobs), meta: deepCopy(state.meta || META_DEFAULTS),
+      ai: state.ai ? deepCopy(state.ai) : null
+    }).then(snapPrune).catch(function () { snapState.newest = null; });
+  };
+  if (snapState.checked) { go(); return; }
+  coll.orderBy("day", "desc").limit(1).get().then(function (qs) {
+    snapState.checked = true;
+    qs.forEach(function (d) { snapState.newest = d.id; });
+    go();
+  }).catch(function () { snapState.checked = true; });
+}
+/* keep a month of days; older copies go */
+function snapPrune() {
+  cloud.db.collection(SNAPSHOTS_COLL).orderBy("day", "desc").limit(60).get().then(function (qs) {
+    var i = 0;
+    qs.forEach(function (d) { i++; if (i > 30) d.ref.delete().catch(function () {}); });
+  }).catch(function () {});
+}
+function snapRestore(day) {
+  /* the catch belongs to the read alone: a restore that has already happened
+     must never report itself as a failure because a redraw threw afterwards */
+  cloud.db.collection(SNAPSHOTS_COLL).doc(day).get()
+    .then(function (d) { snapApply(day, d && d.exists ? d.data() : null); },
+          function (e) { alert("Could not read that version (" + ((e && e.code) || "error") + ")."); });
+}
+function snapApply(day, v) {
+  if (!v) { alert("That version could not be read."); return; }
+  if (!confirm("Put the report back to how it was on " + jdDate(day) + "?\n\n" +
+    (v.jobs || []).length + " jobs will replace what is on screen now. " +
+    "Today's version is kept, so this can be undone.")) return;
+  state = normState({ reportName: v.reportName, jobs: deepCopy(v.jobs || []),
+    meta: deepCopy(v.meta || {}), ai: v.ai || null });
+  try { persist(null, ["Restored the report as it was on " + day], ""); } catch (e) {}
+  try { renderReport(); if (document.body.dataset.view === "edit") renderEditor(); } catch (e) {}
+  document.getElementById("versOverlay").classList.remove("open");
+  alert("Restored the version from " + jdDate(day) + ".");
+}
+document.getElementById("btnVersions").onclick = function () {
+  var list = document.getElementById("versList");
+  document.getElementById("versOverlay").classList.add("open");
+  if (!cloud.on || !isEditor()) {
+    list.innerHTML = '<p class="histempty">Sign in as the property manager to see earlier versions.</p>'; return;
+  }
+  list.innerHTML = '<p class="histempty">Loading…</p>';
+  withTimeout(cloud.db.collection(SNAPSHOTS_COLL).orderBy("day", "desc").limit(30).get(), 8000)
+    .then(function (qs) {
+      if (qs.empty) { list.innerHTML = '<p class="histempty">No earlier versions yet — one is kept the first time the report is saved each day.</p>'; return; }
+      var h = [];
+      qs.forEach(function (d) {
+        var v = d.data(), n = (v.jobs || []).length;
+        h.push('<div class="versrow"><div><b>' + esc(jdDate(d.id)) + "</b>" +
+          '<span class="jdlogwhen"> · ' + n + " job" + (n === 1 ? "" : "s") +
+          (v.by ? " · saved by " + personLabel(v.by) : "") + "</span></div>" +
+          '<button class="btn" type="button" data-vers="' + esc(d.id) + '">Restore this</button></div>');
+      });
+      list.innerHTML = h.join("");
+    })
+    .catch(function (err) {
+      if (window.console) console.error("versions:", err);
+      list.innerHTML = loadFailedHTML(err, 'data-versretry="1"');
+    });
+};
+document.getElementById("versClose").onclick = function () {
+  document.getElementById("versOverlay").classList.remove("open");
+};
+document.getElementById("versOverlay").addEventListener("click", function (e) {
+  if (e.target === this) this.classList.remove("open");
+});
+document.addEventListener("click", function (e) {
+  if (!e.target || !e.target.closest) return;
+  if (e.target.closest("[data-versretry]")) { document.getElementById("btnVersions").onclick(); return; }
+  var v = e.target.closest("[data-vers]");
+  if (v) snapRestore(v.getAttribute("data-vers"));
 });
 
 /* ---------- contract register ----------
@@ -6624,7 +6734,7 @@ function updateReportsButton() {
   setDisp("btnBackup", ed);      /* Backup / Restore / Reset — editor only */
   setDisp("btnRestore", ed);
   setDisp("btnPortable", ed && !inArtifact);
-  setDisp("btnReset", ed);
+  setDisp("btnVersions", ed);
   setDisp("btnMore", cv);        /* hide the whole menu when nothing inside is available */
   setDisp("tplPick", ed);        /* report-design picker — editor only */
   var tsel = document.getElementById("tplSelect");
@@ -7080,11 +7190,10 @@ document.getElementById("fileRestore").addEventListener("change", function () {
   };
   r.readAsText(f);
 });
-document.getElementById("btnReset").onclick = function () {
-  if (!isEditor()) { alert("Sign in with an authorized property manager account first (click “Edit data”)."); return; }
-  if (!confirm("This permanently discards EVERY change and restores the original data for everyone. Continue?")) return;
-  state = normState(null); persist("Reset to original data"); renderReport(); renderEditor();
-};
+/* "Reset to original" used to live here: one click, one confirm, and every
+   job the manager had entered was replaced by the built-in sample data. It
+   existed for the first day of the tracker's life and has been nothing but a
+   hazard since. Restoring an earlier version does the useful half of it. */
 var portableBtn = document.getElementById("btnPortable");
 if (window.claude && window.claude.downloads) {
   portableBtn.style.display = "none"; /* .html not saveable from the artifact viewer */

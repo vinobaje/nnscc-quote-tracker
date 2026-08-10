@@ -39,6 +39,15 @@ service cloud.firestore {
       }
     }
 
+    // Daily copies of the whole report, so a wrong click is never final.
+    // The manager's own safety net: editor read, write and prune.
+    match /nnsccQuoteSnapshots/{day} {
+      allow read, write: if nnsccEditor();
+    }
+    match /nnsccQuoteSnapshotsBeta/{day} {
+      allow read, write: if nnsccEditor();
+    }
+
     // Report library — past/period reports. EDITOR-ONLY (public sees only the current report).
     match /nnsccQuoteReports/{reportId} {
       allow read: if nnsccEditor();
