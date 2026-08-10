@@ -4,9 +4,13 @@ admin.initializeApp();
 
 const OWNER = "mvinobaje@gmail.com";
 const AI_MODEL = "claude-haiku-4-5";
+// A signed contract is read by a stronger model than the report narrative: it is
+// the record the board relies on for renewal dates and money, it is read a
+// handful of times a year, and a misread date is expensive.
+const CONTRACT_MODEL = "claude-sonnet-5";
 
 // One Claude structured-output call; returns the parsed JSON object.
-async function callClaude(key, system, user, schema, maxTokens) {
+async function callClaude(key, system, user, schema, maxTokens, model) {
   const resp = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -15,7 +19,7 @@ async function callClaude(key, system, user, schema, maxTokens) {
       "anthropic-version": "2023-06-01",
     },
     body: JSON.stringify({
-      model: AI_MODEL,
+      model: model || AI_MODEL,
       max_tokens: maxTokens || 1200,
       system,
       messages: [{ role: "user", content: user }],
@@ -59,9 +63,51 @@ const QUOTE_SCHEMA = {
   additionalProperties: false,
 };
 
+// Reading a signed contract into the register + a summary the board can read.
+// The board is elderly and reads this once, on a phone: the summary has to be
+// plain sentences, not clauses. Nothing here is written anywhere on its own —
+// the property manager confirms every field before it is saved.
+const CONTRACT_SYSTEM =
+  "You read signed service agreements between a contractor and a condominium corporation, " +
+  "for a property manager who keeps a register of them for the board of directors.\n" +
+  "Extract only what the document actually says. Leave a field empty (or null) when the " +
+  "document does not say — never guess a date or an amount.\n" +
+  "Dates are ISO YYYY-MM-DD. amount_cad is the recurring contract price as a plain number, " +
+  "excluding one-off extras quoted separately; taxes excluded unless the document says otherwise. " +
+  "period says how that amount is charged: month, year, visit, or fixed for a one-time total.\n" +
+  "notice_days is the number of days' written notice needed to stop it renewing, if stated.\n" +
+  "board_summary is 90-130 words of plain English for a reader over 65 with no legal background: " +
+  "who the contractor is, what they do and how often, what it costs a year, how long it runs, " +
+  "and what happens at the end (renews automatically, notice by when). Short sentences, no " +
+  "clause numbers, no legal jargon, no markdown, no bullet points, third person, no hype.\n" +
+  "watch_out is one sentence naming the single thing the board should not miss — usually the " +
+  "notice deadline or an automatic price increase. Empty if there is nothing of the sort.\n" +
+  "unclear lists anything you could not read with confidence (a smudged date, a missing page), " +
+  "in plain words, so the manager knows what to check by hand. Empty array if the document was clear.";
+const CONTRACT_SCHEMA = {
+  type: "object",
+  properties: {
+    contractor: { type: "string" },
+    title: { type: "string" },
+    start: { type: "string" },
+    end: { type: "string" },
+    auto_renew: { type: "boolean" },
+    notice_days: { type: ["number", "null"] },
+    amount_cad: { type: ["number", "null"] },
+    period: { type: "string", enum: ["month", "year", "visit", "fixed", ""] },
+    board_summary: { type: "string" },
+    watch_out: { type: "string" },
+    unclear: { type: "array", items: { type: "string" } },
+  },
+  required: ["contractor", "title", "start", "end", "auto_renew", "notice_days",
+             "amount_cad", "period", "board_summary", "watch_out", "unclear"],
+  additionalProperties: false,
+};
+
 // AI helper for the NNSCC 292 quote tracker. Modes:
 //  {check:true}          → is a key saved?
 //  {parse:true, text}    → read a pasted quote email into structured job/bid fields
+//  {contract:true, ...}  → read a signed contract into register fields + a board summary
 //  {memo:true, stats}    → draft a cover memo to the board
 //  {stats}               → (default) report narrative: summary + spendNote + openNote
 // The Anthropic key lives in Firestore (nnsccQuoteTrackerConfig/main), unreadable by clients.
@@ -123,6 +169,37 @@ exports.nnsccTrackerAi = onCall(
         return await callClaude(key, QUOTE_EXTRACT_SYSTEM, "Contractor quote text:\n\n" + text, QUOTE_SCHEMA, 800);
       }
       throw new HttpsError("invalid-argument", "Unsupported file — upload a PDF or a Word .docx file.");
+    }
+
+    // ----- mode: read a signed contract (PDF or .docx) for the register -----
+    if (request.data && request.data.contract === true) {
+      const b64 = String(request.data.fileB64 || "");
+      if (!b64) throw new HttpsError("invalid-argument", "No document was provided.");
+      const media = String(request.data.mediaType || "");
+      const ask = "The attached document is a signed service agreement between a contractor and a " +
+        "condominium corporation. Read it for the register and write the board's summary.";
+      if (media === "application/pdf") {
+        return await callClaude(key, CONTRACT_SYSTEM, [
+          { type: "document", source: { type: "base64", media_type: "application/pdf", data: b64 } },
+          { type: "text", text: ask },
+        ], CONTRACT_SCHEMA, 1500, CONTRACT_MODEL);
+      }
+      if (media === "docx") {
+        let text = "";
+        try {
+          const mammoth = require("mammoth");
+          const out = await mammoth.extractRawText({ buffer: Buffer.from(b64, "base64") });
+          text = String((out && out.value) || "").slice(0, 60000);
+        } catch (e) {
+          throw new HttpsError("invalid-argument", "Could not read that Word document — try saving it as a PDF.");
+        }
+        if (!text.trim()) {
+          throw new HttpsError("invalid-argument", "That document looks empty or image-only — save it as a PDF so Claude can read it.");
+        }
+        return await callClaude(key, CONTRACT_SYSTEM, ask + "\n\nAgreement text:\n\n" + text,
+          CONTRACT_SCHEMA, 1500, CONTRACT_MODEL);
+      }
+      throw new HttpsError("invalid-argument", "Unsupported file — a contract must be a PDF or a Word .docx file.");
     }
 
     // ----- shared stats validation for memo + narrative -----

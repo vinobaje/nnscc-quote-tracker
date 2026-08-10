@@ -1390,6 +1390,40 @@ body[data-view="edit"] .wrap { max-width:none; }
 .confile { display:inline-flex; align-items:center; gap:6px; font-size:12.5px; background:var(--paper);
   border:1px solid var(--line); border-radius:7px; padding:5px 9px; }
 .confile .fx { color:var(--prio); cursor:pointer; font-weight:700; }
+/* what Claude read out of the signed document, waiting on the manager */
+.conaibusy, .conaierr { font-size:13.5px; line-height:1.5; margin:10px 0 0; }
+.conaibusy { color:var(--ink2); }
+.conaierr { color:var(--prio); }
+.conprop { margin-top:11px; border:1px solid var(--line); border-left:4px solid var(--accent);
+  border-radius:9px; padding:12px 14px; background:var(--paper); }
+.conproph { font-weight:700; font-size:14.5px; color:var(--ink); }
+.conpropl { font-size:13px; color:var(--ink2); margin:4px 0 9px; }
+.conproprows { display:grid; gap:6px; }
+.conproprow { display:grid; grid-template-columns:auto 128px 1fr; align-items:baseline; gap:9px;
+  font-size:13.5px; text-transform:none; letter-spacing:0; font-weight:400; color:var(--ink);
+  background:var(--card); border:1px solid var(--line); border-radius:7px; padding:7px 10px; cursor:pointer; }
+.conproprow .pl { color:var(--muted); font-size:12px; font-weight:700;
+  text-transform:uppercase; letter-spacing:.04em; }
+.conproprow .pv { font-weight:650; }
+.conproprow .pw { grid-column:2 / -1; font-size:12.5px; color:var(--prio); }
+.conproprow.clash { border-color:var(--amber); }
+.conpropsum { display:block; margin-top:11px; font-size:12px; font-weight:700; text-transform:uppercase;
+  letter-spacing:.04em; color:var(--muted); }
+.conpropsum textarea { display:block; width:100%; box-sizing:border-box; margin-top:4px; font:14.5px/1.55 inherit;
+  color:var(--ink); border:1px solid var(--line); border-radius:7px; padding:9px 10px; background:var(--card); }
+.conpropwatch { font-size:13.5px; line-height:1.5; margin:9px 0 0; background:var(--amber-soft);
+  color:#6d4a0d; border-radius:7px; padding:8px 11px; }
+.conpropun { font-size:13px; color:var(--ink2); margin-top:9px; }
+.conpropun ul { margin:4px 0 0; padding-left:18px; }
+.conpropbtns { display:flex; gap:8px; flex-wrap:wrap; margin-top:12px; }
+@media screen and (max-width:600px) {
+  .conproprow { grid-template-columns:auto 1fr; }
+  .conproprow .pw { grid-column:1 / -1; }
+}
+/* the same summary as the board reads it */
+.consum { margin-top:10px; border-top:1px solid var(--line-soft); padding-top:9px; }
+.consumh { font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); }
+.consumt { font-size:14.5px; line-height:1.6; color:var(--ink); margin-top:4px; white-space:pre-line; }
 /* Condo Super credit — closes the report on screen and on paper */
 .cscredit { margin:26px 0 6px; padding-top:12px; border-top:1px solid var(--line-soft);
   text-align:center; font-size:12px; color:var(--muted); letter-spacing:.01em; }
@@ -4785,7 +4819,9 @@ function edWorkspaceAction(act, el, e) {
     }
     /* ---- contracts ---- */
     case "conadd": {
-      conState.list.push({ id: genId(), contractor: "", title: "", start: todayISO(), end: "",
+      /* no start date is guessed: a contract rarely begins the day it is filed,
+         and a date sitting in the box would fight the one read off the document */
+      conState.list.push({ id: genId(), contractor: "", title: "", start: "", end: "",
         renew: false, noticeDays: "", amount: "", period: "year", notes: "", files: [] });
       conSave(); renderEditor(); return true;
     }
@@ -4804,6 +4840,35 @@ function edWorkspaceAction(act, el, e) {
       var ca = el.closest("[data-cid]"); if (!ca) return true;
       conAttachId = ca.dataset.cid;
       document.getElementById("conFile").click(); return true;
+    }
+    case "conairead": {
+      var cr = el.closest("[data-cid]"); if (!cr) return true;
+      conAiRead(cr.dataset.cid, null); return true;
+    }
+    case "conaicancel": {
+      conAiPending = null; conAiMsg = null; renderEditor(); return true;
+    }
+    /* what the manager ticked goes in; the rest of the proposal is dropped */
+    case "conaiuse": {
+      var cu = el.closest("[data-cid]"); if (!cu) return true;
+      var cai = conById(cu.dataset.cid);
+      if (!cai || !conAiPending || conAiPending.cid !== cai.id) return true;
+      var d = conAiPending.d || {};
+      Array.prototype.forEach.call(cu.querySelectorAll("[data-aif]"), function (cb) {
+        if (!cb.checked) return;
+        var f = cb.getAttribute("data-aif");
+        for (var i = 0; i < CON_AI_FIELDS.length; i++)
+          if (CON_AI_FIELDS[i][0] === f) conFieldSet(cai, f, CON_AI_FIELDS[i][2](d));
+      });
+      var ta = document.getElementById("conAiSum");
+      var boardSum = ta ? ta.value.trim() : "";
+      if (boardSum && boardSum !== (cai.summary || "")) {
+        cai.summary = boardSum;
+        cai.summaryAt = todayISO();
+        cai.summarySrc = conAiPending.src || "";
+      }
+      conAiPending = null; conAiMsg = null;
+      conSave(); renderEditor(); renderReport(); return true;
     }
     case "confiledel": {
       var cf = el.closest("[data-cid]"); if (!cf) return true;
@@ -4955,12 +5020,22 @@ function conCardHTML() {
         esc(c.noticeDays === "" || c.noticeDays == null ? "" : c.noticeDays) + '" placeholder="60"></div>' +
       '<div class="f wide"><label>Notes for the board</label><input type="text" data-conf="notes" value="' +
         esc(c.notes || "") + '" placeholder="anything the board should know"></div>' +
+      '<div class="f wide"><label>Summary for the board</label>' +
+        '<textarea data-conf="summary" rows="4" placeholder="What this agreement covers, in plain words — Claude writes a draft when you attach the document, and you can change it here.">' +
+        esc(c.summary || "") + "</textarea>" +
+        (c.summary && c.summaryAt
+          ? '<p class="rephint">Drafted from ' + esc(c.summarySrc || "the document") + " on " + esc(jdDate(c.summaryAt)) + ".</p>"
+          : "") + "</div>" +
       '<div class="f wide"><label>Signed contract (PDF)</label><div class="confiles">' +
         (c.files || []).map(function (f, fi) {
           return '<span class="confile"><a href="#" data-confile="' + esc(c.id) + ":" + fi + '">\u{1F4C4} ' +
             esc(f.name) + '</a><span class="fx" data-act="confiledel" data-fi="' + fi + '" title="Remove">✕</span></span>';
         }).join("") +
-        '<button class="edbtn" type="button" data-act="conattach">\u{1F4CE} Attach a document</button></div>' +
+        '<button class="edbtn" type="button" data-act="conattach">\u{1F4CE} Attach a document</button>' +
+        ((c.files || []).length
+          ? '<button class="edbtn" type="button" data-act="conairead" title="Claude reads the attached document and fills in the details">\u{2728} Read it with Claude</button>'
+          : "") + "</div>" +
+        conAiBoxHTML(c) +
         (k.notice ? '<p class="rephint">Notice deadline: ' + esc(jdDate(k.notice)) + "</p>" : "") + "</div>" +
       '<div class="f wide"><label>Insurance</label>' +
         (conDir(c.contractor) ? conCertChips(c.contractor) +
@@ -5041,6 +5116,8 @@ function conSectionHTML(ED) {
               ", otherwise it renews automatically.</div>")
         : (c.renew ? '<div class="connotice">Renews automatically.</div>' : "")) +
       conCertChips(c.contractor) +
+      (c.summary ? '<div class="consum"><div class="consumh">What this agreement says</div>' +
+        '<div class="consumt">' + esc(c.summary) + "</div></div>" : "") +
       (c.notes ? '<div class="connote">' + esc(c.notes) + "</div>" : "") +
       '<div class="confoot">' +
         (files ? '<button class="conbtn" type="button" data-confile="' + esc(c.id) + ':0">\u{1F4C4} Read the contract' +
@@ -5084,8 +5161,7 @@ function conGetBlob(url, tok) {
     return conXhrBlob(url, tok);          /* fetch never reached the network */
   });
 }
-function conFileURL(path) {
-  if (conBlobs[path]) return Promise.resolve(conBlobs[path]);
+function conBlobData(path) {
   var u = cloud.user;
   if (!u || !cloud.store) return Promise.reject({ code: "not-signed-in" });
   return u.getIdToken().then(function (tok) {
@@ -5093,7 +5169,11 @@ function conFileURL(path) {
     var url = "https://firebasestorage.googleapis.com/v0/b/" + encodeURIComponent(bucket) +
       "/o/" + encodeURIComponent(path) + "?alt=media";
     return conGetBlob(url, tok);
-  }).then(function (blob) {
+  });
+}
+function conFileURL(path) {
+  if (conBlobs[path]) return Promise.resolve(conBlobs[path]);
+  return conBlobData(path).then(function (blob) {
     conBlobs[path] = URL.createObjectURL(blob);
     return conBlobs[path];
   });
@@ -5167,11 +5247,130 @@ document.addEventListener("change", function (e) {
     conSave();
     if (note) note.textContent = "";
     renderEditor(); renderReport();
+    /* the document is here, so read it now rather than making her ask */
+    if (cloud.fns && /\.(pdf|docx)$/i.test(file.name)) conAiRead(c.id, file);
   }).catch(function (err) {
     if (note) note.textContent = "Upload failed (" + ((err && err.code) || "error") + ") — nothing was saved.";
   });
 });
 
+/* ---------- Claude reads the signed agreement ----------
+   The document says everything the register wants to know, so a manager should
+   not have to copy it out by hand. Claude proposes; she ticks what to keep.
+   Nothing is written on its own — a misread renewal date is the one mistake
+   here that would cost the board money, so none of it lands unseen. */
+var conAiPending = null;    /* { cid, d, src } — the proposal on screen */
+var conAiBusy = "";         /* the contract being read at this moment */
+var conAiMsg = null;        /* { cid, text } — what went wrong, on its own card */
+
+var CON_AI_FIELDS = [
+  ["contractor", "Contractor", function (d) { return String(d.contractor || "").trim(); }],
+  ["title", "What it covers", function (d) { return String(d.title || "").trim(); }],
+  ["start", "Start date", function (d) { return String(d.start || "").slice(0, 10); }],
+  ["end", "End date", function (d) { return String(d.end || "").slice(0, 10); }],
+  ["amount", "Amount", function (d) { return d.amount_cad == null ? "" : String(d.amount_cad); }],
+  ["period", "Charged", function (d) { return String(d.period || ""); }],
+  ["renew", "Renews automatically", function (d) { return d.auto_renew ? "yes" : "no"; }],
+  ["noticeDays", "Notice needed", function (d) { return d.notice_days == null ? "" : String(d.notice_days); }]
+];
+function conFieldNow(c, f) {
+  /* an unticked "renews automatically" is the box's default, not something the
+     manager said — so a document that says it renews is news, not a conflict */
+  if (f === "renew") return c.renew ? "yes" : "";
+  var v = c[f];
+  return v == null ? "" : String(v).trim();
+}
+function conFieldShow(f, v) {
+  if (!v) return "—";
+  if (f === "start" || f === "end") return jdDate(v);
+  if (f === "period") return conPeriodLabel(v);
+  if (f === "noticeDays") return v + " days";
+  if (f === "amount") return isNaN(Number(v)) ? v : money(Number(v));
+  return v;
+}
+function conFieldSet(c, f, v) {
+  if (f === "renew") { c.renew = v === "yes"; return; }
+  c[f] = v;
+}
+/* the proposal, drawn inside the contract's own card so a background save
+   redrawing the page cannot lose it */
+function conAiBoxHTML(c) {
+  if (conAiBusy === c.id)
+    return '<p class="conaibusy">\u{2728} Claude is reading the document — this takes about half a minute.</p>';
+  if (conAiMsg && conAiMsg.cid === c.id)
+    return '<p class="conaierr">' + esc(conAiMsg.text) + "</p>";
+  if (!conAiPending || conAiPending.cid !== c.id) return "";
+  var d = conAiPending.d || {};
+  var h = ['<div class="conprop"><div class="conproph">\u{2728} Claude read “' + esc(conAiPending.src) + "”</div>"];
+  var rows = [];
+  CON_AI_FIELDS.forEach(function (F) {
+    var nv = F[2](d), cv = conFieldNow(c, F[0]);
+    if (!nv || nv === cv) return;                       /* nothing new to offer */
+    if (F[0] === "renew" && nv === "no" && !cv) return; /* "no" over blank is not news */
+    var clash = !!cv && cv !== nv;
+    rows.push('<label class="conproprow' + (clash ? " clash" : "") + '">' +
+      '<input type="checkbox" data-aif="' + F[0] + '"' + (clash ? "" : " checked") + ">" +
+      '<span class="pl">' + esc(F[1]) + "</span>" +
+      '<span class="pv">' + esc(conFieldShow(F[0], nv)) + "</span>" +
+      (clash ? '<span class="pw">replaces ' + esc(conFieldShow(F[0], cv)) + "</span>" : "") + "</label>");
+  });
+  h.push(rows.length
+    ? '<p class="conpropl">Tick what to keep. Anything already filled in is left alone unless you tick it.</p>' +
+      '<div class="conproprows">' + rows.join("") + "</div>"
+    : '<p class="conpropl">Everything in the register already matches the document.</p>');
+  h.push('<label class="conpropsum">Summary for the board' +
+    '<textarea id="conAiSum" rows="7">' + esc(d.board_summary || "") + "</textarea></label>");
+  if (d.watch_out) h.push('<p class="conpropwatch">\u{26A0} ' + esc(d.watch_out) + "</p>");
+  if ((d.unclear || []).length)
+    h.push('<div class="conpropun"><strong>Worth checking against the paper copy:</strong><ul>' +
+      d.unclear.map(function (u) { return "<li>" + esc(u) + "</li>"; }).join("") + "</ul></div>");
+  h.push('<div class="conpropbtns"><button class="edbtn prim" type="button" data-act="conaiuse">✓ Save this</button>' +
+    '<button class="edbtn" type="button" data-act="conaicancel">Discard</button></div></div>');
+  return h.join("");
+}
+function conAiFail(cid, text) {
+  conAiBusy = ""; conAiMsg = { cid: cid, text: text };
+  renderEditor();
+}
+/* file may be the one just chosen, or null to re-read what is already attached */
+function conAiRead(cid, file) {
+  var c = conById(cid); if (!c) return;
+  conAiPending = null; conAiMsg = null;
+  if (!isEditor() || !cloud.fns || !cloud.user) {
+    conAiFail(cid, "Sign in as the property manager to have the document read."); return;
+  }
+  var stored = (c.files || [])[(c.files || []).length - 1];
+  var name = String((file ? file.name : (stored && stored.name)) || "");
+  if (!file && !stored) { conAiFail(cid, "Attach the signed document first."); return; }
+  var lower = name.toLowerCase();
+  var media = /\.pdf$/.test(lower) ? "application/pdf" : (/\.docx$/.test(lower) ? "docx" : "");
+  if (!media) { conAiFail(cid, "Claude can read a PDF or a Word .docx file — “" + name + "” is neither."); return; }
+  conAiBusy = cid; renderEditor();
+  (file ? Promise.resolve(file) : conBlobData(stored.path)).then(function (blob) {
+    if (blob.size > 8 * 1024 * 1024)
+      throw { code: "too-big", message: "That document is over 8 MB — Claude can read a smaller copy, or fill the details in by hand." };
+    return new Promise(function (res, rej) {
+      var r = new FileReader();
+      r.onload = function () { res(String(r.result || "").split(",")[1] || ""); };
+      r.onerror = function () { rej({ message: "Could not read that file." }); };
+      r.readAsDataURL(blob);
+    });
+  }).then(function (b64) {
+    if (!b64) throw { message: "Could not read that file." };
+    return cloud.fns.httpsCallable("nnsccTrackerAi")({
+      contract: true, fileB64: b64, mediaType: media, fileName: name });
+  }).then(function (res) {
+    if (conAiBusy !== cid) return;                     /* superseded while it ran */
+    conAiBusy = "";
+    conAiPending = { cid: cid, d: res.data || {}, src: name };
+    renderEditor();
+    var card = document.querySelector('#editor [data-cid="' + cid + '"] .conprop');
+    if (card) card.scrollIntoView({ block: "nearest" });
+  }).catch(function (e) {
+    conAiFail(cid, "Claude could not read the document — " +
+      ((e && e.message) || (e && e.code) || "something went wrong") + " (nothing was changed).");
+  });
+}
 /* ---------- earlier versions ----------
    A copy of the whole report is written the first time it is saved on any day,
    and thirty of them are kept. Restoring one is a normal save, so a restore is
@@ -5276,7 +5475,9 @@ function conSave() {
       start: c.start || "", end: c.end || "", renew: !!c.renew,
       noticeDays: c.noticeDays == null ? "" : c.noticeDays,
       amount: c.amount == null ? "" : c.amount, period: c.period || "year",
-      notes: c.notes || "", files: (c.files || []).map(function (f) {
+      notes: c.notes || "", summary: c.summary || "",
+      summaryAt: c.summaryAt || "", summarySrc: c.summarySrc || "",
+      files: (c.files || []).map(function (f) {
         return { name: f.name || "", path: f.path || "", size: f.size || 0 }; }) };
   }) }).catch(function () {});
 }
@@ -5284,8 +5485,12 @@ function conSubscribe() {
   if (conUnsub) { conUnsub(); conUnsub = null; }
   if (!cloud.on || !cloud.user) { conState = { list: [] }; return; }
   conUnsub = cloud.db.doc(CONTRACTS_PATH).onSnapshot(function (snap) {
+    var mine = !!(snap.metadata && snap.metadata.hasPendingWrites);
     conState = (snap.exists && Array.isArray(snap.data().list)) ? { list: snap.data().list } : { list: [] };
     conState.list.forEach(function (c) { if (!c.id) c.id = genId(); });
+    /* an echo of our own save: the page already shows it, and redrawing here
+       would take the cursor out of the field being typed in */
+    if (mine) return;
     if (document.body.dataset.view === "edit") renderEditor(); else renderReport();
   }, function () { conState = { list: [] }; });   /* not on the list: no contracts, no noise */
 }
