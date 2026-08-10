@@ -1,0 +1,19 @@
+[
+  {
+    "origin": [
+      "https://quote-report.web.app",
+      "https://quote-report.firebaseapp.com",
+      "https://quote-report-beta.web.app",
+      "https://quote-report-beta.firebaseapp.com",
+      "https://yrscc1045.web.app",
+      "https://yrcc632.web.app",
+      "https://tscc2949.web.app",
+      "https://nnscc345.web.app",
+      "http://localhost:5000",
+      "http://localhost:8080"
+    ],
+    "method": ["GET", "HEAD"],
+    "responseHeader": ["Authorization", "Content-Type", "Content-Length", "Range", "Content-Range"],
+    "maxAgeSeconds": 3600
+  }
+]
