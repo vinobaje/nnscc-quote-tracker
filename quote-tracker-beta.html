@@ -2235,8 +2235,8 @@ function cloudInit() {
   firebase.auth().onAuthStateChanged(function (u) {
     cloud.user = u || null;
     cloud.denied = false;                       /* fresh sign-in clears any prior denial */
-    subscribeBoard(u);
-  conSubscribe();          /* the register is for signed-in readers */                          /* board list + open-vote count (board/editors only) */
+    subscribeBoard(u);       /* board list + open-vote count (board/editors only) */
+    conSubscribe();          /* the contract register: signed-in readers only */
     /* Firestore TERMINATES a listener that hits permission-denied — it does not
        retry it when credentials arrive. The first read of a page load happens
        before Firebase has restored a saved session, so without this the report
