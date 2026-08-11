@@ -6,7 +6,7 @@
  *   node build.js        -> both
  *
  * source/beta-template.html is the ONLY place to edit. It carries three
- * placeholders — __SEED_JSON__, __LOGO_SRC__, __PHOTO_SRC__ — which are filled
+ * placeholders — __SEED_JSON__, __LOGO_SRC__, __PHOTO_SRC__, __BUILD__ — which are filled
  * from whatever the target file already contains, so the seed data and the
  * embedded logo/photo of each copy survive a rebuild untouched.
  *
@@ -59,7 +59,17 @@ function carryOver(existing, template) {
   const photo = grab(/var ASSET_PHOTO = "([^"]*)"/, "building photo");
   return template.split("__SEED_JSON__").join(seed)
                  .split("__LOGO_SRC__").join(logo)
-                 .split("__PHOTO_SRC__").join(photo);
+                 .split("__PHOTO_SRC__").join(photo)
+                 .split("__BUILD__").join(buildStamp());
+}
+
+/* The stamp shown in the report footer: enough to tell one deploy from the
+   next when someone says a change is not showing on their phone. */
+function buildStamp() {
+  const d = new Date();
+  const p = (n) => String(n).padStart(2, "0");
+  return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate()) + " " +
+         p(d.getHours()) + ":" + p(d.getMinutes());
 }
 
 function build(name) {
@@ -68,7 +78,7 @@ function build(name) {
   const template = fs.readFileSync(SRC, "utf8");
   const existing = fs.readFileSync(t.file, "utf8");
   let out = carryOver(existing, template);
-  if (/__(SEED_JSON|LOGO_SRC|PHOTO_SRC)__/.test(out)) throw new Error("a placeholder was left unfilled");
+  if (/__(SEED_JSON|LOGO_SRC|PHOTO_SRC|BUILD)__/.test(out)) throw new Error("a placeholder was left unfilled");
 
   if (t.live) {
     LIVE_SWAPS.forEach(function (pair) {
