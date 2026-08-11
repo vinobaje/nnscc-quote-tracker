@@ -1169,7 +1169,21 @@ exports.nnsccWeeklyPdf = onCall(
       });
       await page.setContent(html, { waitUntil: "load", timeout: 45000 });
       await page.emulateMediaType("print");
-      ours = await page.pdf({ format: "letter", printBackground: true, preferCSSPageSize: true });
+      /* a running foot on the pages we print: which corporation, which period,
+         and where you are in it — his own pages keep whatever footer they came
+         with, which is how a reader tells the two reports apart */
+      const foot = String((request.data && request.data.footer) || "");
+      ours = await page.pdf({
+        format: "letter", printBackground: true, preferCSSPageSize: true,
+        displayHeaderFooter: !!foot,
+        headerTemplate: "<span></span>",
+        footerTemplate: foot
+          ? '<div style="width:100%;font:8.5px -apple-system,Segoe UI,Helvetica,Arial,sans-serif;' +
+            'color:#8894A3;padding:0 12mm;display:flex;justify-content:space-between">' +
+            "<span>" + foot.replace(/[<>]/g, "") + "</span>" +
+            '<span>Page <span class="pageNumber"></span> of <span class="totalPages"></span></span></div>'
+          : "<span></span>",
+      });
     } catch (e) {
       if (e instanceof HttpsError) throw e;
       throw new HttpsError("internal", "Could not render the report: " + ((e && e.message) || "unknown error"));

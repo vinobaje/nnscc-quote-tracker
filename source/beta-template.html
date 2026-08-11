@@ -1460,16 +1460,32 @@ body[data-view="edit"] .wrap { max-width:none; }
 .wkedit:hover { border-color:var(--accent); }
 .wkeditnote { font-size:12.5px; color:var(--ink2); margin:16px 0 0; display:flex; gap:8px;
   align-items:center; flex-wrap:wrap; }
-.wkhead { border-bottom:3px solid var(--accent-ink); padding-bottom:12px; margin-bottom:18px; }
-.wkkicker { font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); }
-.wktitle { font:26px/1.25 Georgia,serif; color:var(--accent-ink); margin-top:6px; }
-.wksub { font-size:13.5px; color:var(--ink2); margin-top:4px; }
-.wkmeet { font-size:13.5px; font-weight:700; color:var(--ink); margin-top:8px; }
+.wkband { margin:-30px -34px 0; border-radius:10px 10px 0 0; overflow:hidden; }
+.wkbandin { background:#16283b; color:#fff; padding:26px 34px 20px; display:flex; align-items:flex-start;
+  justify-content:space-between; gap:20px; }
+.wkbandbar { height:3px; background:linear-gradient(90deg,#c9a24b,#e7cf8f 60%,rgba(231,207,143,.15)); }
+.wklogo { width:88px; height:auto; flex:none; opacity:.95; }
+.wkkicker { font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:#b9c6d4; }
+.wktitle { font:30px/1.2 Georgia,serif; color:#fff; margin-top:7px; }
+.wksub { font-size:14px; color:#cfdae5; margin-top:5px; }
+.wkmeta { display:flex; flex-wrap:wrap; gap:6px 26px; font-size:12.5px; color:var(--ink2);
+  border-bottom:1px solid var(--line); padding:12px 0 13px; margin-bottom:16px; }
+.wkmeta b { color:var(--muted); font-weight:700; text-transform:uppercase; font-size:10.5px;
+  letter-spacing:.05em; margin-right:5px; }
+.wkstats { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; margin:0 0 18px; }
+.wkstat { border:1px solid var(--line); border-top:3px solid var(--accent); border-radius:8px; padding:11px 13px; }
+.wkstat.ok { border-top-color:var(--good); }
+.wkstat.warn { border-top-color:var(--amber); }
+.wkstat.hot { border-top-color:var(--prio); }
+.wkstat .v { font:22px/1.15 Georgia,serif; color:var(--ink); }
+.wkstat.hot .v { color:var(--prio); }
+.wkstat .l { font-size:10.5px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); margin-top:4px; }
 .wklede { font-size:15.5px; line-height:1.65; color:var(--ink); margin:0 0 14px; }
 .wkattn { background:var(--amber-soft); color:#6d4a0d; border-radius:8px; padding:10px 13px;
   font-size:14.5px; line-height:1.55; margin:0 0 16px; }
-.wksec { font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted);
-  border-bottom:1px solid var(--line); padding-bottom:5px; margin:22px 0 9px; }
+.wksec { font:17px/1.3 Georgia,serif; color:var(--accent-ink); border-bottom:2px solid var(--accent-ink);
+  padding-bottom:5px; margin:26px 0 10px; }
+.wktable thead th { background:var(--paper); }
 .wksubsec { font-size:13px; font-weight:700; color:var(--ink2); margin:12px 0 5px; }
 .wktable { width:100%; border-collapse:collapse; font-size:13.5px; }
 .wktable th { text-align:left; font-size:10.5px; letter-spacing:.06em; text-transform:uppercase;
@@ -1483,7 +1499,10 @@ body[data-view="edit"] .wrap { max-width:none; }
 .wkappend { font-size:12.5px; color:var(--muted); margin:18px 0 0; border-top:1px solid var(--line-soft); padding-top:8px; }
 @media print {
   .wkpaper { border:0; border-radius:0; padding:0; margin:0; max-width:none; }
-  .wksec, .wktable tr, .wkattn { break-inside:avoid; }
+  .wkband { margin:0 0 0; border-radius:0; }
+  .wkbandin { padding:22px 26px 18px; }
+  .wksec, .wktable tr, .wkattn, .wkstats { break-inside:avoid; }
+  .wksec { break-after:avoid; }
 }
 .actsched { display:flex; gap:11px; align-items:baseline; padding:8px 0; border-bottom:1px solid var(--line-soft); }
 .actwhen { flex:0 0 190px; font-size:13.5px; font-weight:650; color:var(--ink); }
@@ -6680,8 +6699,11 @@ function wkStandaloneHTML() {
 function wkBuildPdf(then) {
   if (!cloud.fns) { wkNote("Sign in first."); return; }
   wkNote("Printing the report" + (wkState.files.length ? " and joining your pages" : "") + "\u2026");
+  var M = state.meta || META_DEFAULTS;
   cloud.fns.httpsCallable("nnsccWeeklyPdf")({
     html: wkStandaloneHTML(),
+    footer: (M.condoName || "") + " \u00b7 " + (wkState.period === "month" ? "monthly" : "weekly") +
+      " report \u00b7 " + wkPeriodLabel(),
     appendB64s: wkState.files.map(function (f) { return f.b64; })
   }).then(function (res) {
     wkState.pdf = (res.data && res.data.pdf) || null;
@@ -6745,13 +6767,33 @@ function wkRowsHTML(rows, cols) {
 function wkPaperHTML() {
   var g = wkGather(), M = state.meta || META_DEFAULTS, ai = wkState.ai || {};
   var h = [];
-  h.push('<div class="wkhead"><div class="wkkicker">' + esc(M.condoName) + " \u00b7 " + esc(M.regNo) +
-    " \u00b7 " + esc(M.buildings) + '</div><div class="wktitle">' +
-    (wkState.period === "month" ? "Monthly report to the board" : "Weekly report to the board") + "</div>" +
-    '<div class="wksub">' + esc(wkPeriodLabel()) + " \u00b7 prepared by " +
-    esc(personLabel((cloud.user && cloud.user.email) || "") || M.manager) + "</div>" +
-    (wkState.meeting ? '<div class="wkmeet">Next board meeting \u2014 ' + esc(jdDate(wkState.meeting)) + "</div>" : "") +
+  /* the letterhead: the corporation's own colours, not the superintendent's —
+     two reports arrive in the same envelope and should not look like one */
+  h.push('<div class="wkband"><div class="wkbandin">' +
+    '<div class="wkbandtxt"><div class="wkkicker">' + esc(M.condoName) + " \u00b7 " + esc(M.regNo) + "</div>" +
+    '<div class="wktitle">' + (wkState.period === "month" ? "Monthly report" : "Weekly report") + "</div>" +
+    '<div class="wksub">' + esc(wkPeriodLabel()) + "</div></div>" +
+    (ASSET_LOGO ? '<img class="wklogo" src="' + esc(ASSET_LOGO) + '" alt="">' : "") +
+    '</div><div class="wkbandbar"></div></div>');
+  h.push('<div class="wkmeta"><span><b>For</b> the Board of Directors</span>' +
+    '<span><b>From</b> ' + esc(personLabel((cloud.user && cloud.user.email) || "") || M.manager) +
+      ", " + esc(M.manager) + "</span>" +
+    '<span><b>Buildings</b> ' + esc(M.buildings) + "</span>" +
+    (wkState.meeting ? '<span><b>Next board meeting</b> ' + esc(jdDate(wkState.meeting)) + "</span>" : "") +
     "</div>");
+  var stats = [
+    { v: g.done.length, l: "visits carried out", c: "ok" },
+    { v: g.booked.length, l: "booked ahead", c: "" },
+    { v: g.units.length, l: "unit issues", c: g.units.length ? "warn" : "" },
+    { v: money(g.awaiting.reduce(function (t, a2) { return t + a2.cost; }, 0)),
+      l: "awaiting a board decision", c: g.awaiting.length ? "hot" : "" }
+  ];
+  h.push('<div class="wkstats">');
+  stats.forEach(function (x) {
+    h.push('<div class="wkstat ' + x.c + '"><div class="v">' + esc(x.v) + '</div><div class="l">' +
+      esc(x.l) + "</div></div>");
+  });
+  h.push("</div>");
   if (ai.summary) h.push('<p class="wklede">' + esc(ai.summary) + "</p>");
   if (ai.attention) h.push('<div class="wkattn"><strong>Needs the board\u2019s attention.</strong> ' + esc(ai.attention) + "</div>");
 
