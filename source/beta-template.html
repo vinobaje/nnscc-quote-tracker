@@ -6586,12 +6586,16 @@ var wkState = {
 /* Sections in the order they print, and the plain name each goes by. The board
    already gets the quote report, so the parts that repeat it are hers to drop. */
 var WK_SECTIONS = [
+  ["glance", "At a glance — the figures across the top"],
+  ["prose", "Opening, closing and totals"],
   ["done", "Contractor work completed"], ["booked", "Contractor work scheduled"],
   ["units", "Unit issues"], ["tracker", "Quote tracker — changes in this period"],
   ["awaiting", "Waiting on a board decision"], ["alerts", "Dates coming up"],
   ["notes", "Also this period"]
 ];
 function wkOn(sec) { return !wkState.secOff[sec]; }
+/* the pieces that are one thing each rather than a list of them */
+function wkHas(sec, key) { return wkOn(sec) && !wkState.skip[sec + ":" + key]; }
 function wkKept(sec, list, idOf) {
   if (!wkOn(sec)) return [];
   return list.filter(function (x, i) { return !wkState.skip[sec + ":" + idOf(x, i)]; });
@@ -6802,7 +6806,15 @@ function wkPickHTML() {
   wkState.skip = {}; wkState.secOff = {};        /* measure everything available */
   var all = wkGather();
   wkState.skip = saveSkip; wkState.secOff = saveOff;
+  var ai = wkState.ai || {};
   var lists = {
+    glance: wkGlanceFigures(all).map(function (x) { return { id: x.k, t: x.v + " " + x.l, d: "" }; }),
+    prose: [
+      { id: "summary", t: "Opening paragraph" + (ai.summary ? " — \u201C" + String(ai.summary).slice(0, 60) + "\u2026\u201D" : " (written when you generate)"), d: "" },
+      { id: "attention", t: "Needs the board\u2019s attention" + (ai.attention ? "" : " (only if there is something)"), d: "" },
+      { id: "totals", t: "Committed to date, board approved, saved by bidding", d: "" },
+      { id: "closing", t: "Closing line", d: "" }
+    ],
     done: all.done.map(function (r) { return { id: r.id, t: (r.contractor || "In-house") + " — " + (r.work || r.text || ""), d: r.day }; }),
     booked: all.booked.map(function (r) { return { id: r.id, t: (r.contractor || "") + " — " + (r.work || r.text || ""), d: r.day }; }),
     units: all.units.map(function (r) { return { id: r.id, t: "Unit " + (r.unit || "?") + " — " + (r.work || r.text || ""), d: r.day }; }),
@@ -6999,6 +7011,15 @@ function wkRowsHTML(rows, cols) {
   h.push("</tbody></table>");
   return h.join("");
 }
+function wkGlanceFigures(g) {
+  return [
+    { k: "done", v: g.done.length, l: "visits carried out" },
+    { k: "booked", v: g.booked.length, l: "booked ahead" },
+    { k: "units", v: g.units.length, l: "unit issues" },
+    { k: "awaiting", v: money(g.awaiting.reduce(function (t, a) { return t + a.cost; }, 0)),
+      l: "awaiting a board decision", hot: !!g.awaiting.length }
+  ];
+}
 /* the document itself — printed as it appears here */
 function wkPaperHTML() {
   var g = wkGather(), M = state.meta || META_DEFAULTS, ai = wkState.ai || {};
@@ -7017,21 +7038,18 @@ function wkPaperHTML() {
     '<span><b>Buildings</b> ' + esc(M.buildings) + "</span>" +
     (wkState.meeting ? '<span><b>Next board meeting</b> ' + esc(jdDate(wkState.meeting)) + "</span>" : "") +
     "</div>");
-  var stats = [
-    { v: g.done.length, l: "visits carried out" },
-    { v: g.booked.length, l: "booked ahead" },
-    { v: g.units.length, l: "unit issues" },
-    { v: money(g.awaiting.reduce(function (t, a2) { return t + a2.cost; }, 0)),
-      l: "awaiting a board decision", hot: !!g.awaiting.length }
-  ];
-  h.push('<div class="wkglance"><div class="wkglabel">At a glance</div><div class="wkgrow">');
-  stats.forEach(function (x) {
-    h.push('<div class="wkg' + (x.hot ? " hot" : "") + '"><span class="v">' + esc(x.v) +
-      '</span><span class="l">' + esc(x.l) + "</span></div>");
-  });
-  h.push("</div></div>");
-  if (ai.summary) h.push('<p class="wklede">' + esc(ai.summary) + "</p>");
-  if (ai.attention) h.push('<div class="wkattn"><strong>Needs the board\u2019s attention.</strong> ' + esc(ai.attention) + "</div>");
+  var stats = wkGlanceFigures(g).filter(function (x) { return wkHas("glance", x.k); });
+  if (stats.length) {
+    h.push('<div class="wkglance"><div class="wkglabel">At a glance</div><div class="wkgrow">');
+    stats.forEach(function (x) {
+      h.push('<div class="wkg' + (x.hot ? " hot" : "") + '"><span class="v">' + esc(x.v) +
+        '</span><span class="l">' + esc(x.l) + "</span></div>");
+    });
+    h.push("</div></div>");
+  }
+  if (ai.summary && wkHas("prose", "summary")) h.push('<p class="wklede">' + esc(ai.summary) + "</p>");
+  if (ai.attention && wkHas("prose", "attention"))
+    h.push('<div class="wkattn"><strong>Needs the board\u2019s attention.</strong> ' + esc(ai.attention) + "</div>");
 
   if (wkOn("done")) {
   h.push('<div class="wksec">Contractor work completed</div>');
@@ -7078,9 +7096,10 @@ function wkPaperHTML() {
       ["Contractor", function (r) { return esc(r.who || "\u2014"); }],
       ["Amount (incl. HST)", function (r) { return esc(money(r.cost)); }]]));
   }
-  h.push('<p class="wkfig">Committed to date <strong>' + esc(money(g.totals.committed)) +
-    "</strong> \u00b7 board approved <strong>" + esc(money(g.totals.approved)) +
-    "</strong> \u00b7 saved by taking competing quotes <strong>" + esc(money(g.totals.saved)) + "</strong></p>");
+  if (wkHas("prose", "totals"))
+    h.push('<p class="wkfig">Committed to date <strong>' + esc(money(g.totals.committed)) +
+      "</strong> \u00b7 board approved <strong>" + esc(money(g.totals.approved)) +
+      "</strong> \u00b7 saved by taking competing quotes <strong>" + esc(money(g.totals.saved)) + "</strong></p>");
   }
 
   if (g.alerts.length) {
@@ -7093,7 +7112,7 @@ function wkPaperHTML() {
     g.notes.forEach(function (r) { h.push("<li>" + esc(r.text) + "</li>"); });
     h.push("</ul>");
   }
-  if (ai.closing) h.push('<p class="wkclose">' + esc(ai.closing) + "</p>");
+  if (ai.closing && wkHas("prose", "closing")) h.push('<p class="wkclose">' + esc(ai.closing) + "</p>");
   if (wkState.files.length)
     h.push('<p class="wkappend">The superintendent\u2019s ' +
       (wkState.files.length === 1 ? "report follows" : "reports follow") + " this page.</p>");
