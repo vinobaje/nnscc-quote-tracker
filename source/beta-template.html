@@ -144,6 +144,10 @@ table { width:100%; border-collapse:collapse; font-variant-numeric:tabular-nums;
 th { text-align:left; font-size:11.5px; text-transform:uppercase; letter-spacing:.07em; color:var(--muted);
   font-weight:600; padding:10px 14px 8px; border-bottom:1px solid var(--line); }
 td { padding:9px 14px; border-bottom:1px solid var(--line-soft); vertical-align:top; }
+/* a job's own line in the long schedules — room to breathe, and a rule under it
+   heavy enough to tell one job from the next at arm's length */
+.tpl-classic tr.jrow > td { padding-top:12px; padding-bottom:12px; border-bottom:1px solid var(--line); }
+.tpl-classic tr.jrow:hover > td { background:var(--accent-soft); }
 tbody tr:last-child td { border-bottom:none; }
 td.num { color:var(--muted); width:2.2em; }
 .money, td.money, th.money { text-align:right; white-space:nowrap; }
@@ -165,10 +169,24 @@ tr.bidrow > td { padding:0; background:var(--accent-soft); border-bottom:1px sol
 .pendchip { display:inline-block; font-size:11.5px; font-weight:650; color:var(--amber); background:var(--amber-soft);
   border-radius:99px; padding:1px 8px; white-space:nowrap; }
 
-.card { background:var(--card); border:1px solid var(--line); border-radius:6px; margin:12px 0; overflow:hidden; }
-.cardhead { padding:11px 14px; border-bottom:1px solid var(--line); display:flex; gap:10px; align-items:baseline; flex-wrap:wrap; }
+/* One job, one block. A board reading this on a screen should be able to see
+   at a glance where one job ends and the next begins, which of the quotes is
+   the one being counted, and which line a price belongs to — so each job gets
+   its own bordered card with a titled band, the rows alternate, and the quote
+   behind the total is tinted along its whole length. */
+.card { background:var(--card); border:1px solid var(--line); border-left:4px solid var(--accent);
+  border-radius:8px; margin:20px 0; overflow:hidden; box-shadow:0 1px 3px rgba(16,32,52,.06); }
+.cardhead { padding:12px 15px; border-bottom:1px solid var(--line); background:var(--paper);
+  display:flex; gap:10px; align-items:baseline; flex-wrap:wrap; }
+.cardhead strong { font-size:16px; }
 .jobno { font-size:11.5px; font-weight:650; text-transform:uppercase; letter-spacing:.07em; color:var(--accent-ink); }
-.cmp td, .cmp th { font-size:14px; }
+.cmp td, .cmp th { font-size:14.5px; }
+.cmp th { font-size:11.5px; letter-spacing:.05em; }
+.cmp tbody td { padding-top:11px; padding-bottom:11px; }
+.cmp td.money { font-size:15.5px; font-weight:650; }
+.cmp tbody tr:nth-child(even) > td { background:var(--paper); }
+.cmp tbody tr.lowrow > td { background:var(--good-soft); }
+.cmp tbody tr.lowrow > td:first-child { box-shadow:inset 3px 0 0 var(--good); font-weight:650; }
 tr.pend td { color:var(--muted); font-style:italic; }
 
 .group { background:var(--card); border:1px solid var(--line); border-radius:6px; margin:12px 0; overflow:hidden; }
@@ -1562,6 +1580,8 @@ body[data-view="edit"] .wrap { max-width:none; }
   .editable-head, .editable-txt { outline:none !important; }
   .editable-txt:empty::before { content:"" !important; }
   a { text-decoration:none; color:inherit; }
+  /* a job and its quotes stay on one page, and the paper needs no shadow */
+  .card { break-inside:avoid; box-shadow:none !important; }
   /* the credit stays legible on paper and is never dropped */
   .cscredit { display:block !important; color:#5a6a7a !important; break-inside:avoid; }
   .cscredit a { color:#24466B !important; font-weight:700 !important; }
@@ -3668,7 +3688,11 @@ function cmpRows(x) {
       r.push('<tr class="pend"><td>' + cName + "</td><td>" + cNote +
              '</td><td class="money">' + amtP + "</td><td></td></tr>");
     } else {
-      r.push("<tr><td>" + cName + "</td><td>" + cNote +
+      /* the bid the totals are built on is marked on the whole row, not just
+         with a chip at the end of it — a reader should not have to track a
+         line across the page to see which quote counts */
+      var counts = (cb.override || cb.lowest) ? ' class="lowrow"' : "";
+      r.push("<tr" + counts + "><td>" + cName + "</td><td>" + cNote +
              '</td><td class="money">' + tEdit("bid:" + jid + ":" + bi + ":amount", money(cb.total), "Amount") + "</td><td>" +
              carriedFlag(cb, "low") + "</td></tr>");
     }
