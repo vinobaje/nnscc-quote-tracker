@@ -1456,6 +1456,10 @@ body[data-view="edit"] .wrap { max-width:none; }
 /* the report to the board, on screen and on paper */
 .wkpaper { background:var(--card); border:1px solid var(--line); border-radius:10px;
   padding:30px 34px; margin:18px 0 0; max-width:860px; }
+.wkedit:focus { outline:none; }
+.wkedit:hover { border-color:var(--accent); }
+.wkeditnote { font-size:12.5px; color:var(--ink2); margin:16px 0 0; display:flex; gap:8px;
+  align-items:center; flex-wrap:wrap; }
 .wkhead { border-bottom:3px solid var(--accent-ink); padding-bottom:12px; margin-bottom:18px; }
 .wkkicker { font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); }
 .wktitle { font:26px/1.25 Georgia,serif; color:var(--accent-ink); margin-top:6px; }
@@ -2282,7 +2286,7 @@ var CONTRACTS_PATH = "nnsccQuoteTrackerBeta/contracts";      /* the contract reg
 var SNAPSHOTS_COLL = "nnsccQuoteSnapshotsBeta";               /* a copy of the report, kept each day it changes */
 var ACTIVITY_COLL = "nnsccActivityBeta";                      /* the manager's own record of the week */
 var VIEW_BETA = CURRENT_PATH.indexOf("Beta") >= 0;   /* which report the passcode gate reads/protects */
-var BUILD_STAMP = "2026-08-11 13:16";   /* filled in by build.js — which copy of the page this is */
+var BUILD_STAMP = "2026-08-11 13:28";   /* filled in by build.js — which copy of the page this is */
 /* path of the report currently on screen */
 function reportPath() {
   return cloud.active.kind === "current" ? CURRENT_PATH : (REPORTS_COLL + "/" + cloud.active.id);
@@ -4779,6 +4783,8 @@ function alertSendNow() {
 
 /* ---------- editor events (delegated) ---------- */
 document.getElementById("editor").addEventListener("change", function (e) {
+  /* she has typed into the report itself */
+  if (e.target.closest && e.target.closest("#wkPaper")) { wkCapture(); return; }
   /* the report's period, and the meeting date printed on it */
   var wkf = e.target.dataset.wkf;
   if (wkf) {
@@ -4915,9 +4921,13 @@ document.getElementById("editor").addEventListener("click", function (e) {
   }
   if (!act) return;
   if (edWorkspaceAction(act, actEl, e)) return;
-  if (act === "wkgen") { wkGenerate(); return; }
-  if (act === "wkpdf") { wkDownload(); return; }
-  if (act === "wksend") { wkSend(); return; }
+  if (act === "wkgen") { wkCapture(); wkGenerate(); return; }
+  if (act === "wkrebuild") {
+    if (!confirm("Start again from the data?\n\nAnything you have typed into the report will be lost.")) return;
+    wkState.html = wkPaperHTML(); renderEditor(); return;
+  }
+  if (act === "wkpdf") { wkCapture(); wkDownload(); return; }
+  if (act === "wksend") { wkCapture(); wkSend(); return; }
   if (act === "wkattach") { document.getElementById("wkFile").click(); return; }
   if (act === "wkfiledel") {
     wkState.files.splice(+actEl.getAttribute("data-fi"), 1); renderEditor(); return;
@@ -5304,6 +5314,13 @@ function jobCalcAutoIndex(j) {
 }
 /* live feedback while dragging the progress slider (the value is written on change) */
 document.getElementById("editor").addEventListener("input", function (e) {
+  /* she is typing into the report itself — keep it as she goes, so a redraw
+     underneath her never takes the words back */
+  if (e.target.closest && e.target.closest("#wkPaper")) {
+    clearTimeout(wkCapture._t);
+    wkCapture._t = setTimeout(wkCapture, 400);
+    return;
+  }
   if (e.target.dataset.f === "pct" && e.target.dataset.live) {
     var lbl = e.target.parentNode.querySelector(".pval");
     if (lbl) lbl.textContent = e.target.value + "%";
@@ -6583,6 +6600,7 @@ function wkGenerate() {
       wkState.ai = res.data || null;
       wkState.built = todayISO();
       wkState.busy = "";
+      wkState.html = wkPaperHTML();          /* from here on it is hers to edit */
       renderEditor();
       var el = document.getElementById("wkPaper");
       if (el) el.scrollIntoView({ block: "start" });
@@ -6592,6 +6610,7 @@ function wkGenerate() {
         " — the tables below are still correct; you can print it as it stands.";
       wkState.ai = wkState.ai || { summary: "", attention: "", closing: "" };
       wkState.built = todayISO();
+      wkState.html = wkPaperHTML();
       renderEditor();
     });
 }
@@ -6634,7 +6653,12 @@ function wkCardHTML() {
       '<button class="btn" type="button" data-act="wksend">\u{1F4E8} Email it to the board</button>' : "") +
     '<span class="savenote" id="wkNote">' + esc(wkState.busy) + "</span></div></div>");
   h.push("</div></div>");
-  if (wkState.built) h.push(wkPaperHTML());
+  if (wkState.built) {
+    h.push('<p class="wkeditnote">\u270E Everything below can be changed — click into it and type. ' +
+      "Rows can be deleted, wording rewritten, anything added. What is on the page is what prints." +
+      ' <button class="edbtn tiny" type="button" data-act="wkrebuild">Start again from the data</button></p>');
+    h.push(wkPaperWrapHTML(true));
+  }
   return h.join("");
 }
 function wkNote(t) {
@@ -6647,10 +6671,11 @@ function wkStandaloneHTML() {
   var css = "";
   var st = document.querySelector("style");
   if (st) css = st.textContent || "";
+  wkCapture();
   return "<!doctype html><html><head><meta charset=\"utf-8\"><style>" + css +
     "\n@page { size:letter portrait; margin:14mm 12mm 16mm; }\nbody{background:#fff;padding:0;margin:0}\n" +
     ".wkpaper{box-shadow:none;border:0;margin:0;padding:0;max-width:none}</style></head><body>" +
-    '<div class="tpl-classic">' + wkPaperHTML() + "</div></body></html>";
+    '<div class="tpl-classic">' + wkPaperWrapHTML(false) + "</div></body></html>";
 }
 function wkBuildPdf(then) {
   if (!cloud.fns) { wkNote("Sign in first."); return; }
@@ -6719,7 +6744,7 @@ function wkRowsHTML(rows, cols) {
 /* the document itself — printed as it appears here */
 function wkPaperHTML() {
   var g = wkGather(), M = state.meta || META_DEFAULTS, ai = wkState.ai || {};
-  var h = ['<div class="wkpaper" id="wkPaper">'];
+  var h = [];
   h.push('<div class="wkhead"><div class="wkkicker">' + esc(M.condoName) + " \u00b7 " + esc(M.regNo) +
     " \u00b7 " + esc(M.buildings) + '</div><div class="wktitle">' +
     (wkState.period === "month" ? "Monthly report to the board" : "Weekly report to the board") + "</div>" +
@@ -6788,8 +6813,21 @@ function wkPaperHTML() {
   if (wkState.files.length)
     h.push('<p class="wkappend">The superintendent\u2019s ' +
       (wkState.files.length === 1 ? "report follows" : "reports follow") + " this page.</p>");
-  h.push("</div>");
   return h.join("");
+}
+/* Everything on the page is hers to change before it goes out: a wording she
+   would put differently, a row that belongs to next week, a detail the tracker
+   could not know. What she types is what prints — the document is captured
+   from the page itself, not rebuilt from the data underneath it. */
+function wkPaperWrapHTML(editable) {
+  var inner = wkState.html || wkPaperHTML();
+  return '<div class="wkpaper' + (editable ? " wkedit" : "") + '" id="wkPaper"' +
+    (editable ? ' contenteditable="true" spellcheck="true"' : "") + ">" + inner + "</div>";
+}
+function wkCapture() {
+  var el = document.getElementById("wkPaper");
+  if (el) wkState.html = el.innerHTML;
+  return wkState.html;
 }
 
 /* ---------- dates that cost money when they pass unnoticed ----------
