@@ -48,6 +48,16 @@ service cloud.firestore {
       allow read, write: if nnsccEditor();
     }
 
+    // The property manager's own record of the week — walk-throughs, calls,
+    // site visits. Her working notes, not the board's reading: the weekly
+    // report written from them is what the board sees.
+    match /nnsccActivity/{entryId} {
+      allow read, write: if nnsccEditor();
+    }
+    match /nnsccActivityBeta/{entryId} {
+      allow read, write: if nnsccEditor();
+    }
+
     // Report library — past/period reports. EDITOR-ONLY (public sees only the current report).
     match /nnsccQuoteReports/{reportId} {
       allow read: if nnsccEditor();

@@ -1439,6 +1439,27 @@ body[data-view="edit"] .wrap { max-width:none; }
   .conproprow .pw { grid-column:1 / -1; }
 }
 /* the dates worth knowing about, said once on the way into the report */
+/* the journal */
+.actcompose textarea { width:100%; box-sizing:border-box; font:15px/1.6 inherit; color:var(--ink);
+  border:1px solid var(--line); border-radius:8px; padding:10px 12px; background:var(--card); }
+.actrow { display:flex; gap:9px; align-items:center; flex-wrap:wrap; margin-top:8px; }
+.actday { display:inline-flex; align-items:center; gap:6px; font-size:12.5px; color:var(--ink2); }
+.actday input { font:14px/1.4 inherit; border:1px solid var(--line); border-radius:7px; padding:7px 9px; background:var(--card); }
+#actMic.listening { background:var(--prio); border-color:var(--prio); color:#fff; }
+.actday-head { font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.05em;
+  color:var(--muted); margin:16px 0 6px; border-bottom:1px solid var(--line-soft); padding-bottom:4px; }
+.actitem { display:flex; gap:10px; align-items:flex-start; margin:0 0 7px; }
+.actitem textarea { flex:1; font:14.5px/1.55 inherit; color:var(--ink); border:1px solid var(--line);
+  border-radius:7px; padding:8px 10px; background:var(--card); }
+.actmeta { display:flex; flex-direction:column; align-items:flex-end; gap:4px; font-size:11.5px; color:var(--muted); }
+.actmeta .fx { color:var(--prio); cursor:pointer; font-weight:700; background:none; border:0; font-size:13px; }
+.actauto { margin:16px 0 4px; border:1px solid var(--line); border-left:4px solid var(--accent);
+  border-radius:9px; background:var(--paper); padding:12px 15px; }
+.actautohead { font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); }
+.actauto ul { margin:7px 0 0; padding-left:18px; }
+.actauto li { font-size:14px; line-height:1.55; color:var(--ink); margin:3px 0; }
+.actauto li.quote { color:var(--accent-ink); }
+.actauto li.status { color:var(--good); }
 .alertwins { display:flex; gap:14px; flex-wrap:wrap; flex:1; }
 .alertwins label { display:inline-flex; align-items:center; gap:6px; font-size:13px; color:var(--ink2); white-space:nowrap; }
 .alertwins input { width:70px; }
@@ -2214,8 +2235,9 @@ var REPORTS_COLL = "nnsccQuoteReports";           /* archived past-period report
 var CONTRACTORS_PATH = "nnsccQuoteTracker/contractors";  /* shared contractor directory */
 var CONTRACTS_PATH = "nnsccQuoteTracker/contracts";      /* the contract register — read with the report */
 var SNAPSHOTS_COLL = "nnsccQuoteSnapshots";               /* a copy of the report, kept each day it changes */
+var ACTIVITY_COLL = "nnsccActivity";                      /* the manager's own record of the week */
 var VIEW_BETA = CURRENT_PATH.indexOf("Beta") >= 0;   /* which report the passcode gate reads/protects */
-var BUILD_STAMP = "2026-08-11 10:26";   /* filled in by build.js — which copy of the page this is */
+var BUILD_STAMP = "2026-08-11 12:21";   /* filled in by build.js — which copy of the page this is */
 /* path of the report currently on screen */
 function reportPath() {
   return cloud.active.kind === "current" ? CURRENT_PATH : (REPORTS_COLL + "/" + cloud.active.id);
@@ -2288,6 +2310,7 @@ function cloudInit() {
     cloud.denied = false;                       /* fresh sign-in clears any prior denial */
     subscribeBoard(u);       /* board list + open-vote count (board/editors only) */
     conSubscribe();          /* the contract register: signed-in readers only */
+    actSubscribe();          /* the manager's own journal of the week */
     /* Firestore TERMINATES a listener that hits permission-denied — it does not
        retry it when credentials arrive. The first read of a page load happens
        before Firebase has restored a saved session, so without this the report
@@ -4069,6 +4092,7 @@ var edSaved = true;           /* false while an edit is on its way to the cloud 
 
 var ED_SECTIONS = [
   ["jobs", "💼", "Jobs &amp; Bids"], ["overview", "📊", "Overview"],
+  ["activity", "📝", "Activity"],
   ["contracts", "📄", "Contracts"],
   ["contractors", "👷", "Contractors"], ["board", "🗳", "Board &amp; Voting"],
   ["settings", "⚙️", "Settings"]
@@ -4078,9 +4102,13 @@ function renderEditor() {
   var M = state.meta || META_DEFAULTS;
   var h = ['<div class="ed-shell">', edSideHTML(M), '<div class="ed-main">', edTopHTML(M), '<div class="ed-body">'];
   if (edNav === "overview") h.push(edOverviewHTML(M));
+  else if (edNav === "activity") h.push(edSecHead("Activity",
+    "What you did this week that the quotes don\u2019t show. Each line is one thing — a walk-through, " +
+    "a phone call, a visit — and the weekly report to the board is written from these alongside " +
+    "everything the tracker recorded on its own.") + actCardHTML());
   else if (edNav === "contracts") h.push(edSecHead("Contracts",
     "Agreements with contractors — what they cover, until when, and what they cost. " +
-    "The board sees these on the report once signed in; a passcode reader never does.") + conCardHTML());
+    "Everyone who can read the report can read these.") + conCardHTML());
   else if (edNav === "contractors") h.push(edSecHead("Contractors",
     "Contact details and insurance expiry. Lapsing cover is flagged beside that contractor’s contracts.") + dirCardHTML());
   else if (edNav === "board") h.push(edSecHead("Board &amp; voting",
@@ -4092,6 +4120,7 @@ function renderEditor() {
   aiCheckKey();
   alertCheckKey();
   viewPassCheck();
+  if (edNav === "activity") actLoadWeek();
 }
 /* amounts are typed as money ("48,500" / "$48,500.00") and stored as a number */
 function edAmt(n) { return Number(n).toLocaleString("en-CA", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
@@ -4701,6 +4730,14 @@ function alertSendNow() {
 
 /* ---------- editor events (delegated) ---------- */
 document.getElementById("editor").addEventListener("change", function (e) {
+  /* a line of the journal, corrected after the fact */
+  var actf = e.target.dataset.actf;
+  if (actf) {
+    var row = e.target.closest("[data-aid]");
+    if (row) cloud.db.collection(ACTIVITY_COLL).doc(row.dataset.aid)
+      .set({ text: e.target.value.trim() }, { merge: true }).catch(function () {});
+    return;
+  }
   /* how far ahead the alerts look, and who hears about them */
   var alf = e.target.dataset.alf;
   if (alf) {
@@ -4820,6 +4857,14 @@ document.getElementById("editor").addEventListener("click", function (e) {
   }
   if (!act) return;
   if (edWorkspaceAction(act, actEl, e)) return;
+  if (act === "actadd") { actAdd(); return; }
+  if (act === "actmic") { actMicToggle(); return; }
+  if (act === "actdel") {
+    var ai = actEl.closest("[data-aid]"); if (!ai) return;
+    if (!confirm("Delete this entry from the journal?")) return;
+    cloud.db.collection(ACTIVITY_COLL).doc(ai.dataset.aid).delete().catch(function () {});
+    return;
+  }
   if (act === "alert-savekey") { alertSaveKey(); return; }
   if (act === "alert-replacekey") { alertShowKeyRow = true; renderEditor(); return; }
   if (act === "alert-send") { alertSendNow(); return; }
@@ -5876,6 +5921,235 @@ function conDir(name) {
    link and the passcode to. The signed PDFs sit behind that same passcode. */
 function canSeeContracts() {
   return isEditor() || isBoardMember() || conState.list.length > 0;
+}
+
+/* ---------- the property manager's own record of the week ----------
+   The tracker knows what it was told: quotes, amounts, decisions. It knows
+   nothing about the walk-through with the contractor, the call to the town, or
+   the morning spent letting the window cleaners in — and that is most of the
+   job. This is where those go, one line each, ready for the weekly report to
+   the board. Kept to the people who edit the report; the board reads the
+   report, not the diary behind it. */
+var actState = { list: [], loaded: false }, actUnsub = null;
+function actSubscribe() {
+  if (actUnsub) { actUnsub(); actUnsub = null; }
+  if (!cloud.on || !cloud.user || !isEditor()) { actState = { list: [], loaded: false }; return; }
+  actUnsub = cloud.db.collection(ACTIVITY_COLL).orderBy("day", "desc").limit(300)
+    .onSnapshot(function (qs) {
+      var rows = [];
+      qs.forEach(function (d) {
+        var v = d.data() || {};
+        rows.push({ id: d.id, day: v.day || "", text: v.text || "", by: v.by || "" });
+      });
+      actState = { list: rows, loaded: true };
+      if (document.body.dataset.view === "edit" && edNav === "activity") renderEditor();
+    }, function () { actState = { list: [], loaded: true }; });
+}
+/* Monday of the week a date falls in, and the Sunday that closes it */
+function actWeekStart(iso) {
+  var p = String(iso || todayISO()).slice(0, 10).split("-");
+  var d = new Date(+p[0], +p[1] - 1, +p[2]);
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" +
+         String(d.getDate()).padStart(2, "0");
+}
+function actDayLabel(iso) {
+  var p = String(iso || "").slice(0, 10).split("-");
+  if (p.length !== 3) return iso || "";
+  var d = new Date(+p[0], +p[1] - 1, +p[2]);
+  var names = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  return names[d.getDay()] + " " + jdDate(iso) + (iso === todayISO() ? " — today" : "");
+}
+function actAdd() {
+  var ta = document.getElementById("actText"), dayEl = document.getElementById("actDay");
+  var text = (ta && ta.value || "").trim();
+  if (!text) { actNote("Say or type what you did first."); return; }
+  if (!cloud.on || !isEditor()) { actNote("Sign in as the property manager to add to the journal."); return; }
+  actMicStop();
+  var day = (dayEl && dayEl.value) || todayISO();
+  actNote("Saving…");
+  cloud.db.collection(ACTIVITY_COLL).add({
+    day: day, text: text, by: (cloud.user && cloud.user.email) || "",
+    at: firebase.firestore.FieldValue.serverTimestamp()
+  }).then(function () {
+    ta.value = ""; actNote("Added.");
+    setTimeout(function () { actNote(""); }, 2500);
+  }).catch(function (e) { actNote("\u26A0 Could not save (" + ((e && e.code) || "error") + ")."); });
+}
+function actNote(t) { var el = document.getElementById("actNote"); if (el) el.textContent = t || ""; }
+
+/* ---- talking instead of typing ----
+   On a phone the keyboard's own dictation button is better than anything this
+   page could do, so nothing is offered there. On a computer the browser can
+   listen directly; the words land in the box to be read before they are saved,
+   never straight into the journal. */
+var actRec = null, actRecOn = false;
+function actSpeechAvailable() {
+  return !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+}
+function actMicStop() {
+  actRecOn = false;
+  if (actRec) { try { actRec.stop(); } catch (e) {} }
+  var b = document.getElementById("actMic");
+  if (b) { b.classList.remove("listening"); b.innerHTML = "\u{1F3A4} Dictate"; }
+}
+function actMicToggle() {
+  if (actRecOn) { actMicStop(); actNote("Stopped listening."); return; }
+  var Rec = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!Rec) { actNote("This browser cannot listen — type it, or use the microphone on your phone\u2019s keyboard."); return; }
+  var ta = document.getElementById("actText");
+  actRec = new Rec();
+  actRec.lang = "en-CA";
+  actRec.continuous = true;
+  actRec.interimResults = true;
+  var settled = ta ? ta.value : "";
+  actRec.onresult = function (ev) {
+    var interim = "";
+    for (var i = ev.resultIndex; i < ev.results.length; i++) {
+      var t = ev.results[i][0].transcript;
+      if (ev.results[i].isFinal) settled = (settled ? settled.replace(/\s+$/, "") + " " : "") + t.trim();
+      else interim += t;
+    }
+    if (ta) ta.value = (settled + (interim ? " " + interim : "")).replace(/\s+/g, " ").trim();
+  };
+  actRec.onerror = function (ev) {
+    actMicStop();
+    actNote(ev && ev.error === "not-allowed"
+      ? "The browser blocked the microphone — allow it in the address bar and try again."
+      : "Could not hear anything (" + ((ev && ev.error) || "error") + ").");
+  };
+  actRec.onend = function () { if (actRecOn) { try { actRec.start(); } catch (e) { actMicStop(); } } };
+  try { actRec.start(); } catch (e) { actNote("Could not start listening."); return; }
+  actRecOn = true;
+  var b = document.getElementById("actMic");
+  if (b) { b.classList.add("listening"); b.innerHTML = "\u{23F9} Stop"; }
+  actNote("Listening — speak, then read it over before you add it.");
+}
+
+function actCardHTML() {
+  var h = ['<div class="ecard esettings"><div class="ehead"><strong>What you did this week</strong>' +
+    '<span style="font-size:12.5px;color:var(--ink2)">— one line each; the weekly report is written from these</span></div><div class="ebids">'];
+  if (!cloud.on) {
+    h.push('<p class="edithint" style="margin:4px 0">Available on the live site (cloud copy) only.</p></div></div>');
+    return h.join("");
+  }
+  h.push('<div class="actcompose"><textarea id="actText" rows="3" placeholder="Walked the parking garage with Joint Seal to mark the ramp cracks before they quote\u2026"></textarea>' +
+    '<div class="actrow"><label class="actday">Day <input type="date" id="actDay" value="' + esc(todayISO()) + '"></label>' +
+    (actSpeechAvailable()
+      ? '<button class="edbtn" type="button" id="actMic" data-act="actmic" title="Speak instead of typing">\u{1F3A4} Dictate</button>'
+      : '<span class="savenote">On a phone, use the microphone on the keyboard to speak it.</span>') +
+    '<button class="edbtn prim" type="button" data-act="actadd">Add to the journal</button>' +
+    '<span class="savenote" id="actNote"></span></div></div>');
+
+  h.push(actWeekSummaryHTML());
+
+  var days = {}, order = [];
+  actState.list.forEach(function (r) {
+    if (!days[r.day]) { days[r.day] = []; order.push(r.day); }
+    days[r.day].push(r);
+  });
+  if (!actState.loaded) h.push('<p class="updempty">Loading the journal\u2026</p>');
+  else if (!order.length)
+    h.push('<p class="updempty">Nothing written down yet. Add the first thing you did this week — ' +
+      "a walk-through, a call, a contractor meeting — and it will be in Friday\u2019s report.</p>");
+  order.sort().reverse().forEach(function (day) {
+    h.push('<div class="actday-head">' + esc(actDayLabel(day)) + "</div>");
+    days[day].forEach(function (r) {
+      h.push('<div class="actitem" data-aid="' + esc(r.id) + '">' +
+        '<textarea data-actf="text" rows="2">' + esc(r.text) + "</textarea>" +
+        '<div class="actmeta"><span>' + esc(personLabel(r.by)) + "</span>" +
+        '<button class="fx" type="button" data-act="actdel" title="Delete this entry">\u2715</button></div></div>');
+    });
+  });
+  h.push("</div></div>");
+  return h.join("");
+}
+
+/* ---------- what the tracker already knows ----------
+   Sarah should not write down anything the report can see for itself. This is
+   the week as the tracker recorded it — worked out by comparing the copy kept
+   at the start of the week with the report as it stands now — so what is left
+   to write is only what happened away from the screen. */
+var actDiff = { key: "", loading: false, base: null, events: [], err: "" };
+function actWeekEvents(oldJobs, newJobs) {
+  var ev = [], byId = {};
+  (oldJobs || []).forEach(function (j) { byId[j.id] = j; });
+  (newJobs || []).forEach(function (j) {
+    var o = byId[j.id];
+    var jn = jobLabel(j);
+    if (!o) {
+      var priced = (j.bids || []).filter(function (b) { return b.amount != null && b.amount !== ""; });
+      ev.push({ kind: "job", text: "Added " + jn +
+        (priced.length ? " with " + priced.length + " quote" + (priced.length === 1 ? "" : "s") : "") + "." });
+      return;
+    }
+    (j.bids || []).forEach(function (b, bi) {
+      var ob = (o.bids || [])[bi];
+      var had = ob && ob.amount != null && ob.amount !== "";
+      var has = b.amount != null && b.amount !== "";
+      var who = (b.contractor || "").trim() || "a contractor";
+      if (has && !had)
+        ev.push({ kind: "quote", text: "Quote received for " + jn + " — " + who + ", " + money(b.amount) + "." });
+      else if (has && had && Number(b.amount) !== Number(ob.amount))
+        ev.push({ kind: "quote", text: "Price changed on " + jn + " — " + who + ", " +
+          money(ob.amount) + " to " + money(b.amount) + "." });
+      else if (!ob && (b.contractor || "").trim())
+        ev.push({ kind: "quote", text: who + " was invited to quote on " + jn + "." });
+    });
+    if ((o.status || "quoted") !== (j.status || "quoted"))
+      ev.push({ kind: "status", text: jn + " moved to " + statusLabel(j.status || "quoted").toLowerCase() + "." });
+    if (!o.priority && j.priority) ev.push({ kind: "status", text: jn + " was flagged high priority." });
+    if ((o.desc || "") !== (j.desc || "") && (o.desc || "").trim() && (j.desc || "").trim())
+      ev.push({ kind: "job", text: "Job " + j.no + " was renamed to \u201C" + (j.desc || "").trim() + "\u201D." });
+  });
+  var newIds = {};
+  (newJobs || []).forEach(function (j) { newIds[j.id] = 1; });
+  (oldJobs || []).forEach(function (j) {
+    if (!newIds[j.id]) ev.push({ kind: "job", text: "Removed " + jobLabel(j) + "." });
+  });
+  return ev;
+}
+function actLoadWeek() {
+  var start = actWeekStart(todayISO());
+  if (actDiff.key === start || actDiff.loading || !cloud.on || !isEditor()) return;
+  actDiff = { key: start, loading: true, base: null, events: [], err: "" };
+  /* the newest copy taken on or before Monday — copies are only kept on days
+     the report actually changed, so the nearest one before the week is the
+     right thing to measure against */
+  cloud.db.collection(SNAPSHOTS_COLL).where("day", "<=", start).orderBy("day", "desc").limit(1).get()
+    .then(function (qs) {
+      var base = null;
+      qs.forEach(function (d) { base = d.data(); });
+      actDiff.loading = false;
+      if (!base) { actDiff.err = "no copy of the report from before this week"; }
+      else { actDiff.base = base.day || start; actDiff.events = actWeekEvents(base.jobs || [], state.jobs || []); }
+      if (document.body.dataset.view === "edit" && edNav === "activity") renderEditor();
+    })
+    .catch(function (e) {
+      actDiff.loading = false;
+      actDiff.err = (e && e.code) || "could not read the earlier copy";
+      if (document.body.dataset.view === "edit" && edNav === "activity") renderEditor();
+    });
+}
+function actWeekSummaryHTML() {
+  var start = actWeekStart(todayISO());
+  var h = ['<div class="actauto"><div class="actautohead">Already recorded, week of ' +
+    esc(jdDate(start)) + ' \u2014 you don\u2019t need to write any of this down</div>'];
+  if (actDiff.loading || actDiff.key !== start) h.push('<p class="updempty">Working out what changed\u2026</p>');
+  else if (actDiff.err)
+    h.push('<p class="updempty">Nothing to compare against yet (' + esc(actDiff.err) +
+      "). From next week this will list every quote, price and decision on its own.</p>");
+  else if (!actDiff.events.length)
+    h.push('<p class="updempty">No changes to the report since ' + esc(jdDate(actDiff.base)) +
+      " — so far this week is whatever you write below.</p>");
+  else {
+    h.push("<ul>");
+    actDiff.events.slice(0, 40).forEach(function (e) { h.push('<li class="' + e.kind + '">' + esc(e.text) + "</li>"); });
+    if (actDiff.events.length > 40) h.push("<li>…and " + (actDiff.events.length - 40) + " more.</li>");
+    h.push("</ul>");
+  }
+  h.push("</div>");
+  return h.join("");
 }
 
 /* ---------- dates that cost money when they pass unnoticed ----------
