@@ -104,6 +104,71 @@ const CONTRACT_SCHEMA = {
   additionalProperties: false,
 };
 
+// One line of the property manager's day, filed. She says what she did or what
+// is booked; this works out which of the four it is, who it was, and when —
+// "Northern Generator did the monthly testing on Monday" becomes a completed
+// visit dated to that Monday. Nothing is saved until she has seen the fields.
+const JOURNAL_SYSTEM =
+  "You file one line from a condominium property manager's day into fields for her weekly report " +
+  "to the board.\n" +
+  "kind: 'done' for work already carried out, 'scheduled' for work booked or expected, " +
+  "'unit' for a problem in a specific unit, 'note' for anything else (a call, a meeting, an inspection " +
+  "by an authority, an errand).\n" +
+  "date is ISO YYYY-MM-DD. Resolve plain speech against the date given to you: 'Monday' and 'yesterday' " +
+  "mean the most recent one for work already done, the next one for work booked. Empty if no date is " +
+  "stated or implied.\n" +
+  "contractor is the company named, exactly as said, else empty. work is the job in three to eight words, " +
+  "capitalised like a title ('Monthly generator testing'). unit is a unit number if one is named, else empty. " +
+  "note is anything else worth keeping — a building, a floor, a time, a condition — else empty.\n" +
+  "Never invent a contractor, a date or a unit that was not said.";
+const JOURNAL_SCHEMA = {
+  type: "object",
+  properties: {
+    kind: { type: "string", enum: ["done", "scheduled", "unit", "note"] },
+    date: { type: "string" },
+    contractor: { type: "string" },
+    work: { type: "string" },
+    unit: { type: "string" },
+    note: { type: "string" },
+  },
+  required: ["kind", "date", "contractor", "work", "unit", "note"],
+  additionalProperties: false,
+};
+
+// The year's schedule as the contractor sends it — a letter or a table of
+// visits — read into dated entries so nobody types twelve dates by hand.
+const SCHEDULE_SYSTEM =
+  "You read a contractor's schedule of visits to a condominium — an annual maintenance calendar, an " +
+  "inspection notice, or a letter naming dates — into a list for the property manager's calendar.\n" +
+  "One entry per visit. date is ISO YYYY-MM-DD; for a visit spanning days, set date to the first and " +
+  "endDate to the last, otherwise leave endDate empty. Where a month is named without a day (e.g. " +
+  "'monthly testing, first Monday'), work out the actual date if the document says enough to do so, " +
+  "otherwise leave the date empty and say why in note.\n" +
+  "work is the job in three to eight words, capitalised like a title. note carries the building, address, " +
+  "floor, time of day or any condition stated. contractor is the company sending the schedule.\n" +
+  "Extract only visits the document actually names. Never invent a date to fill a pattern.";
+const SCHEDULE_SCHEMA = {
+  type: "object",
+  properties: {
+    contractor: { type: "string" },
+    visits: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          date: { type: "string" }, endDate: { type: "string" },
+          work: { type: "string" }, note: { type: "string" },
+        },
+        required: ["date", "endDate", "work", "note"],
+        additionalProperties: false,
+      },
+    },
+    unclear: { type: "array", items: { type: "string" } },
+  },
+  required: ["contractor", "visits", "unclear"],
+  additionalProperties: false,
+};
+
 // AI helper for the NNSCC 292 quote tracker. Modes:
 //  {check:true}          → is a key saved?
 //  {parse:true, text}    → read a pasted quote email into structured job/bid fields
@@ -169,6 +234,47 @@ exports.nnsccTrackerAi = onCall(
         return await callClaude(key, QUOTE_EXTRACT_SYSTEM, "Contractor quote text:\n\n" + text, QUOTE_SCHEMA, 800);
       }
       throw new HttpsError("invalid-argument", "Unsupported file — upload a PDF or a Word .docx file.");
+    }
+
+    // ----- mode: file one spoken line of the day -----
+    if (request.data && request.data.journal === true) {
+      const text = String(request.data.text || "").slice(0, 4000);
+      if (!text.trim()) throw new HttpsError("invalid-argument", "Nothing to file.");
+      const today = /^\d{4}-\d{2}-\d{2}$/.test(String(request.data.today || ""))
+        ? request.data.today : new Date().toISOString().slice(0, 10);
+      return await callClaude(key, JOURNAL_SYSTEM,
+        "Today is " + today + ". The property manager said:\n\n" + text, JOURNAL_SCHEMA, 400);
+    }
+
+    // ----- mode: read a contractor's schedule of visits -----
+    if (request.data && request.data.schedule === true) {
+      const b64 = String(request.data.fileB64 || "");
+      const media = String(request.data.mediaType || "");
+      const ask = "Read every visit this schedule names, for the property manager's calendar. " +
+        "Today is " + new Date().toISOString().slice(0, 10) + ".";
+      if (b64 && media === "application/pdf") {
+        return await callClaude(key, SCHEDULE_SYSTEM, [
+          { type: "document", source: { type: "base64", media_type: "application/pdf", data: b64 } },
+          { type: "text", text: ask },
+        ], SCHEDULE_SCHEMA, 2500, CONTRACT_MODEL);
+      }
+      if (b64 && media === "docx") {
+        let text = "";
+        try {
+          const mammoth = require("mammoth");
+          const out = await mammoth.extractRawText({ buffer: Buffer.from(b64, "base64") });
+          text = String((out && out.value) || "").slice(0, 60000);
+        } catch (e) {
+          throw new HttpsError("invalid-argument", "Could not read that Word document — try saving it as a PDF.");
+        }
+        if (!text.trim()) throw new HttpsError("invalid-argument", "That document looks empty or image-only — save it as a PDF.");
+        return await callClaude(key, SCHEDULE_SYSTEM, ask + "\n\nSchedule:\n\n" + text,
+          SCHEDULE_SCHEMA, 2500, CONTRACT_MODEL);
+      }
+      const pasted = String(request.data.text || "").slice(0, 30000);
+      if (!pasted.trim()) throw new HttpsError("invalid-argument", "Upload a PDF or paste the schedule.");
+      return await callClaude(key, SCHEDULE_SYSTEM, ask + "\n\nSchedule:\n\n" + pasted,
+        SCHEDULE_SCHEMA, 2500, CONTRACT_MODEL);
     }
 
     // ----- mode: read a signed contract (PDF or .docx) for the register -----

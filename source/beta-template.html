@@ -1453,6 +1453,23 @@ body[data-view="edit"] .wrap { max-width:none; }
   border-radius:7px; padding:8px 10px; background:var(--card); }
 .actmeta { display:flex; flex-direction:column; align-items:flex-end; gap:4px; font-size:11.5px; color:var(--muted); }
 .actmeta .fx { color:var(--prio); cursor:pointer; font-weight:700; background:none; border:0; font-size:13px; }
+.actsched { display:flex; gap:11px; align-items:baseline; padding:8px 0; border-bottom:1px solid var(--line-soft); }
+.actwhen { flex:0 0 190px; font-size:13.5px; font-weight:650; color:var(--ink); }
+.actwhen.late { color:var(--prio); }
+.actwhen .in { font-weight:400; color:var(--muted); margin-left:6px; font-size:12.5px; }
+.actwhat { flex:1 1 auto; min-width:0; font-size:14.5px; line-height:1.5; }
+.actsub { display:block; font-size:12.5px; color:var(--ink2); }
+.actchips { display:flex; flex-wrap:wrap; gap:6px; margin-top:5px; align-items:center; }
+.actchip { font-size:11.5px; font-weight:650; border-radius:99px; padding:2px 9px;
+  background:var(--paper); color:var(--ink2); border:1px solid var(--line); }
+.actchip.k-done { background:var(--good-soft); color:var(--good); border-color:var(--good-soft); }
+.actchip.k-scheduled { background:var(--accent-soft); color:var(--accent-ink); border-color:var(--accent-soft); }
+.actchip.k-unit { background:var(--amber-soft); color:var(--amber); border-color:var(--amber-soft); }
+.edbtn.tiny { font-size:11.5px; padding:2px 8px; }
+@media screen and (max-width:600px) {
+  .actsched { flex-wrap:wrap; }
+  .actwhen { flex:1 0 100%; }
+}
 .actauto { margin:16px 0 4px; border:1px solid var(--line); border-left:4px solid var(--accent);
   border-radius:9px; background:var(--paper); padding:12px 15px; }
 .actautohead { font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); }
@@ -4105,7 +4122,7 @@ function renderEditor() {
   else if (edNav === "activity") h.push(edSecHead("Activity",
     "What you did this week that the quotes don\u2019t show. Each line is one thing — a walk-through, " +
     "a phone call, a visit — and the weekly report to the board is written from these alongside " +
-    "everything the tracker recorded on its own.") + actCardHTML());
+    "everything the tracker recorded on its own.") + actScheduleHTML() + actCardHTML());
   else if (edNav === "contracts") h.push(edSecHead("Contracts",
     "Agreements with contractors — what they cover, until when, and what they cost. " +
     "Everyone who can read the report can read these.") + conCardHTML());
@@ -4858,6 +4875,33 @@ document.getElementById("editor").addEventListener("click", function (e) {
   if (!act) return;
   if (edWorkspaceAction(act, actEl, e)) return;
   if (act === "actadd") { actAdd(); return; }
+  if (act === "actimport") { actImportStart(); return; }
+  if (act === "actimpcancel") { actImport = null; actImportMsg = ""; renderEditor(); return; }
+  if (act === "actimpsave") { actImportSave(); return; }
+  if (act === "actdone") {
+    var ad = actEl.closest("[data-aid]"); if (!ad) return;
+    cloud.db.collection(ACTIVITY_COLL).doc(ad.dataset.aid)
+      .set({ kind: "done", done: true, day: todayISO() }, { merge: true }).catch(function () {});
+    return;
+  }
+  if (act === "actrefile") {
+    var ar = actEl.closest("[data-aid]"); if (!ar || !cloud.fns) return;
+    var row = null;
+    actState.list.forEach(function (x) { if (x.id === ar.dataset.aid) row = x; });
+    if (!row) return;
+    actNote("Reading that line again\u2026");
+    cloud.fns.httpsCallable("nnsccTrackerAi")({ journal: true, text: row.text, today: row.day || todayISO() })
+      .then(function (res) {
+        var f = res.data || {};
+        return cloud.db.collection(ACTIVITY_COLL).doc(row.id).set({
+          kind: f.kind || "note", contractor: f.contractor || "", work: f.work || "",
+          unit: f.unit || "", note: f.note || "", day: f.date || row.day,
+          done: f.kind === "done" }, { merge: true });
+      })
+      .then(function () { actNote(""); })
+      .catch(function () { actNote("\u26A0 Could not read that line."); });
+    return;
+  }
   if (act === "actmic") { actMicToggle(); return; }
   if (act === "actdel") {
     var ai = actEl.closest("[data-aid]"); if (!ai) return;
@@ -5535,6 +5579,16 @@ document.getElementById("editor").addEventListener("input", function (e) {
 /* the signed document. Stored under a path only — no public download URL is
    ever minted, so reading it always goes through the storage rules. */
 document.addEventListener("change", function (e) {
+  if (e.target.id !== "actSchedFile") return;
+  var f = e.target.files[0]; e.target.value = "";
+  if (f) actImportRead(f);
+});
+document.addEventListener("change", function (e) {
+  var i = e.target.getAttribute && e.target.getAttribute("data-actv");
+  if (i == null || !actImport) return;
+  actImport.picked[+i] = e.target.checked;
+});
+document.addEventListener("change", function (e) {
   if (e.target.id !== "conFile") return;
   var file = e.target.files[0]; e.target.value = "";
   var c = conById(conAttachId); conAttachId = null;
@@ -5939,7 +5993,9 @@ function actSubscribe() {
       var rows = [];
       qs.forEach(function (d) {
         var v = d.data() || {};
-        rows.push({ id: d.id, day: v.day || "", text: v.text || "", by: v.by || "" });
+        rows.push({ id: d.id, day: v.day || "", text: v.text || "", by: v.by || "",
+          kind: v.kind || "note", contractor: v.contractor || "", work: v.work || "",
+          unit: v.unit || "", note: v.note || "", endDay: v.endDay || "", done: !!v.done });
       });
       actState = { list: rows, loaded: true };
       if (document.body.dataset.view === "edit" && edNav === "activity") renderEditor();
@@ -5960,6 +6016,11 @@ function actDayLabel(iso) {
   var names = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
   return names[d.getDay()] + " " + jdDate(iso) + (iso === todayISO() ? " — today" : "");
 }
+/* What she said, filed. Claude works out whether it is work done, work booked,
+   a unit problem or a plain note, and pulls out the contractor, the job and the
+   date — "Northern Generator did the monthly testing on Monday" lands on that
+   Monday as a completed visit. The fields show under the line for correcting;
+   if the reading is unavailable the words are still saved, as a plain note. */
 function actAdd() {
   var ta = document.getElementById("actText"), dayEl = document.getElementById("actDay");
   var text = (ta && ta.value || "").trim();
@@ -5967,14 +6028,25 @@ function actAdd() {
   if (!cloud.on || !isEditor()) { actNote("Sign in as the property manager to add to the journal."); return; }
   actMicStop();
   var day = (dayEl && dayEl.value) || todayISO();
-  actNote("Saving…");
-  cloud.db.collection(ACTIVITY_COLL).add({
-    day: day, text: text, by: (cloud.user && cloud.user.email) || "",
-    at: firebase.firestore.FieldValue.serverTimestamp()
-  }).then(function () {
-    ta.value = ""; actNote("Added.");
-    setTimeout(function () { actNote(""); }, 2500);
-  }).catch(function (e) { actNote("\u26A0 Could not save (" + ((e && e.code) || "error") + ")."); });
+  actNote("Filing it\u2026");
+  var save = function (fields) {
+    var rec = { day: (fields && fields.date) || day, text: text,
+      kind: (fields && fields.kind) || "note", contractor: (fields && fields.contractor) || "",
+      work: (fields && fields.work) || "", unit: (fields && fields.unit) || "",
+      note: (fields && fields.note) || "", done: (fields && fields.kind) === "done",
+      by: (cloud.user && cloud.user.email) || "",
+      at: firebase.firestore.FieldValue.serverTimestamp() };
+    return cloud.db.collection(ACTIVITY_COLL).add(rec).then(function () {
+      ta.value = ""; actNote("Added \u2014 check the details underneath.");
+      setTimeout(function () { actNote(""); }, 4000);
+    });
+  };
+  var go = (cloud.fns && cloud.user)
+    ? cloud.fns.httpsCallable("nnsccTrackerAi")({ journal: true, text: text, today: day })
+        .then(function (res) { return save(res.data || null); },
+              function () { return save(null); })
+    : save(null);
+  go.catch(function (e) { actNote("\u26A0 Could not save (" + ((e && e.code) || "error") + ")."); });
 }
 function actNote(t) { var el = document.getElementById("actNote"); if (el) el.textContent = t || ""; }
 
@@ -6026,6 +6098,151 @@ function actMicToggle() {
   actNote("Listening — speak, then read it over before you add it.");
 }
 
+/* ---------- the year's visits ----------
+   Generator testing, fire inspections, alarm testing: booked months ahead and
+   the backbone of every weekly report. A contractor's schedule arrives once as
+   a letter or a table; it is read here into dated entries so nobody types
+   twelve of them, and each one is ticked off as it happens. */
+var actImport = null;      /* { contractor, visits[], unclear[], picked{} } */
+var actImportMsg = "";
+function actKindLabel(k) {
+  return k === "done" ? "Completed" : k === "scheduled" ? "Scheduled"
+       : k === "unit" ? "Unit issue" : "Note";
+}
+function actUpcoming() {
+  var today = todayISO();
+  return actState.list.filter(function (r) {
+    return r.kind === "scheduled" && !r.done && r.day && r.day >= today;
+  }).sort(function (a, b) { return a.day < b.day ? -1 : 1; });
+}
+function actOverdue() {
+  var today = todayISO();
+  return actState.list.filter(function (r) {
+    return r.kind === "scheduled" && !r.done && r.day && r.day < today;
+  }).sort(function (a, b) { return a.day < b.day ? -1 : 1; });
+}
+function actMonthLabel(iso) {
+  var p = String(iso || "").slice(0, 10).split("-");
+  if (p.length !== 3) return "Undated";
+  return ["January", "February", "March", "April", "May", "June", "July",
+          "August", "September", "October", "November", "December"][+p[1] - 1] + " " + p[0];
+}
+function actRowHTML(r, showTick) {
+  var when = r.day ? jdDate(r.day) + (r.endDay && r.endDay !== r.day ? " to " + jdDate(r.endDay) : "") : "no date";
+  var d = conDaysUntil(r.day);
+  return '<div class="actsched" data-aid="' + esc(r.id) + '">' +
+    '<div class="actwhen' + (d != null && d < 0 ? " late" : "") + '">' + esc(when) +
+      (d != null && d >= 0 && d <= 14 ? '<span class="in">' + esc(alertWhen(d)) + "</span>" : "") + "</div>" +
+    '<div class="actwhat"><strong>' + esc(r.contractor || "Contractor not named") + "</strong> — " +
+      esc(r.work || r.text || "visit") +
+      (r.note ? '<span class="actsub">' + esc(r.note) + "</span>" : "") + "</div>" +
+    (showTick ? '<button class="edbtn" type="button" data-act="actdone" title="Mark this as carried out">\u2713 Done</button>' : "") +
+    '<button class="fx" type="button" data-act="actdel" title="Remove">\u2715</button></div>';
+}
+function actScheduleHTML() {
+  var up = actUpcoming(), late = actOverdue();
+  var h = ['<div class="ecard esettings"><div class="ehead"><strong>The year\u2019s schedule</strong>' +
+    '<span style="font-size:12.5px;color:var(--ink2)">— testing, inspections and visits already booked</span>' +
+    '<span class="spacer"></span>' +
+    '<button class="edbtn prim" type="button" data-act="actimport">\u{1F4C4} Read a schedule</button></div><div class="ebids">'];
+  if (actImportMsg) h.push('<p class="conaibusy">' + esc(actImportMsg) + "</p>");
+  if (actImport) h.push(actImportHTML());
+  if (late.length) {
+    h.push('<div class="actday-head">Past its date, not yet ticked off</div>');
+    late.forEach(function (r) { h.push(actRowHTML(r, true)); });
+  }
+  if (!up.length && !late.length)
+    h.push('<p class="updempty">Nothing booked yet. Read in the contractor\u2019s schedule for the year, ' +
+      "or just say when something is coming — “ENEK are doing the fire alarm testing on the 12th”.</p>");
+  var month = "";
+  up.forEach(function (r) {
+    var m = actMonthLabel(r.day);
+    if (m !== month) { month = m; h.push('<div class="actday-head">' + esc(m) + "</div>"); }
+    h.push(actRowHTML(r, true));
+  });
+  h.push('<input type="file" id="actSchedFile" accept="application/pdf,.docx" style="display:none">');
+  h.push("</div></div>");
+  return h.join("");
+}
+/* what the reading found, for checking before any of it is kept */
+function actImportHTML() {
+  var v = actImport.visits || [];
+  var h = ['<div class="conprop"><div class="conproph">\u{2728} ' + esc(actImport.contractor || "Schedule") +
+    " — " + v.length + " visit" + (v.length === 1 ? "" : "s") + " found</div>" +
+    '<p class="conpropl">Untick anything that should not be in the calendar, then keep the rest.</p><div class="conproprows">'];
+  v.forEach(function (x, i) {
+    h.push('<label class="conproprow' + (x.date ? "" : " clash") + '">' +
+      '<input type="checkbox" data-actv="' + i + '"' + (actImport.picked[i] ? " checked" : "") + ">" +
+      '<span class="pl">' + esc(x.date ? jdDate(x.date) : "no date") + "</span>" +
+      '<span class="pv">' + esc(x.work || "visit") +
+        (x.note ? " — " + esc(x.note) : "") + "</span></label>");
+  });
+  h.push("</div>");
+  if ((actImport.unclear || []).length)
+    h.push('<div class="conpropun"><strong>Worth checking against the letter:</strong><ul>' +
+      actImport.unclear.map(function (u) { return "<li>" + esc(u) + "</li>"; }).join("") + "</ul></div>");
+  h.push('<div class="conpropbtns"><button class="edbtn prim" type="button" data-act="actimpsave">\u2713 Add these to the calendar</button>' +
+    '<button class="edbtn" type="button" data-act="actimpcancel">Discard</button></div></div>');
+  return h.join("");
+}
+function actImportStart() {
+  if (!isEditor() || !cloud.fns) { actImportMsg = "Sign in as the property manager first."; renderEditor(); return; }
+  var el = document.getElementById("actSchedFile"); if (el) el.click();
+}
+function actImportRead(file) {
+  var name = (file.name || "").toLowerCase();
+  var media = /\.pdf$/.test(name) ? "application/pdf" : (/\.docx$/.test(name) ? "docx" : "");
+  if (!media) { actImportMsg = "Claude can read a PDF or a Word .docx — “" + file.name + "” is neither."; renderEditor(); return; }
+  if (file.size > 8 * 1024 * 1024) { actImportMsg = "That file is over 8 MB — send a smaller copy."; renderEditor(); return; }
+  actImport = null;
+  actImportMsg = "\u{2728} Reading “" + file.name + "” — this takes about half a minute.";
+  renderEditor();
+  var r = new FileReader();
+  r.onload = function () {
+    var b64 = String(r.result || "").split(",")[1] || "";
+    cloud.fns.httpsCallable("nnsccTrackerAi")({ schedule: true, fileB64: b64, mediaType: media, fileName: file.name })
+      .then(function (res) {
+        var d = res.data || {};
+        var picked = {};
+        (d.visits || []).forEach(function (x, i) { picked[i] = !!x.date; });
+        actImport = { contractor: d.contractor || "", visits: d.visits || [], unclear: d.unclear || [], picked: picked };
+        actImportMsg = (d.visits || []).length ? "" : "Nothing datable was found in that document.";
+        renderEditor();
+      })
+      .catch(function (e) {
+        actImport = null;
+        actImportMsg = "\u26A0 Could not read it — " + ((e && e.message) || "something went wrong") + ".";
+        renderEditor();
+      });
+  };
+  r.onerror = function () { actImportMsg = "Could not read that file."; renderEditor(); };
+  r.readAsDataURL(file);
+}
+function actImportSave() {
+  if (!actImport || !isEditor()) return;
+  var batch = cloud.db.batch(), n = 0;
+  actImport.visits.forEach(function (x, i) {
+    if (!actImport.picked[i] || !x.date) return;
+    batch.set(cloud.db.collection(ACTIVITY_COLL).doc(), {
+      day: x.date, endDay: x.endDate || "", kind: "scheduled", done: false,
+      contractor: actImport.contractor || "", work: x.work || "", unit: "", note: x.note || "",
+      text: (actImport.contractor ? actImport.contractor + " — " : "") + (x.work || "visit"),
+      by: (cloud.user && cloud.user.email) || "", source: "schedule",
+      at: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    n++;
+  });
+  if (!n) { actImportMsg = "Nothing was ticked."; renderEditor(); return; }
+  batch.commit().then(function () {
+    actImport = null;
+    actImportMsg = n + " visit" + (n === 1 ? "" : "s") + " added to the calendar.";
+    renderEditor();
+  }).catch(function (e) {
+    actImportMsg = "\u26A0 Could not save (" + ((e && e.code) || "error") + ").";
+    renderEditor();
+  });
+}
+
 function actCardHTML() {
   var h = ['<div class="ecard esettings"><div class="ehead"><strong>What you did this week</strong>' +
     '<span style="font-size:12.5px;color:var(--ink2)">— one line each; the weekly report is written from these</span></div><div class="ebids">'];
@@ -6043,8 +6260,11 @@ function actCardHTML() {
 
   h.push(actWeekSummaryHTML());
 
+  /* the journal is what happened; what is merely booked lives in the calendar
+     above, and moves down here the day it is ticked off */
   var days = {}, order = [];
   actState.list.forEach(function (r) {
+    if (r.kind === "scheduled" && !r.done) return;
     if (!days[r.day]) { days[r.day] = []; order.push(r.day); }
     days[r.day].push(r);
   });
@@ -6055,8 +6275,16 @@ function actCardHTML() {
   order.sort().reverse().forEach(function (day) {
     h.push('<div class="actday-head">' + esc(actDayLabel(day)) + "</div>");
     days[day].forEach(function (r) {
+      var chips = [];
+      chips.push('<span class="actchip k-' + esc(r.kind || "note") + '">' + esc(actKindLabel(r.kind)) + "</span>");
+      if (r.contractor) chips.push('<span class="actchip">' + esc(r.contractor) + "</span>");
+      if (r.unit) chips.push('<span class="actchip">Unit ' + esc(r.unit) + "</span>");
+      if (r.work) chips.push('<span class="actchip">' + esc(r.work) + "</span>");
       h.push('<div class="actitem" data-aid="' + esc(r.id) + '">' +
-        '<textarea data-actf="text" rows="2">' + esc(r.text) + "</textarea>" +
+        '<div style="flex:1;min-width:0"><textarea data-actf="text" rows="2">' + esc(r.text) + "</textarea>" +
+        '<div class="actchips">' + chips.join("") +
+        '<button class="edbtn tiny" type="button" data-act="actrefile" title="Read this line again">\u21BB Re-file</button>' +
+        "</div></div>" +
         '<div class="actmeta"><span>' + esc(personLabel(r.by)) + "</span>" +
         '<button class="fx" type="button" data-act="actdel" title="Delete this entry">\u2715</button></div></div>');
     });
