@@ -1454,8 +1454,10 @@ body[data-view="edit"] .wrap { max-width:none; }
 .actmeta { display:flex; flex-direction:column; align-items:flex-end; gap:4px; font-size:11.5px; color:var(--muted); }
 .actmeta .fx { color:var(--prio); cursor:pointer; font-weight:700; background:none; border:0; font-size:13px; }
 /* the report to the board, on screen and on paper */
-.wkpaper { background:var(--card); border:1px solid var(--line); border-radius:10px;
+.wkpaper { background:#FCFBF8; border:1px solid var(--line); border-radius:10px;
   padding:30px 34px; margin:18px 0 0; max-width:860px; }
+.wkbrandrow { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+.wkbrandprev { height:34px; width:auto; background:#16283b; border-radius:5px; padding:5px 8px; }
 .wkedit:focus { outline:none; }
 .wkedit:hover { border-color:var(--accent); }
 .wkeditnote { font-size:12.5px; color:var(--ink2); margin:16px 0 0; display:flex; gap:8px;
@@ -1472,20 +1474,24 @@ body[data-view="edit"] .wrap { max-width:none; }
   border-bottom:1px solid var(--line); padding:12px 0 13px; margin-bottom:16px; }
 .wkmeta b { color:var(--muted); font-weight:700; text-transform:uppercase; font-size:10.5px;
   letter-spacing:.05em; margin-right:5px; }
-.wkstats { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; margin:0 0 18px; }
-.wkstat { border:1px solid var(--line); border-top:3px solid var(--accent); border-radius:8px; padding:11px 13px; }
-.wkstat.ok { border-top-color:var(--good); }
-.wkstat.warn { border-top-color:var(--amber); }
-.wkstat.hot { border-top-color:var(--prio); }
-.wkstat .v { font:22px/1.15 Georgia,serif; color:var(--ink); }
-.wkstat.hot .v { color:var(--prio); }
-.wkstat .l { font-size:10.5px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); margin-top:4px; }
-.wklede { font-size:15.5px; line-height:1.65; color:var(--ink); margin:0 0 14px; }
+/* the week in four figures, set as type between two rules — a printed letter,
+   not a dashboard of cards */
+.wkglance { border-top:1px solid var(--ink); border-bottom:1px solid var(--line);
+  padding:12px 0 13px; margin:0 0 20px; }
+.wkglabel { font:11px/1 Georgia,serif; font-style:italic; color:var(--muted); margin-bottom:9px; }
+.wkgrow { display:flex; flex-wrap:wrap; gap:10px 34px; align-items:baseline; }
+.wkg { display:flex; align-items:baseline; gap:8px; }
+.wkg .v { font:23px/1 Georgia,serif; color:var(--ink); }
+.wkg .l { font-size:12px; color:var(--ink2); }
+.wkg.hot .v { color:var(--prio); }
+.wklede { font:16.5px/1.72 Georgia,serif; color:var(--ink); margin:0 0 16px; }
+.wkclose, .wkattn { font-family:Georgia,serif; }
 .wkattn { background:var(--amber-soft); color:#6d4a0d; border-radius:8px; padding:10px 13px;
   font-size:14.5px; line-height:1.55; margin:0 0 16px; }
 .wksec { font:17px/1.3 Georgia,serif; color:var(--accent-ink); border-bottom:2px solid var(--accent-ink);
   padding-bottom:5px; margin:26px 0 10px; }
-.wktable thead th { background:var(--paper); }
+.wktable thead th { background:transparent; border-bottom-width:1.5px; }
+.wktable td { background:transparent; }
 .wksubsec { font-size:13px; font-weight:700; color:var(--ink2); margin:12px 0 5px; }
 .wktable { width:100%; border-collapse:collapse; font-size:13.5px; }
 .wktable th { text-align:left; font-size:10.5px; letter-spacing:.06em; text-transform:uppercase;
@@ -1501,7 +1507,8 @@ body[data-view="edit"] .wrap { max-width:none; }
   .wkpaper { border:0; border-radius:0; padding:0; margin:0; max-width:none; }
   .wkband { margin:0 0 0; border-radius:0; }
   .wkbandin { padding:22px 26px 18px; }
-  .wksec, .wktable tr, .wkattn, .wkstats { break-inside:avoid; }
+  .wkpaper { background:#fff; }
+  .wksec, .wktable tr, .wkattn, .wkglance { break-inside:avoid; }
   .wksec { break-after:avoid; }
 }
 .actsched { display:flex; gap:11px; align-items:baseline; padding:8px 0; border-bottom:1px solid var(--line-soft); }
@@ -2304,8 +2311,9 @@ var CONTRACTORS_PATH = "nnsccQuoteTrackerBeta/contractors";  /* shared contracto
 var CONTRACTS_PATH = "nnsccQuoteTrackerBeta/contracts";      /* the contract register — read with the report */
 var SNAPSHOTS_COLL = "nnsccQuoteSnapshotsBeta";               /* a copy of the report, kept each day it changes */
 var ACTIVITY_COLL = "nnsccActivityBeta";                      /* the manager's own record of the week */
+var BRAND_PATH = "nnsccQuoteTrackerBeta/brand";               /* the letterhead the manager puts on her report */
 var VIEW_BETA = CURRENT_PATH.indexOf("Beta") >= 0;   /* which report the passcode gate reads/protects */
-var BUILD_STAMP = "2026-08-11 13:30";   /* filled in by build.js — which copy of the page this is */
+var BUILD_STAMP = "2026-08-11 13:36";   /* filled in by build.js — which copy of the page this is */
 /* path of the report currently on screen */
 function reportPath() {
   return cloud.active.kind === "current" ? CURRENT_PATH : (REPORTS_COLL + "/" + cloud.active.id);
@@ -2379,6 +2387,7 @@ function cloudInit() {
     subscribeBoard(u);       /* board list + open-vote count (board/editors only) */
     conSubscribe();          /* the contract register: signed-in readers only */
     actSubscribe();          /* the manager's own journal of the week */
+    brandSubscribe();        /* the letterhead on her report */
     /* Firestore TERMINATES a listener that hits permission-denied — it does not
        retry it when credentials arrive. The first read of a page load happens
        before Firebase has restored a saved session, so without this the report
@@ -4948,6 +4957,12 @@ document.getElementById("editor").addEventListener("click", function (e) {
   if (act === "wkpdf") { wkCapture(); wkDownload(); return; }
   if (act === "wksend") { wkCapture(); wkSend(); return; }
   if (act === "wkattach") { document.getElementById("wkFile").click(); return; }
+  if (act === "wklogo") { document.getElementById("wkLogoFile").click(); return; }
+  if (act === "wklogodel") {
+    if (!confirm("Remove the logo from the report?")) return;
+    cloud.db.doc(BRAND_PATH).set({ logo: "" }, { merge: true }).catch(function () {});
+    return;
+  }
   if (act === "wkfiledel") {
     wkState.files.splice(+actEl.getAttribute("data-fi"), 1); renderEditor(); return;
   }
@@ -5676,6 +5691,11 @@ document.getElementById("editor").addEventListener("input", function (e) {
 });
 /* the signed document. Stored under a path only — no public download URL is
    ever minted, so reading it always goes through the storage rules. */
+document.addEventListener("change", function (e) {
+  if (e.target.id !== "wkLogoFile") return;
+  var f = e.target.files[0]; e.target.value = "";
+  if (f) brandSetLogo(f);
+});
 document.addEventListener("change", function (e) {
   if (e.target.id !== "wkFile") return;
   var files = Array.prototype.slice.call(e.target.files || []);
@@ -6531,6 +6551,49 @@ var wkState = {
   base: null, baseDay: "", loading: false, err: "",
   ai: null, busy: "", built: "", pdf: null
 };
+/* The mark at the top of her report. It is held as the image itself rather
+   than a link, because the printer is not allowed to fetch anything from the
+   network — everything on the page has to already be on the page. */
+var brandState = { logo: "", loaded: false }, brandUnsub = null;
+function brandSubscribe() {
+  if (brandUnsub) { brandUnsub(); brandUnsub = null; }
+  if (!cloud.on || !cloud.user || !isEditor()) { brandState = { logo: "", loaded: false }; return; }
+  brandUnsub = cloud.db.doc(BRAND_PATH).onSnapshot(function (snap) {
+    brandState = { logo: (snap.exists && snap.data().logo) || "", loaded: true };
+    if (document.body.dataset.view === "edit" && edNav === "weekly") renderEditor();
+  }, function () { brandState = { logo: "", loaded: true }; });
+}
+function brandLogo() { return brandState.logo || ASSET_LOGO || ""; }
+/* shrunk in the browser before it is stored: a letterhead needs no more than
+   this, and the document it rides in has a size limit */
+function brandSetLogo(file) {
+  if (!isEditor()) { wkNote("Sign in as the property manager first."); return; }
+  if (!/^image\//.test(file.type)) { wkNote("Choose an image file (PNG or JPEG)."); return; }
+  wkNote("Reading the logo\u2026");
+  var r = new FileReader();
+  r.onload = function () {
+    var img = new Image();
+    img.onload = function () {
+      var max = 520, w = img.width, hgt = img.height;
+      if (w > max) { hgt = Math.round(hgt * max / w); w = max; }
+      var c = document.createElement("canvas");
+      c.width = w; c.height = hgt;
+      var ctx = c.getContext("2d");
+      ctx.drawImage(img, 0, 0, w, hgt);
+      var out = c.toDataURL("image/png");
+      if (out.length > 700000) out = c.toDataURL("image/jpeg", 0.86);
+      if (out.length > 700000) { wkNote("That image is too large even after shrinking \u2014 try a smaller one."); return; }
+      cloud.db.doc(BRAND_PATH).set({ logo: out, at: firebase.firestore.FieldValue.serverTimestamp(),
+        by: (cloud.user && cloud.user.email) || "" }, { merge: true })
+        .then(function () { wkNote("Logo saved \u2014 it appears on every report from now on."); })
+        .catch(function (e) { wkNote("\u26A0 Could not save the logo (" + ((e && e.code) || "error") + ")."); });
+    };
+    img.onerror = function () { wkNote("That image could not be read."); };
+    img.src = String(r.result || "");
+  };
+  r.onerror = function () { wkNote("That image could not be read."); };
+  r.readAsDataURL(file);
+}
 function wkDefaultFrom(period) {
   var d = new Date();
   if (period === "month") { d.setDate(1); }
@@ -6652,6 +6715,16 @@ function wkCardHTML() {
     '<input type="date" data-wkf="meeting" value="' + esc(wkState.meeting) + '" style="max-width:220px">' +
     '<div class="savenote">Printed at the top of the report. Leave empty to leave it out.</div></div></div>');
 
+  h.push('<div class="esrow"><label>Letterhead</label><div style="flex:1">' +
+    '<div class="wkbrandrow">' +
+    (brandLogo() ? '<img class="wkbrandprev" src="' + esc(brandLogo()) + '" alt="">'
+                 : '<span class="savenote">No logo set \u2014 the report goes out without one.</span>') +
+    '<button class="edbtn" type="button" data-act="wklogo">' +
+      (brandState.logo ? "Replace the logo\u2026" : "Add a logo\u2026") + "</button>" +
+    (brandState.logo ? '<button class="edbtn" type="button" data-act="wklogodel">Remove</button>' : "") +
+    '<input type="file" id="wkLogoFile" accept="image/png,image/jpeg" style="display:none"></div>' +
+    '<div class="savenote">A PNG or JPEG of the management company\u2019s mark. It is shrunk and stored ' +
+    "with the report, so it prints even where nothing can be fetched from the internet.</div></div></div>");
   h.push('<div class="esrow"><label>Your reports</label><div style="flex:1">');
   if (wkState.files.length) {
     h.push('<div class="confiles">');
@@ -6773,7 +6846,7 @@ function wkPaperHTML() {
     '<div class="wkbandtxt"><div class="wkkicker">' + esc(M.condoName) + " \u00b7 " + esc(M.regNo) + "</div>" +
     '<div class="wktitle">' + (wkState.period === "month" ? "Monthly report" : "Weekly report") + "</div>" +
     '<div class="wksub">' + esc(wkPeriodLabel()) + "</div></div>" +
-    (ASSET_LOGO ? '<img class="wklogo" src="' + esc(ASSET_LOGO) + '" alt="">' : "") +
+    (brandLogo() ? '<img class="wklogo" src="' + esc(brandLogo()) + '" alt="">' : "") +
     '</div><div class="wkbandbar"></div></div>');
   h.push('<div class="wkmeta"><span><b>For</b> the Board of Directors</span>' +
     '<span><b>From</b> ' + esc(personLabel((cloud.user && cloud.user.email) || "") || M.manager) +
@@ -6782,18 +6855,18 @@ function wkPaperHTML() {
     (wkState.meeting ? '<span><b>Next board meeting</b> ' + esc(jdDate(wkState.meeting)) + "</span>" : "") +
     "</div>");
   var stats = [
-    { v: g.done.length, l: "visits carried out", c: "ok" },
-    { v: g.booked.length, l: "booked ahead", c: "" },
-    { v: g.units.length, l: "unit issues", c: g.units.length ? "warn" : "" },
+    { v: g.done.length, l: "visits carried out" },
+    { v: g.booked.length, l: "booked ahead" },
+    { v: g.units.length, l: "unit issues" },
     { v: money(g.awaiting.reduce(function (t, a2) { return t + a2.cost; }, 0)),
-      l: "awaiting a board decision", c: g.awaiting.length ? "hot" : "" }
+      l: "awaiting a board decision", hot: !!g.awaiting.length }
   ];
-  h.push('<div class="wkstats">');
+  h.push('<div class="wkglance"><div class="wkglabel">At a glance</div><div class="wkgrow">');
   stats.forEach(function (x) {
-    h.push('<div class="wkstat ' + x.c + '"><div class="v">' + esc(x.v) + '</div><div class="l">' +
-      esc(x.l) + "</div></div>");
+    h.push('<div class="wkg' + (x.hot ? " hot" : "") + '"><span class="v">' + esc(x.v) +
+      '</span><span class="l">' + esc(x.l) + "</span></div>");
   });
-  h.push("</div>");
+  h.push("</div></div>");
   if (ai.summary) h.push('<p class="wklede">' + esc(ai.summary) + "</p>");
   if (ai.attention) h.push('<div class="wkattn"><strong>Needs the board\u2019s attention.</strong> ' + esc(ai.attention) + "</div>");
 
