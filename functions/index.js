@@ -200,10 +200,23 @@ const WEEKLY_SYSTEM =
   "closing: one sentence inviting questions, in the manager's voice.\n" +
   "quoteChanges: one sentence for each entry in quoteChanges, in the same order and the same number — " +
   "what the quote tracker recorded, said the way a director would say it rather than the way a database " +
-  "records it. Use only the fields that entry carries. 'status changed' to approved means the board " +
-  "approved that job: say the board approved it, and name the contractor and the amount only where the " +
-  "entry gives them. A quote received is a price now in hand from a named contractor. Do not merge two " +
-  "entries, do not add one that is not there, and do not invent a meeting, a date, a reason or a person.\n" +
+  "records it. Use only the fields that entry carries.\n" +
+  "WHO THE WORK WENT TO: an entry names a contractor ONLY in its own contractor field. If that field is " +
+  "empty, no company may appear in that sentence — not from another entry, not from a quote received for " +
+  "the same job, not from anywhere. A board approving a job is not the same as awarding it to the company " +
+  "that quoted lowest, and the corporation may award it to someone else entirely. So 'status changed' to " +
+  "approved with no contractor reads as: the board approved that job — and nothing about who will carry it " +
+  "out or for how much. With a contractor named, it reads as awarded to that company at that amount.\n" +
+  "A quote received is a price now in hand from the contractor named on that entry, and says nothing about " +
+  "who will get the work. Do not merge two entries, do not add one that is not there, and do not invent a " +
+  "meeting, a date, a reason, an amount or a person.\n" +
+  "Say what a change means, not what fields moved: write \"The board approved the tank replacement at 560\", " +
+  "never \"moved from quoted to approved\". The previous state is worth a mention only where it changes the " +
+  "meaning, as when work already approved has now been awarded to a company.\n" +
+  "DATES: write them as a person speaks them — 17 August, or 17 August 2027 when the year is not this one. " +
+  "Never print a date in the 2026-08-17 form anywhere.\n" +
+  "The same rule governs the summary: it may not say who a job went to unless the data says so, and it " +
+  "may not attach a quoted price to an approval as though it were the awarded price.\n" +
   "MONEY: an amount is only money where the data already shows it with a $ sign. Every other number is " +
   "an address, a building, a unit, a floor or a count — 550 and 560 are the two buildings of this " +
   "corporation, 560-905 is a unit, 11 is a floor. Never put a $ in front of a number that did not " +

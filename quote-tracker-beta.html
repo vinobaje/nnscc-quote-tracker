@@ -1499,7 +1499,14 @@ body[data-view="edit"] .wrap { max-width:none; }
 .wkattn { background:var(--amber-soft); color:#6d4a0d; border-radius:8px; padding:10px 13px;
   font-size:14.5px; line-height:1.55; margin:0 0 16px; }
 .wksec { font:17px/1.3 Georgia,serif; color:var(--accent-ink); border-bottom:2px solid var(--accent-ink);
-  padding-bottom:5px; margin:26px 0 10px; }
+  padding-bottom:5px; margin:26px 0 10px; display:flex; align-items:baseline; gap:10px; }
+.wksecn { font:11px/1 -apple-system,Segoe UI,Helvetica,Arial,sans-serif; font-weight:700; color:#fff;
+  background:var(--accent-ink); border-radius:50%; width:19px; height:19px; display:inline-flex;
+  align-items:center; justify-content:center; flex:none; }
+.wksign { margin:26px 0 0; padding-top:14px; border-top:1px solid var(--line); }
+.wksignn { font:17px/1.3 Georgia,serif; color:var(--ink); }
+.wksignt { font-size:13px; color:var(--ink2); margin-top:2px; }
+.wksignd { font-size:12.5px; color:var(--muted); margin-top:6px; }
 .wktable thead th { background:transparent; border-bottom-width:1.5px; }
 .wktable td { background:transparent; }
 .wksubsec { font-size:13px; font-weight:700; color:var(--ink2); margin:12px 0 5px; }
@@ -2122,9 +2129,9 @@ function shortLabel(s) {
   return (sp > 12 ? cut.slice(0, sp) : cut).trim() + "…";
 }
 /* job lifecycle: quoted → board decision (approved / rejected / deferred) → scheduled → in progress → completed */
-var STATUSES = [["quoted","Quoted"],["approved","Approved"],["rejected","Rejected"],["deferred","Deferred"],
-                ["scheduled","Scheduled"],["inprogress","In progress"],["completed","Completed"]];
-var APPROVED_SET = { approved:1, scheduled:1, inprogress:1, completed:1 };   /* counts as board-approved spend */
+var STATUSES = [["quoted","Quoted"],["approved","Approved"],["awarded","Awarded"],["rejected","Rejected"],
+                ["deferred","Deferred"],["scheduled","Scheduled"],["inprogress","In progress"],["completed","Completed"]];
+var APPROVED_SET = { approved:1, awarded:1, scheduled:1, inprogress:1, completed:1 };   /* counts as board-approved spend */
 function statusLabel(k) { for (var i=0;i<STATUSES.length;i++) if (STATUSES[i][0]===k) return STATUSES[i][1]; return k; }
 /* status chip for the report — quiet for the default "quoted" state */
 function stChip(j) {
@@ -2325,7 +2332,7 @@ var BRAND_PATH = "nnsccQuoteTrackerBeta/brand";               /* the letterhead 
 var WEEKLY_DRAFT_PATH = "nnsccQuoteTrackerBeta/weeklyDraft";   /* the report she is working on */
 var WEEKLY_COLL = "nnsccWeeklyReportsBeta";                   /* every one she has finished */
 var VIEW_BETA = CURRENT_PATH.indexOf("Beta") >= 0;   /* which report the passcode gate reads/protects */
-var BUILD_STAMP = "2026-08-11 18:25";   /* filled in by build.js — which copy of the page this is */
+var BUILD_STAMP = "2026-08-11 18:40";   /* filled in by build.js — which copy of the page this is */
 /* path of the report currently on screen */
 function reportPath() {
   return cloud.active.kind === "current" ? CURRENT_PATH : (REPORTS_COLL + "/" + cloud.active.id);
@@ -6493,10 +6500,17 @@ var actDiff = { key: "", loading: false, base: null, events: [], err: "" };
    approved". */
 function actWeekEvents(oldJobs, newJobs) {
   var ev = [], byId = {};
-  var carried = function (j) {
+  /* The lowest quote is not the same thing as the company the work went to.
+     A board can approve a job and award it to somebody else entirely, and the
+     tracker only knows who if the manager marked that bid as the chosen one.
+     Where it does not know, it says nothing — a report that names the wrong
+     contractor is worse than one that names none. */
+  var awardedTo = function (j) {
     try {
-      var c = jobCalc(j), b = c.carriedBids && c.carriedBids[0];
-      return { who: (b && b.b && (b.b.contractor || "").trim()) || "", amount: c.cost || null };
+      var c = jobCalc(j);
+      var chosen = (c.carriedBids || []).filter(function (b) { return b && b.override; })[0];
+      if (!chosen) return { who: "", amount: null };
+      return { who: ((chosen.b && chosen.b.contractor) || "").trim(), amount: chosen.total || null };
     } catch (e) { return { who: "", amount: null }; }
   };
   (oldJobs || []).forEach(function (j) { byId[j.id] = j; });
@@ -6505,7 +6519,7 @@ function actWeekEvents(oldJobs, newJobs) {
     var jn = jobLabel(j), desc = String(j.desc || "").trim();
     if (!o) {
       var priced = (j.bids || []).filter(function (b) { return b.amount != null && b.amount !== ""; });
-      var c0 = carried(j);
+      var c0 = awardedTo(j);
       ev.push({ kind: "job", what: "added", no: j.no, desc: desc, contractor: c0.who, amount: c0.amount,
         text: "Added " + jn + (priced.length ? " with " + priced.length + " quote" + (priced.length === 1 ? "" : "s") : "") + "." });
       return;
@@ -6527,7 +6541,7 @@ function actWeekEvents(oldJobs, newJobs) {
           text: who + " was invited to quote on " + jn + "." });
     });
     if ((o.status || "quoted") !== (j.status || "quoted")) {
-      var c1 = carried(j);
+      var c1 = awardedTo(j);
       ev.push({ kind: "status", what: "status changed", no: j.no, desc: desc,
         status: statusLabel(j.status || "quoted").toLowerCase(),
         wasStatus: statusLabel(o.status || "quoted").toLowerCase(),
@@ -6605,6 +6619,7 @@ var wkState = {
   files: [],            /* { name, path, size } — his reports, in the order they go */
   base: null, baseDay: "", loading: false, err: "",
   ai: null, busy: "", built: "", pdf: null,
+  by: "",               /* the name that signs it */
   skip: {},             /* items she has taken out before it is written */
   secOff: {},           /* whole sections she does not want this time */
   html: "", draftLoaded: false, saving: false
@@ -6789,7 +6804,7 @@ function wkSaveDraft() {
   clearTimeout(wkDraftT);
   wkDraftT = setTimeout(function () {
     cloud.db.doc(WEEKLY_DRAFT_PATH).set({
-      from: wkState.from, to: wkState.to, meeting: wkState.meeting, period: wkState.period,
+      from: wkState.from, to: wkState.to, meeting: wkState.meeting, period: wkState.period, by: wkState.by || "",
       skip: wkState.skip, secOff: wkState.secOff,
       ai: wkState.ai || null, html: wkState.html || "", built: wkState.built || "",
       files: wkState.files.map(function (f) { return { name: f.name, path: f.path || "", size: f.size || 0 }; }),
@@ -6807,6 +6822,7 @@ function wkLoadDraft() {
     wkState.from = d.from || wkState.from;
     wkState.to = d.to || wkState.to;
     wkState.meeting = d.meeting || "";
+    wkState.by = d.by || "";
     wkState.period = d.period || "week";
     wkState.skip = d.skip || {};
     wkState.secOff = d.secOff || {};
@@ -6898,6 +6914,10 @@ function wkCardHTML() {
     '<button class="edbtn' + (wkState.period === "week" ? " prim" : "") + '" type="button" data-act="wkweek">This week</button>' +
     '<button class="edbtn' + (wkState.period === "month" ? " prim" : "") + '" type="button" data-act="wkmonth">This month</button>' +
     "</div></div>");
+  h.push('<div class="esrow"><label>Prepared by</label><div style="flex:1">' +
+    '<input type="text" data-wkf="by" value="' + esc(wkState.by || wkPreparedBy()) +
+    '" style="max-width:320px" placeholder="the name that signs the report">' +
+    '<div class="savenote">Printed on the From line and above the sign-off.</div></div></div>');
   h.push('<div class="esrow"><label>Next board meeting</label><div style="flex:1">' +
     '<input type="date" data-wkf="meeting" value="' + esc(wkState.meeting) + '" style="max-width:220px">' +
     '<div class="savenote">Printed at the top of the report. Leave empty to leave it out.</div></div></div>');
@@ -7030,7 +7050,7 @@ function wkPeriodLabel() {
   return jdDate(wkState.from) + " to " + jdDate(wkState.to);
 }
 function wkRowsHTML(rows, cols) {
-  if (!rows.length) return '<p class="wkempty">Nothing recorded.</p>';
+  if (!rows.length) return "";
   var h = ['<table class="wktable"><thead><tr>'];
   cols.forEach(function (c) { h.push("<th>" + esc(c[0]) + "</th>"); });
   h.push("</tr></thead><tbody>");
@@ -7041,6 +7061,17 @@ function wkRowsHTML(rows, cols) {
   });
   h.push("</tbody></table>");
   return h.join("");
+}
+/* Whose report it is. An email address at the top of a letter to the board
+   reads as a machine wrote it; her name is hers to set, and is remembered. */
+function wkPreparedBy() {
+  if (wkState.by) return wkState.by;
+  var e = (cloud.user && cloud.user.email) || "";
+  var known = personLabel(e);
+  if (known && known !== e) return known;
+  var local = String(e).split("@")[0].replace(/[._-]+/g, " ").trim();
+  if (!local) return (state.meta || META_DEFAULTS).manager || "";
+  return local.replace(/\b\w/g, function (c) { return c.toUpperCase(); });
 }
 function wkGlanceFigures(g) {
   return [
@@ -7064,8 +7095,7 @@ function wkPaperHTML() {
     (brandLogo() ? '<img class="wklogo" src="' + esc(brandLogo()) + '" alt="">' : "") +
     '</div><div class="wkbandbar"></div></div>');
   h.push('<div class="wkmeta"><span><b>For</b> the Board of Directors</span>' +
-    '<span><b>From</b> ' + esc(personLabel((cloud.user && cloud.user.email) || "") || M.manager) +
-      ", " + esc(M.manager) + "</span>" +
+    '<span><b>From</b> ' + esc(wkPreparedBy()) + ", " + esc(M.manager) + "</span>" +
     '<span><b>Buildings</b> ' + esc(M.buildings) + "</span>" +
     (wkState.meeting ? '<span><b>Next board meeting</b> ' + esc(jdDate(wkState.meeting)) + "</span>" : "") +
     "</div>");
@@ -7082,8 +7112,10 @@ function wkPaperHTML() {
   if (ai.attention && wkHas("prose", "attention"))
     h.push('<div class="wkattn"><strong>Needs the board\u2019s attention.</strong> ' + esc(ai.attention) + "</div>");
 
-  if (wkOn("done")) {
-  h.push('<div class="wksec">Contractor work completed</div>');
+  var secNo = 0;
+  var sec = function (t) { secNo++; return '<div class="wksec"><span class="wksecn">' + secNo + "</span>" + t + "</div>"; };
+  if (wkOn("done") && g.done.length) {
+  h.push(sec("Contractor work completed"));
   h.push(wkRowsHTML(g.done, [
     ["Contractor", function (r) { return esc(r.contractor || "In-house"); }],
     ["Type of work", function (r) { return esc(r.work || r.text || ""); }],
@@ -7091,8 +7123,8 @@ function wkPaperHTML() {
     ["Date", function (r) { return esc(jdDate(r.day)); }]]));
   }
 
-  if (wkOn("booked")) {
-  h.push('<div class="wksec">Contractor work scheduled</div>');
+  if (wkOn("booked") && g.booked.length) {
+  h.push(sec("Contractor work scheduled"));
   h.push(wkRowsHTML(g.booked, [
     ["Contractor", function (r) { return esc(r.contractor || "\u2014"); }],
     ["Type of work", function (r) { return esc(r.work || r.text || ""); }],
@@ -7102,7 +7134,7 @@ function wkPaperHTML() {
   }
 
   if (g.units.length) {
-    h.push('<div class="wksec">Unit issues</div>');
+    h.push(sec("Unit issues"));
     h.push(wkRowsHTML(g.units, [
       ["Unit", function (r) { return esc(r.unit || "\u2014"); }],
       ["Issue", function (r) { return esc(r.work || r.text || ""); }],
@@ -7110,8 +7142,8 @@ function wkPaperHTML() {
       ["Note", function (r) { return esc(r.note || "\u2014"); }]]));
   }
 
-  if (wkOn("tracker") || wkOn("awaiting")) {
-  h.push('<div class="wksec">Contractor quotes</div>');
+  if ((wkOn("tracker") && g.tracker.length) || (wkOn("awaiting") && g.awaiting.length)) {
+  h.push(sec("Contractor quotes"));
   if (g.tracker.length) {
     var written = (ai.quoteChanges && ai.quoteChanges.length === g.tracker.length) ? ai.quoteChanges : null;
     h.push('<div class="wksubsec">Changes in this period</div><ul class="wklist">');
@@ -7119,9 +7151,8 @@ function wkPaperHTML() {
       h.push("<li>" + esc(written ? written[i] : e.text) + "</li>");
     });
     h.push("</ul>");
-  } else {
-    h.push('<p class="wkempty">' + (wkState.err ? esc("No earlier copy to compare against (" + wkState.err + ").")
-      : "No changes to the quote tracker in this period.") + "</p>");
+  } else if (wkState.err) {
+    h.push('<p class="wkempty">' + esc("No earlier copy of the report to compare against (" + wkState.err + ").") + "</p>");
   }
   if (g.awaiting.length) {
     h.push('<div class="wksubsec">Waiting on a board decision</div>');
@@ -7137,16 +7168,19 @@ function wkPaperHTML() {
   }
 
   if (g.alerts.length) {
-    h.push('<div class="wksec">Dates coming up</div><ul class="wklist">');
+    h.push(sec("Dates coming up") + '<ul class="wklist">');
     g.alerts.forEach(function (a) { h.push("<li><strong>" + esc(a.title) + "</strong> \u2014 " + esc(a.detail) + "</li>"); });
     h.push("</ul>");
   }
   if (g.notes.length) {
-    h.push('<div class="wksec">Also this period</div><ul class="wklist">');
+    h.push(sec("Also this period") + '<ul class="wklist">');
     g.notes.forEach(function (r) { h.push("<li>" + esc(r.text) + "</li>"); });
     h.push("</ul>");
   }
   if (ai.closing && wkHas("prose", "closing")) h.push('<p class="wkclose">' + esc(ai.closing) + "</p>");
+  h.push('<div class="wksign"><div class="wksignn">' + esc(wkPreparedBy()) + "</div>" +
+    '<div class="wksignt">' + esc(M.manager || "") + "</div>" +
+    '<div class="wksignd">' + esc(jdDate(wkState.to)) + "</div></div>");
   if (wkState.files.length)
     h.push('<p class="wkappend">The superintendent\u2019s ' +
       (wkState.files.length === 1 ? "report follows" : "reports follow") + " this page.</p>");
