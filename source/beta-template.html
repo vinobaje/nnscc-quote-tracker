@@ -1525,8 +1525,18 @@ body[data-view="edit"] .wrap { max-width:none; }
   .wkband { margin:0 0 0; border-radius:0; }
   .wkbandin { padding:22px 26px 18px; }
   .wkpaper { background:#fff; }
-  .wksec, .wktable tr, .wkattn, .wkglance { break-inside:avoid; }
-  .wksec { break-after:avoid; }
+  /* A heading at the foot of a page with its table overleaf is the thing that
+     makes a report look thrown together. Nothing that introduces something may
+     be the last thing on a page, and a table that has to break carries its
+     column headings onto the next one. */
+  .wksec, .wksubsec { break-after:avoid; page-break-after:avoid; break-inside:avoid; }
+  .wksec + *, .wksubsec + * { break-before:avoid; page-break-before:avoid; }
+  .wktable thead { display:table-header-group; }
+  .wktable tr { break-inside:avoid; page-break-inside:avoid; }
+  .wktable tbody tr:first-child { break-before:avoid; page-break-before:avoid; }
+  .wkattn, .wkglance, .wksign, .wkband, .wkmeta { break-inside:avoid; }
+  .wklist li { break-inside:avoid; }
+  p, li { orphans:3; widows:3; }
 }
 .actsched { display:flex; gap:11px; align-items:baseline; padding:8px 0; border-bottom:1px solid var(--line-soft); }
 .actwhen { flex:0 0 190px; font-size:13.5px; font-weight:650; color:var(--ink); }
