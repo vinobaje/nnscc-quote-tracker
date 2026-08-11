@@ -2332,7 +2332,7 @@ var BRAND_PATH = "nnsccQuoteTrackerBeta/brand";               /* the letterhead 
 var WEEKLY_DRAFT_PATH = "nnsccQuoteTrackerBeta/weeklyDraft";   /* the report she is working on */
 var WEEKLY_COLL = "nnsccWeeklyReportsBeta";                   /* every one she has finished */
 var VIEW_BETA = CURRENT_PATH.indexOf("Beta") >= 0;   /* which report the passcode gate reads/protects */
-var BUILD_STAMP = "2026-08-11 18:55";   /* filled in by build.js — which copy of the page this is */
+var BUILD_STAMP = "2026-08-11 19:14";   /* filled in by build.js — which copy of the page this is */
 /* path of the report currently on screen */
 function reportPath() {
   return cloud.active.kind === "current" ? CURRENT_PATH : (REPORTS_COLL + "/" + cloud.active.id);
@@ -6552,8 +6552,10 @@ function actWeekEvents(oldJobs, newJobs) {
         ev.push({ kind: "quote", what: "invited to quote", no: j.no, desc: desc, contractor: who, amount: null,
           text: who + " was invited to quote on " + jn + "." });
     });
+    var statusAt = -1;
     if ((o.status || "quoted") !== (j.status || "quoted")) {
       var c1 = awardInfo(j);
+      statusAt = ev.length;
       ev.push({ kind: "status", what: "status changed", no: j.no, desc: desc,
         status: statusLabel(j.status || "quoted").toLowerCase(),
         wasStatus: statusLabel(o.status || "quoted").toLowerCase(),
@@ -6561,10 +6563,14 @@ function actWeekEvents(oldJobs, newJobs) {
         text: jn + " moved to " + statusLabel(j.status || "quoted").toLowerCase() + "." });
     }
     var aw = awardInfo(j), owho = String((o && o.awardedTo) || "").trim();
-    if (aw.who && aw.who.toLowerCase() !== owho.toLowerCase())
+    if (aw.who && aw.who.toLowerCase() !== owho.toLowerCase()) {
+      /* the same job reaching approved and being awarded inside one period is
+         one thing that happened, not two — the award is the fuller account */
+      if (statusAt >= 0) ev.splice(statusAt, 1);
       ev.push({ kind: "status", what: "awarded", no: j.no, desc: desc, contractor: aw.who,
-        amount: aw.amount, awardDate: aw.date,
+        amount: aw.amount, awardDate: aw.date, wasStatus: statusLabel(o.status || "quoted").toLowerCase(),
         text: jn + " was awarded to " + aw.who + (aw.amount != null ? " at " + money(aw.amount) : "") + "." });
+    }
     if (!o.priority && j.priority)
       ev.push({ kind: "status", what: "flagged high priority", no: j.no, desc: desc, contractor: "", amount: null,
         text: jn + " was flagged high priority." });
