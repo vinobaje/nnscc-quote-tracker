@@ -198,6 +198,12 @@ const WEEKLY_SYSTEM =
   "attention: one or two sentences naming only what the board must act on or know before the next " +
   "meeting. Empty if there is nothing.\n" +
   "closing: one sentence inviting questions, in the manager's voice.\n" +
+  "quoteChanges: one sentence for each entry in quoteChanges, in the same order and the same number — " +
+  "what the quote tracker recorded, said the way a director would say it rather than the way a database " +
+  "records it. Use only the fields that entry carries. 'status changed' to approved means the board " +
+  "approved that job: say the board approved it, and name the contractor and the amount only where the " +
+  "entry gives them. A quote received is a price now in hand from a named contractor. Do not merge two " +
+  "entries, do not add one that is not there, and do not invent a meeting, a date, a reason or a person.\n" +
   "MONEY: an amount is only money where the data already shows it with a $ sign. Every other number is " +
   "an address, a building, a unit, a floor or a count — 550 and 560 are the two buildings of this " +
   "corporation, 560-905 is a unit, 11 is a floor. Never put a $ in front of a number that did not " +
@@ -206,8 +212,11 @@ const WEEKLY_SYSTEM =
   "Canadian dollars with $ and thousands separators.";
 const WEEKLY_SCHEMA = {
   type: "object",
-  properties: { summary: { type: "string" }, attention: { type: "string" }, closing: { type: "string" } },
-  required: ["summary", "attention", "closing"],
+  properties: {
+    summary: { type: "string" }, attention: { type: "string" }, closing: { type: "string" },
+    quoteChanges: { type: "array", items: { type: "string" } },
+  },
+  required: ["summary", "attention", "closing", "quoteChanges"],
   additionalProperties: false,
 };
 
@@ -288,8 +297,10 @@ exports.nnsccTrackerAi = onCall(
         "The corporation is " + String(request.data.buildings || "one building") + ". " +
         "The period is " + String(request.data.from || "") + " to " + String(request.data.to || "") +
         ".\n\nEverything known about it:\n" + JSON.stringify(facts) +
-        "\n\nWrite the summary, the attention line and the closing.",
-        WEEKLY_SCHEMA, 900, CONTRACT_MODEL);
+        "\n\nWrite the summary, the attention line, the closing, and a sentence for each change.",
+        /* room for a sentence per change as well as the prose — at 900 the
+           reply was being cut off mid-string on a busy week */
+        WEEKLY_SCHEMA, 2500, CONTRACT_MODEL);
     }
 
     // ----- mode: tidy a dictated note into a record -----

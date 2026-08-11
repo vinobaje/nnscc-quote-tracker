@@ -2325,7 +2325,7 @@ var BRAND_PATH = "nnsccQuoteTrackerBeta/brand";               /* the letterhead 
 var WEEKLY_DRAFT_PATH = "nnsccQuoteTrackerBeta/weeklyDraft";   /* the report she is working on */
 var WEEKLY_COLL = "nnsccWeeklyReportsBeta";                   /* every one she has finished */
 var VIEW_BETA = CURRENT_PATH.indexOf("Beta") >= 0;   /* which report the passcode gate reads/protects */
-var BUILD_STAMP = "2026-08-11 18:21";   /* filled in by build.js — which copy of the page this is */
+var BUILD_STAMP = "2026-08-11 18:25";   /* filled in by build.js — which copy of the page this is */
 /* path of the report currently on screen */
 function reportPath() {
   return cloud.active.kind === "current" ? CURRENT_PATH : (REPORTS_COLL + "/" + cloud.active.id);
@@ -6486,16 +6486,28 @@ function actCardHTML() {
    at the start of the week with the report as it stands now — so what is left
    to write is only what happened away from the screen. */
 var actDiff = { key: "", loading: false, base: null, events: [], err: "" };
+/* Every change carries its own facts as well as a line of text: which job,
+   which contractor, how much, and what became of it. The text is enough for
+   the manager's own screen; the facts are what the board's sentence is written
+   from, so nothing has to be read back out of a phrase like "moved to
+   approved". */
 function actWeekEvents(oldJobs, newJobs) {
   var ev = [], byId = {};
+  var carried = function (j) {
+    try {
+      var c = jobCalc(j), b = c.carriedBids && c.carriedBids[0];
+      return { who: (b && b.b && (b.b.contractor || "").trim()) || "", amount: c.cost || null };
+    } catch (e) { return { who: "", amount: null }; }
+  };
   (oldJobs || []).forEach(function (j) { byId[j.id] = j; });
   (newJobs || []).forEach(function (j) {
     var o = byId[j.id];
-    var jn = jobLabel(j);
+    var jn = jobLabel(j), desc = String(j.desc || "").trim();
     if (!o) {
       var priced = (j.bids || []).filter(function (b) { return b.amount != null && b.amount !== ""; });
-      ev.push({ kind: "job", text: "Added " + jn +
-        (priced.length ? " with " + priced.length + " quote" + (priced.length === 1 ? "" : "s") : "") + "." });
+      var c0 = carried(j);
+      ev.push({ kind: "job", what: "added", no: j.no, desc: desc, contractor: c0.who, amount: c0.amount,
+        text: "Added " + jn + (priced.length ? " with " + priced.length + " quote" + (priced.length === 1 ? "" : "s") : "") + "." });
       return;
     }
     (j.bids || []).forEach(function (b, bi) {
@@ -6504,23 +6516,37 @@ function actWeekEvents(oldJobs, newJobs) {
       var has = b.amount != null && b.amount !== "";
       var who = (b.contractor || "").trim() || "a contractor";
       if (has && !had)
-        ev.push({ kind: "quote", text: "Quote received for " + jn + " — " + who + ", " + money(b.amount) + "." });
+        ev.push({ kind: "quote", what: "quote received", no: j.no, desc: desc, contractor: who, amount: b.amount,
+          text: "Quote received for " + jn + " — " + who + ", " + money(b.amount) + "." });
       else if (has && had && Number(b.amount) !== Number(ob.amount))
-        ev.push({ kind: "quote", text: "Price changed on " + jn + " — " + who + ", " +
-          money(ob.amount) + " to " + money(b.amount) + "." });
+        ev.push({ kind: "quote", what: "price changed", no: j.no, desc: desc, contractor: who,
+          amount: b.amount, wasAmount: ob.amount,
+          text: "Price changed on " + jn + " — " + who + ", " + money(ob.amount) + " to " + money(b.amount) + "." });
       else if (!ob && (b.contractor || "").trim())
-        ev.push({ kind: "quote", text: who + " was invited to quote on " + jn + "." });
+        ev.push({ kind: "quote", what: "invited to quote", no: j.no, desc: desc, contractor: who, amount: null,
+          text: who + " was invited to quote on " + jn + "." });
     });
-    if ((o.status || "quoted") !== (j.status || "quoted"))
-      ev.push({ kind: "status", text: jn + " moved to " + statusLabel(j.status || "quoted").toLowerCase() + "." });
-    if (!o.priority && j.priority) ev.push({ kind: "status", text: jn + " was flagged high priority." });
+    if ((o.status || "quoted") !== (j.status || "quoted")) {
+      var c1 = carried(j);
+      ev.push({ kind: "status", what: "status changed", no: j.no, desc: desc,
+        status: statusLabel(j.status || "quoted").toLowerCase(),
+        wasStatus: statusLabel(o.status || "quoted").toLowerCase(),
+        contractor: c1.who, amount: c1.amount,
+        text: jn + " moved to " + statusLabel(j.status || "quoted").toLowerCase() + "." });
+    }
+    if (!o.priority && j.priority)
+      ev.push({ kind: "status", what: "flagged high priority", no: j.no, desc: desc, contractor: "", amount: null,
+        text: jn + " was flagged high priority." });
     if ((o.desc || "") !== (j.desc || "") && (o.desc || "").trim() && (j.desc || "").trim())
-      ev.push({ kind: "job", text: "Job " + j.no + " was renamed to \u201C" + (j.desc || "").trim() + "\u201D." });
+      ev.push({ kind: "job", what: "renamed", no: j.no, desc: desc, contractor: "", amount: null,
+        text: "Job " + j.no + " was renamed to \u201C" + desc + "\u201D." });
   });
   var newIds = {};
   (newJobs || []).forEach(function (j) { newIds[j.id] = 1; });
   (oldJobs || []).forEach(function (j) {
-    if (!newIds[j.id]) ev.push({ kind: "job", text: "Removed " + jobLabel(j) + "." });
+    if (!newIds[j.id])
+      ev.push({ kind: "job", what: "removed", no: j.no, desc: String(j.desc || "").trim(),
+        contractor: "", amount: null, text: "Removed " + jobLabel(j) + "." });
   });
   return ev;
 }
@@ -6712,7 +6738,12 @@ function wkFacts(g) {
   return {
     carriedOut: g.done.map(pick), booked: g.booked.map(pick),
     unitIssues: g.units.map(pick), otherActivity: g.notes.map(function (r) { return r.text; }),
-    fromTheTracker: g.tracker.map(function (e) { return e.text; }),
+    quoteChanges: g.tracker.map(function (e) {
+      return { what: e.what || e.kind, job: (e.no != null ? "Job " + e.no : ""), name: e.desc || "",
+               contractor: e.contractor || "", amount: e.amount == null ? "" : money(e.amount),
+               previousAmount: e.wasAmount == null ? "" : money(e.wasAmount),
+               nowStands: e.status || "", previously: e.wasStatus || "" };
+    }),
     awaitingTheBoard: g.awaiting.map(function (a) {
       return "Job " + a.no + " " + a.desc + " — " + a.who + ", " + money(a.cost); }),
     datesComingUp: g.alerts.map(function (a) { return a.title + ": " + a.detail; }),
@@ -7082,8 +7113,11 @@ function wkPaperHTML() {
   if (wkOn("tracker") || wkOn("awaiting")) {
   h.push('<div class="wksec">Contractor quotes</div>');
   if (g.tracker.length) {
+    var written = (ai.quoteChanges && ai.quoteChanges.length === g.tracker.length) ? ai.quoteChanges : null;
     h.push('<div class="wksubsec">Changes in this period</div><ul class="wklist">');
-    g.tracker.slice(0, 25).forEach(function (e) { h.push("<li>" + esc(e.text) + "</li>"); });
+    g.tracker.slice(0, 25).forEach(function (e, i) {
+      h.push("<li>" + esc(written ? written[i] : e.text) + "</li>");
+    });
     h.push("</ul>");
   } else {
     h.push('<p class="wkempty">' + (wkState.err ? esc("No earlier copy to compare against (" + wkState.err + ").")
