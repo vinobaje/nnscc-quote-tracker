@@ -2332,7 +2332,7 @@ var BRAND_PATH = "nnsccQuoteTracker/brand";               /* the letterhead the 
 var WEEKLY_DRAFT_PATH = "nnsccQuoteTracker/weeklyDraft";   /* the report she is working on */
 var WEEKLY_COLL = "nnsccWeeklyReports";                   /* every one she has finished */
 var VIEW_BETA = CURRENT_PATH.indexOf("Beta") >= 0;   /* which report the passcode gate reads/protects */
-var BUILD_STAMP = "2026-08-11 18:40";   /* filled in by build.js — which copy of the page this is */
+var BUILD_STAMP = "2026-08-11 18:55";   /* filled in by build.js — which copy of the page this is */
 /* path of the report currently on screen */
 function reportPath() {
   return cloud.active.kind === "current" ? CURRENT_PATH : (REPORTS_COLL + "/" + cloud.active.id);
@@ -6500,18 +6500,30 @@ var actDiff = { key: "", loading: false, base: null, events: [], err: "" };
    approved". */
 function actWeekEvents(oldJobs, newJobs) {
   var ev = [], byId = {};
-  /* The lowest quote is not the same thing as the company the work went to.
-     A board can approve a job and award it to somebody else entirely, and the
-     tracker only knows who if the manager marked that bid as the chosen one.
-     Where it does not know, it says nothing — a report that names the wrong
-     contractor is worse than one that names none. */
-  var awardedTo = function (j) {
-    try {
-      var c = jobCalc(j);
-      var chosen = (c.carriedBids || []).filter(function (b) { return b && b.override; })[0];
-      if (!chosen) return { who: "", amount: null };
-      return { who: ((chosen.b && chosen.b.contractor) || "").trim(), amount: chosen.total || null };
-    } catch (e) { return { who: "", amount: null }; }
+  /* Who the work went to is a thing the job records outright — "Awarded to",
+     with the date beside it. It is not the selected quote, which only says
+     which price the totals carry, and it is certainly not the lowest bid: a
+     board can approve a job and give the work to somebody else entirely. Where
+     the job does not name a company, neither does the report. */
+  var awardInfo = function (j) {
+    var who = String((j && j.awardedTo) || "").trim();
+    if (!who) return { who: "", amount: null, date: "" };
+    var theirs = (j.bids || []).filter(function (b) {
+      return b && b.amount != null && b.amount !== "" &&
+        String(b.contractor || "").trim().toLowerCase() === who.toLowerCase();
+    });
+    /* one price from them and that is the price. More than one — as when a
+       contractor quotes twice — and only the quote she marked as the selected
+       one counts; failing that the report gives a company and no figure,
+       because guessing between two of their prices is how a wrong number gets
+       in front of the board. */
+    var amount = null;
+    if (theirs.length === 1) amount = theirs[0].amount;
+    else {
+      var picked = theirs.filter(function (b) { return b.override; });
+      if (picked.length === 1) amount = picked[0].amount;
+    }
+    return { who: who, amount: amount, date: j.awardDate || "" };
   };
   (oldJobs || []).forEach(function (j) { byId[j.id] = j; });
   (newJobs || []).forEach(function (j) {
@@ -6519,7 +6531,7 @@ function actWeekEvents(oldJobs, newJobs) {
     var jn = jobLabel(j), desc = String(j.desc || "").trim();
     if (!o) {
       var priced = (j.bids || []).filter(function (b) { return b.amount != null && b.amount !== ""; });
-      var c0 = awardedTo(j);
+      var c0 = awardInfo(j);
       ev.push({ kind: "job", what: "added", no: j.no, desc: desc, contractor: c0.who, amount: c0.amount,
         text: "Added " + jn + (priced.length ? " with " + priced.length + " quote" + (priced.length === 1 ? "" : "s") : "") + "." });
       return;
@@ -6541,13 +6553,18 @@ function actWeekEvents(oldJobs, newJobs) {
           text: who + " was invited to quote on " + jn + "." });
     });
     if ((o.status || "quoted") !== (j.status || "quoted")) {
-      var c1 = awardedTo(j);
+      var c1 = awardInfo(j);
       ev.push({ kind: "status", what: "status changed", no: j.no, desc: desc,
         status: statusLabel(j.status || "quoted").toLowerCase(),
         wasStatus: statusLabel(o.status || "quoted").toLowerCase(),
         contractor: c1.who, amount: c1.amount,
         text: jn + " moved to " + statusLabel(j.status || "quoted").toLowerCase() + "." });
     }
+    var aw = awardInfo(j), owho = String((o && o.awardedTo) || "").trim();
+    if (aw.who && aw.who.toLowerCase() !== owho.toLowerCase())
+      ev.push({ kind: "status", what: "awarded", no: j.no, desc: desc, contractor: aw.who,
+        amount: aw.amount, awardDate: aw.date,
+        text: jn + " was awarded to " + aw.who + (aw.amount != null ? " at " + money(aw.amount) : "") + "." });
     if (!o.priority && j.priority)
       ev.push({ kind: "status", what: "flagged high priority", no: j.no, desc: desc, contractor: "", amount: null,
         text: jn + " was flagged high priority." });
@@ -6756,6 +6773,7 @@ function wkFacts(g) {
     quoteChanges: g.tracker.map(function (e) {
       return { what: e.what || e.kind, job: (e.no != null ? "Job " + e.no : ""), name: e.desc || "",
                contractor: e.contractor || "", amount: e.amount == null ? "" : money(e.amount),
+               awardedOn: e.awardDate ? jdDate(e.awardDate) : "",
                previousAmount: e.wasAmount == null ? "" : money(e.wasAmount),
                nowStands: e.status || "", previously: e.wasStatus || "" };
     }),
