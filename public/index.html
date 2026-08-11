@@ -1450,6 +1450,11 @@ body[data-view="edit"] .wrap { max-width:none; }
 .alertbar li { font-size:14.5px; line-height:1.6; color:var(--ink); margin:5px 0; }
 .alertbar li.passed, .alertbar li.urgent { color:#7a2020; }
 .alertbar li strong { font-weight:700; }
+.alertlink { cursor:pointer; }
+.alertlink:hover .alertsee, .alertlink:focus-visible .alertsee { background:var(--accent); color:#fff; }
+.alertsee { display:inline-block; font-size:12.5px; font-weight:700; white-space:nowrap;
+  color:var(--accent-ink); background:var(--accent-soft); border-radius:99px; padding:1px 9px; margin-left:2px; }
+@media print { .alertsee { display:none; } }
 @media print { .alertbar { break-inside:avoid; } }
 @media screen and (max-width:600px) { .alertbar { padding:12px 14px; } .alertbar li { font-size:14px; } }
 /* the same summary as the board reads it */
@@ -2210,7 +2215,7 @@ var CONTRACTORS_PATH = "nnsccQuoteTracker/contractors";  /* shared contractor di
 var CONTRACTS_PATH = "nnsccQuoteTracker/contracts";      /* the contract register — read with the report */
 var SNAPSHOTS_COLL = "nnsccQuoteSnapshots";               /* a copy of the report, kept each day it changes */
 var VIEW_BETA = CURRENT_PATH.indexOf("Beta") >= 0;   /* which report the passcode gate reads/protects */
-var BUILD_STAMP = "2026-08-11 09:19";   /* filled in by build.js — which copy of the page this is */
+var BUILD_STAMP = "2026-08-11 10:26";   /* filled in by build.js — which copy of the page this is */
 /* path of the report currently on screen */
 function reportPath() {
   return cloud.active.kind === "current" ? CURRENT_PATH : (REPORTS_COLL + "/" + cloud.active.id);
@@ -2625,6 +2630,44 @@ function openStatBreakdown(kind) {
   document.getElementById("statBody").innerHTML = h.join("");
   document.getElementById("statOverlay").classList.add("open");
 }
+/* "13 things need attention" is only useful if you can find out which 13.
+   The quotes open as a list — each row is a way into that job — and the named
+   agreements take you down to the contracts section. */
+function openAlertBreakdown(kind) {
+  if (kind !== "quote") { openStatBreakdown("contracts"); return; }
+  var items = alertList().filter(function (i) { return i.kind === "quote"; });
+  var lapsed = items.filter(function (i) { return i.days < 0; }).length;
+  document.getElementById("statTitle").textContent = "Quoted prices about to lapse";
+  document.getElementById("statLede").textContent = items.length
+    ? (lapsed ? lapsed + " of these " + items.length + " quotes have already lapsed. " : "")
+      + "A lapsed price is no longer one the contractor is held to. Open a job for its dates, quotes and progress."
+    : "Nothing is lapsing inside the current window.";
+  var h = [];
+  if (!items.length) h.push('<p class="histempty">Nothing to show here.</p>');
+  else {
+    h.push('<table class="dashtable"><thead><tr><th>#</th><th>Job</th><th>Contractor</th>' +
+      '<th class="money">Price good until</th></tr></thead><tbody>');
+    items.forEach(function (i) {
+      h.push('<tr class="jlink" data-jdoss="' + esc(i.jid) + '" role="button" tabindex="0"' +
+        ' title="Open this job — dates, quotes and progress"><td>' + esc(i.no) + "</td><td>" + esc(i.desc) +
+        "</td><td>" + esc(i.who) + " · " + money(i.amt) + "</td>" +
+        '<td class="money' + (i.days < 0 ? " expired" : "") + '">' + esc(jdDate(i.exp)) +
+        " — " + esc(alertWhen(i.days)) + "</td></tr>");
+    });
+    h.push("</tbody></table>");
+  }
+  document.getElementById("statBody").innerHTML = h.join("");
+  document.getElementById("statOverlay").classList.add("open");
+}
+document.addEventListener("click", function (e) {
+  var el = e.target && e.target.closest ? e.target.closest("[data-alertlist]") : null;
+  if (el) openAlertBreakdown(el.getAttribute("data-alertlist"));
+});
+document.addEventListener("keydown", function (e) {
+  if (e.key !== "Enter" && e.key !== " ") return;
+  var el = e.target && e.target.closest ? e.target.closest("[data-alertlist]") : null;
+  if (el) { e.preventDefault(); openAlertBreakdown(el.getAttribute("data-alertlist")); }
+});
 document.getElementById("statClose").onclick = function () { document.getElementById("statOverlay").classList.remove("open"); };
 document.getElementById("statOverlay").addEventListener("click", function (e) { if (e.target === this) this.classList.remove("open"); });
 document.addEventListener("click", function (e) {
@@ -5915,6 +5958,8 @@ function alertList() {
       var d = conDaysUntil(e);
       if (d == null || d > cfg.quoteDays || d < -30) return;
       out.push({ kind: "quote", audience: "all", days: d, jid: j.id,
+        no: j.no, desc: (j.desc || "").trim() || "untitled job",
+        who: (b.contractor || "").trim() || "contractor not named", amt: b.amount, exp: e,
         severity: d < 0 ? "passed" : (d <= 2 ? "urgent" : "soon"),
         title: jobLabel(j) + " · " + ((b.contractor || "").trim() || "contractor not named"),
         detail: d < 0
@@ -5945,7 +5990,9 @@ function alertPanelHTML() {
     (urgent ? "\u{26A0}" : "\u{1F514}") + " " + items.length + " thing" + (items.length === 1 ? "" : "s") +
     " need" + (items.length === 1 ? "s" : "") + " attention</div><ul>"];
   named.slice(0, 6).forEach(function (i) {
-    h.push('<li class="' + i.severity + '"><strong>' + esc(i.title) + "</strong> — " + esc(i.detail) + "</li>");
+    h.push('<li class="' + i.severity + '"><span class="alertlink" data-alertlist="contract" role="button" ' +
+      'tabindex="0" title="Go to the contracts section"><strong>' + esc(i.title) + "</strong> — " +
+      esc(i.detail) + "</span></li>");
   });
   if (named.length > 6)
     h.push('<li class="soon">…and ' + (named.length - 6) + " more in the contracts section below.</li>");
@@ -5955,10 +6002,13 @@ function alertPanelHTML() {
     var bits = [];
     if (lapsed) bits.push(lapsed + " quote" + (lapsed === 1 ? " has" : "s have") + " already lapsed");
     if (soon) bits.push(soon + " lapse" + (soon === 1 ? "s" : "") + " within " + alertCfg().quoteDays + " days");
-    h.push('<li class="' + (lapsed ? "passed" : "soon") + '"><strong>Quoted prices</strong> — ' +
+    h.push('<li class="' + (lapsed ? "passed" : "soon") + '">' +
+      '<span class="alertlink" data-alertlist="quote" role="button" tabindex="0" ' +
+      'title="See exactly which quotes these are"><strong>Quoted prices</strong> — ' +
       esc(bits.join(" and ")) + ". " +
       (ED ? "Ask the contractors to re-confirm, or re-date the quotes in Edit data."
-          : "The property manager is re-confirming these prices with the contractors.") + "</li>");
+          : "The property manager is re-confirming these prices with the contractors.") +
+      ' <span class="alertsee">Which ones?</span></span></li>');
   }
   h.push("</ul></div>");
   return h.join("");
