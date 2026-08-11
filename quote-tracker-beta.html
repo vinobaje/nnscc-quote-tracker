@@ -1453,6 +1453,34 @@ body[data-view="edit"] .wrap { max-width:none; }
   border-radius:7px; padding:8px 10px; background:var(--card); }
 .actmeta { display:flex; flex-direction:column; align-items:flex-end; gap:4px; font-size:11.5px; color:var(--muted); }
 .actmeta .fx { color:var(--prio); cursor:pointer; font-weight:700; background:none; border:0; font-size:13px; }
+/* the report to the board, on screen and on paper */
+.wkpaper { background:var(--card); border:1px solid var(--line); border-radius:10px;
+  padding:30px 34px; margin:18px 0 0; max-width:860px; }
+.wkhead { border-bottom:3px solid var(--accent-ink); padding-bottom:12px; margin-bottom:18px; }
+.wkkicker { font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); }
+.wktitle { font:26px/1.25 Georgia,serif; color:var(--accent-ink); margin-top:6px; }
+.wksub { font-size:13.5px; color:var(--ink2); margin-top:4px; }
+.wkmeet { font-size:13.5px; font-weight:700; color:var(--ink); margin-top:8px; }
+.wklede { font-size:15.5px; line-height:1.65; color:var(--ink); margin:0 0 14px; }
+.wkattn { background:var(--amber-soft); color:#6d4a0d; border-radius:8px; padding:10px 13px;
+  font-size:14.5px; line-height:1.55; margin:0 0 16px; }
+.wksec { font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted);
+  border-bottom:1px solid var(--line); padding-bottom:5px; margin:22px 0 9px; }
+.wksubsec { font-size:13px; font-weight:700; color:var(--ink2); margin:12px 0 5px; }
+.wktable { width:100%; border-collapse:collapse; font-size:13.5px; }
+.wktable th { text-align:left; font-size:10.5px; letter-spacing:.06em; text-transform:uppercase;
+  color:var(--muted); border-bottom:1px solid var(--line); padding:5px 8px 5px 0; }
+.wktable td { padding:7px 8px 7px 0; border-bottom:1px solid var(--line-soft); vertical-align:top; }
+.wklist { margin:0; padding-left:19px; font-size:14px; line-height:1.6; }
+.wklist li { margin:3px 0; }
+.wkempty { font-size:13.5px; color:var(--muted); font-style:italic; margin:4px 0; }
+.wkfig { font-size:14px; margin:14px 0 0; color:var(--ink2); }
+.wkclose { font-size:14.5px; margin:20px 0 0; }
+.wkappend { font-size:12.5px; color:var(--muted); margin:18px 0 0; border-top:1px solid var(--line-soft); padding-top:8px; }
+@media print {
+  .wkpaper { border:0; border-radius:0; padding:0; margin:0; max-width:none; }
+  .wksec, .wktable tr, .wkattn { break-inside:avoid; }
+}
 .actsched { display:flex; gap:11px; align-items:baseline; padding:8px 0; border-bottom:1px solid var(--line-soft); }
 .actwhen { flex:0 0 190px; font-size:13.5px; font-weight:650; color:var(--ink); }
 .actwhen.late { color:var(--prio); }
@@ -2254,7 +2282,7 @@ var CONTRACTS_PATH = "nnsccQuoteTrackerBeta/contracts";      /* the contract reg
 var SNAPSHOTS_COLL = "nnsccQuoteSnapshotsBeta";               /* a copy of the report, kept each day it changes */
 var ACTIVITY_COLL = "nnsccActivityBeta";                      /* the manager's own record of the week */
 var VIEW_BETA = CURRENT_PATH.indexOf("Beta") >= 0;   /* which report the passcode gate reads/protects */
-var BUILD_STAMP = "2026-08-11 12:40";   /* filled in by build.js — which copy of the page this is */
+var BUILD_STAMP = "2026-08-11 12:57";   /* filled in by build.js — which copy of the page this is */
 /* path of the report currently on screen */
 function reportPath() {
   return cloud.active.kind === "current" ? CURRENT_PATH : (REPORTS_COLL + "/" + cloud.active.id);
@@ -4109,7 +4137,7 @@ var edSaved = true;           /* false while an edit is on its way to the cloud 
 
 var ED_SECTIONS = [
   ["jobs", "💼", "Jobs &amp; Bids"], ["overview", "📊", "Overview"],
-  ["activity", "📝", "Activity"],
+  ["activity", "📝", "Activity"], ["weekly", "📰", "Board report"],
   ["contracts", "📄", "Contracts"],
   ["contractors", "👷", "Contractors"], ["board", "🗳", "Board &amp; Voting"],
   ["settings", "⚙️", "Settings"]
@@ -4123,6 +4151,9 @@ function renderEditor() {
     "What you did this week that the quotes don\u2019t show. Each line is one thing — a walk-through, " +
     "a phone call, a visit — and the weekly report to the board is written from these alongside " +
     "everything the tracker recorded on its own.") + actScheduleHTML() + actCardHTML());
+  else if (edNav === "weekly") h.push(edSecHead("Report to the board",
+    "The week (or the month) as one document: what was carried out, what is booked, what the board " +
+    "needs to decide, and your own reports joined on the end.") + wkCardHTML());
   else if (edNav === "contracts") h.push(edSecHead("Contracts",
     "Agreements with contractors — what they cover, until when, and what they cost. " +
     "Everyone who can read the report can read these.") + conCardHTML());
@@ -4138,6 +4169,7 @@ function renderEditor() {
   alertCheckKey();
   viewPassCheck();
   if (edNav === "activity") actLoadWeek();
+  if (edNav === "weekly") wkLoadBase();
 }
 /* amounts are typed as money ("48,500" / "$48,500.00") and stored as a number */
 function edAmt(n) { return Number(n).toLocaleString("en-CA", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
@@ -4747,6 +4779,15 @@ function alertSendNow() {
 
 /* ---------- editor events (delegated) ---------- */
 document.getElementById("editor").addEventListener("change", function (e) {
+  /* the report's period, and the meeting date printed on it */
+  var wkf = e.target.dataset.wkf;
+  if (wkf) {
+    wkState[wkf] = e.target.value;
+    if (wkf === "from") { wkState.baseDay = ""; wkLoadBase(); }
+    wkState.built = wkState.built && wkf === "meeting" ? wkState.built : "";
+    renderEditor();
+    return;
+  }
   /* a line of the journal, corrected after the fact */
   var actf = e.target.dataset.actf;
   if (actf) {
@@ -4874,6 +4915,19 @@ document.getElementById("editor").addEventListener("click", function (e) {
   }
   if (!act) return;
   if (edWorkspaceAction(act, actEl, e)) return;
+  if (act === "wkgen") { wkGenerate(); return; }
+  if (act === "wkpdf") { wkDownload(); return; }
+  if (act === "wksend") { wkSend(); return; }
+  if (act === "wkattach") { document.getElementById("wkFile").click(); return; }
+  if (act === "wkfiledel") {
+    wkState.files.splice(+actEl.getAttribute("data-fi"), 1); renderEditor(); return;
+  }
+  if (act === "wkweek" || act === "wkmonth") {
+    wkState.period = act === "wkmonth" ? "month" : "week";
+    wkState.from = wkDefaultFrom(wkState.period); wkState.to = todayISO();
+    wkState.baseDay = ""; wkState.built = ""; wkState.pdf = null;
+    renderEditor(); wkLoadBase(); return;
+  }
   if (act === "actadd") { actAdd(); return; }
   if (act === "actimport") { actImportStart(); return; }
   if (act === "actimpcancel") { actImport = null; actImportMsg = ""; renderEditor(); return; }
@@ -5578,6 +5632,21 @@ document.getElementById("editor").addEventListener("input", function (e) {
 });
 /* the signed document. Stored under a path only — no public download URL is
    ever minted, so reading it always goes through the storage rules. */
+document.addEventListener("change", function (e) {
+  if (e.target.id !== "wkFile") return;
+  var files = Array.prototype.slice.call(e.target.files || []);
+  e.target.value = "";
+  files.forEach(function (f) {
+    if (!/\.pdf$/i.test(f.name)) { wkNote("Only PDFs can be joined on the end."); return; }
+    if (f.size > 15 * 1024 * 1024) { wkNote("\u201C" + f.name + "\u201D is over 15 MB."); return; }
+    var r = new FileReader();
+    r.onload = function () {
+      wkState.files.push({ name: f.name, size: f.size, b64: String(r.result || "").split(",")[1] || "" });
+      renderEditor();
+    };
+    r.readAsDataURL(f);
+  });
+});
 document.addEventListener("change", function (e) {
   if (e.target.id !== "actSchedFile") return;
   var f = e.target.files[0]; e.target.value = "";
@@ -6376,6 +6445,314 @@ function actWeekSummaryHTML() {
     if (actDiff.events.length > 40) h.push("<li>…and " + (actDiff.events.length - 40) + " more.</li>");
     h.push("</ul>");
   }
+  h.push("</div>");
+  return h.join("");
+}
+
+/* ---------- the report to the board ----------
+   Everything the week produced, in one document: the visits carried out and
+   the ones booked, the unit problems, what the quote tracker recorded on its
+   own, the dates coming up, and the manager's own lines for the rest. The
+   superintendent's reports — his weekly highlights, his month-end one — are
+   joined on the end as whole pages, which is what used to be done by
+   screenshotting them into a Word file. */
+var wkState = {
+  from: "", to: "", meeting: "", period: "week",
+  files: [],            /* { name, b64, size } — his reports, in the order they go */
+  base: null, baseDay: "", loading: false, err: "",
+  ai: null, busy: "", built: "", pdf: null
+};
+function wkDefaultFrom(period) {
+  var d = new Date();
+  if (period === "month") { d.setDate(1); }
+  else { d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); }   /* Monday */
+  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" +
+         String(d.getDate()).padStart(2, "0");
+}
+function wkEnsureDates() {
+  if (!wkState.from) wkState.from = wkDefaultFrom(wkState.period);
+  if (!wkState.to) wkState.to = todayISO();
+}
+/* the copy of the report kept nearest the start of the period, to measure from */
+function wkLoadBase() {
+  wkEnsureDates();
+  if (!cloud.on || !isEditor()) return;
+  if (wkState.baseDay === wkState.from || wkState.loading) return;
+  wkState.loading = true; wkState.err = "";
+  cloud.db.collection(SNAPSHOTS_COLL).where("day", "<=", wkState.from).orderBy("day", "desc").limit(1).get()
+    .then(function (qs) {
+      var base = null;
+      qs.forEach(function (d) { base = d.data(); });
+      wkState.loading = false;
+      wkState.baseDay = wkState.from;
+      wkState.base = base || null;
+      if (!base) wkState.err = "no copy of the report from before " + jdDate(wkState.from);
+      if (document.body.dataset.view === "edit" && edNav === "weekly") renderEditor();
+    })
+    .catch(function (e) {
+      wkState.loading = false; wkState.baseDay = wkState.from;
+      wkState.err = (e && e.code) || "could not read the earlier copy";
+      if (document.body.dataset.view === "edit" && edNav === "weekly") renderEditor();
+    });
+}
+function wkInPeriod(day) {
+  return !!day && day >= wkState.from && day <= wkState.to;
+}
+/* everything the report is built from, gathered once */
+function wkGather() {
+  wkEnsureDates();
+  var journal = actState.list.filter(function (r) { return wkInPeriod(r.day); });
+  var done = journal.filter(function (r) { return r.kind === "done" || (r.kind === "scheduled" && r.done); });
+  var units = journal.filter(function (r) { return r.kind === "unit"; });
+  var notes = journal.filter(function (r) { return r.kind === "note"; });
+  var booked = actState.list.filter(function (r) {
+    return r.kind === "scheduled" && !r.done && r.day && r.day >= todayISO();
+  }).sort(function (a, b) { return a.day < b.day ? -1 : 1; }).slice(0, 25);
+  var tracker = wkState.base ? actWeekEvents(wkState.base.jobs || [], state.jobs || []) : [];
+  var d = computeAll();
+  var awaiting = d.jobs.filter(function (x) {
+    return !APPROVED_SET[x.j.status] && x.c.cost > 0;
+  }).map(function (x) {
+    return { no: x.j.no, desc: x.j.desc || "job", cost: x.c.cost,
+             who: (x.c.carriedBids[0] && x.c.carriedBids[0].b.contractor) || "" };
+  }).sort(function (a, b) { return b.cost - a.cost; }).slice(0, 12);
+  var alerts = alertList().filter(function (i) { return i.audience === "all"; }).slice(0, 12);
+  return { done: done, units: units, notes: notes, booked: booked, tracker: tracker,
+           awaiting: awaiting, alerts: alerts, totals: {
+             committed: d.total, approved: d.approvedTotal, saved: d.savings, jobs: d.jobs.length } };
+}
+function wkFacts(g) {
+  var pick = function (r) {
+    return { date: r.day, contractor: r.contractor || "", work: r.work || r.text || "",
+             unit: r.unit || "", note: r.note || "" };
+  };
+  return {
+    carriedOut: g.done.map(pick), booked: g.booked.map(pick),
+    unitIssues: g.units.map(pick), otherActivity: g.notes.map(function (r) { return r.text; }),
+    fromTheTracker: g.tracker.map(function (e) { return e.text; }),
+    awaitingTheBoard: g.awaiting.map(function (a) {
+      return "Job " + a.no + " " + a.desc + " — " + a.who + ", " + money(a.cost); }),
+    datesComingUp: g.alerts.map(function (a) { return a.title + ": " + a.detail; }),
+    totals: { committedToDate: money(g.totals.committed), boardApproved: money(g.totals.approved),
+              savedByBidding: money(g.totals.saved), jobsInReport: g.totals.jobs }
+  };
+}
+function wkGenerate() {
+  if (!isEditor() || !cloud.fns) { wkState.busy = "Sign in as the property manager first."; renderEditor(); return; }
+  var g = wkGather();
+  wkState.busy = "\u{2728} Claude is reading the period\u2026";
+  wkState.pdf = null;
+  renderEditor();
+  cloud.fns.httpsCallable("nnsccTrackerAi")({ weekly: true, from: wkState.from, to: wkState.to, facts: wkFacts(g) })
+    .then(function (res) {
+      wkState.ai = res.data || null;
+      wkState.built = todayISO();
+      wkState.busy = "";
+      renderEditor();
+      var el = document.getElementById("wkPaper");
+      if (el) el.scrollIntoView({ block: "start" });
+    })
+    .catch(function (e) {
+      wkState.busy = "\u26A0 " + ((e && e.message) || "could not write the report") +
+        " — the tables below are still correct; you can print it as it stands.";
+      wkState.ai = wkState.ai || { summary: "", attention: "", closing: "" };
+      wkState.built = todayISO();
+      renderEditor();
+    });
+}
+/* the controls: the period, the meeting date, his reports, and the buttons */
+function wkCardHTML() {
+  wkEnsureDates();
+  var h = ['<div class="ecard esettings"><div class="ehead"><strong>Build the report</strong>' +
+    '<span style="font-size:12.5px;color:var(--ink2)">— everything below is assembled from the tracker and your journal</span></div><div class="ebids">'];
+  if (!cloud.on) {
+    h.push('<p class="edithint" style="margin:4px 0">Available on the live site (cloud copy) only.</p></div></div>');
+    return h.join("");
+  }
+  h.push('<div class="esrow"><label>Period</label><div class="alertwins">' +
+    '<label>From <input type="date" data-wkf="from" value="' + esc(wkState.from) + '"></label>' +
+    '<label>To <input type="date" data-wkf="to" value="' + esc(wkState.to) + '"></label>' +
+    '<button class="edbtn' + (wkState.period === "week" ? " prim" : "") + '" type="button" data-act="wkweek">This week</button>' +
+    '<button class="edbtn' + (wkState.period === "month" ? " prim" : "") + '" type="button" data-act="wkmonth">This month</button>' +
+    "</div></div>");
+  h.push('<div class="esrow"><label>Next board meeting</label><div style="flex:1">' +
+    '<input type="date" data-wkf="meeting" value="' + esc(wkState.meeting) + '" style="max-width:220px">' +
+    '<div class="savenote">Printed at the top of the report. Leave empty to leave it out.</div></div></div>');
+
+  h.push('<div class="esrow"><label>Your reports</label><div style="flex:1">');
+  if (wkState.files.length) {
+    h.push('<div class="confiles">');
+    wkState.files.forEach(function (f, i) {
+      h.push('<span class="confile">\u{1F4C4} ' + esc(f.name) + " <em>" + esc(fvSize(f.size)) + "</em>" +
+        '<span class="fx" data-act="wkfiledel" data-fi="' + i + '" title="Remove">\u2715</span></span>');
+    });
+    h.push("</div>");
+  }
+  h.push('<div style="margin-top:6px"><button class="edbtn" type="button" data-act="wkattach">\u{1F4CE} Attach a PDF</button>' +
+    '<span class="savenote" style="margin-left:8px">Your weekly highlights, the month-end report, a vendor notice — ' +
+    "joined on the end in this order, as whole pages.</span></div>" +
+    '<input type="file" id="wkFile" accept="application/pdf" multiple style="display:none"></div></div>');
+
+  h.push('<div class="esrow"><label></label><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">' +
+    '<button class="btn primary" type="button" data-act="wkgen">\u{1F4F0} Generate the report</button>' +
+    (wkState.built ? '<button class="btn" type="button" data-act="wkpdf">\u2b07 Download the PDF</button>' +
+      '<button class="btn" type="button" data-act="wksend">\u{1F4E8} Email it to the board</button>' : "") +
+    '<span class="savenote" id="wkNote">' + esc(wkState.busy) + "</span></div></div>");
+  h.push("</div></div>");
+  if (wkState.built) h.push(wkPaperHTML());
+  return h.join("");
+}
+function wkNote(t) {
+  wkState.busy = t || "";
+  var el = document.getElementById("wkNote");
+  if (el) el.textContent = wkState.busy;
+}
+/* the printable document, standing alone, for the renderer on the server */
+function wkStandaloneHTML() {
+  var css = "";
+  var st = document.querySelector("style");
+  if (st) css = st.textContent || "";
+  return "<!doctype html><html><head><meta charset=\"utf-8\"><style>" + css +
+    "\n@page { size:letter portrait; margin:14mm 12mm 16mm; }\nbody{background:#fff;padding:0;margin:0}\n" +
+    ".wkpaper{box-shadow:none;border:0;margin:0;padding:0;max-width:none}</style></head><body>" +
+    '<div class="tpl-classic">' + wkPaperHTML() + "</div></body></html>";
+}
+function wkBuildPdf(then) {
+  if (!cloud.fns) { wkNote("Sign in first."); return; }
+  wkNote("Printing the report" + (wkState.files.length ? " and joining your pages" : "") + "\u2026");
+  cloud.fns.httpsCallable("nnsccWeeklyPdf")({
+    html: wkStandaloneHTML(),
+    appendB64s: wkState.files.map(function (f) { return f.b64; })
+  }).then(function (res) {
+    wkState.pdf = (res.data && res.data.pdf) || null;
+    wkNote(wkState.pdf ? "" : "Nothing came back.");
+    if (wkState.pdf && then) then(wkState.pdf);
+  }).catch(function (e) {
+    wkNote("\u26A0 " + ((e && e.message) || "could not produce the PDF"));
+  });
+}
+function wkDownload() {
+  wkBuildPdf(function (b64) {
+    var bin = atob(b64), arr = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+    var url = URL.createObjectURL(new Blob([arr], { type: "application/pdf" }));
+    var a = document.createElement("a");
+    a.href = url;
+    a.download = (wkState.period === "month" ? "Monthly" : "Weekly") + " report " + wkState.to + ".pdf";
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
+    wkNote("Downloaded.");
+  });
+}
+function wkSend() {
+  var label = wkState.period === "month" ? "Monthly report" : "Weekly report";
+  if (!confirm("Email the " + label.toLowerCase() + " for " + wkPeriodLabel() +
+      " to every board member?\n\nThe PDF goes with it" +
+      (wkState.files.length ? ", including your own " + wkState.files.length + " attached page set(s)." : ".")))
+    return;
+  wkBuildPdf(function (b64) {
+    wkNote("Sending\u2026");
+    cloud.fns.httpsCallable("nnsccWeeklySend")({
+      pdfB64: b64,
+      subject: label + " — " + wkPeriodLabel(),
+      filename: label + " " + wkState.to + ".pdf",
+      html: '<p style="font:16px/1.6 -apple-system,Segoe UI,Helvetica,Arial,sans-serif">The ' +
+        label.toLowerCase() + " for " + esc(wkPeriodLabel()) + " is attached.</p>"
+    }).then(function (res) {
+      wkNote("Sent to " + ((res.data && res.data.to) || []).join(", ") + ".");
+    }).catch(function (e) {
+      wkNote("\u26A0 " + ((e && e.message) || "could not send"));
+    });
+  });
+}
+function wkPeriodLabel() {
+  return jdDate(wkState.from) + " to " + jdDate(wkState.to);
+}
+function wkRowsHTML(rows, cols) {
+  if (!rows.length) return '<p class="wkempty">Nothing recorded.</p>';
+  var h = ['<table class="wktable"><thead><tr>'];
+  cols.forEach(function (c) { h.push("<th>" + esc(c[0]) + "</th>"); });
+  h.push("</tr></thead><tbody>");
+  rows.forEach(function (r) {
+    h.push("<tr>");
+    cols.forEach(function (c) { h.push("<td>" + c[1](r) + "</td>"); });
+    h.push("</tr>");
+  });
+  h.push("</tbody></table>");
+  return h.join("");
+}
+/* the document itself — printed as it appears here */
+function wkPaperHTML() {
+  var g = wkGather(), M = state.meta || META_DEFAULTS, ai = wkState.ai || {};
+  var h = ['<div class="wkpaper" id="wkPaper">'];
+  h.push('<div class="wkhead"><div class="wkkicker">' + esc(M.condoName) + " \u00b7 " + esc(M.regNo) +
+    " \u00b7 " + esc(M.buildings) + '</div><div class="wktitle">' +
+    (wkState.period === "month" ? "Monthly report to the board" : "Weekly report to the board") + "</div>" +
+    '<div class="wksub">' + esc(wkPeriodLabel()) + " \u00b7 prepared by " +
+    esc(personLabel((cloud.user && cloud.user.email) || "") || M.manager) + "</div>" +
+    (wkState.meeting ? '<div class="wkmeet">Next board meeting \u2014 ' + esc(jdDate(wkState.meeting)) + "</div>" : "") +
+    "</div>");
+  if (ai.summary) h.push('<p class="wklede">' + esc(ai.summary) + "</p>");
+  if (ai.attention) h.push('<div class="wkattn"><strong>Needs the board\u2019s attention.</strong> ' + esc(ai.attention) + "</div>");
+
+  h.push('<div class="wksec">Contractor work completed</div>');
+  h.push(wkRowsHTML(g.done, [
+    ["Contractor", function (r) { return esc(r.contractor || "\u2014"); }],
+    ["Type of work", function (r) { return esc(r.work || r.text || ""); }],
+    ["Notes", function (r) { return esc(r.note || "\u2014"); }],
+    ["Date", function (r) { return esc(jdDate(r.day)); }]]));
+
+  h.push('<div class="wksec">Contractor work scheduled</div>');
+  h.push(wkRowsHTML(g.booked, [
+    ["Contractor", function (r) { return esc(r.contractor || "\u2014"); }],
+    ["Type of work", function (r) { return esc(r.work || r.text || ""); }],
+    ["Note", function (r) { return esc(r.note || "\u2014"); }],
+    ["Date scheduled", function (r) {
+      return esc(jdDate(r.day) + (r.endDay && r.endDay !== r.day ? " to " + jdDate(r.endDay) : "")); }]]));
+
+  if (g.units.length) {
+    h.push('<div class="wksec">Unit issues</div>');
+    h.push(wkRowsHTML(g.units, [
+      ["Unit", function (r) { return esc(r.unit || "\u2014"); }],
+      ["Issue", function (r) { return esc(r.work || r.text || ""); }],
+      ["Contractor", function (r) { return esc(r.contractor || "\u2014"); }],
+      ["Note", function (r) { return esc(r.note || "\u2014"); }]]));
+  }
+
+  h.push('<div class="wksec">Contractor quotes</div>');
+  if (g.tracker.length) {
+    h.push('<div class="wksubsec">Changes in this period</div><ul class="wklist">');
+    g.tracker.slice(0, 25).forEach(function (e) { h.push("<li>" + esc(e.text) + "</li>"); });
+    h.push("</ul>");
+  } else {
+    h.push('<p class="wkempty">' + (wkState.err ? esc("No earlier copy to compare against (" + wkState.err + ").")
+      : "No changes to the quote tracker in this period.") + "</p>");
+  }
+  if (g.awaiting.length) {
+    h.push('<div class="wksubsec">Waiting on a board decision</div>');
+    h.push(wkRowsHTML(g.awaiting, [
+      ["Job", function (r) { return "" + esc(r.no) + " \u00b7 " + esc(r.desc); }],
+      ["Contractor", function (r) { return esc(r.who || "\u2014"); }],
+      ["Amount (incl. HST)", function (r) { return esc(money(r.cost)); }]]));
+  }
+  h.push('<p class="wkfig">Committed to date <strong>' + esc(money(g.totals.committed)) +
+    "</strong> \u00b7 board approved <strong>" + esc(money(g.totals.approved)) +
+    "</strong> \u00b7 saved by taking competing quotes <strong>" + esc(money(g.totals.saved)) + "</strong></p>");
+
+  if (g.alerts.length) {
+    h.push('<div class="wksec">Dates coming up</div><ul class="wklist">');
+    g.alerts.forEach(function (a) { h.push("<li><strong>" + esc(a.title) + "</strong> \u2014 " + esc(a.detail) + "</li>"); });
+    h.push("</ul>");
+  }
+  if (g.notes.length) {
+    h.push('<div class="wksec">Also this period</div><ul class="wklist">');
+    g.notes.forEach(function (r) { h.push("<li>" + esc(r.text) + "</li>"); });
+    h.push("</ul>");
+  }
+  if (ai.closing) h.push('<p class="wkclose">' + esc(ai.closing) + "</p>");
+  if (wkState.files.length)
+    h.push('<p class="wkappend">The superintendent\u2019s ' +
+      (wkState.files.length === 1 ? "report follows" : "reports follow") + " this page.</p>");
   h.push("</div>");
   return h.join("");
 }

@@ -169,6 +169,27 @@ const SCHEDULE_SCHEMA = {
   additionalProperties: false,
 };
 
+// The week in the board's words. The figures and the tables are assembled from
+// the data before this is called — what is wanted here is the paragraph a
+// director reads first, and it must not contain a number the data did not give.
+const WEEKLY_SYSTEM =
+  "You write the opening of a weekly report from a condominium property manager to her board of " +
+  "directors. The board is elderly and reads this once, on a phone.\n" +
+  "summary: 3 to 5 short sentences covering what was carried out, what is booked, anything decided or " +
+  "waiting on the board, and any money committed. Name contractors and jobs plainly. Every figure must " +
+  "come from the data given.\n" +
+  "attention: one or two sentences naming only what the board must act on or know before the next " +
+  "meeting. Empty if there is nothing.\n" +
+  "closing: one sentence inviting questions, in the manager's voice.\n" +
+  "Plain sentences, no markdown, no bullet points, no headings, no first-person plural, no hype. " +
+  "Canadian dollars with $ and thousands separators.";
+const WEEKLY_SCHEMA = {
+  type: "object",
+  properties: { summary: { type: "string" }, attention: { type: "string" }, closing: { type: "string" } },
+  required: ["summary", "attention", "closing"],
+  additionalProperties: false,
+};
+
 // AI helper for the NNSCC 292 quote tracker. Modes:
 //  {check:true}          → is a key saved?
 //  {parse:true, text}    → read a pasted quote email into structured job/bid fields
@@ -234,6 +255,19 @@ exports.nnsccTrackerAi = onCall(
         return await callClaude(key, QUOTE_EXTRACT_SYSTEM, "Contractor quote text:\n\n" + text, QUOTE_SCHEMA, 800);
       }
       throw new HttpsError("invalid-argument", "Unsupported file — upload a PDF or a Word .docx file.");
+    }
+
+    // ----- mode: the week's report to the board -----
+    if (request.data && request.data.weekly === true) {
+      const facts = request.data.facts;
+      if (!facts || JSON.stringify(facts).length > 200000) {
+        throw new HttpsError("invalid-argument", "Bad weekly payload.");
+      }
+      return await callClaude(key, WEEKLY_SYSTEM,
+        "The period is " + String(request.data.from || "") + " to " + String(request.data.to || "") +
+        ".\n\nEverything known about it:\n" + JSON.stringify(facts) +
+        "\n\nWrite the summary, the attention line and the closing.",
+        WEEKLY_SCHEMA, 900, CONTRACT_MODEL);
     }
 
     // ----- mode: file one spoken line of the day -----
@@ -1059,5 +1093,116 @@ exports.nnsccAlertNow = onCall(
     } catch (e) {
       throw new HttpsError("internal", (e && e.message) || "Could not send the message.");
     }
+  }
+);
+
+// ---------------------------------------------------------------------------
+// The weekly report to the board, as one document
+//
+// The manager's report is written in the browser; the superintendent's own
+// weekly highlights arrive as a PDF he generates elsewhere. Until now those
+// were joined by screenshotting his six pages into a Word file. Here the report
+// is printed by the same headless Chrome the arrears letters use, and his pages
+// are appended whole — full quality, selectable text, one document.
+// ---------------------------------------------------------------------------
+exports.nnsccWeeklyPdf = onCall(
+  { region: "us-central1", memory: "1GiB", timeoutSeconds: 240, maxInstances: 2, concurrency: 1 },
+  async (request) => {
+    await requireArrearsEditor(request);          // same editor test as the letters
+    const html = String((request.data && request.data.html) || "");
+    if (!html) throw new HttpsError("invalid-argument", "No report markup was sent.");
+    if (html.length > 4000000) throw new HttpsError("invalid-argument", "That report is too large to render.");
+    /* his own reports — the weekly highlights, the month-end one, whatever else
+       belongs behind hers — appended in the order she put them in */
+    const appends = Array.isArray(request.data && request.data.appendB64s)
+      ? request.data.appendB64s.map((x) => String(x || "")).filter(Boolean)
+      : (request.data && request.data.appendB64 ? [String(request.data.appendB64)] : []);
+
+    const chromium = require("@sparticuz/chromium");
+    const puppeteer = require("puppeteer-core");
+    let browser, ours;
+    try {
+      browser = await puppeteer.launch({
+        headless: true,
+        args: [...chromium.args, "--font-render-hinting=none"],
+        defaultViewport: { width: 1100, height: 1400 },
+        executablePath: await chromium.executablePath(),
+      });
+      const page = await browser.newPage();
+      /* our own markup, but still content over the wire: no scripts, and
+         nothing fetched except the data: URIs the logo and photos ride in */
+      await page.setJavaScriptEnabled(false);
+      await page.setRequestInterception(true);
+      page.on("request", (req) => {
+        const u = req.url();
+        if (u.startsWith("data:") || u === "about:blank") req.continue(); else req.abort();
+      });
+      await page.setContent(html, { waitUntil: "load", timeout: 45000 });
+      await page.emulateMediaType("print");
+      ours = await page.pdf({ format: "letter", printBackground: true, preferCSSPageSize: true });
+    } catch (e) {
+      if (e instanceof HttpsError) throw e;
+      throw new HttpsError("internal", "Could not render the report: " + ((e && e.message) || "unknown error"));
+    } finally {
+      if (browser) { try { await browser.close(); } catch (_) { /* nothing to do */ } }
+    }
+
+    if (!appends.length) return { pdf: Buffer.from(ours).toString("base64"), pages: null, joined: 0 };
+
+    const { PDFDocument } = require("pdf-lib");
+    const out = await PDFDocument.load(ours);
+    let joined = 0;
+    for (let i = 0; i < appends.length; i++) {
+      try {
+        const theirs = await PDFDocument.load(Buffer.from(appends[i], "base64"));
+        const copied = await out.copyPages(theirs, theirs.getPageIndices());
+        copied.forEach((p) => out.addPage(p));
+        joined++;
+      } catch (e) {
+        throw new HttpsError("invalid-argument",
+          "The report was produced, but attachment " + (i + 1) + " could not be joined to it (" +
+          ((e && e.message) || "unreadable") + ").");
+      }
+    }
+    const merged = await out.save();
+    return { pdf: Buffer.from(merged).toString("base64"), pages: out.getPageCount(), joined: joined };
+  }
+);
+
+// Send the finished report to the board, with the PDF attached.
+exports.nnsccWeeklySend = onCall(
+  { region: "us-central1", memory: "512MiB", timeoutSeconds: 120, maxInstances: 2 },
+  async (request) => {
+    await requireArrearsEditor(request);
+    const db = admin.firestore();
+    const [cfgSnap, boardSnap, conSnap] = await Promise.all([
+      db.doc("nnsccQuoteTrackerConfig/main").get(),
+      db.doc("nnsccQuoteTracker/board").get(),
+      db.doc(ALERT_PATHS.contracts).get(),
+    ]);
+    const key = cfgSnap.exists && cfgSnap.data().resendKey;
+    if (!key) throw new HttpsError("failed-precondition", "No Resend API key has been saved yet.");
+    const settings = (conSnap.exists && conSnap.data().alerts) || {};
+    const from = settings.from || ALERT_DEFAULTS.from;
+    const members = ((boardSnap.exists && boardSnap.data().members) || []).map((e) => String(e).toLowerCase());
+    const extra = Array.isArray(request.data && request.data.to)
+      ? request.data.to.map((e) => String(e).trim().toLowerCase()) : [];
+    const to = members.concat(extra).filter((e, i, a) => e && a.indexOf(e) === i);
+    if (!to.length) throw new HttpsError("failed-precondition", "No board members are listed to send to.");
+    const pdf = String((request.data && request.data.pdfB64) || "");
+    if (!pdf) throw new HttpsError("invalid-argument", "No report was attached.");
+    const subject = String((request.data && request.data.subject) || "Weekly report");
+    const body = String((request.data && request.data.html) || "<p>The weekly report is attached.</p>");
+    const name = String((request.data && request.data.filename) || "weekly-report.pdf")
+      .replace(/[^\w.\-]+/g, "-");
+    const resp = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: "Bearer " + key },
+      body: JSON.stringify({ from: from, to: to, subject: subject, html: body,
+        attachments: [{ filename: name, content: pdf }] }),
+    });
+    const text = await resp.text();
+    if (!resp.ok) throw new HttpsError("internal", "Resend returned HTTP " + resp.status + ": " + text.slice(0, 300));
+    return { ok: true, to: to };
   }
 );
