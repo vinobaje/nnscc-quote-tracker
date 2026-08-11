@@ -100,6 +100,23 @@ service firebase.storage {
     // NOT public: read is restricted to the property manager and the board,
     // and the client never mints a download token — it fetches with the
     // reader's own credentials, so every read comes back through here.
+    // The superintendent's reports, waiting to be joined onto the manager's.
+    // Editor-only both ways: nothing here is public, and the board receives
+    // the finished PDF rather than the parts it was made from.
+    match /weeklyAttachments/{allPaths=**} {
+      function wkEditor() {
+        return request.auth != null
+          && request.auth.token.get('email_verified', false) == true
+          && request.auth.token.email != null
+          && ( request.auth.token.email.lower() == 'mvinobaje@gmail.com'
+            || request.auth.token.email.lower() == 'nnscc292connect@cpomanagement.ca'
+            || request.auth.token.email.lower() in
+               firestore.get(/databases/(default)/documents/nnsccQuoteTrackerConfig/main).data.get('editors', []) );
+      }
+      allow read, delete: if wkEditor();
+      allow create, update: if wkEditor() && request.resource.size < 20 * 1024 * 1024;
+    }
+
     match /contractFiles/{allPaths=**} {
       function conSignedIn() {
         return request.auth != null

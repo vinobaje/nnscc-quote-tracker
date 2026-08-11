@@ -1456,6 +1456,16 @@ body[data-view="edit"] .wrap { max-width:none; }
 /* the report to the board, on screen and on paper */
 .wkpaper { background:#FCFBF8; border:1px solid var(--line); border-radius:10px;
   padding:30px 34px; margin:18px 0 0; max-width:860px; }
+.wkpick { border-bottom:1px solid var(--line-soft); padding:9px 0; }
+.wkpicksec { display:flex; align-items:center; gap:8px; font-size:13.5px; font-weight:700; color:var(--ink); cursor:pointer; }
+.wkpickn { font-size:11.5px; font-weight:650; color:var(--muted); background:var(--paper);
+  border-radius:99px; padding:1px 8px; }
+.wkpickrow { display:flex; align-items:baseline; gap:8px; font-size:13.5px; color:var(--ink2);
+  padding:3px 0 3px 22px; cursor:pointer; }
+.wkpickrow.dim { opacity:.45; }
+.wkpickd { flex:0 0 92px; font-size:12px; color:var(--muted); }
+.wkpickt { flex:1 1 auto; min-width:0; }
+.wkpicknone { font-size:12.5px; color:var(--muted); font-style:italic; margin:3px 0 0 22px; }
 .wkbrandrow { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
 .wkbrandprev { height:34px; width:auto; background:#16283b; border-radius:5px; padding:5px 8px; }
 .wkedit:focus { outline:none; }
@@ -2312,8 +2322,10 @@ var CONTRACTS_PATH = "nnsccQuoteTracker/contracts";      /* the contract registe
 var SNAPSHOTS_COLL = "nnsccQuoteSnapshots";               /* a copy of the report, kept each day it changes */
 var ACTIVITY_COLL = "nnsccActivity";                      /* the manager's own record of the week */
 var BRAND_PATH = "nnsccQuoteTracker/brand";               /* the letterhead the manager puts on her report */
+var WEEKLY_DRAFT_PATH = "nnsccQuoteTracker/weeklyDraft";   /* the report she is working on */
+var WEEKLY_COLL = "nnsccWeeklyReports";                   /* every one she has finished */
 var VIEW_BETA = CURRENT_PATH.indexOf("Beta") >= 0;   /* which report the passcode gate reads/protects */
-var BUILD_STAMP = "2026-08-11 13:36";   /* filled in by build.js — which copy of the page this is */
+var BUILD_STAMP = "2026-08-11 13:46";   /* filled in by build.js — which copy of the page this is */
 /* path of the report currently on screen */
 function reportPath() {
   return cloud.active.kind === "current" ? CURRENT_PATH : (REPORTS_COLL + "/" + cloud.active.id);
@@ -4201,7 +4213,7 @@ function renderEditor() {
   alertCheckKey();
   viewPassCheck();
   if (edNav === "activity") actLoadWeek();
-  if (edNav === "weekly") wkLoadBase();
+  if (edNav === "weekly") { wkLoadDraft(); wkLoadBase(); }
 }
 /* amounts are typed as money ("48,500" / "$48,500.00") and stored as a number */
 function edAmt(n) { return Number(n).toLocaleString("en-CA", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
@@ -4812,11 +4824,19 @@ function alertSendNow() {
 /* ---------- editor events (delegated) ---------- */
 document.getElementById("editor").addEventListener("change", function (e) {
   /* she has typed into the report itself */
-  if (e.target.closest && e.target.closest("#wkPaper")) { wkCapture(); return; }
+  if (e.target.closest && e.target.closest("#wkPaper")) { wkCapture(); wkSaveDraft(); return; }
+  var wsec = e.target.getAttribute && e.target.getAttribute("data-wksec");
+  if (wsec) { wkState.secOff[wsec] = !e.target.checked; wkSaveDraft(); renderEditor(); return; }
+  var witem = e.target.getAttribute && e.target.getAttribute("data-wkitem");
+  if (witem) {
+    if (e.target.checked) delete wkState.skip[witem]; else wkState.skip[witem] = true;
+    wkSaveDraft(); renderEditor(); return;
+  }
   /* the report's period, and the meeting date printed on it */
   var wkf = e.target.dataset.wkf;
   if (wkf) {
     wkState[wkf] = e.target.value;
+    wkSaveDraft();
     if (wkf === "from") { wkState.baseDay = ""; wkLoadBase(); }
     wkState.built = wkState.built && wkf === "meeting" ? wkState.built : "";
     renderEditor();
@@ -4956,6 +4976,7 @@ document.getElementById("editor").addEventListener("click", function (e) {
   }
   if (act === "wkpdf") { wkCapture(); wkDownload(); return; }
   if (act === "wksend") { wkCapture(); wkSend(); return; }
+  if (act === "wkallon") { wkState.skip = {}; wkState.secOff = {}; wkSaveDraft(); renderEditor(); return; }
   if (act === "wkattach") { document.getElementById("wkFile").click(); return; }
   if (act === "wklogo") { document.getElementById("wkLogoFile").click(); return; }
   if (act === "wklogodel") {
@@ -4964,7 +4985,9 @@ document.getElementById("editor").addEventListener("click", function (e) {
     return;
   }
   if (act === "wkfiledel") {
-    wkState.files.splice(+actEl.getAttribute("data-fi"), 1); renderEditor(); return;
+    var gone = wkState.files.splice(+actEl.getAttribute("data-fi"), 1)[0];
+    if (gone && gone.path && cloud.store) cloud.store.ref(gone.path).delete().catch(function () {});
+    wkSaveDraft(); renderEditor(); return;
   }
   if (act === "wkweek" || act === "wkmonth") {
     wkState.period = act === "wkmonth" ? "month" : "week";
@@ -5703,12 +5726,18 @@ document.addEventListener("change", function (e) {
   files.forEach(function (f) {
     if (!/\.pdf$/i.test(f.name)) { wkNote("Only PDFs can be joined on the end."); return; }
     if (f.size > 15 * 1024 * 1024) { wkNote("\u201C" + f.name + "\u201D is over 15 MB."); return; }
-    var r = new FileReader();
-    r.onload = function () {
-      wkState.files.push({ name: f.name, size: f.size, b64: String(r.result || "").split(",")[1] || "" });
-      renderEditor();
-    };
-    r.readAsDataURL(f);
+    if (!cloud.store) { wkNote("The file store is not available."); return; }
+    /* kept in the file store rather than in the page, so a refresh does not
+       lose the attachment along with everything else */
+    var path = "weeklyAttachments/" + Date.now() + "-" + f.name.replace(/[^\w.\-() ]+/g, "_");
+    wkNote("Uploading \u201C" + f.name + "\u201D\u2026");
+    cloud.store.ref(path).put(f).then(function () {
+      wkState.files.push({ name: f.name, size: f.size, path: path });
+      wkNote("");
+      wkSaveDraft(); renderEditor();
+    }).catch(function (e) {
+      wkNote("\u26A0 Could not upload \u201C" + f.name + "\u201D (" + ((e && e.code) || "error") + ").");
+    });
   });
 });
 document.addEventListener("change", function (e) {
@@ -6547,10 +6576,26 @@ function actWeekSummaryHTML() {
    screenshotting them into a Word file. */
 var wkState = {
   from: "", to: "", meeting: "", period: "week",
-  files: [],            /* { name, b64, size } — his reports, in the order they go */
+  files: [],            /* { name, path, size } — his reports, in the order they go */
   base: null, baseDay: "", loading: false, err: "",
-  ai: null, busy: "", built: "", pdf: null
+  ai: null, busy: "", built: "", pdf: null,
+  skip: {},             /* items she has taken out before it is written */
+  secOff: {},           /* whole sections she does not want this time */
+  html: "", draftLoaded: false, saving: false
 };
+/* Sections in the order they print, and the plain name each goes by. The board
+   already gets the quote report, so the parts that repeat it are hers to drop. */
+var WK_SECTIONS = [
+  ["done", "Contractor work completed"], ["booked", "Contractor work scheduled"],
+  ["units", "Unit issues"], ["tracker", "Quote tracker — changes in this period"],
+  ["awaiting", "Waiting on a board decision"], ["alerts", "Dates coming up"],
+  ["notes", "Also this period"]
+];
+function wkOn(sec) { return !wkState.secOff[sec]; }
+function wkKept(sec, list, idOf) {
+  if (!wkOn(sec)) return [];
+  return list.filter(function (x, i) { return !wkState.skip[sec + ":" + idOf(x, i)]; });
+}
 /* The mark at the top of her report. It is held as the image itself rather
    than a link, because the printer is not allowed to fetch anything from the
    network — everything on the page has to already be on the page. */
@@ -6635,21 +6680,22 @@ function wkGather() {
   wkEnsureDates();
   var journal = actState.list.filter(function (r) { return wkInPeriod(r.day); });
   var byDay = function (a, b) { return a.day < b.day ? -1 : (a.day > b.day ? 1 : 0); };
-  var done = journal.filter(function (r) { return r.kind === "done" || (r.kind === "scheduled" && r.done); }).sort(byDay);
-  var units = journal.filter(function (r) { return r.kind === "unit"; }).sort(byDay);
-  var notes = journal.filter(function (r) { return r.kind === "note"; }).sort(byDay);
-  var booked = actState.list.filter(function (r) {
+  var rid = function (r) { return r.id; }, idx = function (x, i) { return i; };
+  var done = wkKept("done", journal.filter(function (r) { return r.kind === "done" || (r.kind === "scheduled" && r.done); }).sort(byDay), rid);
+  var units = wkKept("units", journal.filter(function (r) { return r.kind === "unit"; }).sort(byDay), rid);
+  var notes = wkKept("notes", journal.filter(function (r) { return r.kind === "note"; }).sort(byDay), rid);
+  var booked = wkKept("booked", actState.list.filter(function (r) {
     return r.kind === "scheduled" && !r.done && r.day && r.day >= todayISO();
-  }).sort(function (a, b) { return a.day < b.day ? -1 : 1; }).slice(0, 25);
-  var tracker = wkState.base ? actWeekEvents(wkState.base.jobs || [], state.jobs || []) : [];
+  }).sort(function (a, b) { return a.day < b.day ? -1 : 1; }).slice(0, 25), rid);
+  var tracker = wkKept("tracker", wkState.base ? actWeekEvents(wkState.base.jobs || [], state.jobs || []) : [], idx);
   var d = computeAll();
-  var awaiting = d.jobs.filter(function (x) {
+  var awaiting = wkKept("awaiting", d.jobs.filter(function (x) {
     return !APPROVED_SET[x.j.status] && x.c.cost > 0;
   }).map(function (x) {
     return { no: x.j.no, desc: x.j.desc || "job", cost: x.c.cost,
              who: (x.c.carriedBids[0] && x.c.carriedBids[0].b.contractor) || "" };
-  }).sort(function (a, b) { return b.cost - a.cost; }).slice(0, 12);
-  var alerts = alertList().filter(function (i) { return i.audience === "all"; }).slice(0, 12);
+  }).sort(function (a, b) { return b.cost - a.cost; }).slice(0, 12), function (x) { return x.no; });
+  var alerts = wkKept("alerts", alertList().filter(function (i) { return i.audience === "all"; }).slice(0, 12), idx);
   return { done: done, units: units, notes: notes, booked: booked, tracker: tracker,
            awaiting: awaiting, alerts: alerts, totals: {
              committed: d.total, approved: d.approvedTotal, saved: d.savings, jobs: d.jobs.length } };
@@ -6683,6 +6729,7 @@ function wkGenerate() {
       wkState.built = todayISO();
       wkState.busy = "";
       wkState.html = wkPaperHTML();          /* from here on it is hers to edit */
+      wkSaveDraft();
       renderEditor();
       var el = document.getElementById("wkPaper");
       if (el) el.scrollIntoView({ block: "start" });
@@ -6696,6 +6743,103 @@ function wkGenerate() {
       renderEditor();
     });
 }
+/* A generated report is a few cents of somebody's money and ten minutes of
+   hers. It is kept the moment it exists — the period, what she ticked, what
+   she typed — so closing the tab, or the browser reloading underneath her,
+   costs nothing. Only the attached PDFs live elsewhere: they go to the file
+   store, and only their names travel in the draft. */
+var wkDraftT = null;
+function wkSaveDraft() {
+  if (!cloud.on || !isEditor()) return;
+  clearTimeout(wkDraftT);
+  wkDraftT = setTimeout(function () {
+    cloud.db.doc(WEEKLY_DRAFT_PATH).set({
+      from: wkState.from, to: wkState.to, meeting: wkState.meeting, period: wkState.period,
+      skip: wkState.skip, secOff: wkState.secOff,
+      ai: wkState.ai || null, html: wkState.html || "", built: wkState.built || "",
+      files: wkState.files.map(function (f) { return { name: f.name, path: f.path || "", size: f.size || 0 }; }),
+      at: firebase.firestore.FieldValue.serverTimestamp(),
+      by: (cloud.user && cloud.user.email) || ""
+    }, { merge: true }).catch(function () {});
+  }, 700);
+}
+function wkLoadDraft() {
+  if (!cloud.on || !isEditor() || wkState.draftLoaded) return;
+  wkState.draftLoaded = true;
+  cloud.db.doc(WEEKLY_DRAFT_PATH).get().then(function (snap) {
+    if (!snap.exists) return;
+    var d = snap.data() || {};
+    wkState.from = d.from || wkState.from;
+    wkState.to = d.to || wkState.to;
+    wkState.meeting = d.meeting || "";
+    wkState.period = d.period || "week";
+    wkState.skip = d.skip || {};
+    wkState.secOff = d.secOff || {};
+    wkState.ai = d.ai || null;
+    wkState.html = d.html || "";
+    wkState.built = d.built || "";
+    wkState.files = Array.isArray(d.files) ? d.files : [];
+    wkState.baseDay = "";
+    if (document.body.dataset.view === "edit" && edNav === "weekly") { renderEditor(); wkLoadBase(); }
+  }).catch(function () {});
+}
+/* every report she finishes is kept, so the board can be sent it again and she
+   can see what last week said without building it twice */
+function wkArchive() {
+  if (!cloud.on || !isEditor()) return;
+  cloud.db.collection(WEEKLY_COLL).doc(wkState.period + "-" + wkState.to).set({
+    from: wkState.from, to: wkState.to, period: wkState.period, meeting: wkState.meeting || "",
+    html: wkCapture() || "", at: firebase.firestore.FieldValue.serverTimestamp(),
+    by: (cloud.user && cloud.user.email) || ""
+  }).catch(function () {});
+}
+
+/* What goes in. The board already has the quote report; repeating half of it
+   here helps nobody, so every line is hers to leave out before a word is
+   written — and leaving things out costs nothing, where regenerating does. */
+function wkPickHTML() {
+  var saveSkip = wkState.skip, saveOff = wkState.secOff;
+  wkState.skip = {}; wkState.secOff = {};        /* measure everything available */
+  var all = wkGather();
+  wkState.skip = saveSkip; wkState.secOff = saveOff;
+  var lists = {
+    done: all.done.map(function (r) { return { id: r.id, t: (r.contractor || "In-house") + " — " + (r.work || r.text || ""), d: r.day }; }),
+    booked: all.booked.map(function (r) { return { id: r.id, t: (r.contractor || "") + " — " + (r.work || r.text || ""), d: r.day }; }),
+    units: all.units.map(function (r) { return { id: r.id, t: "Unit " + (r.unit || "?") + " — " + (r.work || r.text || ""), d: r.day }; }),
+    tracker: all.tracker.map(function (e, i) { return { id: i, t: e.text, d: "" }; }),
+    awaiting: all.awaiting.map(function (a) { return { id: a.no, t: "Job " + a.no + " " + a.desc + " — " + money(a.cost), d: "" }; }),
+    alerts: all.alerts.map(function (a, i) { return { id: i, t: a.title, d: "" }; }),
+    notes: all.notes.map(function (r) { return { id: r.id, t: r.text, d: r.day }; })
+  };
+  var total = 0, kept = 0;
+  var h = ['<div class="ecard esettings"><div class="ehead"><strong>What goes in</strong>' +
+    '<span style="font-size:12.5px;color:var(--ink2)">— untick anything the board already has, or that can wait</span>' +
+    '<span class="spacer"></span><button class="edbtn" type="button" data-act="wkallon">Tick everything</button></div><div class="ebids">'];
+  WK_SECTIONS.forEach(function (sec) {
+    var key = sec[0], list = lists[key] || [];
+    total += list.length;
+    var on = wkOn(key);
+    h.push('<div class="wkpick"><label class="wkpicksec"><input type="checkbox" data-wksec="' + key + '"' +
+      (on ? " checked" : "") + "> " + esc(sec[1]) +
+      '<span class="wkpickn">' + list.length + "</span></label>");
+    if (!list.length) h.push('<p class="wkpicknone">nothing in this period</p>');
+    list.forEach(function (x) {
+      var off = !on || wkState.skip[key + ":" + x.id];
+      if (!off) kept++;
+      h.push('<label class="wkpickrow' + (on ? "" : " dim") + '">' +
+        '<input type="checkbox" data-wkitem="' + key + ":" + esc(x.id) + '"' +
+        (off ? "" : " checked") + (on ? "" : " disabled") + ">" +
+        (x.d ? '<span class="wkpickd">' + esc(jdDate(x.d)) + "</span>" : "") +
+        '<span class="wkpickt">' + esc(x.t) + "</span></label>");
+    });
+    h.push("</div>");
+  });
+  h.push('<p class="savenote">' + kept + " of " + total +
+    " items will be in the report. Unticking costs nothing; generating again costs about two cents.</p>");
+  h.push("</div></div>");
+  return h.join("");
+}
+
 /* the controls: the period, the meeting date, his reports, and the buttons */
 function wkCardHTML() {
   wkEnsureDates();
@@ -6745,6 +6889,7 @@ function wkCardHTML() {
       '<button class="btn" type="button" data-act="wksend">\u{1F4E8} Email it to the board</button>' : "") +
     '<span class="savenote" id="wkNote">' + esc(wkState.busy) + "</span></div></div>");
   h.push("</div></div>");
+  h.push(wkPickHTML());
   if (wkState.built) {
     h.push('<p class="wkeditnote">\u270E Everything below can be changed — click into it and type. ' +
       "Rows can be deleted, wording rewritten, anything added. What is on the page is what prints." +
@@ -6769,19 +6914,37 @@ function wkStandaloneHTML() {
     ".wkpaper{box-shadow:none;border:0;margin:0;padding:0;max-width:none}</style></head><body>" +
     '<div class="tpl-classic">' + wkPaperWrapHTML(false) + "</div></body></html>";
 }
+/* the attached PDFs, fetched back out of the file store at the moment they are
+   needed — nothing that large is kept in the page */
+function wkAttachmentsB64() {
+  return Promise.all(wkState.files.map(function (f) {
+    if (f.b64) return Promise.resolve(f.b64);
+    if (!f.path) return Promise.resolve("");
+    return conBlobData(f.path).then(function (blob) {
+      return new Promise(function (res, rej) {
+        var r = new FileReader();
+        r.onload = function () { res(String(r.result || "").split(",")[1] || ""); };
+        r.onerror = function () { rej({ message: "could not read " + f.name }); };
+        r.readAsDataURL(blob);
+      });
+    });
+  })).then(function (list) { return list.filter(Boolean); });
+}
 function wkBuildPdf(then) {
   if (!cloud.fns) { wkNote("Sign in first."); return; }
   wkNote("Printing the report" + (wkState.files.length ? " and joining your pages" : "") + "\u2026");
   var M = state.meta || META_DEFAULTS;
-  cloud.fns.httpsCallable("nnsccWeeklyPdf")({
-    html: wkStandaloneHTML(),
+  var html = wkStandaloneHTML();
+  wkAttachmentsB64().then(function (appends) {
+  return cloud.fns.httpsCallable("nnsccWeeklyPdf")({
+    html: html,
     footer: (M.condoName || "") + " \u00b7 " + (wkState.period === "month" ? "monthly" : "weekly") +
       " report \u00b7 " + wkPeriodLabel(),
-    appendB64s: wkState.files.map(function (f) { return f.b64; })
-  }).then(function (res) {
+    appendB64s: appends
+  }); }).then(function (res) {
     wkState.pdf = (res.data && res.data.pdf) || null;
     wkNote(wkState.pdf ? "" : "Nothing came back.");
-    if (wkState.pdf && then) then(wkState.pdf);
+    if (wkState.pdf) { wkArchive(); if (then) then(wkState.pdf); }
   }).catch(function (e) {
     wkNote("\u26A0 " + ((e && e.message) || "could not produce the PDF"));
   });
@@ -6870,13 +7033,16 @@ function wkPaperHTML() {
   if (ai.summary) h.push('<p class="wklede">' + esc(ai.summary) + "</p>");
   if (ai.attention) h.push('<div class="wkattn"><strong>Needs the board\u2019s attention.</strong> ' + esc(ai.attention) + "</div>");
 
+  if (wkOn("done")) {
   h.push('<div class="wksec">Contractor work completed</div>');
   h.push(wkRowsHTML(g.done, [
     ["Contractor", function (r) { return esc(r.contractor || "In-house"); }],
     ["Type of work", function (r) { return esc(r.work || r.text || ""); }],
     ["Notes", function (r) { return esc(r.note || "\u2014"); }],
     ["Date", function (r) { return esc(jdDate(r.day)); }]]));
+  }
 
+  if (wkOn("booked")) {
   h.push('<div class="wksec">Contractor work scheduled</div>');
   h.push(wkRowsHTML(g.booked, [
     ["Contractor", function (r) { return esc(r.contractor || "\u2014"); }],
@@ -6884,6 +7050,7 @@ function wkPaperHTML() {
     ["Note", function (r) { return esc(r.note || "\u2014"); }],
     ["Date scheduled", function (r) {
       return esc(jdDate(r.day) + (r.endDay && r.endDay !== r.day ? " to " + jdDate(r.endDay) : "")); }]]));
+  }
 
   if (g.units.length) {
     h.push('<div class="wksec">Unit issues</div>');
@@ -6894,6 +7061,7 @@ function wkPaperHTML() {
       ["Note", function (r) { return esc(r.note || "\u2014"); }]]));
   }
 
+  if (wkOn("tracker") || wkOn("awaiting")) {
   h.push('<div class="wksec">Contractor quotes</div>');
   if (g.tracker.length) {
     h.push('<div class="wksubsec">Changes in this period</div><ul class="wklist">');
@@ -6913,6 +7081,7 @@ function wkPaperHTML() {
   h.push('<p class="wkfig">Committed to date <strong>' + esc(money(g.totals.committed)) +
     "</strong> \u00b7 board approved <strong>" + esc(money(g.totals.approved)) +
     "</strong> \u00b7 saved by taking competing quotes <strong>" + esc(money(g.totals.saved)) + "</strong></p>");
+  }
 
   if (g.alerts.length) {
     h.push('<div class="wksec">Dates coming up</div><ul class="wklist">');

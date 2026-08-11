@@ -58,6 +58,15 @@ service cloud.firestore {
       allow read, write: if nnsccEditor();
     }
 
+    // Reports to the board she has finished, and the one she is working on.
+    // Hers to keep and to re-read; the board is sent the PDF, not this.
+    match /nnsccWeeklyReports/{reportId} {
+      allow read, write: if nnsccEditor();
+    }
+    match /nnsccWeeklyReportsBeta/{reportId} {
+      allow read, write: if nnsccEditor();
+    }
+
     // Report library — past/period reports. EDITOR-ONLY (public sees only the current report).
     match /nnsccQuoteReports/{reportId} {
       allow read: if nnsccEditor();
