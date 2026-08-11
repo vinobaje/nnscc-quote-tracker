@@ -2167,7 +2167,7 @@ var CONTRACTORS_PATH = "nnsccQuoteTracker/contractors";  /* shared contractor di
 var CONTRACTS_PATH = "nnsccQuoteTracker/contracts";      /* the contract register — read with the report */
 var SNAPSHOTS_COLL = "nnsccQuoteSnapshots";               /* a copy of the report, kept each day it changes */
 var VIEW_BETA = CURRENT_PATH.indexOf("Beta") >= 0;   /* which report the passcode gate reads/protects */
-var BUILD_STAMP = "2026-08-11 00:14";   /* filled in by build.js — which copy of the page this is */
+var BUILD_STAMP = "2026-08-11 00:19";   /* filled in by build.js — which copy of the page this is */
 /* path of the report currently on screen */
 function reportPath() {
   return cloud.active.kind === "current" ? CURRENT_PATH : (REPORTS_COLL + "/" + cloud.active.id);
@@ -2269,6 +2269,25 @@ function subscribeActive() {
   if (cloud.unsub) { try { cloud.unsub(); } catch (e) {} cloud.unsub = null; }
   cloud.docExists = null;
   cloud.unsub = cloud.db.doc(reportPath()).onSnapshot(onReportSnap, onReportErr);
+  /* Backstop. The gate used to be raised only by a refusal from the server, so
+     a listener that stalled instead of answering — Safari on a poor connection
+     does exactly that — left the browser's remembered copy of the report on
+     screen with nothing ever asking who was reading it. Silence now raises the
+     gate too. */
+  gateUnlessAnswered(4000);
+}
+/* Nothing has come back from the server, so we do not know who this is, and
+   what is on screen is only what this browser remembered. Ask. */
+function gateUnlessAnswered(delay) {
+  clearTimeout(gateTimer);
+  gateTimer = setTimeout(function () {
+    if (cloud.docExists !== null) return;          /* a real read landed */
+    if (cloud.user && (isEditor() || isBoardMember())) return;   /* signed in after all */
+    if (conGate.pass) return;                      /* already came in with the passcode */
+    if (cloud.active.kind !== "current") return;   /* past reports are for editors */
+    cloudStatusMsg("● This report is passcode-protected.");
+    showViewGate();
+  }, delay);
 }
 function onReportSnap(snap) {
   /* Firestore keeps its own copy of what this browser has read, and that copy
@@ -2322,13 +2341,7 @@ function onReportErr(err) {
        property manager. Wait to see whether the retry succeeds — gating
        immediately left a passcode box on top of a report the reader could
        already see, with no way to dismiss it. */
-    clearTimeout(gateTimer);
-    gateTimer = setTimeout(function () {
-      if (cloud.docExists !== null) return;          /* a read landed: no gate */
-      if (isEditor() || isBoardMember()) return;     /* signed in after all */
-      cloudStatusMsg("● This report is passcode-protected.");
-      showViewGate();
-    }, 1500);
+    gateUnlessAnswered(1500);
     return;
   }
   cloudStatusMsg("Cloud unavailable — saving to this browser (" + code + ")");
@@ -6284,21 +6297,24 @@ function closeViewGate() {
   var ov = document.getElementById("viewGateOverlay");
   if (ov && ov.classList.contains("open")) { ov.classList.remove("open"); viewGateMsg(""); }
 }
+/* The passcode is asked for every time the report is opened, and it is never
+   written down anywhere — not in the browser's storage, not in a cookie. A
+   remembered passcode meant a reader could land on a report they had not
+   opened, and the register that comes with it would be missing. */
 function showViewGate() {
   var ov = document.getElementById("viewGateOverlay"); if (!ov) return;
   /* blank any locally-cached copy so no stale data shows behind the gate */
   cloud.blanked = true;   /* ...and refuse to save that blank over the real report */
+  conState = { list: [] };
   try { state = normState({ jobs: [], meta: (state && state.meta) || null }); renderReport(); } catch (e) {}
   ov.classList.add("open");
-  var saved = null; try { saved = sessionStorage.getItem("nnsccView"); } catch (e) {}
-  if (saved) submitViewGate(saved, true);
   var inp = document.getElementById("viewGateInput"); if (inp) inp.focus();
 }
-function submitViewGate(pass, silent) {
+function submitViewGate(pass) {
   pass = String(pass || "").trim();
   if (!pass) { viewGateMsg("Enter the passcode."); return; }
   if (!cloud.fns) { viewGateMsg("Offline — cannot verify the passcode."); return; }
-  if (!silent) viewGateMsg("Checking…");
+  viewGateMsg("Checking…");
   cloud.fns.httpsCallable("nnsccGate")({ view: true, passcode: pass, beta: VIEW_BETA })
     .then(function (res) {
       var r = res.data && res.data.report;
@@ -6310,22 +6326,21 @@ function submitViewGate(pass, silent) {
       conState = { list: Array.isArray(res.data.contracts) ? res.data.contracts : [] };
       conState.list.forEach(function (c) { if (!c.id) c.id = genId(); });
       try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) {}
-      try { sessionStorage.setItem("nnsccView", pass); } catch (e) {}
       document.getElementById("viewGateOverlay").classList.remove("open");
       renderReport();
       cloudStatusMsg("● Viewing with passcode — data as of now; refresh to update.");
     })
     .catch(function (e) {
-      try { sessionStorage.removeItem("nnsccView"); } catch (_) {}
       var code = (e && e.code) || "";
-      if (silent && code === "functions/permission-denied") { viewGateMsg(""); return; }
       viewGateMsg(code === "functions/resource-exhausted" ? "Too many tries — wait a minute." :
         code === "functions/failed-precondition" ? ((e && e.message) || "Viewing isn’t protected yet.") :
         ((e && e.message) || "That passcode isn’t right."));
     });
 }
-document.getElementById("viewGateBtn").onclick = function () { submitViewGate(document.getElementById("viewGateInput").value, false); };
-document.getElementById("viewGateInput").addEventListener("keydown", function (e) { if (e.key === "Enter") submitViewGate(this.value, false); });
+document.getElementById("viewGateBtn").onclick = function () { submitViewGate(document.getElementById("viewGateInput").value); };
+document.getElementById("viewGateInput").addEventListener("keydown", function (e) { if (e.key === "Enter") submitViewGate(this.value); });
+/* a passcode remembered by an older copy of this page is no longer honoured */
+try { sessionStorage.removeItem("nnsccView"); } catch (e) {}
 document.getElementById("viewGateSignin").onclick = function () { cloudSignIn(function () {}); };
 
 /* editor control: set / change the shared view passcode */
