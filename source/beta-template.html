@@ -2271,6 +2271,14 @@ function subscribeActive() {
   cloud.unsub = cloud.db.doc(reportPath()).onSnapshot(onReportSnap, onReportErr);
 }
 function onReportSnap(snap) {
+  /* Firestore keeps its own copy of what this browser has read, and that copy
+     outlives the sign-in that fetched it — the rules run on the server, so the
+     cache answers a signed-out reader quite happily. Left alone it stands in
+     for the real thing: it cancels the passcode gate, reports "live data", and
+     arrives without the contract register, so the report looks complete while
+     it is a stale, partial copy of one. Wait for the server's answer instead,
+     which for a reader with no account is the passcode gate. */
+  if (snap.metadata && snap.metadata.fromCache && !cloud.user && !conGate.pass) return;
   /* We can read the report, so the passcode gate is not needed: close it and
      cancel any gate that was queued while the sign-in session was restoring. */
   clearTimeout(gateTimer);
