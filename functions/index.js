@@ -104,6 +104,23 @@ const CONTRACT_SCHEMA = {
   additionalProperties: false,
 };
 
+// Dictated speech is not a record. It arrives without punctuation, doubles back
+// on itself and trails off — read it in six months and half of it is gone. This
+// tidies what was said into something that reads as a record, adding nothing.
+const TIDY_SYSTEM =
+  "You tidy a property manager's dictated note into a clear written record for a condominium's files.\n" +
+  "Keep every fact, name, number, date, time and outcome exactly as given. Add nothing — no detail, no " +
+  "inference, no politeness, no heading. Remove filler, false starts and repetition. Fix punctuation, " +
+  "capitalisation and obvious mis-hearings of company names only where the intent is unmistakable.\n" +
+  "Write it as one to four plain sentences in the past tense, third person or first person to match what " +
+  "was said. Do not summarise away detail: a longer note stays long. Return only the tidied text.";
+const TIDY_SCHEMA = {
+  type: "object",
+  properties: { text: { type: "string" } },
+  required: ["text"],
+  additionalProperties: false,
+};
+
 // One line of the property manager's day, filed. She says what she did or what
 // is booked; this works out which of the four it is, who it was, and when —
 // "Northern Generator did the monthly testing on Monday" becomes a completed
@@ -181,6 +198,10 @@ const WEEKLY_SYSTEM =
   "attention: one or two sentences naming only what the board must act on or know before the next " +
   "meeting. Empty if there is nothing.\n" +
   "closing: one sentence inviting questions, in the manager's voice.\n" +
+  "MONEY: an amount is only money where the data already shows it with a $ sign. Every other number is " +
+  "an address, a building, a unit, a floor or a count — 550 and 560 are the two buildings of this " +
+  "corporation, 560-905 is a unit, 11 is a floor. Never put a $ in front of a number that did not " +
+  "already carry one, and never turn a building or unit number into an amount.\n" +
   "Plain sentences, no markdown, no bullet points, no headings, no first-person plural, no hype. " +
   "Canadian dollars with $ and thousands separators.";
 const WEEKLY_SCHEMA = {
@@ -264,10 +285,19 @@ exports.nnsccTrackerAi = onCall(
         throw new HttpsError("invalid-argument", "Bad weekly payload.");
       }
       return await callClaude(key, WEEKLY_SYSTEM,
+        "The corporation is " + String(request.data.buildings || "one building") + ". " +
         "The period is " + String(request.data.from || "") + " to " + String(request.data.to || "") +
         ".\n\nEverything known about it:\n" + JSON.stringify(facts) +
         "\n\nWrite the summary, the attention line and the closing.",
         WEEKLY_SCHEMA, 900, CONTRACT_MODEL);
+    }
+
+    // ----- mode: tidy a dictated note into a record -----
+    if (request.data && request.data.tidy === true) {
+      const text = String(request.data.text || "").slice(0, 6000);
+      if (!text.trim()) throw new HttpsError("invalid-argument", "Nothing to tidy.");
+      const out = await callClaude(key, TIDY_SYSTEM, "Dictated:\n\n" + text, TIDY_SCHEMA, 900);
+      return { text: out.text };
     }
 
     // ----- mode: file one spoken line of the day -----

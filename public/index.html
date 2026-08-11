@@ -2282,7 +2282,7 @@ var CONTRACTS_PATH = "nnsccQuoteTracker/contracts";      /* the contract registe
 var SNAPSHOTS_COLL = "nnsccQuoteSnapshots";               /* a copy of the report, kept each day it changes */
 var ACTIVITY_COLL = "nnsccActivity";                      /* the manager's own record of the week */
 var VIEW_BETA = CURRENT_PATH.indexOf("Beta") >= 0;   /* which report the passcode gate reads/protects */
-var BUILD_STAMP = "2026-08-11 12:57";   /* filled in by build.js — which copy of the page this is */
+var BUILD_STAMP = "2026-08-11 13:16";   /* filled in by build.js — which copy of the page this is */
 /* path of the report currently on screen */
 function reportPath() {
   return cloud.active.kind === "current" ? CURRENT_PATH : (REPORTS_COLL + "/" + cloud.active.id);
@@ -4957,6 +4957,14 @@ document.getElementById("editor").addEventListener("click", function (e) {
     return;
   }
   if (act === "actmic") { actMicToggle(); return; }
+  if (act === "acttidy") { actTidy(); return; }
+  if (act === "actuntidy") {
+    var tb = document.getElementById("actText");
+    if (tb && actTidyPrev != null) tb.value = actTidyPrev;
+    var back = actTidyPrev; actTidyPrev = null; renderEditor();
+    var tb2 = document.getElementById("actText"); if (tb2) tb2.value = back || "";
+    return;
+  }
   if (act === "actdel") {
     var ai = actEl.closest("[data-aid]"); if (!ai) return;
     if (!confirm("Delete this entry from the journal?")) return;
@@ -6106,7 +6114,7 @@ function actAdd() {
       by: (cloud.user && cloud.user.email) || "",
       at: firebase.firestore.FieldValue.serverTimestamp() };
     return cloud.db.collection(ACTIVITY_COLL).add(rec).then(function () {
-      ta.value = ""; actNote("Added \u2014 check the details underneath.");
+      ta.value = ""; actTidyPrev = null; actNote("Added \u2014 check the details underneath.");
       setTimeout(function () { actNote(""); }, 4000);
     });
   };
@@ -6124,7 +6132,30 @@ function actNote(t) { var el = document.getElementById("actNote"); if (el) el.te
    page could do, so nothing is offered there. On a computer the browser can
    listen directly; the words land in the box to be read before they are saved,
    never straight into the journal. */
-var actRec = null, actRecOn = false;
+var actRec = null, actRecOn = false, actTidyPrev = null;
+/* Dictated speech is not a record — it doubles back on itself and trails off.
+   This puts it into sentences without adding anything, and what she said is
+   kept until she has looked at the result. */
+function actTidy() {
+  var ta = document.getElementById("actText");
+  var raw = (ta && ta.value || "").trim();
+  if (!raw) { actNote("Say or type something first."); return; }
+  if (!cloud.fns || !cloud.user) { actNote("Sign in first."); return; }
+  actMicStop();
+  actNote("Tidying it\u2026");
+  cloud.fns.httpsCallable("nnsccTrackerAi")({ tidy: true, text: raw }).then(function (res) {
+    var out = (res.data && res.data.text) || "";
+    if (!out) { actNote("Nothing came back."); return; }
+    actTidyPrev = raw;
+    ta.value = out;
+    renderEditor();
+    var t2 = document.getElementById("actText");
+    if (t2) { t2.value = out; t2.focus(); }
+    actNote("Tidied \u2014 read it over, or put it back as you said it.");
+  }).catch(function (e) {
+    actNote("\u26A0 " + ((e && e.message) || "could not tidy that"));
+  });
+}
 function actSpeechAvailable() {
   return !!(window.SpeechRecognition || window.webkitSpeechRecognition);
 }
@@ -6313,8 +6344,8 @@ function actImportSave() {
 }
 
 function actCardHTML() {
-  var h = ['<div class="ecard esettings"><div class="ehead"><strong>What you did this week</strong>' +
-    '<span style="font-size:12.5px;color:var(--ink2)">— one line each; the weekly report is written from these</span></div><div class="ebids">'];
+  var h = ['<div class="ecard esettings"><div class="ehead"><strong>Log it as it happens</strong>' +
+    '<span style="font-size:12.5px;color:var(--ink2)">— say it when you walk out of the meeting, not on Friday; the date is yours to change</span></div><div class="ebids">'];
   if (!cloud.on) {
     h.push('<p class="edithint" style="margin:4px 0">Available on the live site (cloud copy) only.</p></div></div>');
     return h.join("");
@@ -6324,6 +6355,8 @@ function actCardHTML() {
     (actSpeechAvailable()
       ? '<button class="edbtn" type="button" id="actMic" data-act="actmic" title="Speak instead of typing">\u{1F3A4} Dictate</button>'
       : '<span class="savenote">On a phone, use the microphone on the keyboard to speak it.</span>') +
+    '<button class="edbtn" type="button" data-act="acttidy" title="Turn what you said into a clean record — nothing added">\u{2728} Tidy it up</button>' +
+    (actTidyPrev != null ? '<button class="edbtn" type="button" data-act="actuntidy">\u21BA Put it back</button>' : "") +
     '<button class="edbtn prim" type="button" data-act="actadd">Add to the journal</button>' +
     '<span class="savenote" id="actNote"></span></div></div>');
 
@@ -6502,9 +6535,10 @@ function wkInPeriod(day) {
 function wkGather() {
   wkEnsureDates();
   var journal = actState.list.filter(function (r) { return wkInPeriod(r.day); });
-  var done = journal.filter(function (r) { return r.kind === "done" || (r.kind === "scheduled" && r.done); });
-  var units = journal.filter(function (r) { return r.kind === "unit"; });
-  var notes = journal.filter(function (r) { return r.kind === "note"; });
+  var byDay = function (a, b) { return a.day < b.day ? -1 : (a.day > b.day ? 1 : 0); };
+  var done = journal.filter(function (r) { return r.kind === "done" || (r.kind === "scheduled" && r.done); }).sort(byDay);
+  var units = journal.filter(function (r) { return r.kind === "unit"; }).sort(byDay);
+  var notes = journal.filter(function (r) { return r.kind === "note"; }).sort(byDay);
   var booked = actState.list.filter(function (r) {
     return r.kind === "scheduled" && !r.done && r.day && r.day >= todayISO();
   }).sort(function (a, b) { return a.day < b.day ? -1 : 1; }).slice(0, 25);
@@ -6543,7 +6577,8 @@ function wkGenerate() {
   wkState.busy = "\u{2728} Claude is reading the period\u2026";
   wkState.pdf = null;
   renderEditor();
-  cloud.fns.httpsCallable("nnsccTrackerAi")({ weekly: true, from: wkState.from, to: wkState.to, facts: wkFacts(g) })
+  cloud.fns.httpsCallable("nnsccTrackerAi")({ weekly: true, from: wkState.from, to: wkState.to,
+    buildings: (state.meta && state.meta.buildings) || "", facts: wkFacts(g) })
     .then(function (res) {
       wkState.ai = res.data || null;
       wkState.built = todayISO();
@@ -6697,7 +6732,7 @@ function wkPaperHTML() {
 
   h.push('<div class="wksec">Contractor work completed</div>');
   h.push(wkRowsHTML(g.done, [
-    ["Contractor", function (r) { return esc(r.contractor || "\u2014"); }],
+    ["Contractor", function (r) { return esc(r.contractor || "In-house"); }],
     ["Type of work", function (r) { return esc(r.work || r.text || ""); }],
     ["Notes", function (r) { return esc(r.note || "\u2014"); }],
     ["Date", function (r) { return esc(jdDate(r.day)); }]]));
