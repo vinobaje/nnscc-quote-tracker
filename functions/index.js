@@ -474,6 +474,7 @@ exports.nnsccGate = onCall(
         ok: true,
         report: { jobs: d.jobs || [], meta: d.meta || null, ai: d.ai || null, reportName: d.reportName || null },
         contracts: cl,
+        alertSettings: (con.exists && con.data().alerts) || {},
       };
     }
 
@@ -615,3 +616,342 @@ exports.nnsccArrearsPdf = onCall(
 // NOTE: The multi-tenant CondoQuote SaaS functions (saas*) live in the
 // separate SAAS repo (github.com/vinobaje/SAAS), functions codebase "saas".
 // Do not add SaaS code here.
+
+// ---------------------------------------------------------------------------
+// Renewal and expiry alerts
+//
+// Two dates in this system quietly cost money when they pass unnoticed: the
+// last day notice can be given on a contract that renews itself, and the day a
+// contractor's quoted price stops being good. Nobody opens a report to check
+// for either. So the dates are checked here once a day and mailed out, and the
+// same list is drawn at the top of the report for whoever opens it.
+//
+// The rules live in one place and are shared with the page, so what the board
+// reads on screen and what lands in the property manager's inbox cannot drift.
+// ---------------------------------------------------------------------------
+const { onSchedule } = require("firebase-functions/v2/scheduler");
+
+// The settings ride along in the contract register, which every reader of the
+// report already receives — so the page can draw the same list with the same
+// windows without a second document and a second permission to go with it.
+const ALERT_PATHS = {
+  report: "nnsccQuoteTracker/main",
+  contracts: "nnsccQuoteTracker/contracts",
+  directory: "nnsccQuoteTracker/contractors",
+  state: "nnsccQuoteTracker/alertState",
+};
+const ALERT_DEFAULTS = {
+  contractDays: 90,      // a renewal or an ending contract, this far ahead
+  insuranceDays: 60,     // a contractor's cover running out
+  quoteDays: 7,          // a quoted price about to stop being good
+  recipients: [],        // filled from settings; the owner is always included
+  from: "Waterview Quote Report <onboarding@resend.dev>",
+  reportUrl: "https://quote-report.web.app",
+  enabled: true,
+};
+
+function alertDaysUntil(iso, todayMs) {
+  const s = String(iso || "").slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
+  const p = s.split("-");
+  return Math.round((Date.UTC(+p[0], +p[1] - 1, +p[2]) - todayMs) / 86400000);
+}
+function alertDate(iso) {
+  const s = String(iso || "").slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  const p = s.split("-");
+  const m = ["January", "February", "March", "April", "May", "June", "July",
+             "August", "September", "October", "November", "December"][+p[1] - 1];
+  return m + " " + +p[2] + ", " + p[0];
+}
+function alertMoney(n) {
+  return "$" + Number(n || 0).toLocaleString("en-CA", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+// the last day notice can be given before a contract renews itself
+function alertNoticeBy(c) {
+  if (!c.renew || !c.end || !(+c.noticeDays > 0)) return "";
+  const p = String(c.end).slice(0, 10).split("-");
+  if (p.length !== 3) return "";
+  const d = new Date(Date.UTC(+p[0], +p[1] - 1, +p[2]));
+  d.setUTCDate(d.getUTCDate() - Math.round(+c.noticeDays));
+  return d.toISOString().slice(0, 10);
+}
+function alertWhen(days) {
+  if (days === 0) return "today";
+  if (days === 1) return "tomorrow";
+  if (days < 0) return Math.abs(days) + " day" + (days === -1 ? "" : "s") + " ago";
+  return "in " + days + " days";
+}
+
+// Every date worth watching, in one list. `audience` says who it concerns:
+// "all" is anyone reading the report, "manager" is housekeeping the board has
+// no use for. Each item carries a key that changes when its date does, so a
+// rescheduled deadline is announced again and an unchanged one is not.
+function buildAlerts(data, cfg, todayISO) {
+  const p = String(todayISO).split("-");
+  const today = Date.UTC(+p[0], +p[1] - 1, +p[2]);
+  const out = [];
+  const contracts = Array.isArray(data.contracts) ? data.contracts : [];
+  const directory = Array.isArray(data.directory) ? data.directory : [];
+  const jobs = Array.isArray(data.jobs) ? data.jobs : [];
+
+  contracts.forEach((c) => {
+    const who = (c.contractor || "").trim() || "Contractor not named";
+    const what = (c.title || "").trim();
+    const label = who + (what ? " — " + what : "");
+    const notice = alertNoticeBy(c);
+    const endDays = alertDaysUntil(c.end, today);
+    if (notice) {
+      const nd = alertDaysUntil(notice, today);
+      /* a deadline that went by months ago is history, not news — the register
+         still shows it, but it stops arriving in the post every Monday */
+      if (nd != null && nd <= cfg.contractDays && nd > -60) {
+        out.push({
+          key: "con-notice-" + c.id + "-" + notice,
+          kind: "contract", audience: "all",
+          severity: nd < 0 ? "passed" : (nd <= 14 ? "urgent" : "soon"),
+          days: nd, when: alertDate(notice),
+          title: label,
+          detail: nd < 0
+            ? "The deadline to give notice passed " + alertWhen(nd) + " (" + alertDate(notice) +
+              ") — this agreement renews for another term."
+            : "Notice to end this agreement must be given by " + alertDate(notice) + " (" + alertWhen(nd) +
+              "), otherwise it renews automatically" +
+              (c.end ? " on " + alertDate(c.end) : "") + ".",
+        });
+      }
+    } else if (endDays != null && endDays <= cfg.contractDays && endDays > -60) {
+      out.push({
+        key: "con-end-" + c.id + "-" + c.end,
+        kind: "contract", audience: "all",
+        severity: endDays < 0 ? "passed" : (endDays <= 14 ? "urgent" : "soon"),
+        days: endDays, when: alertDate(c.end),
+        title: label,
+        detail: endDays < 0
+          ? "This agreement ended " + alertWhen(endDays) + " (" + alertDate(c.end) + ")."
+          : "This agreement ends " + alertDate(c.end) + " (" + alertWhen(endDays) + ")" +
+            (c.renew ? " and renews automatically." : " and does not renew on its own."),
+      });
+    }
+    if (!(c.files || []).length) {
+      out.push({
+        key: "con-nodoc-" + c.id,
+        kind: "housekeeping", audience: "manager", severity: "info", days: null, when: "",
+        title: label, detail: "No signed copy of this agreement is attached to the register.",
+      });
+    }
+  });
+
+  // cover on a contractor who currently holds a live agreement
+  const holders = {};
+  contracts.forEach((c) => {
+    const nm = (c.contractor || "").trim();
+    if (!nm) return;
+    const endDays = alertDaysUntil(c.end, today);
+    if (c.end && endDays != null && endDays < 0 && !c.renew) return;   // finished
+    holders[nm.toLowerCase()] = nm;
+  });
+  directory.forEach((r) => {
+    const nm = (r.name || "").trim();
+    if (!nm || !holders[nm.toLowerCase()] || !r.insuranceExp) return;
+    const d = alertDaysUntil(r.insuranceExp, today);
+    if (d == null || d > cfg.insuranceDays) return;
+    out.push({
+      key: "ins-" + nm.toLowerCase() + "-" + String(r.insuranceExp).slice(0, 10),
+      kind: "insurance", audience: "all",
+      severity: d < 0 ? "passed" : (d <= 14 ? "urgent" : "soon"),
+      days: d, when: alertDate(r.insuranceExp),
+      title: nm,
+      detail: d < 0
+        ? "Their insurance certificate expired " + alertWhen(d) + " (" + alertDate(r.insuranceExp) +
+          ") — no new work should be awarded until it is renewed."
+        : "Their insurance certificate expires " + alertDate(r.insuranceExp) + " (" + alertWhen(d) + ").",
+    });
+  });
+
+  // a quoted price stops being good; the board decides on figures that hold
+  jobs.forEach((j) => {
+    (j.bids || []).forEach((b, bi) => {
+      if (!b || !b.qdate || b.amount == null || b.amount === "") return;
+      const days = +b.validDays > 0 ? Math.round(+b.validDays) : 60;
+      const q = String(b.qdate).slice(0, 10).split("-");
+      if (q.length !== 3) return;
+      const exp = new Date(Date.UTC(+q[0], +q[1] - 1, +q[2]));
+      exp.setUTCDate(exp.getUTCDate() + days);
+      const expISO = exp.toISOString().slice(0, 10);
+      const d = alertDaysUntil(expISO, today);
+      /* long-lapsed quotes are a fact of the report, not something to chase */
+      if (d == null || d > cfg.quoteDays || d < -30) return;
+      out.push({
+        key: "bid-" + j.id + "-" + bi + "-" + expISO,
+        kind: "quote", audience: "all",
+        severity: d < 0 ? "passed" : (d <= 2 ? "urgent" : "soon"),
+        days: d, when: alertDate(expISO),
+        title: "Job " + (j.no || "?") + " — " + ((j.desc || "").trim() || "untitled") +
+               " · " + ((b.contractor || "").trim() || "contractor not named") +
+               " · " + alertMoney(b.amount),
+        detail: d < 0
+          ? "This quote was only good for " + days + " days and lapsed " + alertWhen(d) +
+            " — ask the contractor to re-confirm the price."
+          : "This quote is only good until " + alertDate(expISO) + " (" + alertWhen(d) +
+            ") — get the decision made or ask for it to be held.",
+      });
+    });
+  });
+
+  const rank = { passed: 0, urgent: 1, soon: 2, info: 3 };
+  out.sort((a, b) => (rank[a.severity] - rank[b.severity]) ||
+    ((a.days == null ? 9999 : a.days) - (b.days == null ? 9999 : b.days)));
+  return out;
+}
+
+const ALERT_KIND_LABEL = {
+  contract: "Contracts", insurance: "Contractor insurance",
+  quote: "Quotes about to lapse", housekeeping: "For the property manager",
+};
+function alertEmailHTML(items, cfg, todayISO, isDigest) {
+  const esc = (s) => String(s == null ? "" : s)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  const colour = { passed: "#A03636", urgent: "#A03636", soon: "#8A6410", info: "#4A5866" };
+  const groups = {};
+  items.forEach((i) => { (groups[i.kind] = groups[i.kind] || []).push(i); });
+  let h = '<div style="font:16px/1.6 -apple-system,Segoe UI,Helvetica,Arial,sans-serif;color:#1B2A3B;max-width:640px">';
+  h += '<p style="font-size:15px;color:#4A5866;margin:0 0 4px">Waterview Condominium · NNSCC No. 292</p>';
+  h += '<h1 style="font:700 22px/1.3 Georgia,serif;margin:0 0 14px">' +
+       (isDigest ? "Dates coming up" : "Something needs attention") + "</h1>";
+  ["contract", "insurance", "quote", "housekeeping"].forEach((k) => {
+    if (!groups[k]) return;
+    h += '<h2 style="font:700 13px/1.4 sans-serif;text-transform:uppercase;letter-spacing:.06em;color:#4A5866;' +
+         'margin:22px 0 8px;border-bottom:1px solid #E8ECEF;padding-bottom:5px">' + ALERT_KIND_LABEL[k] + "</h2>";
+    groups[k].forEach((i) => {
+      h += '<div style="margin:0 0 14px;padding-left:12px;border-left:3px solid ' + colour[i.severity] + '">' +
+        '<div style="font-weight:700">' + esc(i.title) + "</div>" +
+        '<div style="color:#3C4A5A">' + esc(i.detail) + "</div></div>";
+    });
+  });
+  h += '<p style="margin:26px 0 0"><a href="' + esc(cfg.reportUrl) +
+       '" style="background:#24466B;color:#fff;text-decoration:none;padding:11px 18px;border-radius:8px;' +
+       'font-weight:700;display:inline-block">Open the report</a></p>';
+  h += '<p style="font-size:13px;color:#7A8794;margin:22px 0 0;border-top:1px solid #E8ECEF;padding-top:10px">' +
+       "Sent by the contractor quote report on " + alertDate(todayISO) + ". " +
+       (isDigest ? "This is the weekly summary of everything outstanding."
+                 : "You are told once per date; the weekly summary on Monday repeats what is still open.") +
+       "</p></div>";
+  return h;
+}
+
+async function sendAlertEmail(key, cfg, to, subject, html) {
+  const resp = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: { "content-type": "application/json", authorization: "Bearer " + key },
+    body: JSON.stringify({ from: cfg.from, to: to, subject: subject, html: html }),
+  });
+  const body = await resp.text();
+  if (!resp.ok) throw new Error("Resend returned HTTP " + resp.status + ": " + body.slice(0, 300));
+  return body;
+}
+
+// Read everything the rules are computed from.
+async function alertGather() {
+  const db = admin.firestore();
+  const [rep, con, dir, cfgSnap, st] = await Promise.all([
+    db.doc(ALERT_PATHS.report).get(),
+    db.doc(ALERT_PATHS.contracts).get(),
+    db.doc(ALERT_PATHS.directory).get(),
+    db.doc("nnsccQuoteTrackerConfig/main").get(),
+    db.doc(ALERT_PATHS.state).get(),
+  ]);
+  const settings = (con.exists && con.data().alerts) || {};
+  const cfg = Object.assign({}, ALERT_DEFAULTS, {
+    contractDays: +settings.contractDays > 0 ? +settings.contractDays : ALERT_DEFAULTS.contractDays,
+    insuranceDays: +settings.insuranceDays > 0 ? +settings.insuranceDays : ALERT_DEFAULTS.insuranceDays,
+    quoteDays: +settings.quoteDays > 0 ? +settings.quoteDays : ALERT_DEFAULTS.quoteDays,
+    recipients: Array.isArray(settings.recipients) ? settings.recipients : [],
+    from: settings.from || ALERT_DEFAULTS.from,
+    enabled: settings.enabled !== false,
+  });
+  return {
+    cfg,
+    data: {
+      jobs: (rep.exists && rep.data().jobs) || [],
+      contracts: (con.exists && con.data().list) || [],
+      directory: (dir.exists && dir.data().list) || [],
+    },
+    resendKey: (cfgSnap.exists && cfgSnap.data().resendKey) || "",
+    state: st.exists ? st.data() : {},
+  };
+}
+
+// The daily run. Nothing is sent when nothing has changed: an item is mailed
+// the first day it appears, and after that only in Monday's summary, so a
+// deadline three months out does not arrive ninety times.
+async function alertRun(todayISO, force) {
+  const { cfg, data, resendKey, state } = await alertGather();
+  const items = buildAlerts(data, cfg, todayISO);
+  const to = [OWNER].concat(cfg.recipients.map((e) => String(e).trim().toLowerCase()))
+    .filter((e, i, a) => e && a.indexOf(e) === i);
+  const monday = new Date(todayISO + "T12:00:00Z").getUTCDay() === 1;
+  const sent = state.sent || {};
+  const fresh = items.filter((i) => !sent[i.key]);
+  const digest = force || (monday && items.length > 0);
+  const result = { items: items.length, fresh: fresh.length, digest: digest, sent: false, to: to };
+
+  if (!cfg.enabled) { result.skipped = "alerts are switched off"; return result; }
+  if (!items.length && !force) { result.skipped = "nothing to report"; return result; }
+  if (!fresh.length && !digest) { result.skipped = "nothing new since the last message"; return result; }
+  if (!resendKey) { result.skipped = "no Resend API key has been saved"; return result; }
+
+  const show = digest ? items : fresh;
+  const urgent = show.filter((i) => i.severity === "passed" || i.severity === "urgent").length;
+  const subject = "Waterview: " + show.length + " item" + (show.length === 1 ? "" : "s") +
+    " need" + (show.length === 1 ? "s" : "") + " attention" + (urgent ? " (" + urgent + " overdue or urgent)" : "");
+  await sendAlertEmail(resendKey, cfg, to, subject, alertEmailHTML(show, cfg, todayISO, digest));
+
+  const keep = {};
+  items.forEach((i) => { keep[i.key] = sent[i.key] || todayISO; });
+  await admin.firestore().doc(ALERT_PATHS.state).set(
+    { sent: keep, lastRun: todayISO, lastSent: todayISO, lastCount: show.length }, { merge: true });
+  result.sent = true;
+  return result;
+}
+
+exports.nnsccAlerts = onSchedule(
+  { schedule: "0 8 * * *", timeZone: "America/Toronto", region: "us-central1",
+    memory: "256MiB", timeoutSeconds: 120 },
+  async () => {
+    const today = new Date(Date.now() - 4 * 3600 * 1000).toISOString().slice(0, 10);  // Toronto morning
+    const r = await alertRun(today, false);
+    console.log("alerts:", JSON.stringify(r));
+  }
+);
+
+// The property manager's "send it to me now" button, and what the Settings
+// panel uses to show what today's message would say.
+exports.nnsccAlertNow = onCall(
+  { region: "us-central1", memory: "256MiB", timeoutSeconds: 120, maxInstances: 3 },
+  async (request) => {
+    const auth = request.auth;
+    if (!auth || !auth.token || !auth.token.email || auth.token.email_verified !== true) {
+      throw new HttpsError("unauthenticated", "Sign in with an authorized account.");
+    }
+    const email = auth.token.email.toLowerCase();
+    const cfgSnap = await admin.firestore().doc("nnsccQuoteTrackerConfig/main").get();
+    const editors = ((cfgSnap.exists ? cfgSnap.data().editors : []) || []).map((e) => String(e).toLowerCase());
+    if (email !== OWNER && !editors.includes(email)) {
+      throw new HttpsError("permission-denied", "This account is not the property manager.");
+    }
+    const today = new Date(Date.now() - 4 * 3600 * 1000).toISOString().slice(0, 10);
+    if (request.data && request.data.preview === true) {
+      const { cfg, data, resendKey } = await alertGather();
+      const items = buildAlerts(data, cfg, today);
+      return { items: items, keySet: !!resendKey, cfg: { contractDays: cfg.contractDays,
+        insuranceDays: cfg.insuranceDays, quoteDays: cfg.quoteDays, recipients: cfg.recipients,
+        from: cfg.from, enabled: cfg.enabled } };
+    }
+    try {
+      return await alertRun(today, true);
+    } catch (e) {
+      throw new HttpsError("internal", (e && e.message) || "Could not send the message.");
+    }
+  }
+);

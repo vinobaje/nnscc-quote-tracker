@@ -1438,6 +1438,20 @@ body[data-view="edit"] .wrap { max-width:none; }
   .conproprow { grid-template-columns:auto 1fr; }
   .conproprow .pw { grid-column:1 / -1; }
 }
+/* the dates worth knowing about, said once on the way into the report */
+.alertwins { display:flex; gap:14px; flex-wrap:wrap; flex:1; }
+.alertwins label { display:inline-flex; align-items:center; gap:6px; font-size:13px; color:var(--ink2); white-space:nowrap; }
+.alertwins input { width:70px; }
+.alertbar { border:1px solid var(--amber); border-left:5px solid var(--amber); border-radius:10px;
+  background:var(--amber-soft); padding:14px 18px; margin:0 0 18px; }
+.alertbar.hot { border-color:var(--prio); border-left-color:var(--prio); background:var(--prio-soft); }
+.alerthead { font:700 16px/1.35 inherit; color:var(--ink); margin-bottom:7px; }
+.alertbar ul { margin:0; padding-left:19px; }
+.alertbar li { font-size:14.5px; line-height:1.6; color:var(--ink); margin:5px 0; }
+.alertbar li.passed, .alertbar li.urgent { color:#7a2020; }
+.alertbar li strong { font-weight:700; }
+@media print { .alertbar { break-inside:avoid; } }
+@media screen and (max-width:600px) { .alertbar { padding:12px 14px; } .alertbar li { font-size:14px; } }
 /* the same summary as the board reads it */
 .consum { margin-top:10px; border-top:1px solid var(--line-soft); padding-top:9px; }
 .consumh { font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); }
@@ -2007,12 +2021,21 @@ function stChip(j) {
   return ' <span class="stchip st-' + esc(j.status) + '">' + esc(statusLabel(j.status)) + "</span>";
 }
 function todayISO() { return new Date().toISOString().slice(0, 10); }
-/* a dated quote goes stale after its validity window (default 60 days) */
+/* the day a quoted price stops being good: the quote date plus its validity
+   window (60 days unless the contractor said otherwise) */
+function bidExpiryISO(b) {
+  if (!b || !b.qdate) return "";
+  var q = String(b.qdate).slice(0, 10).split("-");
+  if (q.length !== 3) return "";
+  var days = +b.validDays > 0 ? Math.round(+b.validDays) : 60;
+  var d = new Date(+q[0], +q[1] - 1, +q[2]);
+  d.setDate(d.getDate() + days);
+  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" +
+         String(d.getDate()).padStart(2, "0");
+}
 function bidExpired(b) {
-  if (!b.qdate) return false;
-  var days = +b.validDays > 0 ? +b.validDays : 60;
-  var exp = new Date(b.qdate); exp.setDate(exp.getDate() + days);
-  return exp < new Date();
+  var e = bidExpiryISO(b);
+  return !!e && conDaysUntil(e) < 0;
 }
 /* extra per-bid facts for the report: quote date, expiry, attachments */
 function bidMetaHTML(b, jid, bi) {
@@ -2187,7 +2210,7 @@ var CONTRACTORS_PATH = "nnsccQuoteTracker/contractors";  /* shared contractor di
 var CONTRACTS_PATH = "nnsccQuoteTracker/contracts";      /* the contract register — read with the report */
 var SNAPSHOTS_COLL = "nnsccQuoteSnapshots";               /* a copy of the report, kept each day it changes */
 var VIEW_BETA = CURRENT_PATH.indexOf("Beta") >= 0;   /* which report the passcode gate reads/protects */
-var BUILD_STAMP = "2026-08-11 00:25";   /* filled in by build.js — which copy of the page this is */
+var BUILD_STAMP = "2026-08-11 09:19";   /* filled in by build.js — which copy of the page this is */
 /* path of the report currently on screen */
 function reportPath() {
   return cloud.active.kind === "current" ? CURRENT_PATH : (REPORTS_COLL + "/" + cloud.active.id);
@@ -3599,6 +3622,7 @@ function renderPacketReport() {
     '<div class="pk-gold"></div></div>' +
     '<div class="pk-top-photo"><img src="' + esc(photoSrc()) + '" alt=""></div></div>' +
     '<section id="secSum" class="pk-stats">' + statCards(d) + '</section></div>');
+  h.push(alertPanelHTML());
   h.push(tplBanners(ctx.ED));
   /* dense 4-up: spend | donut | high-priority | top savings */
   h.push('<div class="pk-grid4">');
@@ -3763,6 +3787,7 @@ function renderClassicReport() {
   if (EDITOR)
     h.push('<div class="edithint-inline">✎ You’re signed in as the property manager — click almost anything to edit it right here (look for the dashed underline on hover): headings, descriptions, job names, contractor names, scope notes, and dollar amounts. Amounts you type are treated as the <strong>HST-included total</strong>; type an amount over “Enter amount” to turn a pending bid into a quote. Totals, the lowest-bid flag, and the charts recalculate automatically. Use the <strong>Edit</strong> tab to add or remove jobs and bids or toggle priority.</div>');
 
+  h.push(alertPanelHTML());
   h.push('<section id="secSum"><h2' + hA("headSum") + ">" + esc(M.headSum) + "</h2>");
   if (state.ai && state.ai.summary)
     h.push('<p class="seclede ainarr">' + tE("ai:summary", state.ai.summary, "AI summary") + "</p>");
@@ -4022,6 +4047,7 @@ function renderEditor() {
   h.push("</div></div></div>");
   document.getElementById("editor").innerHTML = h.join("");
   aiCheckKey();
+  alertCheckKey();
   viewPassCheck();
 }
 /* amounts are typed as money ("48,500" / "$48,500.00") and stored as a number */
@@ -4380,6 +4406,7 @@ function edOverviewHTML(M) {
   h.push('<p class="edithint" style="margin:6px 0 0;font-size:12.5px">Section headings are edited in the report itself — ' +
     "open <strong>Preview report</strong> and click any heading to rename it.</p></div></div>");
   h.push(aiCardHTML());
+  h.push(alertCardHTML());
   h.push(intakeCardHTML());
   return h.join("");
 }
@@ -4429,6 +4456,81 @@ function aiCheckKey() {
     aiKeyState = (res.data && res.data.keySet) ? "set" : "unset";
     if (document.body.dataset.view === "edit") renderEditor();
   }).catch(function () { aiCheckDone = false; });
+}
+
+/* the manager's side of the alerts: how far ahead to look, who is told, and
+   the one credential that makes the message actually leave the building */
+var alertKeyState = null, alertShowKeyRow = false, alertMsg = "";
+function alertCardHTML() {
+  var cfg = alertCfg(), items = alertList();
+  var h = ['<div class="ecard esettings" id="alertCard"><div class="ehead"><strong>Renewal and expiry alerts</strong>' +
+    '<span style="font-size:12.5px;color:var(--ink2)">— a message once a day when a date is coming up, and the same list on the report</span></div><div class="ebids">'];
+  if (!cloud.on) {
+    h.push('<p class="edithint" style="margin:4px 0">Available on the live site (cloud copy) only.</p></div></div>');
+    return h.join("");
+  }
+  h.push('<div class="esrow"><label>Look ahead</label><div class="alertwins">' +
+    '<label>Contract renewals <input type="number" min="1" max="365" data-alf="contractDays" value="' +
+      esc(cfg.contractDays) + '"> days</label>' +
+    '<label>Contractor insurance <input type="number" min="1" max="365" data-alf="insuranceDays" value="' +
+      esc(cfg.insuranceDays) + '"> days</label>' +
+    '<label>Quoted prices <input type="number" min="1" max="120" data-alf="quoteDays" value="' +
+      esc(cfg.quoteDays) + '"> days</label></div></div>');
+  h.push('<div class="esrow"><label>Also email</label><div style="flex:1">' +
+    '<input type="text" data-alf="recipients" value="' + esc(cfg.recipients.join(", ")) +
+    '" placeholder="sarah@example.com, someone@example.com">' +
+    '<div class="savenote">Separate addresses with a comma. ' + esc(LOG_EXEMPT[0]) +
+    ' is always included. Board members are not emailed — they see the same list at the top of the report.</div></div></div>');
+  h.push('<div class="esrow"><label>Sent from</label><div style="flex:1">' +
+    '<input type="text" data-alf="from" value="' + esc(cfg.from) + '">' +
+    '<div class="savenote">Resend only delivers to your own address until a domain is verified with them — ' +
+    'verify one and put an address at that domain here to reach anyone else.</div></div></div>');
+  h.push('<div class="esrow"><label>Daily message</label><div style="flex:1">' +
+    '<label class="echk" style="font-weight:400"><input type="checkbox" data-alf="enabled"' +
+    (cfg.enabled ? " checked" : "") + "> send it</label>" +
+    '<div class="savenote">Checked at 8am. A date is announced the day it comes into range, and again in ' +
+    'Monday\u2019s summary if it is still open — never the same thing every morning.</div></div></div>');
+  var keyRow = '<div style="display:flex;gap:8px;margin-top:6px">' +
+    '<input type="password" id="alertKeyInput" placeholder="paste the Resend API key (owner only)" style="flex:1" autocomplete="off">' +
+    '<button class="btn" data-act="alert-savekey" type="button">Save key</button></div>' +
+    '<div class="savenote" style="margin-top:4px">Stored server-side in Firebase; no browser can read it back. Get one free at resend.com.</div>';
+  h.push('<div class="esrow"><label>Email key</label><div style="flex:1">');
+  if (alertKeyState === "set") {
+    h.push('<div class="savenote" style="color:var(--good);font-weight:600">\u2713 A key is saved — the daily message can go out.' +
+      (alertShowKeyRow ? "" : ' <button class="btn ghost" data-act="alert-replacekey" type="button" style="margin-left:6px">Replace key…</button>') + "</div>");
+    if (alertShowKeyRow) h.push(keyRow);
+  } else if (alertKeyState === "unset") {
+    h.push('<div class="savenote">No key saved yet, so nothing is emailed — the list still shows on the report.</div>' + keyRow);
+  } else {
+    h.push('<div class="savenote">Checking…</div>');
+    if (alertShowKeyRow) h.push(keyRow);
+  }
+  h.push("</div></div>");
+  h.push('<div class="esrow"><label></label><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">' +
+    '<button class="btn primary" data-act="alert-send" type="button">\u{1F4E8} Send it to me now</button>' +
+    '<span class="savenote" id="alertStatus">' + esc(alertMsg) + "</span></div></div>");
+  h.push('<div class="esrow"><label>Right now</label><div style="flex:1">' +
+    (items.length
+      ? '<div class="savenote">' + items.length + " item" + (items.length === 1 ? "" : "s") +
+        " would be listed: " + esc(items.slice(0, 3).map(function (i) { return i.title; }).join("; ")) +
+        (items.length > 3 ? "; …" : "") + "</div>"
+      : '<div class="savenote" style="color:var(--good)">Nothing is coming up inside these windows.</div>') +
+    "</div></div>");
+  h.push("</div></div>");
+  return h.join("");
+}
+function alertCheckKey() {
+  if (!cloud.fns || !cloud.user || !isEditor() || alertKeyState !== null) return;
+  alertKeyState = "checking";
+  cloud.fns.httpsCallable("nnsccAlertNow")({ preview: true }).then(function (res) {
+    alertKeyState = (res.data && res.data.keySet) ? "set" : "unset";
+    if (document.body.dataset.view === "edit") renderEditor();
+  }).catch(function () { alertKeyState = null; });
+}
+function alertStatus(t) {
+  alertMsg = t || "";
+  var el = document.getElementById("alertStatus");
+  if (el) el.textContent = alertMsg;
 }
 
 function aiCardHTML() {
@@ -4528,8 +4630,46 @@ function aiSaveKey() {
   });
 }
 
+function alertSaveKey() {
+  var inp = document.getElementById("alertKeyInput");
+  var v = (inp.value || "").trim();
+  if (!v) { alertStatus("Paste a key first."); return; }
+  cloud.db.doc(CONFIG_PATH).set({ resendKey: v }, { merge: true }).then(function () {
+    inp.value = ""; alertKeyState = "set"; alertShowKeyRow = false; renderEditor();
+    alertStatus("Key saved server-side. It can never be read back by a browser.");
+  }).catch(function (e) {
+    alertStatus(e && e.code === "permission-denied"
+      ? "\u26A0 Only the owner account can save the key." : "\u26A0 Could not save key.");
+  });
+}
+/* the same message the daily run would send, on demand */
+function alertSendNow() {
+  if (!cloud.fns || !cloud.user) { alertStatus("Sign in first."); return; }
+  alertStatus("Sending…");
+  cloud.fns.httpsCallable("nnsccAlertNow")({}).then(function (res) {
+    var r = res.data || {};
+    alertStatus(r.sent
+      ? "Sent to " + (r.to || []).join(", ") + " — " + r.items + " item" + (r.items === 1 ? "" : "s") + " listed."
+      : "Nothing sent: " + (r.skipped || "nothing to report") + ".");
+  }).catch(function (e) {
+    alertStatus("\u26A0 " + ((e && e.message) || "could not send"));
+  });
+}
+
 /* ---------- editor events (delegated) ---------- */
 document.getElementById("editor").addEventListener("change", function (e) {
+  /* how far ahead the alerts look, and who hears about them */
+  var alf = e.target.dataset.alf;
+  if (alf) {
+    conState.alerts = conState.alerts || {};
+    if (alf === "enabled") conState.alerts.enabled = e.target.checked;
+    else if (alf === "recipients")
+      conState.alerts.recipients = e.target.value.split(",")
+        .map(function (x) { return x.trim().toLowerCase(); }).filter(Boolean);
+    else if (alf === "from") conState.alerts.from = e.target.value.trim();
+    else conState.alerts[alf] = Math.max(1, Math.round(+e.target.value || 0));
+    conSave(); renderEditor(); renderReport(); return;
+  }
   var aif = e.target.dataset.aif;
   if (aif && state.ai) {
     state.ai[aif] = e.target.value;
@@ -4637,6 +4777,9 @@ document.getElementById("editor").addEventListener("click", function (e) {
   }
   if (!act) return;
   if (edWorkspaceAction(act, actEl, e)) return;
+  if (act === "alert-savekey") { alertSaveKey(); return; }
+  if (act === "alert-replacekey") { alertShowKeyRow = true; renderEditor(); return; }
+  if (act === "alert-send") { alertSendNow(); return; }
   if (act === "ai-savekey") { aiSaveKey(); return; }
   if (act === "ai-replacekey") { aiShowKeyRow = true; renderEditor(); return; }
   if (act === "ai-generate") { aiGenerate(); return; }
@@ -4905,9 +5048,9 @@ function edWorkspaceAction(act, el, e) {
       var cai = conById(cu.dataset.cid);
       if (!cai || !conAiPending || conAiPending.cid !== cai.id) return true;
       var d = conAiPending.d || {};
-      Array.prototype.forEach.call(cu.querySelectorAll("[data-aif]"), function (cb) {
+      Array.prototype.forEach.call(cu.querySelectorAll("[data-conaif]"), function (cb) {
         if (!cb.checked) return;
-        var f = cb.getAttribute("data-aif");
+        var f = cb.getAttribute("data-conaif");
         for (var i = 0; i < CON_AI_FIELDS.length; i++)
           if (CON_AI_FIELDS[i][0] === f) conFieldSet(cai, f, CON_AI_FIELDS[i][2](d));
       });
@@ -5381,7 +5524,7 @@ function conAiBoxHTML(c) {
     if (F[0] === "renew" && nv === "no" && !cv) return; /* "no" over blank is not news */
     var clash = !!cv && cv !== nv;
     rows.push('<label class="conproprow' + (clash ? " clash" : "") + '">' +
-      '<input type="checkbox" data-aif="' + F[0] + '"' + (clash ? "" : " checked") + ">" +
+      '<input type="checkbox" data-conaif="' + F[0] + '"' + (clash ? "" : " checked") + ">" +
       '<span class="pl">' + esc(F[1]) + "</span>" +
       '<span class="pv">' + esc(conFieldShow(F[0], nv)) + "</span>" +
       (clash ? '<span class="pw">replaces ' + esc(conFieldShow(F[0], cv)) + "</span>" : "") + "</label>");
@@ -5545,7 +5688,7 @@ var conState = { list: [] }, conUnsub = null;
 var conGate = { pass: "" };
 function conSave() {
   if (!cloud.on || !isEditor()) return;
-  cloud.db.doc(CONTRACTS_PATH).set({ list: conState.list.map(function (c) {
+  cloud.db.doc(CONTRACTS_PATH).set({ alerts: conState.alerts || {}, list: conState.list.map(function (c) {
     return { id: c.id || genId(), contractor: c.contractor || "", title: c.title || "",
       start: c.start || "", end: c.end || "", renew: !!c.renew,
       noticeDays: c.noticeDays == null ? "" : c.noticeDays,
@@ -5562,7 +5705,9 @@ function conSubscribe() {
   if (!cloud.on || !cloud.user) { if (!conGate.pass) conState = { list: [] }; return; }
   conUnsub = cloud.db.doc(CONTRACTS_PATH).onSnapshot(function (snap) {
     var mine = !!(snap.metadata && snap.metadata.hasPendingWrites);
-    conState = (snap.exists && Array.isArray(snap.data().list)) ? { list: snap.data().list } : { list: [] };
+    conState = snap.exists
+      ? { list: Array.isArray(snap.data().list) ? snap.data().list : [], alerts: snap.data().alerts || {} }
+      : { list: [], alerts: {} };
     conState.list.forEach(function (c) { if (!c.id) c.id = genId(); });
     /* an echo of our own save: the page already shows it, and redrawing here
        would take the cursor out of the field being typed in */
@@ -5688,6 +5833,135 @@ function conDir(name) {
    link and the passcode to. The signed PDFs sit behind that same passcode. */
 function canSeeContracts() {
   return isEditor() || isBoardMember() || conState.list.length > 0;
+}
+
+/* ---------- dates that cost money when they pass unnoticed ----------
+   Two of them: the last day notice can be given on an agreement that renews
+   itself, and the day a contractor's quoted price stops being good. Nobody
+   opens a report to go looking for either, so the report says so on the way in
+   and a message goes out once a day (nnsccAlerts, in functions/index.js —
+   these rules and those must stay the same). */
+var ALERT_DEFAULTS = { contractDays: 90, insuranceDays: 60, quoteDays: 7,
+  recipients: [], from: "Waterview Quote Report <onboarding@resend.dev>", enabled: true };
+function alertCfg() {
+  var a = (conState && conState.alerts) || {};
+  return {
+    contractDays: +a.contractDays > 0 ? +a.contractDays : ALERT_DEFAULTS.contractDays,
+    insuranceDays: +a.insuranceDays > 0 ? +a.insuranceDays : ALERT_DEFAULTS.insuranceDays,
+    quoteDays: +a.quoteDays > 0 ? +a.quoteDays : ALERT_DEFAULTS.quoteDays,
+    recipients: Array.isArray(a.recipients) ? a.recipients : [],
+    from: a.from || ALERT_DEFAULTS.from,
+    enabled: a.enabled !== false
+  };
+}
+function alertWhen(d) {
+  if (d === 0) return "today";
+  if (d === 1) return "tomorrow";
+  if (d < 0) return Math.abs(d) + " day" + (d === -1 ? "" : "s") + " ago";
+  return "in " + d + " days";
+}
+function alertList() {
+  var cfg = alertCfg(), out = [], ED = isEditor();
+  conState.list.forEach(function (c) {
+    var who = (c.contractor || "").trim() || "Contractor not named";
+    var label = who + (c.title ? " — " + c.title : "");
+    var notice = conNoticeBy(c), endD = conDaysUntil(c.end);
+    if (notice) {
+      var nd = conDaysUntil(notice);
+      if (nd != null && nd <= cfg.contractDays && nd > -60)
+        out.push({ kind: "contract", audience: "all", days: nd,
+          severity: nd < 0 ? "passed" : (nd <= 14 ? "urgent" : "soon"), title: label,
+          detail: nd < 0
+            ? "The deadline to give notice passed " + alertWhen(nd) + " (" + jdDate(notice) +
+              ") — this agreement renews for another term."
+            : "Notice to end this agreement must be given by " + jdDate(notice) + " (" + alertWhen(nd) +
+              "), otherwise it renews automatically" + (c.end ? " on " + jdDate(c.end) : "") + "." });
+    } else if (endD != null && endD <= cfg.contractDays && endD > -60) {
+      out.push({ kind: "contract", audience: "all", days: endD,
+        severity: endD < 0 ? "passed" : (endD <= 14 ? "urgent" : "soon"), title: label,
+        detail: endD < 0
+          ? "This agreement ended " + alertWhen(endD) + " (" + jdDate(c.end) + ")."
+          : "This agreement ends " + jdDate(c.end) + " (" + alertWhen(endD) + ")" +
+            (c.renew ? " and renews automatically." : " and does not renew on its own.") });
+    }
+    if (ED && !(c.files || []).length)
+      out.push({ kind: "housekeeping", audience: "manager", days: null, severity: "info",
+        title: label, detail: "No signed copy of this agreement is attached to the register." });
+  });
+  /* cover on a contractor who currently holds a live agreement */
+  var holders = {};
+  conState.list.forEach(function (c) {
+    var nm = (c.contractor || "").trim(); if (!nm) return;
+    var ed = conDaysUntil(c.end);
+    if (c.end && ed != null && ed < 0 && !c.renew) return;
+    holders[nm.toLowerCase()] = nm;
+  });
+  dirState.list.forEach(function (r) {
+    var nm = (r.name || "").trim();
+    if (!nm || !holders[nm.toLowerCase()] || !r.insuranceExp) return;
+    var d = conDaysUntil(r.insuranceExp);
+    if (d == null || d > cfg.insuranceDays) return;
+    out.push({ kind: "insurance", audience: "all", days: d,
+      severity: d < 0 ? "passed" : (d <= 14 ? "urgent" : "soon"), title: nm,
+      detail: d < 0
+        ? "Their insurance certificate expired " + alertWhen(d) + " (" + jdDate(r.insuranceExp) +
+          ") — no new work should be awarded until it is renewed."
+        : "Their insurance certificate expires " + jdDate(r.insuranceExp) + " (" + alertWhen(d) + ")." });
+  });
+  (state.jobs || []).forEach(function (j) {
+    (j.bids || []).forEach(function (b) {
+      if (!b || b.amount == null || b.amount === "") return;
+      var e = bidExpiryISO(b); if (!e) return;
+      var d = conDaysUntil(e);
+      if (d == null || d > cfg.quoteDays || d < -30) return;
+      out.push({ kind: "quote", audience: "all", days: d, jid: j.id,
+        severity: d < 0 ? "passed" : (d <= 2 ? "urgent" : "soon"),
+        title: jobLabel(j) + " · " + ((b.contractor || "").trim() || "contractor not named"),
+        detail: d < 0
+          ? "This quote lapsed " + alertWhen(d) + " — ask the contractor to re-confirm the price."
+          : "This quote is only good until " + jdDate(e) + " (" + alertWhen(d) +
+            ") — get the decision made or ask for it to be held." });
+    });
+  });
+  var rank = { passed: 0, urgent: 1, soon: 2, info: 3 };
+  out.sort(function (a, b) {
+    return (rank[a.severity] - rank[b.severity]) ||
+      ((a.days == null ? 9999 : a.days) - (b.days == null ? 9999 : b.days));
+  });
+  return out;
+}
+/* What the reader sees on the way in. Agreements are named one by one — there
+   are never many and each is a decision. Quotes are counted rather than listed:
+   a dozen lines about prices going stale is the property manager's work, not
+   the board's, and burying the renewals under them helps nobody. */
+function alertPanelHTML() {
+  var ED = isEditor();
+  var items = alertList().filter(function (i) { return ED || i.audience === "all"; });
+  if (!items.length) return "";
+  var quotes = [], named = [];
+  items.forEach(function (i) { (i.kind === "quote" ? quotes : named).push(i); });
+  var urgent = items.filter(function (i) { return i.severity === "passed" || i.severity === "urgent"; }).length;
+  var h = ['<div class="alertbar' + (urgent ? " hot" : "") + '"><div class="alerthead">' +
+    (urgent ? "\u{26A0}" : "\u{1F514}") + " " + items.length + " thing" + (items.length === 1 ? "" : "s") +
+    " need" + (items.length === 1 ? "s" : "") + " attention</div><ul>"];
+  named.slice(0, 6).forEach(function (i) {
+    h.push('<li class="' + i.severity + '"><strong>' + esc(i.title) + "</strong> — " + esc(i.detail) + "</li>");
+  });
+  if (named.length > 6)
+    h.push('<li class="soon">…and ' + (named.length - 6) + " more in the contracts section below.</li>");
+  if (quotes.length) {
+    var lapsed = quotes.filter(function (i) { return i.days < 0; }).length;
+    var soon = quotes.length - lapsed;
+    var bits = [];
+    if (lapsed) bits.push(lapsed + " quote" + (lapsed === 1 ? " has" : "s have") + " already lapsed");
+    if (soon) bits.push(soon + " lapse" + (soon === 1 ? "s" : "") + " within " + alertCfg().quoteDays + " days");
+    h.push('<li class="' + (lapsed ? "passed" : "soon") + '"><strong>Quoted prices</strong> — ' +
+      esc(bits.join(" and ")) + ". " +
+      (ED ? "Ask the contractors to re-confirm, or re-date the quotes in Edit data."
+          : "The property manager is re-confirming these prices with the contractors.") + "</li>");
+  }
+  h.push("</ul></div>");
+  return h.join("");
 }
 
 /* ---------- contractor directory (beta) ---------- */
@@ -6347,7 +6621,8 @@ function submitViewGate(pass) {
       lastSaved = deepCopy(state);
       /* the agreements come with the report, and the passcode opens their PDFs */
       conGate.pass = pass;
-      conState = { list: Array.isArray(res.data.contracts) ? res.data.contracts : [] };
+      conState = { list: Array.isArray(res.data.contracts) ? res.data.contracts : [],
+                   alerts: res.data.alertSettings || {} };
       conState.list.forEach(function (c) { if (!c.id) c.id = genId(); });
       try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) {}
       document.getElementById("viewGateOverlay").classList.remove("open");
