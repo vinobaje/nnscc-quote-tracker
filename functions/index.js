@@ -34,7 +34,13 @@ async function callClaude(key, system, user, schema, maxTokens, model) {
   }
   let txt = "";
   (j.content || []).forEach((b) => { if (b.type === "text") txt += b.text; });
-  return JSON.parse(txt);
+  try {
+    return JSON.parse(txt);
+  } catch (e) {
+    throw new HttpsError("internal", j.stop_reason === "max_tokens"
+      ? "The reply was longer than the room allowed and came back incomplete — try again, or take some items out."
+      : "The reply could not be read back.");
+  }
 }
 
 // Shared extraction prompt + schema for reading a contractor quote (pasted text
@@ -311,9 +317,10 @@ exports.nnsccTrackerAi = onCall(
         "The period is " + String(request.data.from || "") + " to " + String(request.data.to || "") +
         ".\n\nEverything known about it:\n" + JSON.stringify(facts) +
         "\n\nWrite the summary, the attention line, the closing, and a sentence for each change.",
-        /* room for a sentence per change as well as the prose — at 900 the
-           reply was being cut off mid-string on a busy week */
-        WEEKLY_SCHEMA, 2500, CONTRACT_MODEL);
+        /* room for a sentence per change as well as the prose. The model's own
+           reasoning is spent out of this same allowance — a quiet week already
+           uses two thirds of 2500, and a truncated reply is not JSON at all. */
+        WEEKLY_SCHEMA, 6000, CONTRACT_MODEL);
     }
 
     // ----- mode: tidy a dictated note into a record -----
