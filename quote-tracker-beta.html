@@ -1148,6 +1148,11 @@ body[data-view="edit"] .wrap { max-width:none; }
 .ed-nav button:hover { background:var(--paper); color:var(--ink); }
 .ed-nav button.on { background:var(--accent-soft); color:var(--accent-ink); }
 .ed-nav .ni { flex:none; font-size:15px; line-height:1; width:18px; text-align:center; }
+.ed-navgroup { display:flex; flex-direction:column; gap:3px; }
+.ed-navgroup + .ed-navgroup { margin-top:15px; }
+.ed-navhead { padding:0 11px 5px; font-size:10.5px; font-weight:800; letter-spacing:.09em;
+  text-transform:uppercase; color:var(--ink2); opacity:.6; }
+.ed-navgroup.foot { margin-top:15px; padding-top:13px; border-top:1px solid var(--line-soft); }
 .ed-sidefoot { margin-top:auto; display:flex; flex-direction:column; gap:10px; }
 .ed-help { background:var(--paper); border:1px solid var(--line-soft); border-radius:10px;
   padding:11px 12px; font-size:12px; color:var(--ink2); line-height:1.45; }
@@ -1667,7 +1672,12 @@ body[data-view="edit"] .wrap { max-width:none; }
   .ed-side { position:static; min-height:0; border-right:0; border-bottom:1px solid var(--line);
     flex-direction:row; align-items:center; flex-wrap:wrap; gap:8px; padding:10px 14px; }
   .ed-brand { padding:0; margin-right:auto; }
+  /* on a phone the rail is one wrapping row of buttons — the group headings
+     would each force a line break of their own, so they step aside */
   .ed-nav { flex-direction:row; flex-wrap:wrap; }
+  .ed-navgroup { flex-direction:row; flex-wrap:wrap; }
+  .ed-navgroup + .ed-navgroup, .ed-navgroup.foot { margin-top:0; padding-top:0; border-top:0; }
+  .ed-navhead { display:none; }
   .ed-sidefoot, .ed-help { display:none; }
   .ed-top { position:static; padding:12px 14px; }
   .ed-body { padding:14px; }
@@ -4207,13 +4217,16 @@ var edFilter = { on: false, q: "", st: "", prio: false };
 var edArchOpen = false;
 var edSaved = true;           /* false while an edit is on its way to the cloud */
 
-var ED_SECTIONS = [
-  ["jobs", "💼", "Jobs &amp; Bids"], ["overview", "📊", "Overview"],
-  ["activity", "📝", "Activity"], ["weekly", "📰", "Board report"],
-  ["contracts", "📄", "Contracts"],
-  ["contractors", "👷", "Contractors"], ["board", "🗳", "Board &amp; Voting"],
-  ["settings", "⚙️", "Settings"]
+/* The rail, in three groups of two. Eight flat items all looked equally
+   important; grouped, the eye lands in the right third of the list first.
+   Settings is not in a group — it sits on its own at the foot. */
+var ED_GROUPS = [
+  ["Work", [["jobs", "💼", "Jobs &amp; Bids"], ["overview", "📊", "Overview"]]],
+  ["Who we use", [["contractors", "👷", "Contractors"], ["contracts", "📄", "Contracts"]]],
+  ["For the board", [["activity", "📝", "Activity"], ["weekly", "📰", "Board report"]]]
 ];
+if (VOTING_ON) ED_GROUPS.push(["Decisions", [["board", "🗳", "Board &amp; Voting"]]]);
+var ED_FOOT = [["settings", "⚙️", "Settings"]];
 
 function renderEditor() {
   var M = state.meta || META_DEFAULTS;
@@ -4257,12 +4270,19 @@ function edSecHead(t, p) {
 function edSideHTML(M) {
   var h = ['<aside class="ed-side">'];
   h.push('<div class="ed-brand"><span class="bi">🏢</span><b>' + esc(M.manager || "Property management") + "</b></div>");
+  function navBtn(s) {
+    return '<button type="button" data-act="ednav" data-nav="' + s[0] + '"' + (edNav === s[0] ? ' class="on"' : "") +
+      '><span class="ni">' + s[1] + "</span>" + s[2] + "</button>";
+  }
   h.push('<nav class="ed-nav">');
-  ED_SECTIONS.forEach(function (s) {
-    h.push('<button type="button" data-act="ednav" data-nav="' + s[0] + '"' + (edNav === s[0] ? ' class="on"' : "") +
-      '><span class="ni">' + s[1] + "</span>" + s[2] + "</button>");
+  ED_GROUPS.forEach(function (g) {
+    h.push('<div class="ed-navgroup"><span class="ed-navhead">' + g[0] + "</span>");
+    g[1].forEach(function (s) { h.push(navBtn(s)); });
+    h.push("</div>");
   });
-  h.push("</nav>");
+  h.push('<div class="ed-navgroup foot">');
+  ED_FOOT.forEach(function (s) { h.push(navBtn(s)); });
+  h.push("</div></nav>");
   var who = (cloud.user && cloud.user.email) || "";
   h.push('<div class="ed-sidefoot"><div class="ed-help"><b>Everything saves itself</b>' +
     "Each change is written as you make it — to this browser, and to the cloud when you’re signed in. " +
