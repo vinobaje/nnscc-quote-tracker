@@ -136,6 +136,7 @@ html { scroll-behavior:smooth; }
 tbody tr:not(.bidrow):not(.subtotal):hover td { background:rgba(45,86,127,.05); }
 .tile .v { font-size:23px; font-weight:650; font-variant-numeric:tabular-nums; letter-spacing:-.01em; }
 .tile .l { font-size:11.5px; color:var(--muted); text-transform:uppercase; letter-spacing:.08em; margin-top:2px; }
+.tile .l small { text-transform:none; letter-spacing:0; font-size:11px; opacity:.85; }
 .tile.hp .v { color:var(--prio); } .tile.sv .v { color:var(--good); } .tile.pd .v { color:var(--amber); }
 
 /* ---------- tables ---------- */
@@ -3425,8 +3426,14 @@ function donutSVG(slices, top, bot) {
 }
 /* six headline stat cards (markup shared; parent class styles the look) */
 function statCards(d) {
+  /* What this number is, said on the card. It is one quote per job added up —
+     the lowest priced one, unless the property manager carried a different
+     quote there — and never the sum of every quote received. */
+  var carriedNote = d.jobs.some(function (x) {
+    return x.c.carriedBids.some(function (b) { return b.override; });
+  }) ? "lowest quote each, bar those carried ⚑" : "lowest quote on each job";
   var cards = [
-    { k: "total", c: "tt", ic: "💵", v: money(d.total), l: "Total, all jobs", s: "" },
+    { k: "total", c: "tt", ic: "💵", v: money(d.total), l: "Total, all jobs", s: carriedNote },
     { k: "hp", c: "hp", ic: "🚩", v: money(d.hpTotal), l: "High priority", s: d.hp.length + " jobs" },
     { k: "std", c: "sd", ic: "📁", v: money(d.total - d.hpTotal), l: "Standard priority", s: d.nhp.length + " jobs" },
     { k: "saved", c: "sv", ic: "📈", v: money(d.savings), l: "Saved via bids", s: "vs. highest bids" },
@@ -3998,12 +4005,15 @@ function renderClassicReport() {
     ". Where a job received more than one priced quote, the lowest bid " +
     "is used in all totals. All amounts include 13% HST.</p>");
   h.push('<div class="tiles">');
+  var carriedNote = d.jobs.some(function (x) {
+    return x.c.carriedBids.some(function (b) { return b.override; });
+  }) ? "lowest quote each, bar those carried ⚑" : "lowest quote on each job";
   function tile(stat, cls, val, label, style, vstyle) {
     h.push('<div class="tile' + (cls ? " " + cls : "") + ' statlink" data-stat="' + stat +
       '" role="button" tabindex="0" title="See the jobs behind this figure"' + (style || "") + '><div class="v"' +
       (vstyle || "") + '>' + val + '</div><div class="l">' + label + '</div></div>');
   }
-  tile("total", "", money(d.total), "Total, all jobs");
+  tile("total", "", money(d.total), "Total, all jobs <small>— " + carriedNote + "</small>");
   tile("hp", "hp", money(d.hpTotal), "High priority (" + d.hp.length + " jobs)");
   tile("std", "", money(d.total - d.hpTotal), "Standard (" + d.nhp.length + " jobs)");
   tile("saved", "sv", money(d.savings), "Saved via competing bids");
