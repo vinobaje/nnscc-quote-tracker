@@ -1475,6 +1475,31 @@ body[data-view="edit"] .wrap { max-width:none; }
 .wkbrandprev { height:34px; width:auto; background:#16283b; border-radius:5px; padding:5px 8px; }
 .wkedit:focus { outline:none; }
 .wkedit:hover { border-color:var(--accent); }
+/* The whole report is one editable surface — but it looked like a printout, so
+   nobody believed it could be typed into. Every piece of it now behaves like a
+   field: the pointer outlines what it is over, and whatever the caret lands in
+   turns into a white box with a ring round it, the way an input does. This is
+   appearance only. It hangs off .wkedit, which the printed copy never carries,
+   and the ring's class is stripped when the page is captured. */
+.wkedit p, .wkedit li, .wkedit td, .wkedit th, .wkedit .wksec, .wkedit .wksubsec,
+.wkedit .wkattn, .wkedit .wkglabel, .wkedit .wkg .v, .wkedit .wkg .l,
+.wkedit .wktitle, .wkedit .wksub, .wkedit .wkkicker, .wkedit .wkmeta span,
+.wkedit .wksignn, .wkedit .wksignt, .wkedit .wksignd {
+  border-radius:5px; cursor:text; transition:background .12s ease, box-shadow .12s ease; }
+.wkedit p:hover, .wkedit li:hover, .wkedit td:hover, .wkedit th:hover,
+.wkedit .wksec:hover, .wkedit .wksubsec:hover, .wkedit .wkattn:hover,
+.wkedit .wkglabel:hover, .wkedit .wkg .v:hover, .wkedit .wkg .l:hover,
+.wkedit .wktitle:hover, .wkedit .wksub:hover, .wkedit .wkkicker:hover,
+.wkedit .wkmeta span:hover, .wkedit .wksignn:hover, .wkedit .wksignt:hover,
+.wkedit .wksignd:hover {
+  background:rgba(45,86,127,.055); box-shadow:0 0 0 1px rgba(45,86,127,.2); }
+.wkedit .wkfocus, .wkedit .wkfocus:hover {
+  background:#fff; box-shadow:0 0 0 2px var(--accent), 0 1px 4px rgba(16,32,52,.14); }
+/* inside the dark letterhead a white box would be a hole, so the ring is gold */
+.wkedit .wkband .wktitle:hover, .wkedit .wkband .wksub:hover, .wkedit .wkband .wkkicker:hover {
+  background:rgba(255,255,255,.1); box-shadow:0 0 0 1px rgba(231,207,143,.45); }
+.wkedit .wkband .wkfocus, .wkedit .wkband .wkfocus:hover {
+  background:rgba(255,255,255,.16); box-shadow:0 0 0 2px rgba(231,207,143,.95); }
 .wkeditnote { font-size:12.5px; color:var(--ink2); margin:16px 0 0; display:flex; gap:8px;
   align-items:center; flex-wrap:wrap; }
 .wkband { margin:-30px -34px 0; border-radius:10px 10px 0 0; overflow:hidden; }
@@ -7017,7 +7042,7 @@ function wkCardHTML() {
   h.push("</div></div>");
   h.push(wkPickHTML());
   if (wkState.built) {
-    h.push('<p class="wkeditnote">\u270E Everything below can be changed — click into it and type. ' +
+    h.push('<p class="wkeditnote">\u270E Everything below can be changed — click any line and it opens as a box to type in. ' +
       "Rows can be deleted, wording rewritten, anything added. What is on the page is what prints." +
       ' <button class="edbtn tiny" type="button" data-act="wkrebuild">Start again from the data</button></p>');
     h.push(wkPaperWrapHTML(true));
@@ -7258,9 +7283,44 @@ function wkPaperWrapHTML(editable) {
   return '<div class="wkpaper' + (editable ? " wkedit" : "") + '" id="wkPaper"' +
     (editable ? ' contenteditable="true" spellcheck="true"' : "") + ">" + inner + "</div>";
 }
+/* Which piece of the page the caret is in — the one drawn as an open box.
+   Bound to selectionchange, so it follows a click, an arrow key and a drag
+   alike. Nothing here changes a word: only which element wears .wkfocus. */
+var WK_FIELDS = "p,li,td,th,.wksec,.wksubsec,.wkattn,.wkglabel,.wkg .v,.wkg .l," +
+  ".wktitle,.wksub,.wkkicker,.wkmeta span,.wksignn,.wksignt,.wksignd";
+function wkFieldMark() {
+  var paper = document.getElementById("wkPaper");
+  if (!paper) return;
+  var prev = paper.querySelector(".wkfocus");
+  var el = null;
+  if (paper.isContentEditable) {
+    var sel = window.getSelection();
+    var node = sel && sel.focusNode;
+    if (node && paper.contains(node)) {
+      var start = node.nodeType === 1 ? node : node.parentNode;
+      if (start && start.closest) el = start.closest(WK_FIELDS);
+      if (el && !paper.contains(el)) el = null;
+    }
+  }
+  if (prev === el) return;
+  if (prev) prev.classList.remove("wkfocus");
+  if (el) el.classList.add("wkfocus");
+}
+document.addEventListener("selectionchange", wkFieldMark);
+
+/* The page as it will print: the caret's box is a thing on screen only, so the
+   copy that is saved, emailed and turned into a PDF is taken without it. */
 function wkCapture() {
   var el = document.getElementById("wkPaper");
-  if (el) wkState.html = el.innerHTML;
+  if (!el) return wkState.html;
+  var ring = el.querySelector(".wkfocus");
+  var had = ring ? ring.getAttribute("class") : null;
+  if (ring) {
+    ring.classList.remove("wkfocus");
+    if (!ring.getAttribute("class")) ring.removeAttribute("class");   /* leave no class="" behind */
+  }
+  wkState.html = el.innerHTML;
+  if (ring) ring.setAttribute("class", had);
   return wkState.html;
 }
 
