@@ -188,6 +188,10 @@ tr.bidrow > td { padding:0; background:var(--accent-soft); border-bottom:1px sol
 .cmp tbody tr:nth-child(even) > td { background:var(--paper); }
 .cmp tbody tr.lowrow > td { background:var(--good-soft); }
 .cmp tbody tr.lowrow > td:first-child { box-shadow:inset 3px 0 0 var(--good); font-weight:650; }
+/* the line that stops a cheaper price reading as the better one */
+.cmp tbody tr.cmpwarn > td, .pk-cmptable tbody tr.cmpwarn > td, .jdqt tbody tr.cmpwarn > td {
+  background:var(--amber-soft); color:var(--ink); font-size:13px; line-height:1.5;
+  padding:9px 11px; border-top:1px solid var(--line-soft); }
 tr.pend td { color:var(--muted); font-style:italic; }
 
 .group { background:var(--card); border:1px solid var(--line); border-radius:6px; margin:12px 0; overflow:hidden; }
@@ -879,6 +883,7 @@ body:has(#report.tpl-packet) .wrap { max-width:1560px; }
 .tpl-packet .pk-lowflag { display:block; font-size:10.5px; font-weight:700; color:var(--good); margin-top:1px; }
 /* a carried quote that is NOT the lowest — the board should see that plainly */
 .pk-lowflag.isover, .low.isover { color:var(--amber); }
+.pk-lowflag.isbest, .low.isbest { color:var(--accent-ink); font-weight:700; }
 .tpl-packet tr.pk-pend td { color:var(--muted); }
 .tpl-packet tr.pk-pend .pk-av { opacity:.5; }
 .tpl-packet tr.pk-pend .pk-cn { color:var(--muted); font-weight:600; }
@@ -1293,6 +1298,25 @@ body[data-view="edit"] .wrap { max-width:none; }
 .updrow input:focus { border-color:var(--accent); background:var(--card); outline:none; }
 .updrow .xbtn { flex:none; }
 .updempty { font-size:12.5px; color:var(--muted); padding:8px 2px; }
+/* what each quote actually buys, in Edit data */
+.qcbox { border:1px solid var(--line); border-radius:10px; margin:10px 0 2px; overflow:hidden;
+  background:var(--card); }
+.qcbox.differ { border-color:var(--amber,#C8892B); }
+.qchead { display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; padding:9px 12px;
+  font-size:13px; font-weight:700; color:var(--ink); background:var(--good-soft); }
+.qcbox.differ .qchead { background:var(--amber-soft,#FDF3E2); }
+.qcwhen { font-size:11.5px; font-weight:500; color:var(--muted); margin-left:auto; }
+.qcdiff { margin:10px 12px 0; font-size:13.5px; line-height:1.55; color:var(--ink); }
+.qctab { width:100%; border-collapse:collapse; margin:10px 0 0; font-size:13px; }
+.qctab th { text-align:left; font-size:10.5px; letter-spacing:.06em; text-transform:uppercase;
+  color:var(--muted); font-weight:650; padding:4px 12px; border-bottom:1px solid var(--line-soft); }
+.qctab td { padding:7px 12px; border-bottom:1px solid var(--line-soft); vertical-align:top; }
+.qctab tr:last-child td { border-bottom:0; }
+.qcex { display:block; font-size:11.5px; color:var(--muted); margin-top:2px; }
+.qcbest { margin:10px 12px; font-size:13px; line-height:1.6; color:var(--ink); }
+.qcok { color:var(--good); font-weight:650; font-size:12.5px; }
+.qccaut { margin:0 12px 8px; font-size:12.5px; color:var(--ink2); }
+.qcfoot { margin:0 12px 10px; font-size:12px; color:var(--muted); }
 
 /* quotes table */
 .qwrap { border:1px solid var(--line-soft); border-radius:9px; overflow-x:auto; }
@@ -1315,6 +1339,7 @@ body[data-view="edit"] .wrap { max-width:none; }
 .qst { font-size:11px; font-weight:700; border-radius:99px; padding:2px 9px; white-space:nowrap; }
 .qst.sel { color:var(--good); background:var(--good-soft); }
 .qst.over { color:var(--amber); background:var(--amber-soft); }
+.qst.best { color:var(--accent-ink); background:var(--accent-soft); font-weight:700; }
 .qst.pen { color:var(--muted); background:var(--line-soft); }
 .qst.hi { color:var(--ink2); background:var(--paper); }
 .qxtra td { background:var(--paper); }
@@ -2210,8 +2235,16 @@ function bidMetaHTML(b, jid, bi) {
    different quote the board sees exactly that, so the totals are never a
    silent departure from "lowest bid wins". */
 function carriedFlag(cb, cls) {
-  if (cb.override) return '<span class="' + cls + ' isover">✓ Selected</span>';
-  return cb.lowest ? '<span class="' + cls + '">✓ Lowest</span>' : "";
+  /* Nothing here may read as a decision. "Selected" sounded like the board had
+     chosen this contractor when all it ever meant was which quote the totals
+     count. Where the quotes are not for the same thing, the one that buys more
+     for the money is named as that and nothing more. */
+  if (cb.bestValue) return '<span class="' + cls + ' isbest">★ Best value</span>';
+  if (cb.override) return '<span class="' + cls + ' isover">✓ Counted in totals</span>';
+  /* "Lowest price" and not "Lowest": it is true of the number, and says
+     nothing about whether the quotes bought the same thing. Where they did
+     not, the line under the table says so. */
+  return cb.lowest ? '<span class="' + cls + '">✓ Lowest price</span>' : "";
 }
 /* light totals for any raw jobs array (used by the cross-period dashboard) */
 function calcJobsTotals(jobs) {
@@ -2665,8 +2698,19 @@ function jobCalc(j) {
   var cost = carriedBids.reduce(function (s, x) { return s + x.total; }, 0);
   var alt = bids.filter(function (x) { return x.total != null && !x.carried; })
                 .map(function (x) { return x.total; });
-  var saving = alt.length ? Math.max(0, Math.min.apply(null, alt) - cost) : 0;
+  /* A saving is the difference between two prices for the SAME thing. Where the
+     quotes have been read and found to buy different things, the difference is
+     not money saved and the report may not count it as any. */
+  var likeForLike = !(j.compare && j.compare.comparable === false);
+  /* the quote the reading named as the better value for the money — only worth
+     marking where the quotes were found NOT to be for the same thing, since
+     otherwise "better value" and "lowest price" are the same row */
+  bids.forEach(function (x, i) {
+    x.bestValue = !likeForLike && j.compare && j.compare.best === i;
+  });
+  var saving = (likeForLike && alt.length) ? Math.max(0, Math.min.apply(null, alt) - cost) : 0;
   return { bids: bids, priced: priced.length, cost: cost, carriedBids: carriedBids,
+           likeForLike: likeForLike,
            saving: Math.round(saving * 100) / 100,
            pendingNames: bids.filter(function (x) { return x.pending; })
                              .map(function (x) { return x.b.contractor; }) };
@@ -2971,11 +3015,12 @@ function jdQuotesHTML(j, c) {
     var note;
     /* "counted in the totals" is bookkeeping, not a decision — the board may
        not have approved the job at all, so never word it like an award */
-    if (x.carried) note = x.override ? "Counted in totals — chosen over the lowest quote"
-      : (c.priced > 1 ? "Lowest quote — counted in totals" : "Only quote in — counted in totals");
+    if (x.carried) note = x.override ? "Counted in totals — carried over the lowest price"
+      : (c.priced > 1 ? "Lowest price — counted in totals" : "Only quote in — counted in totals");
     else if (x.pending) note = "Awaiting quote";
-    else if (x.lowest) note = "Lowest";
+    else if (x.lowest) note = "Lowest price";
     else note = "";
+    if (x.bestValue) note = "Better value for the money — " + (note || "not counted in totals");
     if (x.b.qno) note += (note ? " · " : "") + "Quote #" + x.b.qno;
     if (x.b.notes) note += (note ? " · " : "") + x.b.notes;
     var n = (x.b.files || []).length;
@@ -2992,7 +3037,7 @@ function jdQuotesHTML(j, c) {
   });
   return '<div class="jdscroll"><table class="jdqt"><thead><tr><th>Contractor</th><th>Note</th>' +
     '<th>Attachment</th><th class="money">Total (incl. HST)</th></tr></thead><tbody>' +
-    rows.join("") + "</tbody></table></div>";
+    rows.join("") + qcNoteHTML(j, 4) + "</tbody></table></div>";
 }
 /* the right-hand rail: the numbers a board member asks for out loud */
 function jdSummaryHTML(j, c) {
@@ -3610,6 +3655,7 @@ function packetSecB(d, ctx) {
           '<td class="pk-c-amt">' + amt + carriedFlag(cb, "pk-lowflag") + "</td></tr>");
       }
     });
+    rows.push(qcNoteHTML(x.j, 4));   /* where the quotes are not for the same thing, say so */
     cards.push('<div class="pk-cmpcard"><div class="pk-cmphead jrow"' + jdData(x.j) + '><span class="pk-cmpno">' + (idx + 1) + "</span> " +
       esc(x.j.desc) + (x.j.priority ? ' <span class="pk-prio">High priority</span>' : "") + "</div>" +
       '<table class="pk-cmptable"><colgroup><col style="width:27%"><col><col style="width:16%"><col style="width:21%"></colgroup>' +
@@ -3928,6 +3974,7 @@ function cmpRows(x) {
              carriedFlag(cb, "low") + "</td></tr>");
     }
   });
+  r.push(qcNoteHTML(x.j));      /* where the quotes are not for the same thing, say so */
   return r.join("");
 }
 function bidRowHTML(x, colspan) {
@@ -4518,9 +4565,12 @@ function edJobCardHTML(j, ji) {
     '<th style="text-align:right">Amount (CAD)</th><th>HST</th><th>Notes</th><th>Attachments</th><th>Status</th><th></th></tr></thead><tbody>');
   j.bids.forEach(function (b, bi) {
     var x = c.bids[bi], qk = j.id + ":" + bi, xo = !!edQOpen[qk];
-    var st = x.carried
-      ? '<span class="qst ' + (x.override ? "over" : "sel") + '">' + (x.override ? "Selected ⚑" : "Selected") + "</span>"
-      : (x.total != null ? '<span class="qst hi">Higher bid</span>'
+    var st = x.bestValue
+      ? '<span class="qst best">★ Best value</span>'
+      : x.carried
+      ? '<span class="qst ' + (x.override ? "over" : "sel") + '">' +
+        (x.override ? "Counted ⚑" : "Counted in totals") + "</span>"
+      : (x.total != null ? '<span class="qst hi">Not counted</span>'
         : ((b.contractor || "").trim() ? '<span class="qst pen">Pending</span>' : ""));
     var files = (b.files || []).map(function (f, fi) {
       return '<a class="attlink" href="' + esc(f.url) + '" data-att="' + esc(j.id) + ":" + bi + ":" + fi +
@@ -4562,6 +4612,7 @@ function edJobCardHTML(j, ji) {
       ' instead of the lowest quote — the board’s copy says “✓ Selected”. ' +
       '<button class="edbtn" type="button" data-act="pickauto" style="font-size:12px;padding:3px 9px">Use the lowest again</button></p>');
   }
+  h.push(qcCardHTML(j));       /* what each of these prices actually buys */
   h.push("</div>");
 
   /* ---- 3. board actions ---- */
@@ -4611,10 +4662,12 @@ function edRailHTML() {
   h.push(row("Decision date", esc(j.statusDate || "—")));
   h.push(row("Awarded to", esc(j.awardedTo || "—")));
   h.push('<div class="rsep"></div>');
-  h.push(row("Lowest bid", '<span class="money">' + (low == null ? "—" : money(low)) + "</span>"));
-  h.push(row("Selected quote", '<span class="money' + (carried && carried.override ? "" : " good") + '">' +
+  h.push(row("Lowest price", '<span class="money">' + (low == null ? "—" : money(low)) + "</span>"));
+  h.push(row("Quote carried", '<span class="money' + (carried && carried.override ? "" : " good") + '">' +
     (carried ? money(carried.total) + (carried.override ? " ⚑" : "") : "—") + "</span>"));
   h.push(row("Counted in report", '<span class="money good">' + money(c.cost) + "</span>"));
+  if (c.likeForLike === false)
+    h.push('<div class="rrow"><span class="k">Like for like</span><span class="v" style="color:var(--amber);font-weight:650">No — see the reading</span></div>');
   if (sg.overall != null)
     h.push('<div class="rrow"><span class="k">Progress</span><span class="v"><span class="jbar" style="display:inline-block;vertical-align:middle">' +
       '<span style="width:' + sg.overall + '%"></span></span> ' + sg.overall + "%</span></div>");
@@ -4651,6 +4704,7 @@ function edOverviewHTML(M) {
   h.push('<p class="edithint" style="margin:6px 0 0;font-size:12.5px">Section headings are edited in the report itself — ' +
     "open <strong>Preview report</strong> and click any heading to rename it.</p></div></div>");
   h.push(aiCardHTML());
+  h.push(qcEngineCardHTML());
   h.push(alertCardHTML());
   h.push(intakeCardHTML());
   return h.join("");
@@ -4686,6 +4740,243 @@ function edSettingsHTML(M) {
     '<p class="rephint" style="margin:10px 0 0">A copy of the whole report is kept every day it changes, and the ' +
     'database itself is backed up nightly and weekly by Firebase. Nothing here can be lost by one wrong click.</p>' +
     "</div></div>");
+  return h.join("");
+}
+
+/* ---------- what each price actually buys ----------
+   Two prices for one job are rarely two prices for the same thing. One quote
+   covers a single fire extinguisher, the next covers two and the cabinet; one
+   carries ten years on a waterproofing membrane and the next says nothing at
+   all about a warranty. A tick reading "lowest" is true about the number and
+   misleading about the job, and a saving measured from it is not a saving.
+
+   So the quotes are read — the manager's scope note and the contractor's own
+   document, PDF or photograph — and what each price buys is set side by side.
+   It runs when the quotes on a job change, in the manager's browser, and never
+   on a page load: a comparison is paid for by the edit that made it necessary.
+   Nothing it finds reaches the board on its own. It may nominate the better
+   value, but carrying a quote in the totals is still a button she presses. */
+var qcBusy = {};     /* jobId -> a comparison is in flight */
+var qcErr = {};      /* jobId -> why the last one failed */
+var qcPend = {};     /* jobId -> queued by an edit, waiting for the typing to stop */
+var qcTimer = null;
+
+function qcPriced(j) {
+  return (j.bids || []).map(function (b, i) { return { i: i, b: b, total: bidTotal(b) }; })
+    .filter(function (x) { return x.total != null; });
+}
+/* the inputs a comparison was made from — change any of them and it is stale */
+function qcFP(j) {
+  return String(j.desc || "").trim() + " ~ " + qcPriced(j).map(function (x) {
+    return x.i + "|" + String(x.b.contractor || "").trim() + "|" + x.total + "|" +
+      String(x.b.notes || "").trim() + "|" +
+      (x.b.files || []).map(function (f) { return f.path || f.name || ""; }).join(",");
+  }).join(" ~ ");
+}
+function qcCan(j) {
+  return !!(j && cloud.on && cloud.fns && cloud.user && isEditor() &&
+            aiKeyState === "set" && qcPriced(j).length > 1);
+}
+function qcStale(j) { return !!(j && j.compare && j.compare.fp && j.compare.fp !== qcFP(j)); }
+
+/* an edit touched the quotes on this job; wait for her to stop typing */
+function qcTouch(j) {
+  if (!qcCan(j)) return;
+  qcPend[j.id] = true;
+  clearTimeout(qcTimer);
+  qcTimer = setTimeout(qcFlush, 4000);
+}
+function qcFlush() {
+  var ids = Object.keys(qcPend); qcPend = {};
+  ids.forEach(function (id) {
+    var j = null;
+    state.jobs.forEach(function (x) { if (x.id === id) j = x; });
+    if (!j || !qcCan(j)) return;
+    if (j.compare && j.compare.fp === qcFP(j)) return;   /* the same quotes as last time */
+    qcRun(j);
+  });
+}
+function qcRedraw() {
+  if (document.body.dataset.view === "edit") renderEditor(); else renderReport();
+}
+function qcRun(j) {
+  if (!qcCan(j) || qcBusy[j.id]) return;
+  var jid = j.id, fp = qcFP(j);
+  qcBusy[jid] = true; delete qcErr[jid];
+  qcRedraw();
+  cloud.fns.httpsCallable("nnsccTrackerAi")({
+    compare: true,
+    engine: qcEngine().k,
+    model: qcModel(),
+    job: {
+      desc: j.desc || "",
+      bids: qcPriced(j).map(function (x) {
+        return { i: x.i, contractor: x.b.contractor || "", total: x.total,
+                 scope: x.b.notes || "", qno: x.b.qno || "", date: x.b.qdate || "",
+                 files: (x.b.files || []).map(function (f) { return { name: f.name, path: f.path }; }) };
+      })
+    }
+  }).then(function (res) {
+    qcBusy[jid] = false;
+    var d = res && res.data && res.data.compare;
+    /* the cloud may have replaced state.jobs while this was away */
+    var cur = null;
+    state.jobs.forEach(function (x) { if (x.id === jid) cur = x; });
+    if (!cur) return;
+    if (!d) { qcErr[jid] = "no answer came back"; qcRedraw(); return; }
+    cur.compare = {
+      fp: fp, at: todayISO(), read: (res.data && res.data.read) || 0,
+      by: (res.data && res.data.engine) || "", model: (res.data && res.data.model) || "",
+      quotes: Array.isArray(d.quotes) ? d.quotes : [],
+      comparable: d.comparable !== false,
+      difference: String(d.difference || ""),
+      best: typeof d.best_index === "number" ? d.best_index : null,
+      bestWhy: String(d.best_reason || ""),
+      cautions: Array.isArray(d.cautions) ? d.cautions : []
+    };
+    persist();
+    qcRedraw();
+  }).catch(function (e) {
+    qcBusy[jid] = false;
+    qcErr[jid] = (e && e.message) || "the quotes could not be compared";
+    qcRedraw();
+  });
+}
+/* what one contractor charges for one of the thing — arithmetic, not judgement,
+   and only where that quote said how many it was pricing */
+function qcEach(j, i) {
+  var q = null, tot = null;
+  ((j.compare && j.compare.quotes) || []).forEach(function (x) { if (x && x.index === i) q = x; });
+  qcPriced(j).forEach(function (x) { if (x.i === i) tot = x.total; });
+  if (!q || tot == null || !q.quantity || q.quantity <= 1) return null;
+  return { each: tot / q.quantity, n: q.quantity, unit: q.unit || "" };
+}
+/* the panel under the quotes in Edit data */
+function qcCardHTML(j) {
+  if (qcPriced(j).length < 2) return "";
+  var cp = j.compare;
+  if (qcBusy[j.id])
+    return '<p class="updempty">⏳ Reading the quotes and what is attached to them…</p>';
+  if (!cp) {
+    var why = qcErr[j.id] ? '<span style="color:var(--bad)"> — ' + esc(qcErr[j.id]) + "</span>" : "";
+    if (!qcCan(j)) return "";
+    return '<p class="updempty">These quotes have not been compared. ' +
+      '<button class="edbtn" type="button" data-act="qc-run" style="font-size:12px;padding:3px 9px">Compare these quotes</button>' +
+      why + "</p>";
+  }
+  var h = ['<div class="qcbox' + (cp.comparable ? "" : " differ") + '">'];
+  h.push('<div class="qchead">' + (cp.comparable
+    ? "✓ These quotes are for substantially the same work"
+    : "⚠ These quotes are not for the same thing") +
+    '<span class="qcwhen">read ' + esc(jdDate(cp.at)) +
+    (cp.by ? " by " + esc(cp.by) : "") +
+    (cp.read ? " · " + cp.read + " attached document" + (cp.read === 1 ? "" : "s") : " · scope notes only") + "</span></div>");
+  if (cp.difference) h.push('<p class="qcdiff">' + esc(cp.difference) + "</p>");
+  h.push('<table class="qctab"><thead><tr><th>Contractor</th><th>What the price covers</th>' +
+    "<th>Each</th><th>Warranty</th></tr></thead><tbody>");
+  qcPriced(j).forEach(function (x) {
+    var q = null;
+    (cp.quotes || []).forEach(function (y) { if (y && y.index === x.i) q = y; });
+    var per = qcEach(j, x.i);
+    h.push("<tr><td>" + esc((x.b.contractor || "").trim() || "—") + "</td><td>" +
+      esc((q && q.covers) || "—") +
+      (q && q.excludes && q.excludes.length
+        ? '<span class="qcex">excludes ' + esc(q.excludes.join(", ")) + "</span>" : "") +
+      /* which line of a document that prices several things this price is */
+      (q && q.amount_note
+        ? '<span class="qcex">' + esc(money(x.total)) + " is " + esc(q.amount_note) + "</span>" : "") +
+      "</td><td>" + (per ? esc(money(per.each)) + '<span class="qcex">' + esc(per.n + (per.unit ? " " + per.unit : "") + " in this price") + "</span>" : "—") +
+      "</td><td>" + esc((q && q.warranty) || "—") + "</td></tr>");
+  });
+  h.push("</tbody></table>");
+  if (cp.best != null && cp.bestWhy) {
+    var bj = null;
+    qcPriced(j).forEach(function (x) { if (x.i === cp.best) bj = x; });
+    if (bj) {
+      var carried = (typeof j.pick === "number" ? j.pick : jobCalcAutoIndex(j)) === cp.best;
+      h.push('<p class="qcbest"><strong>Better value on what is written:</strong> ' +
+        esc((bj.b.contractor || "").trim() || "quote " + (cp.best + 1)) + " — " + esc(cp.bestWhy) +
+        (carried ? ' <span class="qcok">✓ this is the quote the totals carry</span>'
+          : ' <button class="edbtn" type="button" data-act="qc-carry" data-bi="' + cp.best +
+            '" style="font-size:12px;padding:3px 9px">Carry this quote instead</button>') + "</p>");
+    }
+  }
+  (cp.cautions || []).forEach(function (c) {
+    h.push('<p class="qccaut">⚠ ' + esc(c) + "</p>");
+  });
+  h.push('<p class="qcfoot">' + (qcStale(j)
+    ? "The quotes have changed since this was read. "
+    : "") + '<button class="edbtn" type="button" data-act="qc-run" style="font-size:12px;padding:3px 9px">' +
+    (qcStale(j) ? "Read them again" : "Read them again") + "</button>" +
+    (qcErr[j.id] ? '<span style="color:var(--bad)"> — ' + esc(qcErr[j.id]) + "</span>" : "") + "</p>");
+  return h.join("") + "</div>";
+}
+/* the one line the board reads under a bid table, in the manager's own words —
+   she can rewrite it like anything else on the report before it goes out */
+function qcNoteHTML(j, colspan) {
+  var cp = j.compare;
+  if (!cp || cp.comparable || !cp.difference) return "";
+  return '<tr class="cmpwarn"><td colspan="' + (colspan || 4) + '">⚠ ' +
+    (isEditor() ? tEdit("cmp:" + j.id + ":difference", cp.difference, "What differs between these quotes")
+                : esc(cp.difference)) + "</td></tr>";
+}
+
+/* ---------- which model reads the quotes ----------
+   The comparison is the one job worth putting a cheaper model on trial for,
+   so which model does it is a setting rather than a decision baked into the
+   code. The choice rides in the report's own settings; the key for each
+   provider is saved server-side beside the Anthropic one and no browser can
+   read any of them back. Every comparison records which model produced it,
+   so two readings of the same job can be set against each other fairly. */
+var QC_ENGINES = [
+  { k: "claude", l: "Claude Sonnet 5", m: "claude-sonnet-5",
+    n: "$3 / $15 per million — about 4¢ a job. What the first comparisons were read with." },
+  { k: "gemini", l: "Gemini Flash-Lite", m: "gemini-3.5-flash-lite",
+    n: "3.5 Flash-Lite is $0.30 / $2.50 — under a penny a job. gemini-3.1-flash-lite is cheaper again ($0.25 / $1.50). Google has closed 2.5 to new projects, so it will be refused." },
+  { k: "openai", l: "GPT-5.6 Luna", m: "gpt-5.6-luna",
+    n: "$1 / $6 per million — about 2¢ a job." }
+];
+function qcEngine() {
+  var k = (state.meta && state.meta.cmpEngine) || "claude";
+  var e = null;
+  QC_ENGINES.forEach(function (x) { if (x.k === k) e = x; });
+  return e || QC_ENGINES[0];
+}
+function qcModel() {
+  return String((state.meta && state.meta.cmpModel) || "").trim() || qcEngine().m;
+}
+function qcEngineCardHTML() {
+  var e = qcEngine();
+  var h = ['<div class="ecard esettings" id="qcEngCard"><div class="ehead"><strong>Reading the quotes</strong>' +
+    '<span style="font-size:12.5px;color:var(--ink2)">— which model compares what each price actually buys</span></div><div class="ebids">'];
+  if (!cloud.on) {
+    h.push('<p class="edithint" style="margin:4px 0">Available on the live site (cloud copy) only.</p></div></div>');
+    return h.join("");
+  }
+  h.push('<div class="esrow"><label>Model</label><div style="flex:1">' +
+    '<select data-mf="cmpEngine">' + QC_ENGINES.map(function (x) {
+      return '<option value="' + x.k + '"' + (x.k === e.k ? " selected" : "") + ">" + esc(x.l) + "</option>";
+    }).join("") + "</select>" +
+    '<div class="savenote">' + esc(e.n) + "</div></div></div>");
+  h.push('<div class="esrow"><label>Model name</label><div style="flex:1">' +
+    '<input type="text" data-mf="cmpModel" value="' + esc((state.meta && state.meta.cmpModel) || "") +
+    '" placeholder="' + esc(e.m) + '">' +
+    '<div class="savenote">Leave blank for ' + esc(e.m) + '. Model names change; this is here so a new one can be tried without waiting for a rebuild.</div></div></div>');
+  if (e.k !== "claude") {
+    h.push('<div class="esrow"><label>' + esc(e.l.split(" ")[0]) + ' key</label><div style="flex:1">' +
+      '<div style="display:flex;gap:8px">' +
+      '<input type="password" id="qcKeyInput" placeholder="paste the ' +
+      (e.k === "gemini" ? "Google AI Studio" : "OpenAI") + ' API key (owner only)" style="flex:1" autocomplete="off">' +
+      '<button class="btn" data-act="qc-savekey" type="button">Save key</button></div>' +
+      '<div class="savenote">From ' + (e.k === "gemini"
+        ? "aistudio.google.com — free tier available, paid needed for volume."
+        : "platform.openai.com.") +
+      ' Stored server-side; no browser can read it back. Only the owner may save it.</div></div></div>');
+  }
+  h.push('<p class="rephint" style="margin:8px 0 0">A comparison already read stays as it was until the quotes change or ' +
+    '<strong>Read them again</strong> is pressed, so switching model here does not spend anything on its own. ' +
+    'Each reading says which model produced it — read one job twice and judge for yourself.</p>');
+  h.push("</div></div>");
   return h.join("");
 }
 
@@ -4876,6 +5167,27 @@ function aiSaveKey() {
   });
 }
 
+/* the same write, to whichever provider's field the chosen model reads from */
+function qcSaveKey() {
+  var e = qcEngine();
+  var inp = document.getElementById("qcKeyInput");
+  if (!inp) return;
+  var v = (inp.value || "").trim();
+  var note = document.getElementById("saveNote");
+  function say(t) { if (note) note.textContent = t; }
+  if (!v) { say("Paste a key first."); return; }
+  var field = e.k === "gemini" ? "geminiKey" : "openaiKey";
+  var patch = {};
+  patch[field] = v;
+  cloud.db.doc(CONFIG_PATH).set(patch, { merge: true }).then(function () {
+    inp.value = "";
+    say("Key saved server-side for " + e.l + ". No browser can read it back.");
+  }).catch(function (er) {
+    say(er && er.code === "permission-denied"
+      ? "⚠ Only the owner account can save an API key." : "⚠ Could not save the key.");
+  });
+}
+
 function alertSaveKey() {
   var inp = document.getElementById("alertKeyInput");
   var v = (inp.value || "").trim();
@@ -4952,7 +5264,10 @@ document.getElementById("editor").addEventListener("change", function (e) {
   if (mf) {
     state.meta = state.meta || Object.assign({}, META_DEFAULTS);
     state.meta[mf] = (mf === "budget") ? Math.max(0, +e.target.value || 0) : e.target.value;
-    persist(); renderReport(); return;
+    persist(); renderReport();
+    /* the reading-model card explains whichever model is chosen, so it redraws */
+    if (mf === "cmpEngine" || mf === "cmpModel") renderEditor();
+    return;
   }
   var dirf = e.target.dataset.dirf;
   if (dirf != null) {                                  /* contractor-directory field */
@@ -5009,6 +5324,8 @@ document.getElementById("editor").addEventListener("change", function (e) {
     else if (f === "hst") b.hst = e.target.value === "yes";
     else if (f === "validDays") b.validDays = Math.max(1, +e.target.value || 60);
     else b[f] = e.target.value;
+    /* a price or a scope note changed — read the quotes against each other again */
+    if (f === "amount" || f === "hst" || f === "notes" || f === "contractor") qcTouch(j);
   }
   persist(); renderEditor(); renderReport();
 });
@@ -5123,6 +5440,7 @@ document.getElementById("editor").addEventListener("click", function (e) {
   if (act === "alert-replacekey") { alertShowKeyRow = true; renderEditor(); return; }
   if (act === "alert-send") { alertSendNow(); return; }
   if (act === "ai-savekey") { aiSaveKey(); return; }
+  if (act === "qc-savekey") { qcSaveKey(); return; }
   if (act === "ai-replacekey") { aiShowKeyRow = true; renderEditor(); return; }
   if (act === "ai-generate") { aiGenerate(); return; }
   if (act === "ai-remove") {
@@ -5188,7 +5506,7 @@ document.getElementById("editor").addEventListener("click", function (e) {
     var fb = fj.bids[+fr.dataset.bi]; if (!fb || !fb.files) return;
     var rm = fb.files.splice(+actEl.dataset.fi, 1)[0];
     if (rm && rm.path && cloud.store) { try { cloud.store.ref(rm.path).delete().catch(function(){}); } catch (er) {} }
-    persist(); renderEditor(); renderReport(); return;
+    persist(); qcTouch(fj); renderEditor(); renderReport(); return;
   }
   var card = e.target.closest(".ecard"); if (!card) return;
   var ji = +card.dataset.ji, j = state.jobs[ji];
@@ -5202,6 +5520,9 @@ document.getElementById("editor").addEventListener("click", function (e) {
       if (j.pick === dbi) delete j.pick;
       else if (j.pick > dbi) j.pick--;
     }
+    /* the comparison was between quotes one of which is now gone */
+    if (j.compare) delete j.compare;
+    qcTouch(j);
   } else if (act === "deljob") {
     /* two-step delete: first click arms the button, second click within 4s deletes */
     if (e.target.dataset.armed !== "1") {
@@ -5298,6 +5619,23 @@ function edWorkspaceAction(act, el, e) {
           ((bd.contractor || "").trim() || "a higher quote") + " " + money(bidTotal(bd)) +
           " instead of the lowest quote"], pj.id);
       }
+      renderEditor(); renderReport(); return true;
+    }
+    /* --- reading the quotes against each other --- */
+    case "qc-run": {
+      var qc = el.closest(".jcard"); if (!qc) return true;
+      var qj = state.jobs[+qc.dataset.ji]; if (!qj) return true;
+      qcRun(qj); return true;
+    }
+    case "qc-carry": {                       /* take up the better-value quote it named */
+      var cc = el.closest(".jcard"); if (!cc) return true;
+      var cj = state.jobs[+cc.dataset.ji]; if (!cj) return true;
+      var cbi = +el.dataset.bi, cbd = cj.bids[cbi];
+      if (!cbd || bidTotal(cbd) == null) return true;
+      if (jobCalcAutoIndex(cj) === cbi) delete cj.pick; else cj.pick = cbi;
+      persist(null, [jobLabel(cj) + ": carrying " +
+        ((cbd.contractor || "").trim() || "another quote") + " " + money(bidTotal(cbd)) +
+        " — the quotes are not for the same thing"], cj.id);
       renderEditor(); renderReport(); return true;
     }
     case "pickauto": {
@@ -7796,6 +8134,7 @@ document.getElementById("fileAttach").addEventListener("change", function () {
       if (!Array.isArray(b.files)) b.files = [];
       b.files.push({ name: f.name, url: url, path: path, size: f.size });
       persist(null, ["Attached “" + f.name + "” to a quote on " + jobLabel(j)], j.id);
+      qcTouch(j);            /* the contractor's own document says more than the note does */
       renderEditor(); renderReport();
     })
     .catch(function (e) { alert("Upload failed (" + ((e && e.code) || "error") + ")."); });
@@ -9179,6 +9518,11 @@ function commitEdit(el) {
       if (sameText(b.notes, val)) { el.textContent = val; return; }
       b.notes = val;
     } else return;
+    qcTouch(jb);            /* a quote changed on the board's own page */
+  } else if (p[0] === "cmp") {                       /* her wording of what differs */
+    var jc = findJob(p[1]); if (!jc || !jc.compare) return;
+    if (sameText(jc.compare.difference, val)) { el.textContent = val; return; }
+    jc.compare.difference = val;
   } else if (p[0] === "upd") {                                  /* progress-update text */
     var ju = findJob(p[1]); if (!ju || !ju.updates) return;
     var u = ju.updates[+p[2]]; if (!u) return;

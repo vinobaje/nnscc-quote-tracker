@@ -10,7 +10,13 @@ const AI_MODEL = "claude-haiku-4-5";
 const CONTRACT_MODEL = "claude-sonnet-5";
 
 // One Claude structured-output call; returns the parsed JSON object.
-async function callClaude(key, system, user, schema, maxTokens, model) {
+async function callClaude(key, system, user, schema, maxTokens, model, effort) {
+  // These models think before they answer, and the thinking is spent out of
+  // max_tokens. A budget sized for the answer alone comes back cut off with
+  // nothing readable in it, so every caller here leaves room for both, and the
+  // ones that don't need deep deliberation ask for less of it.
+  const out = { format: { type: "json_schema", schema } };
+  if (effort) out.effort = effort;
   const resp = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -23,7 +29,7 @@ async function callClaude(key, system, user, schema, maxTokens, model) {
       max_tokens: maxTokens || 1200,
       system,
       messages: [{ role: "user", content: user }],
-      output_config: { format: { type: "json_schema", schema } },
+      output_config: out,
     }),
   });
   const j = await resp.json();
@@ -37,6 +43,8 @@ async function callClaude(key, system, user, schema, maxTokens, model) {
   try {
     return JSON.parse(txt);
   } catch (e) {
+    console.error("Claude reply unreadable", { model: j.model, stop: j.stop_reason,
+      usage: j.usage, head: txt.slice(0, 200) });
     throw new HttpsError("internal", j.stop_reason === "max_tokens"
       ? "The reply was longer than the room allowed and came back incomplete — try again, or take some items out."
       : "The reply could not be read back.");
@@ -191,6 +199,187 @@ const SCHEDULE_SCHEMA = {
   required: ["contractor", "visits", "unclear"],
   additionalProperties: false,
 };
+
+// Two prices for one job are not two prices for the same thing. One quote covers
+// a single extinguisher, the next covers two and the cabinet; one carries ten
+// years on a waterproofing membrane and the next says nothing. The report used to
+// tick the smaller number and call it the lowest, which is true about the number
+// and misleading about the job. This reads what each price actually buys — from
+// the scope note and from the quote document itself — and says where they differ.
+// It never awards anything: the board does that.
+const COMPARE_SYSTEM =
+  "You compare the quotes a condominium property manager has received for ONE job, for the board of " +
+  "directors who must decide which to accept.\n" +
+  "Read only what each quote itself says — its scope note and any document attached to it. Never carry " +
+  "a detail from one quote onto another, and never add a detail no quote states.\n" +
+  "covers: one line saying what that price buys, in the quote's own terms — what is supplied and " +
+  "installed, not which line of the document it is and not the job's own title. Where a quote has no " +
+  "scope note and no readable document, covers says exactly that and nothing more: you may not describe " +
+  "it from the job title, from another quote, or from what the work would usually involve.\n" +
+  "quantity and unit: only where the quote says how many. “2 -10 lb fire extinguishers plus 1 cabinet” " +
+  "is quantity 2, unit “extinguisher”. Where the quote does not say, quantity is null and unit is empty. " +
+  "Do not infer a quantity from the price.\n" +
+  "warranty: the term the quote states, e.g. “10 years on the membrane”. Where the quote says nothing " +
+  "about a warranty, write “not stated” — silence is not the absence of one, and must never be " +
+  "reported as “no warranty”.\n" +
+  "amount_note: which part of the document the price given corresponds to. Every price you are given " +
+  "already has 13% HST added, so a line reading $1,000.00 in the document reaches you as $1,130.00 — " +
+  "work in those terms before deciding whether a figure matches. Where a document prices several " +
+  "locations, phases or line items and only one of them is this job, name the line the price matches: " +
+  "\u201cthe $66,800.00 ramp waterproofing line, plus HST\u201d. Where it matches no line, or matches the " +
+  "grand total for the whole document rather than the line for this job, report that finding and " +
+  "add a caution. Show the working when you do: give the line figure, the total figure, and the price " +
+  "you were given, so the reader can check the claim rather than take it on trust. Never state that a " +
+  "price is a document total unless the arithmetic says so — a price that quietly carries work belonging to another job is the costliest error on " +
+  "this page. Empty where there is no document, or where the document prices one thing only.\n" +
+  "includes / excludes: at most four short items each, only what is written (permits, disposal, making " +
+  "good, cabinet, tax). Empty arrays where the quote is silent.\n" +
+  "comparable: true only where the quotes buy substantially the same thing, so that the prices can be " +
+  "set against each other as they stand. False where one covers more equipment, more area, a longer " +
+  "warranty, or work the others exclude.\n" +
+  "difference: one plain sentence a director can read on a phone, naming the contractors and what " +
+  "differs between them. Empty string when they are comparable.\n" +
+  "best_index: the quote that is the better value ON WHAT IS WRITTEN — weighing quantity, warranty and " +
+  "what is included, not price alone. Name one whenever what is written supports it. The cheapest quote " +
+  "being also the most fully specified is a finding worth stating plainly, not an obvious one to pass " +
+  "over. And a quote you cannot read does not stop you naming the best of the ones you can — say which " +
+  "of the readable quotes is the better value and let a caution carry the unknown one. Use null only " +
+  "where naming any of them would be a guess: where they are equally specified with nothing to choose " +
+  "between them, or where too little is written about all of them to compare at all.\n" +
+  "best_reason: one sentence for that choice in the quotes' own terms, e.g. “covers two extinguishers " +
+  "and the cabinet at $296.63 each against $508.50 for one”. Empty when best_index is null.\n" +
+  "YOU ARE NOT AWARDING THE WORK. The board of directors awards it, and may award it to a contractor " +
+  "you did not name for reasons no quote shows. Never write that a contractor should be given the job, " +
+  "is recommended, has won, or is the one to go with. State what the quotes say and stop.\n" +
+  "cautions: what the property manager should check by hand — a quote that reads as an estimate rather " +
+  "than a fixed price, a page that appears to be missing, a quantity you were unsure of. Empty when " +
+  "there is nothing.\n" +
+  "Every amount you are given already includes 13% HST, so any per-unit figure you work out is on the " +
+  "same footing. Plain sentences, no markdown, Canadian dollars with $ and thousands separators.";
+const COMPARE_SCHEMA = {
+  type: "object",
+  properties: {
+    quotes: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          index: { type: "number" },
+          covers: { type: "string" },
+          amount_note: { type: "string" },
+          quantity: { type: ["number", "null"] },
+          unit: { type: "string" },
+          warranty: { type: "string" },
+          includes: { type: "array", items: { type: "string" } },
+          excludes: { type: "array", items: { type: "string" } },
+        },
+        required: ["index", "covers", "amount_note", "quantity", "unit", "warranty", "includes", "excludes"],
+        additionalProperties: false,
+      },
+    },
+    comparable: { type: "boolean" },
+    difference: { type: "string" },
+    best_index: { type: ["number", "null"] },
+    best_reason: { type: "string" },
+    cautions: { type: "array", items: { type: "string" } },
+  },
+  required: ["quotes", "comparable", "difference", "best_index", "best_reason", "cautions"],
+  additionalProperties: false,
+};
+
+// ---------------------------------------------------------------------------
+// Reading the quotes with somebody else's model.
+//
+// The comparison is the one place where the model's accuracy is worth real
+// money — it is what noticed that a $525 quote carried a $25 truck charge, and
+// that a $75,484 price covered one location out of four. So it is also the one
+// place worth putting a cheaper model on trial rather than assuming.
+//
+// All three providers are asked for the same JSON, against the same schema,
+// from the same documents. What comes back is normalised to one shape, so the
+// rest of the app neither knows nor cares which one answered.
+const ENGINES = {
+  claude: { label: "Claude Sonnet 5", model: "claude-sonnet-5", keyField: "anthropicKey" },
+  gemini: { label: "Gemini Flash-Lite", model: "gemini-3.5-flash-lite", keyField: "geminiKey" },
+  openai: { label: "GPT-5.6 Luna", model: "gpt-5.6-luna", keyField: "openaiKey" },
+};
+
+// Google's Interactions API. Documents and images ride inline as base64.
+async function callGemini(key, model, system, blocks, schema) {
+  const input = blocks.map((b) => (b.text
+    ? { type: "text", text: b.text }
+    : { type: b.media === "application/pdf" ? "document" : "image", data: b.b64, mime_type: b.media }));
+  const resp = await fetch("https://generativelanguage.googleapis.com/v1beta/interactions", {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-goog-api-key": key },
+    body: JSON.stringify({
+      model,
+      /* the Interactions API takes this as a plain string — the {parts:[...]}
+         shape belongs to the older generateContent endpoint and is rejected */
+      system_instruction: system,
+      input,
+      response_format: { type: "text", mime_type: "application/json", schema },
+    }),
+  });
+  const j = await resp.json();
+  if (!resp.ok) {
+    const msg = (j.error && j.error.message) || "HTTP " + resp.status;
+    throw new HttpsError(resp.status === 400 || resp.status === 403 ? "failed-precondition" : "internal",
+      "Gemini: " + msg);
+  }
+  let txt = j.output_text || "";
+  if (!txt && Array.isArray(j.steps)) {
+    const last = j.steps[j.steps.length - 1] || {};
+    (last.content || []).forEach((c) => { if (c && c.text) txt += c.text; });
+  }
+  try {
+    return JSON.parse(txt);
+  } catch (e) {
+    console.error("Gemini reply unreadable", { model, head: String(txt).slice(0, 200) });
+    throw new HttpsError("internal", "Gemini answered with something that was not the JSON asked for.");
+  }
+}
+
+// OpenAI's Responses API. A PDF goes as input_file with a data: URL; an image
+// as input_image the same way.
+async function callOpenAI(key, model, system, blocks, schema) {
+  const content = blocks.map((b) => {
+    if (b.text) return { type: "input_text", text: b.text };
+    if (b.media === "application/pdf") {
+      return { type: "input_file", filename: b.name || "quote.pdf",
+        file_data: "data:application/pdf;base64," + b.b64 };
+    }
+    return { type: "input_image", image_url: "data:" + b.media + ";base64," + b.b64 };
+  });
+  const resp = await fetch("https://api.openai.com/v1/responses", {
+    method: "POST",
+    headers: { "content-type": "application/json", authorization: "Bearer " + key },
+    body: JSON.stringify({
+      model,
+      instructions: system,
+      input: [{ role: "user", content }],
+      text: { format: { type: "json_schema", name: "quote_comparison", schema, strict: true } },
+    }),
+  });
+  const j = await resp.json();
+  if (!resp.ok) {
+    const msg = (j.error && j.error.message) || "HTTP " + resp.status;
+    throw new HttpsError(resp.status === 401 || resp.status === 400 ? "failed-precondition" : "internal",
+      "OpenAI: " + msg);
+  }
+  let txt = j.output_text || "";
+  if (!txt && Array.isArray(j.output)) {
+    j.output.forEach((o) => (o.content || []).forEach((c) => {
+      if (c && (c.type === "output_text" || c.text)) txt += c.text || "";
+    }));
+  }
+  try {
+    return JSON.parse(txt);
+  } catch (e) {
+    console.error("OpenAI reply unreadable", { model, stop: j.status, head: String(txt).slice(0, 200) });
+    throw new HttpsError("internal", "GPT answered with something that was not the JSON asked for.");
+  }
+}
 
 // The week in the board's words. The figures and the tables are assembled from
 // the data before this is called — what is wanted here is the paragraph a
@@ -401,6 +590,82 @@ exports.nnsccTrackerAi = onCall(
           CONTRACT_SCHEMA, 1500, CONTRACT_MODEL);
       }
       throw new HttpsError("invalid-argument", "Unsupported file — a contract must be a PDF or a Word .docx file.");
+    }
+
+    // ----- mode: compare the quotes on one job (what each price actually buys) -----
+    if (request.data && request.data.compare === true) {
+      const eng = ENGINES[String(request.data.engine || "claude")] || ENGINES.claude;
+      const engKey = cfg[eng.keyField];
+      if (!engKey) {
+        throw new HttpsError("failed-precondition",
+          "No API key has been saved for " + eng.label + " — the owner saves it under Overview.");
+      }
+      const engModel = String(request.data.model || "").trim() || eng.model;
+      const job = request.data.job || {};
+      const bids = Array.isArray(job.bids) ? job.bids.slice(0, 8) : [];
+      const priced = bids.filter((b) => b && b.total != null);
+      if (priced.length < 2) {
+        throw new HttpsError("invalid-argument", "Two priced quotes are needed before there is anything to compare.");
+      }
+      const lines = ["Job: " + String(job.desc || "").slice(0, 400),
+        "", "The quotes received (every amount includes 13% HST):"];
+      bids.forEach((b) => {
+        if (b.total == null) return;
+        lines.push("");
+        lines.push("Quote " + b.i + " — " + (String(b.contractor || "").trim() || "unnamed contractor"));
+        lines.push("  price: $" + Number(b.total).toFixed(2));
+        if (b.qno) lines.push("  quote number: " + String(b.qno).slice(0, 60));
+        if (b.date) lines.push("  quoted: " + String(b.date).slice(0, 20));
+        lines.push("  scope note as the manager typed it: " +
+          (String(b.scope || "").trim().slice(0, 1200) || "(nothing typed)"));
+      });
+      const blocks = [{ text: lines.join("\n") }];
+
+      // The quote documents themselves — the scope note is the manager's
+      // shorthand, the attachment is what the contractor actually wrote.
+      let budget = 14 * 1024 * 1024, taken = 0;
+      for (const b of bids) {
+        if (b.total == null) continue;
+        const files = Array.isArray(b.files) ? b.files.slice(0, 2) : [];
+        for (const f of files) {
+          if (taken >= 6 || !f || !f.path) continue;
+          const path = String(f.path);
+          if (!path.startsWith("quoteAttachments/")) continue;   // only ever a quote attachment
+          const name = String(f.name || "");
+          const ext = name.toLowerCase().split(".").pop();
+          const media = ext === "pdf" ? "application/pdf"
+            : ext === "png" ? "image/png"
+            : (ext === "jpg" || ext === "jpeg") ? "image/jpeg"
+            : ext === "webp" ? "image/webp" : "";
+          if (!media) continue;                                   // .docx/.heic and the rest: scope note only
+          let buf;
+          try {
+            [buf] = await admin.storage().bucket(CONTRACT_BUCKET).file(path).download();
+          } catch (e) { continue; }                               // a missing file is not a failed comparison
+          if (buf.length > 6 * 1024 * 1024 || buf.length > budget) continue;
+          budget -= buf.length; taken++;
+          blocks.push({ text: "Attached to quote " + b.i + " (" +
+            (String(b.contractor || "").trim() || "unnamed contractor") + "): " + name });
+          blocks.push({ media: media, b64: buf.toString("base64"), name: name });
+        }
+      }
+      blocks.push({ text: "Compare these quotes now. Report only what they say." });
+
+      let out;
+      if (eng === ENGINES.gemini) {
+        out = await callGemini(engKey, engModel, COMPARE_SYSTEM, blocks, COMPARE_SCHEMA);
+      } else if (eng === ENGINES.openai) {
+        out = await callOpenAI(engKey, engModel, COMPARE_SYSTEM, blocks, COMPARE_SCHEMA);
+      } else {
+        /* Anthropic wants its own block shapes */
+        const content = blocks.map((b) => (b.text
+          ? { type: "text", text: b.text }
+          : { type: b.media === "application/pdf" ? "document" : "image",
+              source: { type: "base64", media_type: b.media, data: b.b64 } }));
+        out = await callClaude(engKey, COMPARE_SYSTEM, content, COMPARE_SCHEMA,
+          12000, engModel, "medium");
+      }
+      return { ok: true, read: taken, engine: eng.label, model: engModel, compare: out };
     }
 
     // ----- shared stats validation for memo + narrative -----
