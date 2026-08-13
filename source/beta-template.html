@@ -1894,15 +1894,6 @@ body[data-view="edit"] .wrap { max-width:none; }
   </div>
   <button class="btn" id="btnReports" type="button" title="Save this period, start a new one, or open a past report">📁 <span id="reportNameLabel">Report</span> ▾</button>
   <button class="btn" id="btnPrint" type="button">Print / PDF</button>
-  <label class="tplpick" id="tplPick" style="display:none" title="Choose the report design — this is what everyone sees">
-    <span>Design</span>
-    <select id="tplSelect">
-      <option value="classic">Classic report</option>
-      <option value="packet">Board packet</option>
-    </select>
-  </label>
-  <button class="btn" id="btnHistory" type="button" style="display:none">History</button>
-  <button class="btn" id="btnDash" type="button" style="display:none" title="Totals across all report periods">📊 Dashboard</button>
   <button class="btn" id="btnVotes" type="button" style="display:none" title="Board voting on quoted jobs">🗳 <span id="votesLabel">Votes</span></button>
   <div class="spacer"></div>
   <span class="barnote" id="cloudStatus"></span>
@@ -1911,6 +1902,8 @@ body[data-view="edit"] .wrap { max-width:none; }
   <div class="menu" id="moreMenu">
     <button class="btn" id="btnMore" type="button" style="display:none">More ▾</button>
     <div class="dropdown">
+      <button id="btnDash" type="button" style="display:none" title="Totals across all report periods">📊 Dashboard</button>
+      <button id="btnHistory" type="button" style="display:none">🕘 Change history</button>
       <button id="btnMemo" type="button" style="display:none">✨ AI board memo</button>
       <button id="btnDecLog" type="button" style="display:none">📜 Decision log</button>
       <button id="btnBackup" type="button" style="display:none">Backup data (JSON)</button>
@@ -3287,7 +3280,7 @@ function tplBanners(EDITOR) {
       (votesCache.open > 1 ? "s are" : " is") + ' open — your review is requested. ' +
       '<button class="btn small" id="voteBannerBtn" type="button">Review &amp; vote</button></div>');
   if (EDITOR)
-    h.push('<div class="edithint-inline">✎ You’re signed in as the property manager — click almost anything to edit it right here (headings, descriptions, contractor names and dollar amounts). Amounts are treated as the <strong>HST-included total</strong>. Use the <strong>Design</strong> menu in the top bar to switch report layouts, and the <strong>Edit</strong> tab to add or remove jobs.</div>');
+    h.push('<div class="edithint-inline">✎ You’re signed in as the property manager — click almost anything to edit it right here (headings, descriptions, contractor names and dollar amounts). Amounts are treated as the <strong>HST-included total</strong>. Switch report layouts under <strong>Edit data → Settings</strong>, and use the <strong>Edit</strong> tab to add or remove jobs.</div>');
   return h.join("");
 }
 /* Section A rows (high-priority table body) — shared */
@@ -8765,8 +8758,6 @@ function activeReportName() {
 function updateReportsButton() {
   var lbl = document.getElementById("reportNameLabel");
   if (lbl) lbl.textContent = activeReportName();
-  var db = document.getElementById("btnDash");
-  if (db) db.style.display = isEditor() ? "" : "none";   /* archived periods are editor-only */
   var vb = document.getElementById("btnVotes");
   if (vb) vb.style.display = VOTING_ON && canVoteView() ? "" : "none";
   var vl = document.getElementById("votesLabel");
@@ -8775,6 +8766,7 @@ function updateReportsButton() {
   var ed = isEditor(), cv = canVoteView();
   var inArtifact = !!(window.claude && window.claude.downloads);
   function setDisp(id, show) { var el = document.getElementById(id); if (el) el.style.display = show ? "" : "none"; }
+  setDisp("btnDash", ed);        /* totals across every period — editor only */
   setDisp("btnMemo", ed);        /* AI board memo — editor only */
   setDisp("btnHistory", ed);     /* change history — the manager's own record */
   /* Decision log — only votes were ever written to it. With voting put away it
@@ -8784,7 +8776,6 @@ function updateReportsButton() {
   setDisp("btnRestore", ed);
   setDisp("btnPortable", ed && !inArtifact);
   setDisp("btnVersions", ed);
-  setDisp("tplPick", ed);        /* report-design picker — editor only */
   setDisp("btnMore", ed || (VOTING_ON && cv));   /* hidden when nothing inside is available */
   var tsel = document.getElementById("tplSelect");
   if (tsel) tsel.value = (state.meta && state.meta.template) || "classic";
