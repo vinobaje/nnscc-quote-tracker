@@ -2342,7 +2342,7 @@ var BRAND_PATH = "nnsccQuoteTracker/brand";               /* the letterhead the 
 var WEEKLY_DRAFT_PATH = "nnsccQuoteTracker/weeklyDraft";   /* the report she is working on */
 var WEEKLY_COLL = "nnsccWeeklyReports";                   /* every one she has finished */
 var VIEW_BETA = CURRENT_PATH.indexOf("Beta") >= 0;   /* which report the passcode gate reads/protects */
-var BUILD_STAMP = "2026-08-11 19:18";   /* filled in by build.js — which copy of the page this is */
+var BUILD_STAMP = "2026-08-12 20:17";   /* filled in by build.js — which copy of the page this is */
 /* path of the report currently on screen */
 function reportPath() {
   return cloud.active.kind === "current" ? CURRENT_PATH : (REPORTS_COLL + "/" + cloud.active.id);
@@ -3272,7 +3272,7 @@ function tplBanners(EDITOR) {
     h.push('<div class="archbanner">📁 You’re viewing a past report — <strong>' + esc(cloud.active.name || "") + '</strong>. ' +
       (EDITOR ? 'Edits here change this archived report only, not the current one. ' : '') +
       '<button class="btn small archback" type="button">← Back to current report</button></div>');
-  if (canVoteView() && votesCache.open > 0)
+  if (VOTING_ON && canVoteView() && votesCache.open > 0)
     h.push('<div class="votebanner">🗳 <strong>' + votesCache.open + '</strong> board vote' +
       (votesCache.open > 1 ? "s are" : " is") + ' open — your review is requested. ' +
       '<button class="btn small" id="voteBannerBtn" type="button">Review &amp; vote</button></div>');
@@ -3952,7 +3952,7 @@ function renderClassicReport() {
     '<a href="#secD">D · ' + esc(shortLabel(M.headD)) + "</a>" +
     '<a href="#secE">E · ' + esc(shortLabel(M.headE)) + "</a>" +
     (canSeeContracts() ? '<a href="#secF">F · Contracts</a>' : "") + "</nav>");
-  if (canVoteView() && votesCache.open > 0)
+  if (VOTING_ON && canVoteView() && votesCache.open > 0)
     h.push('<div class="votebanner">🗳 <strong>' + votesCache.open + '</strong> board vote' +
       (votesCache.open > 1 ? "s are" : " is") + ' open — your review is requested. ' +
       '<button class="btn small" id="voteBannerBtn" type="button">Review &amp; vote</button></div>');
@@ -4188,6 +4188,17 @@ function updateLastUpd() {
    job cards that expand to show updates / quotes / board actions, and a
    summary of the selected job. Every field here writes to the same
    state the report renders from — there is no second copy of the data. */
+/* Board voting — opening a vote on a job, directors voting and signing the
+   resolution in their own browser — is built and works, but is put away: a
+   written resolution passed this way is a delicate thing under the Ontario
+   Condominium Act and this board would rather not rely on it. Everything it
+   touches is behind this one flag; set it to true and it all comes back —
+   the sidebar section, the 🗳 button in the bar, the vote banner on the
+   report, and the "Board vote" button inside each job card. The list of
+   board members is NOT part of it: that list is what lets a director open
+   the report at all, so it lives in Settings either way. */
+var VOTING_ON = false;
+
 var edNav = "jobs";           /* jobs | overview | contractors | board | settings */
 var edOpen = {};              /* jobId -> expanded */
 var edSel = null;             /* jobId shown in the summary rail */
@@ -4220,9 +4231,11 @@ function renderEditor() {
     "Everyone who can read the report can read these.") + conCardHTML());
   else if (edNav === "contractors") h.push(edSecHead("Contractors",
     "Contact details and insurance expiry. Lapsing cover is flagged beside that contractor’s contracts.") + dirCardHTML());
-  else if (edNav === "board") h.push(edSecHead("Board &amp; voting",
+  else if (edNav === "board" && VOTING_ON) h.push(edSecHead("Board &amp; voting",
     "Who can open the report, vote on a job and sign the resolution.") + boardCardHTML() + edVotingHTML());
-  else if (edNav === "settings") h.push(edSettingsHTML(M));
+  /* with voting put away the board-member list lives in Settings, so an old
+     link or a stale click on "board" lands there rather than on nothing */
+  else if (edNav === "settings" || edNav === "board") h.push(edSettingsHTML(M));
   else h.push(edJobsHTML());
   h.push("</div></div></div>");
   document.getElementById("editor").innerHTML = h.join("");
@@ -4370,9 +4383,10 @@ function edJobsHTML() {
     '<div class="ed-short"><span class="si">👷</span><span><b>Contractor directory</b>' +
     "<small>Contacts &amp; insurance expiry</small></span><span class=\"spacer\"></span>" +
     '<button class="edbtn" type="button" data-act="ednav" data-nav="contractors">View all</button></div>' +
-    '<div class="ed-short"><span class="si">🗳</span><span><b>Board members</b>' +
-    "<small>Voting access &amp; signatures</small></span><span class=\"spacer\"></span>" +
-    '<button class="edbtn" type="button" data-act="ednav" data-nav="board">View all</button></div></div>');
+    '<div class="ed-short"><span class="si">' + (VOTING_ON ? "🗳" : "🔑") + "</span><span><b>Board members</b>" +
+    "<small>" + (VOTING_ON ? "Voting access &amp; signatures" : "Who can open the report") + "</small></span>" +
+    '<span class="spacer"></span><button class="edbtn" type="button" data-act="ednav" data-nav="' +
+    (VOTING_ON ? "board" : "settings") + '">View all</button></div></div>');
   return h.join("");
 }
 function edJobCardHTML(j, ji) {
@@ -4515,8 +4529,9 @@ function edJobCardHTML(j, ji) {
     '<div class="bact"><span class="jchip st-' + esc(stk) + '">' +
     (APPROVED_SET[stk] ? "✓ " : "") + esc(statusLabel(stk)) + "</span>" +
     '<span class="bl">' + bl + "</span>" +
-    (voteOpen ? '<span class="qst over">🗳 Vote open</span>' : "") +
-    '<button class="edbtn" type="button" data-act="openvote">🗳 Board vote</button></div></div>');
+    (VOTING_ON && voteOpen ? '<span class="qst over">🗳 Vote open</span>' : "") +
+    (VOTING_ON ? '<button class="edbtn" type="button" data-act="openvote">🗳 Board vote</button>' : "") +
+    "</div></div>");
   return h.join("") + "</div></div>";
 }
 
@@ -4610,6 +4625,7 @@ function edSettingsHTML(M) {
   h.push('<div class="esrow"><label>Design</label><select data-mf="template">' +
     '<option value="classic"' + (tpl === "classic" ? " selected" : "") + ">Classic report</option>" +
     '<option value="packet"' + (tpl === "packet" ? " selected" : "") + ">Board packet</option></select></div></div></div>");
+  if (!VOTING_ON) h.push(boardCardHTML());   /* the two ways in: named directors, then the passcode */
   h.push(viewPassCardHTML());
   h.push('<div class="ecard esettings"><div class="ehead"><strong>Data</strong>' +
     '<span style="font-size:12.5px;color:var(--ink2)">— backups and the change trail</span></div><div class="ebids">' +
@@ -7410,7 +7426,10 @@ function dirCardHTML() {
 function boardCardHTML() {
   var h = [];
   h.push('<div class="ecard esettings" id="boardCard"><div class="ehead"><strong>Board members</strong>' +
-    '<span style="font-size:12.5px;color:var(--ink2)">— Google accounts allowed to vote and sign resolutions (they sign in like you do, but can’t edit)</span></div><div class="ebids">');
+    '<span style="font-size:12.5px;color:var(--ink2)">— ' + (VOTING_ON
+      ? "Google accounts allowed to vote and sign resolutions (they sign in like you do, but can’t edit)"
+      : "Google accounts that open the report without a passcode (they sign in like you do, but can’t edit)") +
+    "</span></div><div class=\"ebids\">");
   if (!cloud.on) h.push('<p class="edithint" style="margin:4px 0">Available on the live site only.</p>');
   else {
     boardState.members.forEach(function (m, mi) {
@@ -7420,8 +7439,11 @@ function boardCardHTML() {
     h.push('<div class="esrow"><label>Add member</label>' +
       '<input type="email" id="boardNewEmail" placeholder="their.gmail@example.com" style="flex:1" autocomplete="off">' +
       '<button class="btn" data-act="board-add" type="button">Add</button></div>');
-    h.push('<p class="edithint" style="margin:6px 0 0;font-size:12.5px">Board members see a 🗳 Votes button after signing in with Google. ' +
-      'Quorum is a majority of this list. Send them the report link and they’re ready to vote.</p>');
+    h.push('<p class="edithint" style="margin:6px 0 0;font-size:12.5px">' + (VOTING_ON
+      ? "Board members see a 🗳 Votes button after signing in with Google. " +
+        "Quorum is a majority of this list. Send them the report link and they’re ready to vote."
+      : "Anyone listed here opens the report straight away once they sign in with Google — " +
+        "no passcode to remember. Everyone else uses the passcode below.") + "</p>");
   }
   h.push("</div></div>");
   return h.join("");
@@ -8726,7 +8748,7 @@ function updateReportsButton() {
   var db = document.getElementById("btnDash");
   if (db) db.style.display = isEditor() ? "" : "none";   /* archived periods are editor-only */
   var vb = document.getElementById("btnVotes");
-  if (vb) vb.style.display = canVoteView() ? "" : "none";
+  if (vb) vb.style.display = VOTING_ON && canVoteView() ? "" : "none";
   var vl = document.getElementById("votesLabel");
   if (vl) vl.textContent = votesCache.open > 0 ? "Votes (" + votesCache.open + " open)" : "Votes";
   /* ---- More ▾ menu: hide editor-only tools from viewers/board members ---- */
@@ -8735,13 +8757,15 @@ function updateReportsButton() {
   function setDisp(id, show) { var el = document.getElementById(id); if (el) el.style.display = show ? "" : "none"; }
   setDisp("btnMemo", ed);        /* AI board memo — editor only */
   setDisp("btnHistory", ed);     /* change history — the manager's own record */
-  setDisp("btnDecLog", cv);      /* Decision log — board members + editors */
+  /* Decision log — only votes were ever written to it. With voting put away it
+     stays reachable as a record of what happened, but only for the manager. */
+  setDisp("btnDecLog", VOTING_ON ? cv : ed);
   setDisp("btnBackup", ed);      /* Backup / Restore / Reset — editor only */
   setDisp("btnRestore", ed);
   setDisp("btnPortable", ed && !inArtifact);
   setDisp("btnVersions", ed);
-  setDisp("btnMore", cv);        /* hide the whole menu when nothing inside is available */
   setDisp("tplPick", ed);        /* report-design picker — editor only */
+  setDisp("btnMore", ed || (VOTING_ON && cv));   /* hidden when nothing inside is available */
   var tsel = document.getElementById("tplSelect");
   if (tsel) tsel.value = (state.meta && state.meta.template) || "classic";
   var btn = document.getElementById("btnReports");
