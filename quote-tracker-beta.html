@@ -87,6 +87,7 @@ html { scroll-behavior:smooth; }
   margin:14px -20px 4px; padding:10px 20px; box-shadow:0 6px 12px -8px rgba(20,26,33,.18);
   display:flex; align-items:center; gap:14px; }
 .secbar .secnav { flex:1 1 auto; min-width:0; }
+.secbar-r { flex:0 0 auto; display:flex; align-items:center; gap:9px; }
 .secnav { display:flex; gap:6px; flex-wrap:wrap; }
 .secnav a { font-size:12.5px; font-weight:600; color:var(--accent-ink); text-decoration:none;
   background:var(--card); border:1px solid var(--line); border-radius:99px; padding:6px 13px;
@@ -107,7 +108,9 @@ html { scroll-behavior:smooth; }
     -webkit-overflow-scrolling:touch; scrollbar-width:none; }
   .secnav::-webkit-scrollbar { display:none; }
   .secnav a { flex:0 0 auto; white-space:nowrap; }
-  .secbar .rsearch { flex:0 0 auto; width:auto; }
+  /* second row: the search takes the width it can, the bell keeps its corner */
+  .secbar-r { width:100%; }
+  .secbar .rsearch { flex:1 1 auto; width:auto; }
   /* full width of the box it hangs from, rather than a panel floating right */
   .secbar .rsres { left:0; right:0; width:auto; }
   #report section { scroll-margin-top:106px; }   /* the chips row and the search under it */
@@ -149,6 +152,27 @@ html { scroll-behavior:smooth; }
 .rsamt { flex:none; font-size:13px; font-weight:650; color:var(--ink); font-variant-numeric:tabular-nums; }
 .rsprio { color:var(--prio); font-weight:700; }
 .rsnone { padding:14px 13px; font-size:13px; color:var(--ink2); }
+
+/* ---------- the attention bell ---------- */
+.albell { position:relative; flex:0 0 auto; }
+.albtn { position:relative; width:38px; height:38px; border-radius:50%; cursor:pointer;
+  background:var(--card); border:1px solid var(--line); font-size:16px; line-height:1;
+  display:flex; align-items:center; justify-content:center; color:var(--ink); }
+.albtn:hover { background:var(--accent-soft); border-color:var(--accent); }
+.albadge { position:absolute; top:-6px; right:-7px; min-width:17px; height:17px; padding:0 4px;
+  border-radius:99px; background:var(--amber); color:#fff; border:2px solid var(--paper);
+  font-size:10px; font-weight:800; line-height:13px; font-variant-numeric:tabular-nums; }
+.albtn.hot .albadge { background:var(--prio); }
+.aldrop { position:absolute; z-index:41; top:calc(100% + 8px); right:0; width:min(430px, 92vw);
+  background:var(--card); border:1px solid var(--line); border-radius:12px;
+  box-shadow:0 18px 40px -18px rgba(16,32,52,.45); overflow:hidden; }
+.aldhead { padding:10px 14px; font-size:13.5px; font-weight:700; color:var(--ink);
+  background:var(--paper); border-bottom:1px solid var(--line-soft); }
+.aldlist { margin:0; padding:6px 16px 6px 30px; max-height:min(52vh, 400px); overflow-y:auto; }
+.aldlist li { font-size:13.5px; line-height:1.55; color:var(--ink); margin:8px 0; }
+.aldlist li.passed, .aldlist li.urgent { color:#7a2020; }
+.aldfoot { padding:9px 14px; font-size:11.5px; color:var(--muted);
+  background:var(--paper); border-top:1px solid var(--line-soft); }
 
 .editable-head { cursor:text; transition:outline-color .12s; }
 .editable-head:hover { outline:1px dashed var(--accent); outline-offset:5px; border-radius:4px; }
@@ -2453,7 +2477,7 @@ var BRAND_PATH = "nnsccQuoteTrackerBeta/brand";               /* the letterhead 
 var WEEKLY_DRAFT_PATH = "nnsccQuoteTrackerBeta/weeklyDraft";   /* the report she is working on */
 var WEEKLY_COLL = "nnsccWeeklyReportsBeta";                   /* every one she has finished */
 var VIEW_BETA = CURRENT_PATH.indexOf("Beta") >= 0;   /* which report the passcode gate reads/protects */
-var BUILD_STAMP = "2026-08-14 00:49";   /* filled in by build.js — which copy of the page this is */
+var BUILD_STAMP = "2026-08-14 00:50";   /* filled in by build.js — which copy of the page this is */
 /* path of the report currently on screen */
 function reportPath() {
   return cloud.active.kind === "current" ? CURRENT_PATH : (REPORTS_COLL + "/" + cloud.active.id);
@@ -4083,7 +4107,7 @@ function renderClassicReport() {
     '<a href="#secD">D · ' + esc(shortLabel(M.headD)) + "</a>" +
     '<a href="#secE">E · ' + esc(shortLabel(M.headE)) + "</a>" +
     (canSeeContracts() ? '<a href="#secF">F · Contracts</a>' : "") + "</nav>" +
-    rsBoxHTML() + "</div>");
+    '<div class="secbar-r">' + rsBoxHTML() + alertBellHTML() + "</div></div>");
   if (VOTING_ON && canVoteView() && votesCache.open > 0)
     h.push('<div class="votebanner">🗳 <strong>' + votesCache.open + '</strong> board vote' +
       (votesCache.open > 1 ? "s are" : " is") + ' open — your review is requested. ' +
@@ -4091,7 +4115,8 @@ function renderClassicReport() {
   if (EDITOR)
     h.push('<div class="edithint-inline">✎ You’re signed in as the property manager — click almost anything to edit it right here (look for the dashed underline on hover): headings, descriptions, job names, contractor names, scope notes, and dollar amounts. Amounts you type are treated as the <strong>HST-included total</strong>; type an amount over “Enter amount” to turn a pending bid into a quote. Totals, the lowest-bid flag, and the charts recalculate automatically. Use the <strong>Edit</strong> tab to add or remove jobs and bids or toggle priority.</div>');
 
-  h.push(alertPanelHTML());
+  /* no banner here: on the board's copy these warnings live in the bell up in
+     the section strip, where they can be looked at rather than looked past */
   h.push('<section id="secSum"><h2' + hA("headSum") + ">" + esc(M.headSum) + "</h2>");
   if (state.ai && state.ai.summary)
     h.push('<p class="seclede ainarr">' + tE("ai:summary", state.ai.summary, "AI summary") + "</p>");
@@ -4270,6 +4295,7 @@ function renderClassicReport() {
   updateReportsButton();
   setupScrollSpy();
   if (rsShow) rsPaint();   /* a cloud update mid-search must not blank the matches */
+  if (alShow) alertPaint();
 }
 
 /* keep --abh equal to the app bar's real height so the sticky nav sits right under it */
@@ -7824,16 +7850,19 @@ function alertList() {
    are never many and each is a decision. Quotes are counted rather than listed:
    a dozen lines about prices going stale is the property manager's work, not
    the board's, and burying the renewals under them helps nobody. */
-function alertPanelHTML() {
+/* what this reader is allowed to be told about */
+function alertVisible() {
   var ED = isEditor();
-  var items = alertList().filter(function (i) { return ED || i.audience === "all"; });
-  if (!items.length) return "";
-  var quotes = [], named = [];
+  return alertList().filter(function (i) { return ED || i.audience === "all"; });
+}
+function alertUrgent(items) {
+  return items.filter(function (i) { return i.severity === "passed" || i.severity === "urgent"; }).length;
+}
+/* the list itself — shared by the packet's banner and the report's bell, so the
+   two can never drift into saying different things about the same month */
+function alertLisHTML(items) {
+  var ED = isEditor(), quotes = [], named = [], h = [];
   items.forEach(function (i) { (i.kind === "quote" ? quotes : named).push(i); });
-  var urgent = items.filter(function (i) { return i.severity === "passed" || i.severity === "urgent"; }).length;
-  var h = ['<div class="alertbar' + (urgent ? " hot" : "") + '"><div class="alerthead">' +
-    (urgent ? "\u{26A0}" : "\u{1F514}") + " " + items.length + " thing" + (items.length === 1 ? "" : "s") +
-    " need" + (items.length === 1 ? "s" : "") + " attention</div><ul>"];
   named.slice(0, 6).forEach(function (i) {
     h.push('<li class="' + i.severity + '"><span class="alertlink" data-alertlist="contract" role="button" ' +
       'tabindex="0" title="Go to the contracts section"><strong>' + esc(i.title) + "</strong> — " +
@@ -7855,9 +7884,63 @@ function alertPanelHTML() {
           : "The property manager is re-confirming these prices with the contractors.") +
       ' <span class="alertsee">Which ones?</span></span></li>');
   }
-  h.push("</ul></div>");
   return h.join("");
 }
+/* the banner across the page — the board packet keeps it */
+function alertPanelHTML() {
+  var items = alertVisible();
+  if (!items.length) return "";
+  var urgent = alertUrgent(items);
+  return '<div class="alertbar' + (urgent ? " hot" : "") + '"><div class="alerthead">' +
+    (urgent ? "\u{26A0}" : "\u{1F514}") + " " + items.length + " thing" + (items.length === 1 ? "" : "s") +
+    " need" + (items.length === 1 ? "s" : "") + " attention</div><ul>" +
+    alertLisHTML(items) + "</ul></div>";
+}
+
+/* ---------- the same warnings, as a bell rather than a wall ----------
+   A red panel across the top of every page said "something is wrong here" to a
+   board member who had merely opened the report to read it — and what it was
+   warning about (a quote going stale, an agreement about to renew) is the
+   property manager's work, not theirs. It is still worth being able to see, and
+   still counted the same way. So it is a bell in the corner of the strip that
+   follows the page down: a number when there is something, nothing at all when
+   there is not, and the whole list one click away. */
+var alShow = false;      /* the bell's panel is open */
+
+function alertBellHTML() {
+  var items = alertVisible();
+  if (!items.length) return "";
+  var urgent = alertUrgent(items);
+  return '<div class="albell"><button class="albtn' + (urgent ? " hot" : "") + '" type="button" data-albell ' +
+    'aria-label="' + items.length + " thing" + (items.length === 1 ? "" : "s") + ' needing attention" ' +
+    'title="Things needing attention">\u{1F514}<span class="albadge">' + items.length + "</span></button>" +
+    '<div id="alDrop"></div></div>';
+}
+function alertDropHTML() {
+  if (!alShow) return "";
+  var items = alertVisible();
+  if (!items.length) return "";
+  var urgent = alertUrgent(items);
+  return '<div class="aldrop"><div class="aldhead">' + (urgent ? "\u{26A0}" : "\u{1F514}") + " " +
+    items.length + " thing" + (items.length === 1 ? "" : "s") + " need" + (items.length === 1 ? "s" : "") +
+    ' attention</div><ul class="aldlist">' + alertLisHTML(items) + "</ul>" +
+    '<div class="aldfoot">The property manager is on these — they are here so the board can see them.</div></div>';
+}
+function alertPaint() {
+  var box = document.getElementById("alDrop");
+  if (box) box.innerHTML = alertDropHTML();
+}
+function alertClose() { if (!alShow) return; alShow = false; alertPaint(); }
+document.addEventListener("click", function (e) {
+  if (!e.target || !e.target.closest) return;
+  if (e.target.closest("[data-albell]")) { alShow = !alShow; alertPaint(); return; }
+  /* choosing an item hands over to the breakdown overlay — get out of its way */
+  if (e.target.closest(".aldrop")) { alertClose(); return; }
+  if (!e.target.closest(".albell")) alertClose();
+});
+document.addEventListener("keydown", function (e) {
+  if (e.key === "Escape") alertClose();
+});
 
 /* ---------- contractor directory (beta) ---------- */
 var dirState = { list: [] };
