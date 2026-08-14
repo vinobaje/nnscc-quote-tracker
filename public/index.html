@@ -78,9 +78,16 @@ html { scroll-behavior:smooth; }
 .hero h1 { color:#fff; font-size:32px; margin:2px 0 4px; text-shadow:0 1px 8px rgba(0,0,0,.35); }
 .herokick { color:#BFD5EA; font-weight:600; letter-spacing:.14em; text-transform:uppercase; font-size:11.5px; }
 .herometa { color:rgba(255,255,255,.88); font-size:13.5px; }
-.secnav { display:flex; gap:6px; flex-wrap:wrap; position:sticky; top:var(--abh, 48px); z-index:20;
-  background:var(--paper); margin:14px -20px 4px; padding:10px 20px;
-  box-shadow:0 6px 12px -8px rgba(20,26,33,.18); }
+/* The strip that follows you down the report: section chips on the left, the
+   job search on the right. The sticky/backdrop part lives on the bar so the
+   chips can scroll sideways inside it on a phone without taking the search
+   with them. (.secnav is also worn by the board packet's dark rail, which
+   resets what it needs — keep bar-only rules on .secbar.) */
+.secbar { position:sticky; top:var(--abh, 48px); z-index:20; background:var(--paper);
+  margin:14px -20px 4px; padding:10px 20px; box-shadow:0 6px 12px -8px rgba(20,26,33,.18);
+  display:flex; align-items:center; gap:14px; }
+.secbar .secnav { flex:1 1 auto; min-width:0; }
+.secnav { display:flex; gap:6px; flex-wrap:wrap; }
 .secnav a { font-size:12.5px; font-weight:600; color:var(--accent-ink); text-decoration:none;
   background:var(--card); border:1px solid var(--line); border-radius:99px; padding:6px 13px;
   transition:background .15s, color .15s; }
@@ -94,13 +101,55 @@ html { scroll-behavior:smooth; }
   /* the top bar is position:static on a phone (it scrolls away), so holding
      its height back as a sticky offset left this bar floating a third of the
      way down the screen — it belongs at the very top */
-  .secnav { top:0; flex-wrap:nowrap; overflow-x:auto; overscroll-behavior-x:contain;
-    -webkit-overflow-scrolling:touch; scrollbar-width:none; margin:12px -20px 4px; padding:8px 14px; }
+  .secbar { top:0; margin:12px -20px 4px; padding:8px 14px; gap:8px;
+    flex-direction:column; align-items:stretch; }
+  .secnav { flex-wrap:nowrap; overflow-x:auto; overscroll-behavior-x:contain;
+    -webkit-overflow-scrolling:touch; scrollbar-width:none; }
   .secnav::-webkit-scrollbar { display:none; }
   .secnav a { flex:0 0 auto; white-space:nowrap; }
-  #report section { scroll-margin-top:58px; }   /* just the nav strip now */
+  .secbar .rsearch { flex:0 0 auto; width:auto; }
+  /* full width of the box it hangs from, rather than a panel floating right */
+  .secbar .rsres { left:0; right:0; width:auto; }
+  #report section { scroll-margin-top:106px; }   /* the chips row and the search under it */
 }
 #report section { scroll-margin-top:calc(var(--abh, 48px) + 58px); }
+
+/* ---------- find a job, from anywhere on the report ----------
+   Sixty jobs is more than anyone scrolls through to answer "what did we get for
+   the garage?". This searches only what the report already shows — job number,
+   job name, contractor, the scope note and the quote number — and it takes you
+   to the job rather than filtering the page: nothing is hidden, no total is
+   recalculated, so a figure read out at a meeting is always the whole figure. */
+.rsearch { position:relative; flex:0 0 268px; }
+.rsbox { display:flex; align-items:center; gap:7px; background:var(--card);
+  border:1px solid var(--line); border-radius:99px; padding:6px 12px; }
+.rsbox:focus-within { border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft); }
+.rsbox .ic { flex:none; font-size:12.5px; opacity:.55; }
+.rsbox input { flex:1 1 auto; min-width:0; border:0; background:none; outline:none;
+  font:inherit; font-size:13px; color:var(--ink); }
+.rsbox input::-webkit-search-cancel-button, .rsbox input::-webkit-search-decoration { display:none; }
+.rsx { flex:none; border:0; background:none; cursor:pointer; color:var(--muted);
+  font-size:13px; line-height:1; padding:2px 1px; }
+.rsx:hover { color:var(--ink); }
+.rsres { position:absolute; z-index:40; top:calc(100% + 6px); right:0; width:min(430px, 92vw);
+  background:var(--card); border:1px solid var(--line); border-radius:12px;
+  box-shadow:0 18px 40px -18px rgba(16,32,52,.45); overflow:hidden; }
+.rshead, .rsmore { padding:8px 13px; font-size:11.5px; color:var(--muted); background:var(--paper); }
+.rshead { border-bottom:1px solid var(--line-soft); }
+.rsmore { border-top:1px solid var(--line-soft); }
+.rslist { max-height:min(56vh, 430px); overflow-y:auto; }
+.rsrow { display:flex; gap:10px; align-items:baseline; width:100%; text-align:left; font:inherit;
+  border:0; border-bottom:1px solid var(--line-soft); background:none; cursor:pointer; padding:9px 13px; }
+.rsrow:last-child { border-bottom:0; }
+.rsrow:hover, .rsrow.on { background:var(--accent-soft); }
+.rsno { flex:none; min-width:22px; font-size:11.5px; font-weight:700; color:var(--muted); }
+.rsmain { flex:1 1 auto; min-width:0; display:block; }
+.rsdesc { display:block; font-size:13.5px; font-weight:600; color:var(--ink); line-height:1.3; }
+.rssub { display:block; font-size:12px; color:var(--ink2); margin-top:2px; }
+.rsamt { flex:none; font-size:13px; font-weight:650; color:var(--ink); font-variant-numeric:tabular-nums; }
+.rsprio { color:var(--prio); font-weight:700; }
+.rsnone { padding:14px 13px; font-size:13px; color:var(--ink2); }
+
 .editable-head { cursor:text; transition:outline-color .12s; }
 .editable-head:hover { outline:1px dashed var(--accent); outline-offset:5px; border-radius:4px; }
 .editable-head:focus { outline:2px solid var(--accent); outline-offset:5px; border-radius:4px; }
@@ -1778,7 +1827,7 @@ body[data-view="edit"] .wrap { max-width:none; }
   body { padding:0; margin:0; }
   .wrap { max-width:none; width:auto; margin:0; padding:0; }
   #report { display:block !important; }
-  #editor, .appbar, .secnav, .edithint-inline, .votebanner, .overlay,
+  #editor, .appbar, .secbar, .secnav, .rsearch, .edithint-inline, .votebanner, .overlay,
   .dropdown, .tplpick, .btn, .btn-print, .js-print { display:none !important; }
   .editable-head, .editable-txt { outline:none !important; }
   .editable-txt:empty::before { content:"" !important; }
@@ -2404,7 +2453,7 @@ var BRAND_PATH = "nnsccQuoteTracker/brand";               /* the letterhead the 
 var WEEKLY_DRAFT_PATH = "nnsccQuoteTracker/weeklyDraft";   /* the report she is working on */
 var WEEKLY_COLL = "nnsccWeeklyReports";                   /* every one she has finished */
 var VIEW_BETA = CURRENT_PATH.indexOf("Beta") >= 0;   /* which report the passcode gate reads/protects */
-var BUILD_STAMP = "2026-08-12 20:17";   /* filled in by build.js — which copy of the page this is */
+var BUILD_STAMP = "2026-08-14 00:49";   /* filled in by build.js — which copy of the page this is */
 /* path of the report currently on screen */
 function reportPath() {
   return cloud.active.kind === "current" ? CURRENT_PATH : (REPORTS_COLL + "/" + cloud.active.id);
@@ -4027,13 +4076,14 @@ function renderClassicReport() {
          tE("meta:manager", M.manager, "Manager") + " · " +
          d.jobs.length + " jobs · " + nContractors + " contractors · Prepared " + esc(todayStr()) + "</div>");
   h.push('</div><div class="logochip"><img src="' + ASSET_LOGO + '" alt="' + esc(M.manager) + '"></div></div></header>');
-  h.push('<nav class="secnav"><a href="#secSum">' + esc(shortLabel(M.headSum)) + "</a>" +
+  h.push('<div class="secbar"><nav class="secnav"><a href="#secSum">' + esc(shortLabel(M.headSum)) + "</a>" +
     '<a href="#secA">A · ' + esc(shortLabel(M.headA)) + "</a>" +
     '<a href="#secB">B · ' + esc(shortLabel(M.headB)) + "</a>" +
     '<a href="#secC">C · ' + esc(shortLabel(M.headC)) + "</a>" +
     '<a href="#secD">D · ' + esc(shortLabel(M.headD)) + "</a>" +
     '<a href="#secE">E · ' + esc(shortLabel(M.headE)) + "</a>" +
-    (canSeeContracts() ? '<a href="#secF">F · Contracts</a>' : "") + "</nav>");
+    (canSeeContracts() ? '<a href="#secF">F · Contracts</a>' : "") + "</nav>" +
+    rsBoxHTML() + "</div>");
   if (VOTING_ON && canVoteView() && votesCache.open > 0)
     h.push('<div class="votebanner">🗳 <strong>' + votesCache.open + '</strong> board vote' +
       (votesCache.open > 1 ? "s are" : " is") + ' open — your review is requested. ' +
@@ -4219,6 +4269,7 @@ function renderClassicReport() {
   updateLastUpd();
   updateReportsButton();
   setupScrollSpy();
+  if (rsShow) rsPaint();   /* a cloud update mid-search must not blank the matches */
 }
 
 /* keep --abh equal to the app bar's real height so the sticky nav sits right under it */
@@ -8404,6 +8455,137 @@ document.addEventListener("click", function (e) {
     var href = a.getAttribute("href");
     if (href && href.length > 1) setTimeout(function () { flashSection(href.slice(1)); }, 60);
   }
+});
+
+/* ---------- find a job, from anywhere on the report ----------
+   A board member asking "what did we get for the garage ramp?" should not have
+   to scroll sixty jobs to answer it. This searches only what the report already
+   puts on the page — the job number and name, the contractors, their scope
+   notes and quote numbers — so it can show nothing a reader could not already
+   see, and there is no back-office data behind it.
+
+   It finds rather than filters. Hiding rows would leave a page whose totals no
+   longer matched what was visible, and a figure read out at a meeting has to be
+   the whole figure. So the report is never touched: the matches drop down under
+   the box, and choosing one opens that job's own window — dates, every quote,
+   the attachments — which is where the answer actually is. */
+var rsQ = "";        /* the query, kept across re-renders of the report */
+var rsShow = false;  /* results panel open */
+var rsSel = -1;      /* keyboard highlight, -1 = none */
+var RS_MAX = 12;     /* enough to scan; beyond this, better to type another word */
+
+function rsBoxHTML() {
+  return '<div class="rsearch"><div class="rsbox"><span class="ic">🔍</span>' +
+    '<input type="search" id="rsInput" placeholder="Find a job or contractor" autocomplete="off" ' +
+    'spellcheck="false" aria-label="Find a job or contractor" value="' + esc(rsQ) + '">' +
+    '<button class="rsx" type="button" data-rs="clear" title="Clear" aria-label="Clear">✕</button>' +
+    '</div><div id="rsRes"></div></div>';
+}
+/* everything this job says about itself, in one lower-case string */
+function rsHay(j) {
+  var s = ["#" + j.no, j.desc || "", statusLabel(j.status || "quoted")];
+  (j.bids || []).forEach(function (b) {
+    s.push(b.contractor || "", b.notes || "", b.qno ? "#" + b.qno : "");
+  });
+  return s.join(" ").toLowerCase();
+}
+/* every word has to appear somewhere, in any order — so "joint ramp" finds the
+   ramp crack repair quoted by Joint Seal without knowing which word is which */
+function rsFind(q) {
+  var words = String(q || "").toLowerCase().split(/\s+/).filter(Boolean);
+  if (!words.length) return [];
+  var out = [];
+  (state.jobs || []).forEach(function (j) {
+    var hay = rsHay(j);
+    for (var i = 0; i < words.length; i++) if (hay.indexOf(words[i]) < 0) return;
+    out.push(j);
+  });
+  return out;
+}
+function rsResHTML() {
+  if (!rsShow || !rsQ.trim()) return "";
+  var hits = rsFind(rsQ);
+  if (!hits.length)
+    return '<div class="rsres"><p class="rsnone">Nothing matches “' + esc(rsQ.trim()) + '”. ' +
+      "Try a contractor’s name, or a word from the job.</p></div>";
+  var h = ['<div class="rsres"><div class="rshead">' +
+    (hits.length === 1 ? "1 job matches" : hits.length + " jobs match") +
+    (hits.length > RS_MAX ? " — first " + RS_MAX + " shown" : "") + "</div><div class=\"rslist\">"];
+  hits.slice(0, RS_MAX).forEach(function (j, i) {
+    var c = jobCalc(j), names = [];
+    c.carriedBids.forEach(function (cb) {
+      var n = (cb.b.contractor || "").trim();
+      if (n && names.indexOf(n) < 0) names.push(n);
+    });
+    if (!names.length)
+      (j.bids || []).forEach(function (b) {
+        var n = (b.contractor || "").trim();
+        if (n && names.indexOf(n) < 0) names.push(n);
+      });
+    var sub = (names.join(" + ") || "no contractor yet") +
+      (c.priced > 1 ? " · " + c.priced + " quotes" : "");
+    h.push('<button class="rsrow' + (i === rsSel ? " on" : "") + '" type="button" data-rsjob="' + esc(j.id) +
+      '"><span class="rsno">' + esc(j.no) + '</span><span class="rsmain"><span class="rsdesc">' +
+      esc(j.desc || "Job") + (j.priority ? ' <span class="rsprio">⚑</span>' : "") +
+      '</span><span class="rssub">' + esc(sub) + "</span></span>" +
+      '<span class="rsamt">' + (c.cost ? money(c.cost) : "—") + "</span></button>");
+  });
+  h.push("</div>");
+  if (hits.length > RS_MAX) h.push('<div class="rsmore">Add another word to narrow it down.</div>');
+  return h.join("") + "</div>";
+}
+function rsPaint() {
+  var box = document.getElementById("rsRes");
+  if (box) box.innerHTML = rsResHTML();
+}
+function rsClose() { rsShow = false; rsSel = -1; rsPaint(); }
+function rsClear() {
+  rsQ = ""; rsClose();
+  var inp = document.getElementById("rsInput");
+  if (inp) { inp.value = ""; inp.focus(); }
+}
+/* the job's own window is the answer — dates, every quote, the attachments */
+function rsGo(id) {
+  rsClose();
+  var inp = document.getElementById("rsInput"); if (inp) inp.blur();
+  openJobDossier(id);
+}
+document.addEventListener("input", function (e) {
+  if (!e.target || e.target.id !== "rsInput") return;
+  rsQ = e.target.value || "";
+  rsShow = true; rsSel = -1;
+  rsPaint();
+});
+document.addEventListener("keydown", function (e) {
+  if (!e.target || e.target.id !== "rsInput") return;
+  if (e.key === "Escape") { if (rsQ) rsClear(); else e.target.blur(); return; }
+  var rows = document.querySelectorAll(".rsres .rsrow");
+  if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+    if (!rows.length) return;
+    e.preventDefault();
+    rsSel = e.key === "ArrowDown" ? (rsSel + 1) % rows.length
+                                  : (rsSel <= 0 ? rows.length - 1 : rsSel - 1);
+    rsPaint();
+    var on = document.querySelector(".rsres .rsrow.on");
+    if (on) on.scrollIntoView({ block: "nearest" });
+    return;
+  }
+  if (e.key === "Enter") {
+    e.preventDefault();
+    var pick = rows[rsSel >= 0 ? rsSel : 0];
+    if (pick) rsGo(pick.getAttribute("data-rsjob"));
+  }
+});
+document.addEventListener("click", function (e) {
+  if (!e.target || !e.target.closest) return;
+  var row = e.target.closest("[data-rsjob]");
+  if (row) { rsGo(row.getAttribute("data-rsjob")); return; }
+  if (e.target.closest('[data-rs="clear"]')) { rsClear(); return; }
+  if (e.target.closest("#rsInput")) {                 /* clicking back in reopens */
+    if (rsQ.trim()) { rsShow = true; rsPaint(); }
+    return;
+  }
+  if (!e.target.closest(".rsearch")) rsClose();       /* anywhere else closes it */
 });
 /* the in-report Print / PDF button (board packet header) */
 document.addEventListener("click", function (e) {
