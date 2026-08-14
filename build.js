@@ -24,7 +24,8 @@ const ROOT = __dirname;
 const SRC = path.join(ROOT, "source", "beta-template.html");
 
 const TARGETS = {
-  beta: { file: path.join(ROOT, "quote-tracker-beta.html"), live: false },
+  beta: { file: path.join(ROOT, "quote-tracker-beta.html"), live: false,
+          also: path.join(ROOT, "beta", "index.html") },
   live: { file: path.join(ROOT, "public", "index.html"), live: true }
 };
 
@@ -99,6 +100,16 @@ function build(name) {
   fs.writeFileSync(t.file, out);
   console.log("built " + name + " -> " + path.relative(ROOT, t.file) +
     " (" + out.length.toLocaleString() + " bytes)");
+
+  /* Hosting serves a directory, so the beta copy is written a second time as
+     beta/index.html — that is what quote-report-beta.web.app deploys. Keeping
+     it here rather than as a copy step means the deployed beta can never be an
+     older build than the one at the repo root. */
+  if (t.also) {
+    fs.mkdirSync(path.dirname(t.also), { recursive: true });
+    fs.writeFileSync(t.also, out);
+    console.log("       and -> " + path.relative(ROOT, t.also));
+  }
 }
 
 const which = process.argv[2];

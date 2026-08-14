@@ -16,6 +16,21 @@
       ]
     },
     {
+      "site": "quote-report-beta",
+      "public": "beta",
+      "headers": [
+        {
+          "source": "**",
+          "headers": [
+            {
+              "key": "Cache-Control",
+              "value": "no-cache"
+            }
+          ]
+        }
+      ]
+    },
+    {
       "site": "nnscc292",
       "public": "arrears",
       "headers": [
