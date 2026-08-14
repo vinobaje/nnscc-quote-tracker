@@ -216,25 +216,30 @@ html { scroll-behavior:smooth; }
 .savenote { font-size:12px; color:var(--muted); }
 
 /* ---------- summary tiles ---------- */
-/* Seven figures on a row that fits five leaves two stranded and stretched, and
-   labels long enough to wrap three deep ("committed each year under contract")
-   make every card a different height. Fixed columns instead — four, three or
-   two by width — so the cards line up in both directions, with the wording
-   split into a short label and the qualifier under it. */
-.tiles { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; margin:20px 0 8px; }
-@media screen and (min-width:720px) { .tiles { grid-template-columns:repeat(3,minmax(0,1fr)); } }
-@media screen and (min-width:1000px) { .tiles { grid-template-columns:repeat(4,minmax(0,1fr)); } }
-.tile { background:var(--card); border:1px solid var(--line); border-radius:6px; padding:14px 16px; }
-.tile, .card, .group, .tablewrap, .chart { box-shadow:0 1px 3px rgba(30,40,51,.06); transition:box-shadow .18s, transform .18s; }
-.tile { border-top:3px solid var(--accent); }
-.tile.hp { border-top-color:var(--prio); } .tile.sv { border-top-color:var(--good); } .tile.pd { border-top-color:var(--amber); }
-.tile:hover { box-shadow:0 6px 18px rgba(30,40,51,.13); transform:translateY(-2px); }
+/* Seven headline figures as seven cards is seven borders, seven shadows and
+   seven top rules — four across with three stranded underneath, and 226px of
+   page gone before the report proper begins. The same seven read just as well
+   as one band: hairline rules where the cards used to have chrome, the colour
+   kept on the figure itself, and a third of the height. The hairlines are the
+   grid's own 1px gaps showing the container through, so a row that wraps is
+   ruled in both directions without any first-child arithmetic. */
+.tiles { display:grid; grid-template-columns:repeat(auto-fit,minmax(136px,1fr));
+  background:var(--card); border:1px solid var(--line); border-radius:9px;
+  overflow:hidden; margin:16px 0 8px; }
+/* the rules are drawn by each cell rather than by gaps showing the container
+   through: a row that wraps is then still ruled, and the cells an incomplete
+   last row leaves empty stay the colour of the band instead of a grey void */
+.tile { padding:10px 13px; cursor:pointer; transition:background .15s;
+  box-shadow:inset 1px 0 0 var(--line), inset 0 1px 0 var(--line); }
+.tile:hover { background:var(--accent-soft); }
+.card, .group, .tablewrap, .chart { box-shadow:0 1px 3px rgba(30,40,51,.06); transition:box-shadow .18s, transform .18s; }
 .card:hover, .group:hover, .tablewrap:hover { box-shadow:0 4px 14px rgba(30,40,51,.10); }
 tbody tr:not(.bidrow):not(.subtotal):hover td { background:rgba(45,86,127,.05); }
-.tile .v { font-size:23px; font-weight:650; font-variant-numeric:tabular-nums; letter-spacing:-.01em; }
-.tile .l { font-size:11.5px; color:var(--muted); text-transform:uppercase; letter-spacing:.08em; margin-top:3px; }
-.tile .s { font-size:11.5px; color:var(--ink2); line-height:1.35; margin-top:3px; }
+.tile .v { font-size:17.5px; font-weight:650; font-variant-numeric:tabular-nums; letter-spacing:-.01em; line-height:1.25; }
+.tile .l { font-size:10.5px; color:var(--muted); text-transform:uppercase; letter-spacing:.07em; margin-top:2px; }
+.tile .s { font-size:11px; color:var(--ink2); line-height:1.35; margin-top:2px; }
 .tile.hp .v { color:var(--prio); } .tile.sv .v { color:var(--good); } .tile.pd .v { color:var(--amber); }
+.tile.ap .v { color:#137333; }
 
 /* ---------- tables ---------- */
 table { width:100%; border-collapse:collapse; font-variant-numeric:tabular-nums; }
@@ -1104,10 +1109,9 @@ body:has(#report.tpl-packet) .wrap { max-width:1560px; }
 @media screen and (max-width:600px) {
   /* six figures stacked one per screen is a lot of thumb; two across fits
      a phone and still reads at a glance */
-  .tpl-classic .tiles { grid-template-columns:repeat(2,minmax(0,1fr)); gap:9px; }
-  .tpl-classic .tile { padding:11px 12px; }
-  .tpl-classic .tile .v { font-size:19px; }
-  .tpl-classic .tile .l { font-size:10.5px; }
+  .tpl-classic .tiles { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .tpl-classic .tile { padding:9px 11px; }
+  .tpl-classic .tile .v { font-size:18px; }
   /* spend bars: a 120px name column left the bar about 30px wide and cut the
      contractor's name in half. Name and amount on one line, bar underneath. */
   .tpl-classic .brow { grid-template-columns:minmax(0,1fr) auto; row-gap:5px;
@@ -2514,7 +2518,7 @@ var BRAND_PATH = "nnsccQuoteTracker/brand";               /* the letterhead the 
 var WEEKLY_DRAFT_PATH = "nnsccQuoteTracker/weeklyDraft";   /* the report she is working on */
 var WEEKLY_COLL = "nnsccWeeklyReports";                   /* every one she has finished */
 var VIEW_BETA = CURRENT_PATH.indexOf("Beta") >= 0;   /* which report the passcode gate reads/protects */
-var BUILD_STAMP = "2026-08-14 00:51";   /* filled in by build.js — which copy of the page this is */
+var BUILD_STAMP = "2026-08-14 01:05";   /* filled in by build.js — which copy of the page this is */
 /* path of the report currently on screen */
 function reportPath() {
   return cloud.active.kind === "current" ? CURRENT_PATH : (REPORTS_COLL + "/" + cloud.active.id);
@@ -3586,7 +3590,7 @@ function statCards(d) {
      quote there — and never the sum of every quote received. */
   var carriedNote = d.jobs.some(function (x) {
     return x.c.carriedBids.some(function (b) { return b.override; });
-  }) ? "lowest quote each, bar those carried ⚑" : "lowest quote on each job";
+  }) ? "lowest each, bar carried ⚑" : "lowest quote per job";
   var cards = [
     { k: "total", c: "tt", ic: "💵", v: money(d.total), l: "Total, all jobs", s: carriedNote },
     { k: "hp", c: "hp", ic: "🚩", v: money(d.hpTotal), l: "High priority", s: d.hp.length + " jobs" },
@@ -4166,16 +4170,15 @@ function renderClassicReport() {
   h.push('<section id="secSum"><h2' + hA("headSum") + ">" + esc(M.headSum) + "</h2>");
   if (state.ai && state.ai.summary)
     h.push('<p class="seclede ainarr">' + tE("ai:summary", state.ai.summary, "AI summary") + "</p>");
-  h.push('<p class="seclede">' + d.jobs.length + " repair and maintenance jobs have been quoted, " +
-    d.hp.length + " flagged high priority" +
-    (d.pendingCount ? "; " + d.pendingCount + " invited bid" + (d.pendingCount > 1 ? "s are" : " is") +
-      " still outstanding" : "") +
-    ". Where a job received more than one priced quote, the lowest bid " +
+  /* the counts this sentence used to open with — jobs quoted, how many are high
+     priority, how many bids are outstanding — are each their own figure in the
+     band below it now, so all that is left to say is how the figures are read */
+  h.push('<p class="seclede">Where a job received more than one priced quote, the lowest bid ' +
     "is used in all totals. All amounts include 13% HST.</p>");
   h.push('<div class="tiles">');
   var carriedNote = d.jobs.some(function (x) {
     return x.c.carriedBids.some(function (b) { return b.override; });
-  }) ? "lowest quote each, bar those carried ⚑" : "lowest quote on each job";
+  }) ? "lowest each, bar carried ⚑" : "lowest quote per job";
   /* the figure, then what it is called, then what it counts — the third line is
      where the qualifiers go, so no label has to wrap to carry one */
   function tile(stat, cls, val, label, sub, style, vstyle) {
@@ -4186,10 +4189,9 @@ function renderClassicReport() {
   }
   tile("total", "", money(d.total), "Total, all jobs", carriedNote);
   tile("hp", "hp", money(d.hpTotal), "High priority", d.hp.length + " jobs");
-  tile("std", "", money(d.total - d.hpTotal), "Standard priority", d.nhp.length + " jobs");
+  tile("std", "", money(d.total - d.hpTotal), "Standard", d.nhp.length + " jobs");
   tile("saved", "sv", money(d.savings), "Saved via bids", "vs. highest bids");
-  tile("approved", "", money(d.approvedTotal), "Board approved", "approved spend",
-    ' style="border-top-color:#137333"', ' style="color:#137333"');
+  tile("approved", "ap", money(d.approvedTotal), "Board approved", "approved spend");
   tile("pending", "pd", String(d.pendingCount), "Bids pending", "open for quotes");
   if (canSeeContracts() && conState.list.length) {
     var nAtt2 = conAttentionCount();
