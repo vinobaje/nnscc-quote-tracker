@@ -84,16 +84,33 @@ html { scroll-behavior:smooth; }
    with them. (.secnav is also worn by the board packet's dark rail, which
    resets what it needs — keep bar-only rules on .secbar.) */
 .secbar { position:sticky; top:var(--abh, 48px); z-index:20; background:var(--paper);
-  margin:14px -20px 4px; padding:10px 20px; box-shadow:0 6px 12px -8px rgba(20,26,33,.18);
-  display:flex; align-items:center; gap:14px; }
+  margin:14px -20px 4px; padding:9px 20px; box-shadow:0 6px 12px -8px rgba(20,26,33,.18);
+  display:flex; align-items:flex-start; gap:10px; }
 .secbar .secnav { flex:1 1 auto; min-width:0; }
 .secbar-r { flex:0 0 auto; display:flex; align-items:center; gap:9px; }
 .secnav { display:flex; gap:6px; flex-wrap:wrap; }
-.secnav a { font-size:12.5px; font-weight:600; color:var(--accent-ink); text-decoration:none;
-  background:var(--card); border:1px solid var(--line); border-radius:99px; padding:6px 13px;
+/* Seven separately-outlined chips wrapping onto three ragged rows read as
+   seven decisions. They are one control — a place to jump to — so they are
+   drawn as one: a single tray, no borders between, and a letter tile in front
+   of each name so the eye can travel by A-B-C rather than by reading. */
+.secbar .secnav { gap:2px; background:var(--card); border:1px solid var(--line);
+  border-radius:11px; padding:3px;
+  /* one line, always: a heading long enough to overflow scrolls sideways
+     rather than dropping the strip onto a second and third row */
+  flex-wrap:nowrap; overflow-x:auto; overscroll-behavior-x:contain;
+  -webkit-overflow-scrolling:touch; scrollbar-width:none; }
+.secbar .secnav::-webkit-scrollbar { display:none; }
+.secbar .secnav a { flex:0 0 auto; }
+.secbar .secnav a { display:inline-flex; align-items:center; gap:6px; font-size:12px;
+  font-weight:650; color:var(--ink2); text-decoration:none; background:none; border:0;
+  border-radius:8px; padding:5px 9px; white-space:nowrap;
   transition:background .15s, color .15s; }
-.secnav a:hover { background:var(--accent-soft); }
-.secnav a.active { background:var(--accent); border-color:var(--accent); color:#fff; }
+.secbar .secnav a .nl { flex:none; width:17px; height:17px; border-radius:5px;
+  background:var(--accent-soft); color:var(--accent-ink); font-size:10px; font-weight:800;
+  display:flex; align-items:center; justify-content:center; letter-spacing:0; }
+.secbar .secnav a:hover { background:var(--accent-soft); color:var(--accent-ink); }
+.secbar .secnav a.active { background:var(--accent); color:#fff; }
+.secbar .secnav a.active .nl { background:rgba(255,255,255,.24); color:#fff; }
 /* On a phone the five section chips wrapped onto five lines and, being sticky,
    took half the screen with them. One row that scrolls sideways instead: the
    bar stays ~40px whatever the section names are, and the active chip is
@@ -123,7 +140,7 @@ html { scroll-behavior:smooth; }
    job name, contractor, the scope note and the quote number — and it takes you
    to the job rather than filtering the page: nothing is hidden, no total is
    recalculated, so a figure read out at a meeting is always the whole figure. */
-.rsearch { position:relative; flex:0 0 268px; }
+.rsearch { position:relative; flex:0 0 188px; }
 .rsbox { display:flex; align-items:center; gap:7px; background:var(--card);
   border:1px solid var(--line); border-radius:99px; padding:6px 12px; }
 .rsbox:focus-within { border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft); }
@@ -2257,6 +2274,19 @@ var META_DEFAULTS = { title: "Contractor Quote Report", condoName: "Waterview Co
   ledeC: "All standard-priority jobs, in the board’s chosen order. Per-contractor totals are in Section D.",
   ledeD: "Value of carried quotes per contractor (job count after each amount).",
   ledeE: "" };
+/* What a section is called in the jump strip, as against on the page. A heading
+   earns its length where it sits ("Committed spend by contractor"); in a row of
+   seven it just pushes the row onto three lines. These are the short forms of
+   the headings as they ship. Rename a heading and the strip falls back to
+   shortening whatever it now says, so her wording is never overridden. */
+var NAV_WORDS = {
+  "Executive summary": "Summary",
+  "High-priority jobs — approval requested": "High priority",
+  "Competitive bid comparisons": "Bids",
+  "Standard-priority schedule, by contractor": "Schedule",
+  "Committed spend by contractor": "Spend",
+  "Open items for the board": "Open items"
+};
 /* short label for the floating nav pills: heading up to the first dash/comma, capped */
 function shortLabel(s) {
   s = String(s || "").split("—")[0].split(" - ")[0].split(",")[0].trim();
@@ -4100,13 +4130,22 @@ function renderClassicReport() {
          tE("meta:manager", M.manager, "Manager") + " · " +
          d.jobs.length + " jobs · " + nContractors + " contractors · Prepared " + esc(todayStr()) + "</div>");
   h.push('</div><div class="logochip"><img src="' + ASSET_LOGO + '" alt="' + esc(M.manager) + '"></div></div></header>');
-  h.push('<div class="secbar"><nav class="secnav"><a href="#secSum">' + esc(shortLabel(M.headSum)) + "</a>" +
-    '<a href="#secA">A · ' + esc(shortLabel(M.headA)) + "</a>" +
-    '<a href="#secB">B · ' + esc(shortLabel(M.headB)) + "</a>" +
-    '<a href="#secC">C · ' + esc(shortLabel(M.headC)) + "</a>" +
-    '<a href="#secD">D · ' + esc(shortLabel(M.headD)) + "</a>" +
-    '<a href="#secE">E · ' + esc(shortLabel(M.headE)) + "</a>" +
-    (canSeeContracts() ? '<a href="#secF">F · Contracts</a>' : "") + "</nav>" +
+  /* one tile per section: the letter, then the manager's own heading for it,
+     shortened to fit and carrying the full wording as a tooltip */
+  function navTile(id, letter, heading, label) {
+    var full = String(heading || "").trim();
+    return '<a href="#' + id + '"' + (full ? ' title="' + esc(full) + '"' : "") + ">" +
+      (letter ? '<span class="nl">' + letter + "</span>" : "") +
+      esc(label || NAV_WORDS[full] || shortLabel(full)) + "</a>";
+  }
+  h.push('<div class="secbar"><nav class="secnav">' +
+    navTile("secSum", "", M.headSum) +
+    navTile("secA", "A", M.headA) +
+    navTile("secB", "B", M.headB) +
+    navTile("secC", "C", M.headC) +
+    navTile("secD", "D", M.headD) +
+    navTile("secE", "E", M.headE) +
+    (canSeeContracts() ? navTile("secF", "F", "Contracts with contractors", "Contracts") : "") + "</nav>" +
     '<div class="secbar-r">' + rsBoxHTML() + alertBellHTML() + "</div></div>");
   if (VOTING_ON && canVoteView() && votesCache.open > 0)
     h.push('<div class="votebanner">🗳 <strong>' + votesCache.open + '</strong> board vote' +
