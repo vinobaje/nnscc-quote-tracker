@@ -35,6 +35,8 @@ header.rep { padding:30px 0 20px; border-top:4px solid var(--accent); border-bot
   border:1px solid var(--line); display:block; }
 @media screen and (max-width:640px) { .banner img { height:150px; } .logochip img { height:44px; } }
 section { margin:34px 0; }
+.decnote { font-size:12.5px; color:var(--ink2); margin:10px 0 0; padding:9px 12px;
+  background:var(--paper); border:1px solid var(--line-soft); border-radius:8px; }
 .seclede { color:var(--ink2); font-size:14px; max-width:64ch; margin:2px 0 14px; }
 
 /* ---------- app bar (screen only) ---------- */
@@ -2535,7 +2537,7 @@ var BRAND_PATH = "nnsccQuoteTrackerBeta/brand";               /* the letterhead 
 var WEEKLY_DRAFT_PATH = "nnsccQuoteTrackerBeta/weeklyDraft";   /* the report she is working on */
 var WEEKLY_COLL = "nnsccWeeklyReportsBeta";                   /* every one she has finished */
 var VIEW_BETA = CURRENT_PATH.indexOf("Beta") >= 0;   /* which report the passcode gate reads/protects */
-var BUILD_STAMP = "2026-08-15 18:44";   /* filled in by build.js — which copy of the page this is */
+var BUILD_STAMP = "2026-08-15 18:52";   /* filled in by build.js — which copy of the page this is */
 /* path of the report currently on screen */
 function reportPath() {
   return cloud.active.kind === "current" ? CURRENT_PATH : (REPORTS_COLL + "/" + cloud.active.id);
@@ -2850,10 +2852,24 @@ function jobCalc(j) {
 /* jobs the board sees — archived ones are parked in the editor and count for
    nothing on the report (no number, no total, no chart) */
 function liveJobs() { return state.jobs.filter(function (j) { return !j.archived; }); }
+/* A job is on the report's lists while it is still waiting for the board. The
+   moment a decision is recorded against it — approved, deferred, rejected, or
+   anything downstream of approval — it stops being something to read through
+   and becomes something to look up: the board packet tracks it under Work in
+   progress, and both layouts list it with its date under Status & board
+   decisions. The figures above the lists still count every job, because money
+   the board has approved is still the corporation's money for the period. */
+function awaitingBoard(j) { return (j.status || "quoted") === "quoted"; }
+
 function computeAll() {
   var jobs = liveJobs().map(function (j) { var c = jobCalc(j); return { j: j, c: c }; });
   var hp = jobs.filter(function (x) { return x.j.priority; });
   var nhp = jobs.filter(function (x) { return !x.j.priority; });
+  var wait = jobs.filter(function (x) { return awaitingBoard(x.j); });
+  var decided = jobs.filter(function (x) { return !awaitingBoard(x.j); });
+  var hpW = hp.filter(function (x) { return awaitingBoard(x.j); });
+  var nhpW = nhp.filter(function (x) { return awaitingBoard(x.j); });
+  var sum = function (a) { return a.reduce(function (s, x) { return s + x.c.cost; }, 0); };
   var total = jobs.reduce(function (s, x) { return s + x.c.cost; }, 0);
   var hpTotal = hp.reduce(function (s, x) { return s + x.c.cost; }, 0);
   var savings = jobs.reduce(function (s, x) { return s + x.c.saving; }, 0);
@@ -2872,6 +2888,8 @@ function computeAll() {
     x.j.bids.forEach(function (b) { if (bidExpired(b)) staleBids++; });
   });
   return { jobs: jobs, hp: hp, nhp: nhp, total: total, hpTotal: hpTotal,
+           wait: wait, decided: decided, hpW: hpW, nhpW: nhpW,
+           hpWTotal: sum(hpW), nhpWTotal: sum(nhpW),
            savings: savings, pendingCount: pendingCount, roll: roll,
            approvedTotal: approvedTotal, stCounts: stCounts, staleBids: staleBids };
 }
@@ -3485,10 +3503,23 @@ function tplBanners(EDITOR) {
     h.push('<div class="edithint-inline">✎ You’re signed in as the property manager — click almost anything to edit it right here (headings, descriptions, contractor names and dollar amounts). Amounts are treated as the <strong>HST-included total</strong>. Switch report layouts under <strong>Edit data → Settings</strong>, and use the <strong>Edit</strong> tab to add or remove jobs.</div>');
   return h.join("");
 }
+/* said under a list that is shorter than the job count suggests */
+function decidedNote(d, which) {
+  var gone = d.decided.filter(function (x) {
+    return which === "hp" ? x.j.priority : !x.j.priority; });
+  if (!gone.length) return "";
+  var by = {};
+  gone.forEach(function (x) { var k = statusLabel(x.j.status); by[k] = (by[k] || 0) + 1; });
+  var bits = Object.keys(by).map(function (k) { return by[k] + " " + k.toLowerCase(); });
+  return '<p class="decnote">' + gone.length + (gone.length === 1 ? " job is" : " jobs are") +
+    " not listed here — the board has already decided " + (gone.length === 1 ? "it" : "them") +
+    " (" + esc(bits.join(", ")) + "). They are in <strong>Status &amp; board decisions</strong> " +
+    "at the end of the report, and still counted in the figures above.</p>";
+}
 /* Section A rows (high-priority table body) — shared */
 function secARows(d, ctx) {
   var h = [];
-  d.hp.forEach(function (x) {
+  d.hpW.forEach(function (x) {
     var names = []; x.c.carriedBids.forEach(function (cb) {
       if (names.indexOf(cb.b.contractor) < 0) names.push(cb.b.contractor); });
     var notes = []; x.c.carriedBids.forEach(function (cb) {
@@ -3503,7 +3534,7 @@ function secARows(d, ctx) {
 /* Section C rows (standard-priority table body) — shared; returns {html,total} */
 function secCRows(d, ctx) {
   var h = [], nhpTotal = 0;
-  d.nhp.forEach(function (x) {
+  d.nhpW.forEach(function (x) {
     var names = []; x.c.carriedBids.forEach(function (cb) {
       if (names.indexOf(cb.b.contractor) < 0) names.push(cb.b.contractor); });
     if (!names.length && x.j.bids[0]) names.push(x.j.bids[0].contractor);
@@ -3519,7 +3550,7 @@ function secCRows(d, ctx) {
 }
 /* Section B cards (bid comparisons) — shared */
 function secBCards(d, ctx) {
-  var multi = d.jobs.filter(function (x) { return x.j.bids.length > 1; });
+  var multi = d.wait.filter(function (x) { return x.j.bids.length > 1; });
   if (!multi.length) return '<p class="seclede">No jobs currently have more than one bid.</p>';
   var h = [];
   multi.forEach(function (x) {
@@ -3635,7 +3666,7 @@ function statCards(d) {
    (#/Job/Contractor/Bids/Lowest/Status). Single-bid cells stay inline-editable. */
 function hpCompactRows(d, ctx) {
   var h = [];
-  d.hp.forEach(function (x, i) {
+  d.hpW.forEach(function (x, i) {
     var names = []; x.c.carriedBids.forEach(function (cb) {
       if (names.indexOf(cb.b.contractor) < 0) names.push(cb.b.contractor); });
     if (!names.length && x.j.bids[0]) names.push(x.j.bids[0].contractor);
@@ -3650,7 +3681,7 @@ function hpCompactRows(d, ctx) {
       '</td><td class="pk-hp-con">' + contractor + '</td><td class="ctr">' + x.j.bids.length + '</td><td class="money">' + amt +
       '</td><td class="pk-hp-stat"><span class="hi-flag">High</span></td></tr>');
   });
-  if (!d.hp.length) h.push('<tr><td colspan="6" style="color:var(--muted)">No high-priority jobs.</td></tr>');
+  if (!d.hpW.length) h.push('<tr><td colspan="6" style="color:var(--muted)">No high-priority jobs.</td></tr>');
   return h.join("");
 }
 /* top-savings as a vertical list + total card (board-packet panel) */
@@ -3749,7 +3780,7 @@ function pkSecHead(letter, title, sub, right) {
 
 /* ---- Section B (packet): competitive bid comparisons ---- */
 function packetSecB(d, ctx) {
-  var multi = d.jobs.filter(function (x) { return x.j.bids.length > 1; });
+  var multi = d.wait.filter(function (x) { return x.j.bids.length > 1; });
   var pend = 0;
   multi.forEach(function (x) { x.c.bids.forEach(function (b) { if (b.pending) pend++; }); });
   var chips = '<div class="pk-chips">' +
@@ -3799,7 +3830,7 @@ function packetSecB(d, ctx) {
 /* ---- Section C (packet): standard-priority schedule with a contractor timeline ---- */
 function packetSecC(d, ctx) {
   var rows = [];
-  d.nhp.forEach(function (x, i) {
+  d.nhpW.forEach(function (x, i) {
     var names = []; x.c.carriedBids.forEach(function (cb) {
       if (names.indexOf(cb.b.contractor) < 0) names.push(cb.b.contractor); });
     if (!names.length && x.j.bids[0]) names.push(x.j.bids[0].contractor);
@@ -4020,7 +4051,8 @@ function renderPacketReport() {
     '<thead><tr><th>#</th><th>Job</th><th>Contractor</th><th class="ctr">Bids</th>' +
     '<th class="money">Lowest</th><th>Status</th></tr></thead><tbody>' + hpCompactRows(d, ctx) +
     '<tr class="subtotal"><td></td><td class="pk-hp-job">High-priority subtotal</td><td class="pk-hp-con"></td><td class="ctr"></td>' +
-    '<td class="money">' + money(d.hpTotal) + '</td><td class="pk-hp-stat"></td></tr></tbody></table></div>' +
+    '<td class="money">' + money(d.hpWTotal) + '</td><td class="pk-hp-stat"></td></tr></tbody></table></div>' +
+    decidedNote(d, "hp") +
     (d.hp.length > 5 ? '<a class="pk-viewall" data-hpmore="' + d.hp.length + '">View all ' + d.hp.length + ' high-priority jobs ↓</a>' : '') +
     '</section>');
   h.push('<section class="panel"><h3>Top savings from competitive bids</h3>' + topSavingsList(d, ov) + '</section>');
@@ -4033,7 +4065,7 @@ function renderPacketReport() {
   h.push('<section id="secC" class="panel pk-detailcard">' +
     pkSecHead("C", M.headC, "All standard-priority jobs, in the board’s chosen order. Per-contractor totals are in Section D.",
       '<div class="pk-totalcard"><div class="tl">Total (incl. HST)</div><div class="tv">' + money(cRows.total) + '</div></div>') +
-    packetSecC(d, ctx) + '</section>');
+    packetSecC(d, ctx) + decidedNote(d, "std") + '</section>');
   h.push('</div>');
   /* work-in-progress pipeline: one card per approved job (stepper + % + updates) */
   var nAct = d.jobs.filter(function (x) { return APPROVED_SET[x.j.status]; }).length;
@@ -4241,7 +4273,7 @@ function renderClassicReport() {
   h.push('<section id="secA"><div class="kicker">Section A</div><h2' + hA("headA") + ">" + esc(M.headA) + "</h2>");
   h.push('<p class="seclede">' + tE("meta:ledeA", M.ledeA, "Section description") + "</p>");
   h.push('<div class="tablewrap"><table><thead><tr><th>#</th><th>Job</th><th>Contractor</th><th class="money">Total (incl. HST)</th></tr></thead><tbody>');
-  d.hp.forEach(function (x) {
+  d.hpW.forEach(function (x) {
     var names = []; x.c.carriedBids.forEach(function (cb) {
       if (names.indexOf(cb.b.contractor) < 0) names.push(cb.b.contractor); });
     var notes = []; x.c.carriedBids.forEach(function (cb) {
@@ -4252,10 +4284,10 @@ function renderClassicReport() {
     h.push(bidRowHTML(x, 4));
   });
   h.push('<tr class="subtotal"><td></td><td colspan="2">High-priority subtotal</td><td class="money">' +
-         money(d.hpTotal) + "</td></tr></tbody></table></div></section>");
+         money(d.hpWTotal) + "</td></tr></tbody></table></div>" + decidedNote(d, "hp") + "</section>");
 
   /* Section B */
-  var multi = d.jobs.filter(function (x) { return x.j.bids.length > 1; });
+  var multi = d.wait.filter(function (x) { return x.j.bids.length > 1; });
   h.push('<section id="secB"><div class="kicker">Section B</div><h2' + hA("headB") + ">" + esc(M.headB) + "</h2>");
   h.push('<p class="seclede">' + tE("meta:ledeB", M.ledeB, "Section description") + "</p>");
   if (!multi.length) h.push('<p class="seclede">No jobs currently have more than one bid.</p>');
@@ -4273,7 +4305,7 @@ function renderClassicReport() {
   h.push('<p class="seclede">' + tE("meta:ledeC", M.ledeC, "Section description") + "</p>");
   h.push('<div class="tablewrap"><table><thead><tr><th>#</th><th>Job</th><th>Contractor</th><th class="money">Total (incl. HST)</th></tr></thead><tbody>');
   var nhpTotal = 0;
-  d.nhp.forEach(function (x) {
+  d.nhpW.forEach(function (x) {
     var names = []; x.c.carriedBids.forEach(function (cb) {
       if (names.indexOf(cb.b.contractor) < 0) names.push(cb.b.contractor); });
     if (!names.length && x.j.bids[0]) names.push(x.j.bids[0].contractor);
@@ -4286,7 +4318,7 @@ function renderClassicReport() {
     h.push(bidRowHTML(x, 4));
   });
   h.push('<tr class="subtotal"><td></td><td colspan="2">Standard-priority subtotal</td><td class="money">' + money(nhpTotal) + "</td></tr>");
-  h.push("</tbody></table></div></section>");
+  h.push("</tbody></table></div>" + decidedNote(d, "std") + "</section>");
 
   /* Section D */
   var rollArr = Object.keys(d.roll).map(function (nm) { return { nm: nm, v: d.roll[nm] }; })
