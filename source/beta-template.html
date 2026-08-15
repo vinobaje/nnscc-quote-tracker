@@ -1340,6 +1340,19 @@ body[data-view="edit"] .wrap { max-width:none; }
 .jchip.match { color:var(--amber); background:var(--amber-soft); font-weight:650;
   max-width:260px; overflow:hidden; text-overflow:ellipsis; }
 /* the search bar that sits above the cards */
+/* the folders across the top of the job list */
+.edbuckets { display:flex; flex-wrap:wrap; gap:3px; background:var(--paper);
+  border:1px solid var(--line); border-radius:10px; padding:3px; margin:0 0 10px; }
+.edbk { display:inline-flex; align-items:center; gap:7px; border:0; background:none; cursor:pointer;
+  font:inherit; font-size:12.5px; font-weight:650; color:var(--ink2); padding:6px 11px;
+  border-radius:7px; transition:background .15s, color .15s; }
+.edbk .n { font-size:11px; font-weight:800; color:var(--muted); background:var(--card);
+  border-radius:99px; padding:1px 7px; font-variant-numeric:tabular-nums; }
+.edbk:hover { background:var(--accent-soft); color:var(--accent-ink); }
+.edbk.on { background:var(--accent); color:#fff; }
+.edbk.on .n { background:rgba(255,255,255,.22); color:#fff; }
+.edbk.none { opacity:.5; }
+.edbknote { font-size:12px; color:var(--ink2); margin:0 0 8px; }
 .ed-search { display:flex; align-items:center; gap:8px; margin:0 0 12px; background:var(--card);
   border:1px solid var(--line); border-radius:9px; padding:2px 10px; }
 .ed-search:focus-within { border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft); }
@@ -4423,6 +4436,31 @@ var edOpen = {};              /* jobId -> expanded */
 var edSel = null;             /* jobId shown in the summary rail */
 var edQOpen = {};             /* "jobId:bidIndex" -> quote detail row open */
 var edFilter = { on: false, q: "", st: "", prio: false };
+/* Sixty-two job cards in one list, and the ones the board has already dealt
+   with sitting among the ones it has not. A job's status already says which is
+   which, so the list is divided by it: the manager opens on what is still
+   waiting for a decision, and a job leaves that list the moment she records
+   one. Nothing is hidden — every bucket is a click away, and a search looks
+   through all of them at once, because a job you are hunting for is usually one
+   you have forgotten the status of. */
+var ED_BUCKETS = [
+  ["open",     "Awaiting the board", ["quoted"]],
+  ["approved", "Approved",           ["approved", "awarded", "scheduled", "inprogress"]],
+  ["deferred", "Deferred",           ["deferred"]],
+  ["closed",   "Closed",             ["completed", "rejected"]],
+  ["all",      "All",                null]
+];
+var edBucket = "open";
+function edBucketLabel(key) {
+  var out = key;
+  ED_BUCKETS.forEach(function (b) { if (b[0] === key) out = b[1]; });
+  return out;
+}
+function edBucketOf(j) {
+  var st = j.status || "quoted", key = "open";
+  ED_BUCKETS.forEach(function (b) { if (b[2] && b[2].indexOf(st) >= 0) key = b[0]; });
+  return key;
+}
 var edArchOpen = false;
 var edSaved = true;           /* false while an edit is on its way to the cloud */
 
@@ -4556,6 +4594,8 @@ function edJobMatches(j) {
   if (edFilter.prio && !j.priority) return false;
   if (edFilter.st && (j.status || "quoted") !== edFilter.st) return false;
   var q = edFilter.q.trim().toLowerCase();
+  /* a search reaches across the buckets — see the note on ED_BUCKETS */
+  if (!q && edBucket !== "all" && edBucketOf(j) !== edBucket) return false;
   if (!q) return true;
   return !!edSearchHit(j, q);
 }
@@ -4583,6 +4623,16 @@ function edJobsHTML() {
     (live.length === 1 ? "" : "s") + (shown.length !== live.length ? " · " + shown.length + " shown" : "") + "</span>" +
     '<button class="edbtn" type="button" data-act="edfilter">⚙ Filter</button><span class="spacer"></span>' +
     '<button class="edbtn" type="button" data-act="edexpand">' + (anyOpen ? "Collapse all" : "Expand all") + "</button></div>");
+  /* the folders: what is waiting for the board, and what has been decided */
+  var searching = !!edFilter.q.trim();
+  h.push('<div class="edbuckets">');
+  ED_BUCKETS.forEach(function (b) {
+    var n = b[2] ? live.filter(function (r) { return edBucketOf(r.j) === b[0]; }).length : live.length;
+    h.push('<button class="edbk' + (!searching && edBucket === b[0] ? " on" : "") + (n ? "" : " none") +
+      '" type="button" data-act="edbucket" data-bucket="' + b[0] + '">' + esc(b[1]) +
+      '<span class="n">' + n + "</span></button>");
+  });
+  h.push("</div>");
   /* the search sits above the cards, always there — not folded inside a panel */
   h.push('<div class="ed-search"><span class="edmag">\u{1F50D}</span>' +
     '<input type="search" id="edFilterQ" autocomplete="off" value="' + esc(edFilter.q) +
@@ -4597,6 +4647,9 @@ function edJobsHTML() {
       '<label><input type="checkbox" id="edFilterPrio"' + (edFilter.prio ? " checked" : "") + "> High priority only</label>" +
       '<button class="edbtn" type="button" data-act="edfilterclear">Clear</button></div>');
   }
+  if (searching && edBucket !== "all")
+    h.push('<p class="edbknote">Searching every folder, not just ' +
+      esc(edBucketLabel(edBucket).toLowerCase()) + ".</p>");
   if (!shown.length) h.push('<p class="updempty">' + (live.length
     ? (edFilter.q ? "Nothing matches “" + esc(edFilter.q) + "”." : "No jobs match this filter.")
     : "No jobs yet — use “+ Add job”.") + "</p>");
@@ -5714,6 +5767,11 @@ function edWorkspaceAction(act, el, e) {
          the timestamp would be wiped by the fresh markup) */
       persist("Saved " + new Date().toLocaleTimeString());
       edSaved = true; return true;
+    case "edbucket": {
+      var bk = el.closest("[data-bucket]");
+      if (bk) { edBucket = bk.getAttribute("data-bucket"); renderEditor(); }
+      return true;
+    }
     case "edfilter": edFilter.on = !edFilter.on; renderEditor(); return true;
     case "edfilterclear": edFilter = { on: true, q: edFilter.q, st: "", prio: false }; renderEditor(); return true;
     case "edsearchclear": edFilter.q = ""; renderEditor(); return true;
