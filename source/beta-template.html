@@ -1404,7 +1404,11 @@ body[data-view="edit"] .wrap { max-width:none; }
   background:var(--card); }
 .qcbox.differ { border-color:var(--amber,#C8892B); }
 .qchead { display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; padding:9px 12px;
-  font-size:13px; font-weight:700; color:var(--ink); background:var(--good-soft); }
+  font-size:13px; font-weight:700; color:var(--ink); background:var(--good-soft);
+  width:100%; border:0; text-align:left; font-family:inherit; cursor:pointer; }
+.qchead:hover { filter:brightness(.97); }
+.qcarw { flex:none; font-size:10px; color:var(--ink2); transition:transform .15s; }
+.qcbox.open .qcarw { transform:rotate(90deg); }
 .qcbox.differ .qchead { background:var(--amber-soft,#FDF3E2); }
 .qcwhen { font-size:11.5px; font-weight:500; color:var(--muted); margin-left:auto; }
 .qcdiff { margin:10px 12px 0; font-size:13.5px; line-height:1.55; color:var(--ink); }
@@ -4886,6 +4890,7 @@ function edSettingsHTML(M) {
    on a page load: a comparison is paid for by the edit that made it necessary.
    Nothing it finds reaches the board on its own. It may nominate the better
    value, but carrying a quote in the totals is still a button she presses. */
+var qcOpen = {};     /* jobId -> the reading is unfolded (folded by default) */
 var qcBusy = {};     /* jobId -> a comparison is in flight */
 var qcErr = {};      /* jobId -> why the last one failed */
 var qcPend = {};     /* jobId -> queued by an edit, waiting for the typing to stop */
@@ -4994,13 +4999,20 @@ function qcCardHTML(j) {
       '<button class="edbtn" type="button" data-act="qc-run" style="font-size:12px;padding:3px 9px">Compare these quotes</button>' +
       why + "</p>";
   }
-  var h = ['<div class="qcbox' + (cp.comparable ? "" : " differ") + '">'];
-  h.push('<div class="qchead">' + (cp.comparable
+  /* Folded away by default. The verdict is the part worth a permanent line —
+     whether these two prices buy the same thing — and the reading behind it is
+     three hundred words she has already acted on by the time she next opens
+     the job. Clicking the line brings the reading back. */
+  var open = !!qcOpen[j.id];
+  var h = ['<div class="qcbox' + (cp.comparable ? "" : " differ") + (open ? " open" : "") + '">'];
+  h.push('<button class="qchead" type="button" data-act="qc-fold" aria-expanded="' + (open ? "true" : "false") + '">' +
+    '<span class="qcarw">▸</span>' + (cp.comparable
     ? "✓ These quotes are for substantially the same work"
     : "⚠ These quotes are not for the same thing") +
     '<span class="qcwhen">read ' + esc(jdDate(cp.at)) +
     (cp.by ? " by " + esc(cp.by) : "") +
-    (cp.read ? " · " + cp.read + " attached document" + (cp.read === 1 ? "" : "s") : " · scope notes only") + "</span></div>");
+    (cp.read ? " · " + cp.read + " attached document" + (cp.read === 1 ? "" : "s") : " · scope notes only") + "</span></button>");
+  if (!open) return h.join("") + "</div>";
   if (cp.difference) h.push('<p class="qcdiff">' + esc(cp.difference) + "</p>");
   h.push('<table class="qctab"><thead><tr><th>Contractor</th><th>What the price covers</th>' +
     "<th>Each</th><th>Warranty</th></tr></thead><tbody>");
@@ -5752,6 +5764,12 @@ function edWorkspaceAction(act, el, e) {
       renderEditor(); renderReport(); return true;
     }
     /* --- reading the quotes against each other --- */
+    case "qc-fold": {
+      var fc = el.closest(".jcard"); if (!fc) return true;
+      var fj = state.jobs[+fc.dataset.ji]; if (!fj) return true;
+      if (qcOpen[fj.id]) delete qcOpen[fj.id]; else qcOpen[fj.id] = true;
+      renderEditor(); return true;
+    }
     case "qc-run": {
       var qc = el.closest(".jcard"); if (!qc) return true;
       var qj = state.jobs[+qc.dataset.ji]; if (!qj) return true;
