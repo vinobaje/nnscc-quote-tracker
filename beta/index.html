@@ -2537,7 +2537,7 @@ var BRAND_PATH = "nnsccQuoteTrackerBeta/brand";               /* the letterhead 
 var WEEKLY_DRAFT_PATH = "nnsccQuoteTrackerBeta/weeklyDraft";   /* the report she is working on */
 var WEEKLY_COLL = "nnsccWeeklyReportsBeta";                   /* every one she has finished */
 var VIEW_BETA = CURRENT_PATH.indexOf("Beta") >= 0;   /* which report the passcode gate reads/protects */
-var BUILD_STAMP = "2026-08-15 19:05";   /* filled in by build.js — which copy of the page this is */
+var BUILD_STAMP = "2026-08-15 19:14";   /* filled in by build.js — which copy of the page this is */
 /* path of the report currently on screen */
 function reportPath() {
   return cloud.active.kind === "current" ? CURRENT_PATH : (REPORTS_COLL + "/" + cloud.active.id);
@@ -8913,7 +8913,8 @@ function submitViewGate(pass) {
       conState = { list: Array.isArray(res.data.contracts) ? res.data.contracts : [],
                    alerts: res.data.alertSettings || {} };
       conState.list.forEach(function (c) { if (!c.id) c.id = genId(); });
-      try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) {}
+      /* deliberately not written to this browser: the passcode is asked for
+         every time, so the report it opened must not outlive the tab either */
       document.getElementById("viewGateOverlay").classList.remove("open");
       renderReport();
       cloudStatusMsg("● Viewing with passcode — data as of now; refresh to update.");
@@ -10097,8 +10098,33 @@ if (window.claude && window.claude.downloads) {
   };
 }
 
-/* ---------- go ---------- */
+/* ---------- go ----------
+   What this browser remembered is drawn before the server has said a word,
+   which is right for the property manager — her report is on screen instantly
+   — and wrong for anyone else: a reader with the link but no passcode was shown
+   the whole report for as long as Firebase took to load, deny the read and put
+   the gate up. Long enough to read it. Long enough to photograph it.
+
+   The server was never the problem: the rules deny the read, and the passcode
+   path goes through a Cloud Function. The leak was entirely local, so the
+   answer is local too — do not paint a remembered report for a reader this
+   browser has no signed-in session for. That question is answerable before the
+   Firebase SDK has even loaded, because the SDK keeps its session in
+   localStorage, so the gate can be up in the first frame with nothing behind
+   it. Sign in, or enter the passcode, and the report arrives from the server. */
+function hasSignedInSession() {
+  try {
+    for (var i = 0; i < localStorage.length; i++)
+      if (String(localStorage.key(i)).indexOf("firebase:authUser:") === 0) return true;
+  } catch (e) {}
+  return false;
+}
 lastSaved = deepCopy(state);
+if (!hasSignedInSession()) {
+  state = normState({ jobs: [], meta: (state && state.meta) || null });
+  lastSaved = deepCopy(state);
+  showViewGate();          /* blanks what is on screen and asks, in the first frame */
+}
 cloudInit();
 setView("report");
 })();
