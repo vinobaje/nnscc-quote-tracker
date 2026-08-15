@@ -2537,7 +2537,7 @@ var BRAND_PATH = "nnsccQuoteTracker/brand";               /* the letterhead the 
 var WEEKLY_DRAFT_PATH = "nnsccQuoteTracker/weeklyDraft";   /* the report she is working on */
 var WEEKLY_COLL = "nnsccWeeklyReports";                   /* every one she has finished */
 var VIEW_BETA = CURRENT_PATH.indexOf("Beta") >= 0;   /* which report the passcode gate reads/protects */
-var BUILD_STAMP = "2026-08-15 18:52";   /* filled in by build.js — which copy of the page this is */
+var BUILD_STAMP = "2026-08-15 19:05";   /* filled in by build.js — which copy of the page this is */
 /* path of the report currently on screen */
 function reportPath() {
   return cloud.active.kind === "current" ? CURRENT_PATH : (REPORTS_COLL + "/" + cloud.active.id);
@@ -2860,15 +2860,27 @@ function liveJobs() { return state.jobs.filter(function (j) { return !j.archived
    decisions. The figures above the lists still count every job, because money
    the board has approved is still the corporation's money for the period. */
 function awaitingBoard(j) { return (j.status || "quoted") === "quoted"; }
+/* A job with no title, no contractor and no price is a line she has started and
+   not finished. It is hers to finish, not something to put in front of the
+   board as a numbered row reading "— Pending", so the report leaves it out.
+   It stays in Edit data, where it can be finished or deleted. */
+function reportListable(j) {
+  if (!awaitingBoard(j)) return false;
+  if (String(j.desc || "").trim()) return true;
+  return (j.bids || []).some(function (b) {
+    return String(b.contractor || "").trim() || bidTotal(b) != null;
+  });
+}
 
 function computeAll() {
   var jobs = liveJobs().map(function (j) { var c = jobCalc(j); return { j: j, c: c }; });
   var hp = jobs.filter(function (x) { return x.j.priority; });
   var nhp = jobs.filter(function (x) { return !x.j.priority; });
-  var wait = jobs.filter(function (x) { return awaitingBoard(x.j); });
+  var wait = jobs.filter(function (x) { return reportListable(x.j); });
   var decided = jobs.filter(function (x) { return !awaitingBoard(x.j); });
-  var hpW = hp.filter(function (x) { return awaitingBoard(x.j); });
-  var nhpW = nhp.filter(function (x) { return awaitingBoard(x.j); });
+  var drafts = jobs.filter(function (x) { return awaitingBoard(x.j) && !reportListable(x.j); });
+  var hpW = hp.filter(function (x) { return reportListable(x.j); });
+  var nhpW = nhp.filter(function (x) { return reportListable(x.j); });
   var sum = function (a) { return a.reduce(function (s, x) { return s + x.c.cost; }, 0); };
   var total = jobs.reduce(function (s, x) { return s + x.c.cost; }, 0);
   var hpTotal = hp.reduce(function (s, x) { return s + x.c.cost; }, 0);
@@ -2888,7 +2900,7 @@ function computeAll() {
     x.j.bids.forEach(function (b) { if (bidExpired(b)) staleBids++; });
   });
   return { jobs: jobs, hp: hp, nhp: nhp, total: total, hpTotal: hpTotal,
-           wait: wait, decided: decided, hpW: hpW, nhpW: nhpW,
+           wait: wait, decided: decided, drafts: drafts, hpW: hpW, nhpW: nhpW,
            hpWTotal: sum(hpW), nhpWTotal: sum(nhpW),
            savings: savings, pendingCount: pendingCount, roll: roll,
            approvedTotal: approvedTotal, stCounts: stCounts, staleBids: staleBids };
