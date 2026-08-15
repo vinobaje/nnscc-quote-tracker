@@ -2537,7 +2537,7 @@ var BRAND_PATH = "nnsccQuoteTrackerBeta/brand";               /* the letterhead 
 var WEEKLY_DRAFT_PATH = "nnsccQuoteTrackerBeta/weeklyDraft";   /* the report she is working on */
 var WEEKLY_COLL = "nnsccWeeklyReportsBeta";                   /* every one she has finished */
 var VIEW_BETA = CURRENT_PATH.indexOf("Beta") >= 0;   /* which report the passcode gate reads/protects */
-var BUILD_STAMP = "2026-08-15 19:14";   /* filled in by build.js — which copy of the page this is */
+var BUILD_STAMP = "2026-08-15 19:28";   /* filled in by build.js — which copy of the page this is */
 /* path of the report currently on screen */
 function reportPath() {
   return cloud.active.kind === "current" ? CURRENT_PATH : (REPORTS_COLL + "/" + cloud.active.id);
@@ -4898,7 +4898,7 @@ function edRailHTML() {
     (carried ? money(carried.total) + (carried.override ? " ⚑" : "") : "—") + "</span>"));
   h.push(row("Counted in report", '<span class="money good">' + money(c.cost) + "</span>"));
   if (c.likeForLike === false)
-    h.push('<div class="rrow"><span class="k">Like for like</span><span class="v" style="color:var(--amber);font-weight:650">No — see the reading</span></div>');
+    h.push('<div class="rrow"><span class="k">Same scope</span><span class="v" style="color:var(--amber);font-weight:650">No — see the reading</span></div>');
   if (sg.overall != null)
     h.push('<div class="rrow"><span class="k">Progress</span><span class="v"><span class="jbar" style="display:inline-block;vertical-align:middle">' +
       '<span style="width:' + sg.overall + '%"></span></span> ' + sg.overall + "%</span></div>");
@@ -5104,8 +5104,8 @@ function qcCardHTML(j) {
   var h = ['<div class="qcbox' + (cp.comparable ? "" : " differ") + (open ? " open" : "") + '">'];
   h.push('<button class="qchead" type="button" data-act="qc-fold" aria-expanded="' + (open ? "true" : "false") + '">' +
     '<span class="qcarw">▸</span>' + (cp.comparable
-    ? "✓ These quotes are for substantially the same work"
-    : "⚠ These quotes are not for the same thing") +
+    ? "✓ Same scope — the prices are comparable"
+    : "⚠ Different scope — the prices aren’t comparable") +
     '<span class="qcwhen">read ' + esc(jdDate(cp.at)) +
     (cp.by ? " by " + esc(cp.by) : "") +
     (cp.read ? " · " + cp.read + " attached document" + (cp.read === 1 ? "" : "s") : " · scope notes only") + "</span></button>");
@@ -5885,7 +5885,7 @@ function edWorkspaceAction(act, el, e) {
       if (jobCalcAutoIndex(cj) === cbi) delete cj.pick; else cj.pick = cbi;
       persist(null, [jobLabel(cj) + ": carrying " +
         ((cbd.contractor || "").trim() || "another quote") + " " + money(bidTotal(cbd)) +
-        " — the quotes are not for the same thing"], cj.id);
+        " — the quotes are not for the same scope"], cj.id);
       renderEditor(); renderReport(); return true;
     }
     case "pickauto": {
