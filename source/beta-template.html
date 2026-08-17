@@ -748,10 +748,16 @@ body:has(#report.tpl-packet) .wrap { max-width:1560px; }
 /* donut + legend */
 .ov-donut { display:flex; gap:18px; align-items:center; flex-wrap:wrap; }
 .donut .dn-top { font:700 20px Georgia,serif; fill:var(--ink); }
-.donut .dn-bot { font:600 9px -apple-system,sans-serif; fill:var(--muted); text-transform:uppercase; letter-spacing:.08em; }
+/* the centre caption has to sit inside the ring's hole — "awaiting board"
+   is half again as long as the "total jobs" it replaced, so the tracking
+   comes off before the words spill onto the ring */
+.donut .dn-bot { font:600 8.5px -apple-system,sans-serif; fill:var(--muted);
+  text-transform:uppercase; letter-spacing:.04em; }
 .ov-legend { list-style:none; margin:0; padding:0; font-size:13px; color:var(--ink2); }
 .ov-legend li { display:flex; align-items:center; gap:8px; padding:3px 0; }
 .ov-legend .sw { width:11px; height:11px; border-radius:3px; flex:none; }
+.ov-legend .ov-legfoot { margin-top:5px; padding-top:6px; border-top:1px solid var(--line-soft);
+  font-size:12px; color:var(--muted); }
 .ov-legend b { color:var(--ink); font-variant-numeric:tabular-nums; }
 
 /* top-savings cards */
@@ -3713,15 +3719,25 @@ function topSavingsList(d, ov) {
    Mutually-exclusive partition of all jobs so the slices sum to the total:
    high-priority (quoted) · standard (quoted) · awaiting quotes (any, unpriced). */
 function priorityDonut(d, ov) {
+  /* This chart sits beside the approval table, so it counts what that table
+     counts: the jobs still waiting for the board. A job the board has already
+     approved or deferred is not something it is being asked about, and putting
+     it in the ring made the figure in the middle disagree with every list on
+     the page. How many were decided is said under the legend instead. */
+  var pend = d.wait.filter(function (x) { return x.c.priced === 0; }).length;
+  var high = d.hpW.filter(function (x) { return x.c.priced > 0; }).length;
+  var std = d.nhpW.filter(function (x) { return x.c.priced > 0; }).length;
   var slices = [
-    { label: "High priority", value: ov.highQ, color: "#A03636" },
-    { label: "Standard priority", value: ov.stdQ, color: "#2D567F" }
+    { label: "High priority", value: high, color: "#A03636" },
+    { label: "Standard priority", value: std, color: "#2D567F" }
   ];
-  if (ov.awaiting) slices.push({ label: "Open / pending", value: ov.awaiting, color: "#E0A422" });
+  if (pend) slices.push({ label: "Open / pending", value: pend, color: "#E0A422" });
   var leg = slices.map(function (s) {
     return '<li><span class="sw" style="background:' + s.color + '"></span>' + esc(s.label) + ' <b>(' + s.value + ')</b></li>';
   }).join("");
-  return '<div class="ov-donut">' + donutSVG(slices, String(d.jobs.length), "Total jobs") +
+  if (d.decided.length)
+    leg += '<li class="ov-legfoot">' + d.decided.length + " already decided — not counted here</li>";
+  return '<div class="ov-donut">' + donutSVG(slices, String(d.wait.length), "Awaiting board") +
     '<ul class="ov-legend">' + leg + "</ul></div>";
 }
 /* top-savings cards + total */
