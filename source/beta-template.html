@@ -4081,7 +4081,10 @@ function renderPacketReport() {
     '<tr class="subtotal"><td></td><td class="pk-hp-job">High-priority subtotal</td><td class="pk-hp-con"></td><td class="ctr"></td>' +
     '<td class="money">' + money(d.hpWTotal) + '</td><td class="pk-hp-stat"></td></tr></tbody></table></div>' +
     decidedNote(d, "hp") +
-    (d.hp.length > 5 ? '<a class="pk-viewall" data-hpmore="' + d.hp.length + '">View all ' + d.hp.length + ' high-priority jobs ↓</a>' : '') +
+    /* the rows are the ones still awaiting a decision, so the count on the
+       button has to be those too — offering to show eleven and then revealing
+       nothing was the count of a list this table no longer draws */
+    (d.hpW.length > 5 ? '<a class="pk-viewall" data-hpmore="' + d.hpW.length + '">View all ' + d.hpW.length + ' high-priority jobs ↓</a>' : '') +
     '</section>');
   h.push('<section class="panel"><h3>Top savings from competitive bids</h3>' + topSavingsList(d, ov) + '</section>');
   h.push('</div>');
