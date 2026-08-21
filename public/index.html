@@ -2343,6 +2343,15 @@ var APPROVED_SET = { approved:1, awarded:1, scheduled:1, inprogress:1, completed
    who ended it — the board declines a job, but a job already approved can be
    called off by the corporation, the contractor, or events. */
 var STOPPED_SET = { rejected:1, deferred:1, cancelled:1 };
+/* Money the corporation will never spend. A deferred job is coming back, so it
+   stays in the figures; a job the board turned down and a job that was called
+   off are not spending that has been put off, they are spending that will not
+   happen. Counting them made "Total, all jobs" a number no cheque will ever be
+   written against, and inflated every contractor's committed spend with work
+   they are not doing. They keep their place in the record — Status & board
+   decisions still lists them with the date — but they are out of the arithmetic. */
+var DEAD_SET = { rejected:1, cancelled:1 };
+function countsAsSpend(j) { return !DEAD_SET[j.status || "quoted"]; }
 function statusLabel(k) { for (var i=0;i<STATUSES.length;i++) if (STATUSES[i][0]===k) return STATUSES[i][1]; return k; }
 /* status chip for the report — quiet for the default "quoted" state */
 function stChip(j) {
@@ -2551,7 +2560,7 @@ var BRAND_PATH = "nnsccQuoteTracker/brand";               /* the letterhead the 
 var WEEKLY_DRAFT_PATH = "nnsccQuoteTracker/weeklyDraft";   /* the report she is working on */
 var WEEKLY_COLL = "nnsccWeeklyReports";                   /* every one she has finished */
 var VIEW_BETA = CURRENT_PATH.indexOf("Beta") >= 0;   /* which report the passcode gate reads/protects */
-var BUILD_STAMP = "2026-08-21 10:55";   /* filled in by build.js — which copy of the page this is */
+var BUILD_STAMP = "2026-08-21 17:21";   /* filled in by build.js — which copy of the page this is */
 /* path of the report currently on screen */
 function reportPath() {
   return cloud.active.kind === "current" ? CURRENT_PATH : (REPORTS_COLL + "/" + cloud.active.id);
@@ -2888,20 +2897,24 @@ function reportListable(j) {
 
 function computeAll() {
   var jobs = liveJobs().map(function (j) { var c = jobCalc(j); return { j: j, c: c }; });
-  var hp = jobs.filter(function (x) { return x.j.priority; });
-  var nhp = jobs.filter(function (x) { return !x.j.priority; });
-  var wait = jobs.filter(function (x) { return reportListable(x.j); });
+  /* every figure on the report is drawn from this set, not from every job */
+  var spend = jobs.filter(function (x) { return countsAsSpend(x.j); });
+  var dead = jobs.filter(function (x) { return !countsAsSpend(x.j); });
+  var hp = spend.filter(function (x) { return x.j.priority; });
+  var nhp = spend.filter(function (x) { return !x.j.priority; });
+  var wait = spend.filter(function (x) { return reportListable(x.j); });
   var decided = jobs.filter(function (x) { return !awaitingBoard(x.j); });
   var drafts = jobs.filter(function (x) { return awaitingBoard(x.j) && !reportListable(x.j); });
   var hpW = hp.filter(function (x) { return reportListable(x.j); });
   var nhpW = nhp.filter(function (x) { return reportListable(x.j); });
   var sum = function (a) { return a.reduce(function (s, x) { return s + x.c.cost; }, 0); };
-  var total = jobs.reduce(function (s, x) { return s + x.c.cost; }, 0);
+  var total = spend.reduce(function (s, x) { return s + x.c.cost; }, 0);
   var hpTotal = hp.reduce(function (s, x) { return s + x.c.cost; }, 0);
-  var savings = jobs.reduce(function (s, x) { return s + x.c.saving; }, 0);
-  var pendingCount = jobs.reduce(function (s, x) { return s + x.c.pendingNames.length; }, 0);
+  var savings = spend.reduce(function (s, x) { return s + x.c.saving; }, 0);
+  /* nobody is waiting on a quote for a job that is not going ahead */
+  var pendingCount = spend.reduce(function (s, x) { return s + x.c.pendingNames.length; }, 0);
   var roll = {};
-  jobs.forEach(function (x) { x.c.carriedBids.forEach(function (cb) {
+  spend.forEach(function (x) { x.c.carriedBids.forEach(function (cb) {
     var nm = (cb.b.contractor || "—").trim() || "—";
     if (!roll[nm]) roll[nm] = { n: 0, tot: 0 };
     roll[nm].n++; roll[nm].tot += cb.total;
@@ -2913,7 +2926,7 @@ function computeAll() {
     if (APPROVED_SET[st]) approvedTotal += x.c.cost;
     x.j.bids.forEach(function (b) { if (bidExpired(b)) staleBids++; });
   });
-  return { jobs: jobs, hp: hp, nhp: nhp, total: total, hpTotal: hpTotal,
+  return { jobs: jobs, spend: spend, dead: dead, hp: hp, nhp: nhp, total: total, hpTotal: hpTotal,
            wait: wait, decided: decided, drafts: drafts, hpW: hpW, nhpW: nhpW,
            hpWTotal: sum(hpW), nhpWTotal: sum(nhpW),
            savings: savings, pendingCount: pendingCount, roll: roll,
@@ -2950,14 +2963,14 @@ function openStatBreakdown(kind) {
              amt: x.c.cost, st: x.j.status };
   }
   if (kind === "total" || kind === "hp" || kind === "std") {
-    var set = kind === "hp" ? d.hp : (kind === "std" ? d.nhp : d.jobs);
+    var set = kind === "hp" ? d.hp : (kind === "std" ? d.nhp : d.spend);
     title = kind === "hp" ? "High-priority jobs" : (kind === "std" ? "Standard-priority jobs" : "Every job in this report");
     lede = set.length + " job" + (set.length === 1 ? "" : "s") +
       ", each counted at the quote in the report totals — the lowest, unless another was chosen.";
     rows = set.map(jobRow).sort(function (a, b) { return b.amt - a.amt; });
     total = rows.reduce(function (t, r) { return t + r.amt; }, 0);
   } else if (kind === "approved") {
-    var ap = d.jobs.filter(function (x) { return APPROVED_SET[x.j.status]; });
+    var ap = d.spend.filter(function (x) { return APPROVED_SET[x.j.status]; });
     title = "Board-approved spend";
     lede = "Jobs the board has approved, awarded, scheduled, in progress or completed.";
     rows = ap.map(jobRow).sort(function (a, b) { return b.amt - a.amt; });
@@ -2966,7 +2979,7 @@ function openStatBreakdown(kind) {
     title = "Saved via competing bids";
     lede = "The difference between the quote carried in the totals and the next-lowest quote received for the same job.";
     cols = ["Job", "Carried quote", "Saving"];
-    d.jobs.forEach(function (x) {
+    d.spend.forEach(function (x) {
       if (!(x.c.saving > 0)) return;
       var carried = x.c.carriedBids[0];
       rows.push({ id: x.j.id, no: x.j.no, desc: x.j.desc || "job",
@@ -2979,7 +2992,7 @@ function openStatBreakdown(kind) {
     title = "Bids still pending";
     lede = "Contractors who were invited to quote and have not returned a price yet.";
     cols = ["Job", "Contractor", "Status"];
-    d.jobs.forEach(function (x) {
+    d.spend.forEach(function (x) {
       x.c.bids.forEach(function (b) {
         if (b.pending) rows.push({ id: x.j.id, no: x.j.no, desc: x.j.desc || "job",
           who: (b.b.contractor || "").trim() || "—", amt: null });
@@ -3591,10 +3604,10 @@ function secBCards(d, ctx) {
 /* Section E lists (open items, decisions, savings) — shared */
 function secEBlocks(d, M, EDITOR) {
   var h = [];
-  var pend = d.jobs.filter(function (x) { return x.c.pendingNames.length; });
-  var savers = d.jobs.filter(function (x) { return x.c.saving > 0; });
+  var pend = d.spend.filter(function (x) { return x.c.pendingNames.length; });
+  var savers = d.spend.filter(function (x) { return x.c.saving > 0; });
   var biggest = null;
-  d.jobs.forEach(function (x) { if (!biggest || x.c.cost > biggest.c.cost) biggest = x; });
+  d.spend.forEach(function (x) { if (!biggest || x.c.cost > biggest.c.cost) biggest = x; });
   if (state.ai && state.ai.openNote)
     h.push('<p class="seclede ainarr">' + tEdit("ai:openNote", state.ai.openNote, "AI note") + "</p>");
   h.push('<ul class="notes">');
@@ -3638,7 +3651,7 @@ function overviewData(d) {
   var awaiting = d.jobs.filter(function (x) { return x.c.priced === 0; }).length;
   var highQ = d.hp.filter(function (x) { return x.c.priced > 0; }).length;
   var stdQ = d.nhp.filter(function (x) { return x.c.priced > 0; }).length;
-  var savers = d.jobs.filter(function (x) { return x.c.saving > 0; })
+  var savers = d.spend.filter(function (x) { return x.c.saving > 0; })
     .sort(function (a, b) { return b.c.saving - a.c.saving; });
   return { awaiting: awaiting, highQ: highQ, stdQ: stdQ, savers: savers };
 }
@@ -3662,7 +3675,7 @@ function statCards(d) {
   /* What this number is, said on the card. It is one quote per job added up —
      the lowest priced one, unless the property manager carried a different
      quote there — and never the sum of every quote received. */
-  var carriedNote = d.jobs.some(function (x) {
+  var carriedNote = d.spend.some(function (x) {
     return x.c.carriedBids.some(function (b) { return b.override; });
   }) ? "lowest each, bar carried ⚑" : "lowest quote per job";
   var cards = [
@@ -3763,7 +3776,7 @@ function topSavings(d, ov) {
 /* schedule-at-a-glance buckets from real statusDate months (packet) */
 function scheduleBuckets(d) {
   var m = {};
-  d.jobs.forEach(function (x) {
+  d.spend.forEach(function (x) {
     var dt = x.j.statusDate;
     if (dt && /^\d{4}-\d{2}/.test(dt)) { var k = dt.slice(0, 7); m[k] = (m[k] || 0) + 1; }
   });
@@ -4227,7 +4240,7 @@ function renderClassicReport() {
          ">" + esc(M.title) + "</h1>");
   h.push('<div class="herometa">' + tE("meta:buildings", M.buildings, "Buildings") + " · Managed by " +
          tE("meta:manager", M.manager, "Manager") + " · " +
-         d.jobs.length + " jobs · " + nContractors + " contractors · Prepared " + esc(todayStr()) + "</div>");
+         d.spend.length + " jobs · " + nContractors + " contractors · Prepared " + esc(todayStr()) + "</div>");
   h.push('</div><div class="logochip"><img src="' + ASSET_LOGO + '" alt="' + esc(M.manager) + '"></div></div></header>');
   /* one tile per section: the letter, then the manager's own heading for it,
      shortened to fit and carrying the full wording as a tooltip */
@@ -4264,7 +4277,7 @@ function renderClassicReport() {
   h.push('<p class="seclede">Where a job received more than one priced quote, the lowest bid ' +
     "is used in all totals. All amounts include 13% HST.</p>");
   h.push('<div class="tiles">');
-  var carriedNote = d.jobs.some(function (x) {
+  var carriedNote = d.spend.some(function (x) {
     return x.c.carriedBids.some(function (b) { return b.override; });
   }) ? "lowest each, bar carried ⚑" : "lowest quote per job";
   /* the figure, then what it is called, then what it counts — the third line is
@@ -4375,10 +4388,10 @@ function renderClassicReport() {
   h.push("</div></section>");
 
   /* Section E */
-  var pend = d.jobs.filter(function (x) { return x.c.pendingNames.length; });
-  var savers = d.jobs.filter(function (x) { return x.c.saving > 0; });
+  var pend = d.spend.filter(function (x) { return x.c.pendingNames.length; });
+  var savers = d.spend.filter(function (x) { return x.c.saving > 0; });
   var biggest = null;
-  d.jobs.forEach(function (x) { if (!biggest || x.c.cost > biggest.c.cost) biggest = x; });
+  d.spend.forEach(function (x) { if (!biggest || x.c.cost > biggest.c.cost) biggest = x; });
   h.push('<section id="secE"><div class="kicker">Section E</div><h2' + hA("headE") + ">" + esc(M.headE) + "</h2>");
   if (state.ai && state.ai.openNote)
     h.push('<p class="seclede ainarr">' + tE("ai:openNote", state.ai.openNote, "AI note") + "</p>");
@@ -5394,7 +5407,7 @@ function aiBuildStats() {
   }).sort(function (a, b) { return b.total_cad - a.total_cad; });
   return { condominium: state.meta.condoName, registration: state.meta.regNo,
     manager: state.meta.manager, buildings: state.meta.buildings,
-    totals: { all_jobs_cad: Math.round(d.total * 100) / 100, jobs: d.jobs.length,
+    totals: { all_jobs_cad: Math.round(d.total * 100) / 100, jobs: d.spend.length,
       high_priority_jobs: d.hp.length, high_priority_cad: Math.round(d.hpTotal * 100) / 100,
       savings_from_competitive_bids_cad: Math.round(d.savings * 100) / 100,
       bids_pending: d.pendingCount },
@@ -7446,8 +7459,8 @@ function wkGather() {
   }).sort(function (a, b) { return a.day < b.day ? -1 : 1; }).slice(0, 25), rid);
   var tracker = wkKept("tracker", wkState.base ? actWeekEvents(wkState.base.jobs || [], state.jobs || []) : [], idx);
   var d = computeAll();
-  var awaiting = wkKept("awaiting", d.jobs.filter(function (x) {
-    return !APPROVED_SET[x.j.status] && x.c.cost > 0;
+  var awaiting = wkKept("awaiting", d.spend.filter(function (x) {
+    return awaitingBoard(x.j) && x.c.cost > 0;
   }).map(function (x) {
     return { no: x.j.no, desc: x.j.desc || "job", cost: x.c.cost,
              who: (x.c.carriedBids[0] && x.c.carriedBids[0].b.contractor) || "" };
@@ -7455,7 +7468,7 @@ function wkGather() {
   var alerts = wkKept("alerts", alertList().filter(function (i) { return i.audience === "all"; }).slice(0, 12), idx);
   return { done: done, units: units, notes: notes, booked: booked, tracker: tracker,
            awaiting: awaiting, alerts: alerts, totals: {
-             committed: d.total, approved: d.approvedTotal, saved: d.savings, jobs: d.jobs.length } };
+             committed: d.total, approved: d.approvedTotal, saved: d.savings, jobs: d.spend.length } };
 }
 function wkFacts(g) {
   var pick = function (r) {
