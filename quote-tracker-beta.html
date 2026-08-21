@@ -584,6 +584,7 @@ tr.jlink td:first-child::after { content:" ›"; color:var(--muted); }
 .st-scheduled { background:#E8F0FE; color:#1a56b8; border-color:#bcd2f7; }
 .st-inprogress { background:#E4F7FB; color:#0b7285; border-color:#a8e3ef; }
 .st-completed { background:#EDEDED; color:#444; border-color:#ccc; }
+.st-cancelled { background:#EFEFEF; color:#6b6b6b; border-color:#cfcfcf; text-decoration:line-through; }
 #editor .ebrow.extra { display:flex !important; flex-wrap:wrap; gap:10px; align-items:center;
   background:var(--paper); border-radius:5px; padding:5px 9px; margin:-3px 0 7px; font-size:12.5px; }
 #editor .ebrow.extra label { font-size:11.5px; color:var(--muted); display:flex; align-items:center; gap:5px; }
@@ -1375,6 +1376,7 @@ body[data-view="edit"] .wrap { max-width:none; }
 .jchip.st-approved, .jchip.st-completed { color:var(--good); background:var(--good-soft); }
 .jchip.st-inprogress, .jchip.st-scheduled { color:var(--amber); background:var(--amber-soft); }
 .jchip.st-rejected, .jchip.st-deferred { color:var(--prio); background:var(--prio-soft); }
+.jchip.st-cancelled { color:var(--muted); background:var(--line-soft); text-decoration:line-through; }
 .jsum { display:flex; align-items:center; gap:10px; font-size:12.5px; color:var(--ink2); flex:0 1 auto;
   min-width:0; white-space:nowrap; }
 .jsum .who { overflow:hidden; text-overflow:ellipsis; max-width:140px; }
@@ -2333,8 +2335,14 @@ function shortLabel(s) {
 }
 /* job lifecycle: quoted → board decision (approved / rejected / deferred) → scheduled → in progress → completed */
 var STATUSES = [["quoted","Quoted"],["approved","Approved"],["awarded","Awarded"],["rejected","Rejected"],
+                ["cancelled","Cancelled"],
                 ["deferred","Deferred"],["scheduled","Scheduled"],["inprogress","In progress"],["completed","Completed"]];
 var APPROVED_SET = { approved:1, awarded:1, scheduled:1, inprogress:1, completed:1 };   /* counts as board-approved spend */
+/* the job is not going ahead: the progress stepper stops rather than completes,
+   and the timeline marks the day it stopped. Cancelled differs from rejected in
+   who ended it — the board declines a job, but a job already approved can be
+   called off by the corporation, the contractor, or events. */
+var STOPPED_SET = { rejected:1, deferred:1, cancelled:1 };
 function statusLabel(k) { for (var i=0;i<STATUSES.length;i++) if (STATUSES[i][0]===k) return STATUSES[i][1]; return k; }
 /* status chip for the report — quiet for the default "quoted" state */
 function stChip(j) {
@@ -2543,7 +2551,7 @@ var BRAND_PATH = "nnsccQuoteTrackerBeta/brand";               /* the letterhead 
 var WEEKLY_DRAFT_PATH = "nnsccQuoteTrackerBeta/weeklyDraft";   /* the report she is working on */
 var WEEKLY_COLL = "nnsccWeeklyReportsBeta";                   /* every one she has finished */
 var VIEW_BETA = CURRENT_PATH.indexOf("Beta") >= 0;   /* which report the passcode gate reads/protects */
-var BUILD_STAMP = "2026-08-17 09:40";   /* filled in by build.js — which copy of the page this is */
+var BUILD_STAMP = "2026-08-21 10:55";   /* filled in by build.js — which copy of the page this is */
 /* path of the report currently on screen */
 function reportPath() {
   return cloud.active.kind === "current" ? CURRENT_PATH : (REPORTS_COLL + "/" + cloud.active.id);
@@ -3139,7 +3147,7 @@ function jdTimelineHTML(j, ED) {
         (x.b.qno ? ' <span class="jdwho">#' + esc(x.b.qno) + "</span>" : "") });
   });
   if (st !== "quoted" && j.statusDate)
-    ev.push({ d: j.statusDate, done: !!APPROVED_SET[st], stop: (st === "rejected" || st === "deferred"),
+    ev.push({ d: j.statusDate, done: !!APPROVED_SET[st], stop: STOPPED_SET[st],
       what: "<b>Marked " + esc(statusLabel(st)) + "</b>" + (j.statusNote ? " — " + esc(j.statusNote) : "") });
   if ((j.awardedTo || "").trim() && j.awardDate)
     ev.push({ d: j.awardDate, done: true, what: "<b>Awarded to " + esc(j.awardedTo.trim()) + "</b>" });
@@ -3889,7 +3897,7 @@ function packetSecC(d, ctx) {
 function jobStages(x) {
   var j = x.j, st = j.status || "quoted";
   var quotesIn = x.c.bids.filter(function (b) { return !b.pending; }).length;
-  var stopped = (st === "rejected" || st === "deferred");
+  var stopped = !!STOPPED_SET[st];
   var approved = !!APPROVED_SET[st];
   var awarded = !!((j.awardedTo || "").trim() || j.awardDate);
   var doneJob = st === "completed";
@@ -4510,7 +4518,7 @@ var ED_BUCKETS = [
   ["open",     "Awaiting the board", ["quoted"]],
   ["approved", "Approved",           ["approved", "awarded", "scheduled", "inprogress"]],
   ["deferred", "Deferred",           ["deferred"]],
-  ["closed",   "Closed",             ["completed", "rejected"]],
+  ["closed",   "Closed",             ["completed", "rejected", "cancelled"]],
   ["all",      "All",                null]
 ];
 var edBucket = "open";
@@ -4871,7 +4879,7 @@ function edJobCardHTML(j, ji) {
   var bl = APPROVED_SET[stk]
     ? (j.awardedTo ? "Awarded to <b>" + esc(j.awardedTo) + "</b>" + (j.awardDate ? " on " + esc(j.awardDate) : "") +
         (stk === "completed" ? " · work complete" : "") : "Approved — no contractor recorded yet")
-    : (stk === "rejected" || stk === "deferred"
+    : (STOPPED_SET[stk]
       ? statusLabel(stk) + (j.statusDate ? " on " + esc(j.statusDate) : "") + (j.statusNote ? " — " + esc(j.statusNote) : "")
       : "Not yet before the board.");
   h.push('<div class="jsec"><div class="jsechead"><span class="n">3</span><h4>Board actions</h4></div>' +
