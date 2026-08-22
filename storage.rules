@@ -117,6 +117,23 @@ service firebase.storage {
       allow create, update: if wkEditor() && request.resource.size < 20 * 1024 * 1024;
     }
 
+    // Board meeting minutes. The strictest thing in this bucket: the property
+    // manager and the owner, and nobody else — not board members, not passcode
+    // readers. A minute book is not a report appendix.
+    match /boardMinutes/{allPaths=**} {
+      function minEditor() {
+        return request.auth != null
+          && request.auth.token.get('email_verified', false) == true
+          && request.auth.token.email != null
+          && ( request.auth.token.email.lower() == 'mvinobaje@gmail.com'
+            || request.auth.token.email.lower() == 'nnscc292connect@cpomanagement.ca'
+            || request.auth.token.email.lower() in
+               firestore.get(/databases/(default)/documents/nnsccQuoteTrackerConfig/main).data.get('editors', []) );
+      }
+      allow read, delete: if minEditor();
+      allow create, update: if minEditor() && request.resource.size < 25 * 1024 * 1024;
+    }
+
     match /contractFiles/{allPaths=**} {
       function conSignedIn() {
         return request.auth != null

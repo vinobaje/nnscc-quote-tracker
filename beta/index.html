@@ -1446,6 +1446,28 @@ body[data-view="edit"] .wrap { max-width:none; }
 .qccaut { margin:0 12px 8px; font-size:12.5px; color:var(--ink2); }
 .qcfoot { margin:0 12px 10px; font-size:12px; color:var(--muted); }
 
+/* ---------- the minute book ---------- */
+.minadd { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+.minadd input[type=text] { flex:1 1 220px; min-width:0; }
+.minchk { display:flex; align-items:center; gap:5px; font-size:12.5px; color:var(--ink2); white-space:nowrap; }
+.minrow { display:flex; align-items:center; gap:10px; padding:9px 0; border-top:1px solid var(--line-soft); }
+.minmain { flex:1 1 auto; min-width:0; font-size:13.5px; color:var(--ink); }
+.minttl { color:var(--ink2); font-weight:500; }
+.mindraft { display:inline-block; font-size:10.5px; font-weight:800; letter-spacing:.05em; text-transform:uppercase;
+  color:#8a6d00; background:#FEF7E0; border:1px solid #eeda9a; border-radius:4px; padding:1px 6px; margin-left:6px; }
+.minsub { display:block; font-size:11.5px; color:var(--muted); margin-top:2px; }
+/* a job's pointer into the book */
+.minlink { border:1px solid var(--line); border-radius:9px; padding:9px 11px; margin:0 0 8px; background:var(--card); }
+.minlinkhead { display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-size:13px; color:var(--ink); }
+.minpg { font-size:11.5px; color:var(--muted); }
+.minquote { margin:7px 0 0; padding:7px 11px; border-left:3px solid var(--accent);
+  background:var(--paper); border-radius:0 6px 6px 0; font-size:13px; line-height:1.55; color:var(--ink); }
+.minform { border:1px solid var(--accent); border-radius:9px; padding:10px 11px; margin:8px 0 0; background:var(--accent-soft); }
+.minformrow { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:8px; }
+.minformrow select { flex:1 1 220px; min-width:0; }
+.minform textarea { width:100%; box-sizing:border-box; font:inherit; font-size:13px; padding:7px 9px;
+  border:1px solid var(--line); border-radius:6px; resize:vertical; }
+
 /* quotes table */
 .qwrap { border:1px solid var(--line-soft); border-radius:9px; overflow-x:auto; }
 .qtable { width:100%; border-collapse:collapse; font-size:13px; }
@@ -2094,6 +2116,7 @@ body[data-view="edit"] .wrap { max-width:none; }
   <input type="file" id="fileRestore" accept=".json,application/json" style="display:none">
   <input type="file" id="filePhoto" accept="image/png,image/jpeg,image/webp" style="display:none">
   <input type="file" id="fileAttach" accept=".pdf,.png,.jpg,.jpeg,.webp,.heic,.doc,.docx,.xls,.xlsx,.eml,.txt" style="display:none">
+  <input type="file" id="minFile" accept=".pdf" style="display:none">
   <input type="file" id="progMediaFile" accept="image/*,video/*" multiple style="display:none">
   <input type="file" id="aiIntakeFile" accept=".pdf,.docx" style="display:none">
 </div></div>
@@ -2554,13 +2577,18 @@ var CURRENT_PATH = "nnsccQuoteTrackerBeta/main";      /* BETA sandbox — live/c
 var REPORTS_COLL = "nnsccQuoteReportsBeta";           /* BETA sandbox — archived reports */
 var CONTRACTORS_PATH = "nnsccQuoteTrackerBeta/contractors";  /* shared contractor directory */
 var CONTRACTS_PATH = "nnsccQuoteTrackerBeta/contracts";      /* the contract register — read with the report */
+/* The minute book. Its own collection rather than a sibling of the report,
+   because the report is readable by the board and this is not: minutes carry
+   legal advice, arrears and personnel matters. The rules allow the property
+   manager and the owner, nobody else, on the documents and on this register. */
+var MINUTES_PATH = "nnsccMinutesBeta/main";
 var SNAPSHOTS_COLL = "nnsccQuoteSnapshotsBeta";               /* a copy of the report, kept each day it changes */
 var ACTIVITY_COLL = "nnsccActivityBeta";                      /* the manager's own record of the week */
 var BRAND_PATH = "nnsccQuoteTrackerBeta/brand";               /* the letterhead the manager puts on her report */
 var WEEKLY_DRAFT_PATH = "nnsccQuoteTrackerBeta/weeklyDraft";   /* the report she is working on */
 var WEEKLY_COLL = "nnsccWeeklyReportsBeta";                   /* every one she has finished */
 var VIEW_BETA = CURRENT_PATH.indexOf("Beta") >= 0;   /* which report the passcode gate reads/protects */
-var BUILD_STAMP = "2026-08-21 17:21";   /* filled in by build.js — which copy of the page this is */
+var BUILD_STAMP = "2026-08-22 18:52";   /* filled in by build.js — which copy of the page this is */
 /* path of the report currently on screen */
 function reportPath() {
   return cloud.active.kind === "current" ? CURRENT_PATH : (REPORTS_COLL + "/" + cloud.active.id);
@@ -2633,6 +2661,7 @@ function cloudInit() {
     cloud.denied = false;                       /* fresh sign-in clears any prior denial */
     subscribeBoard(u);       /* board list + open-vote count (board/editors only) */
     conSubscribe();          /* the contract register: signed-in readers only */
+    minSubscribe();          /* the minute book: the property manager's only */
     actSubscribe();          /* the manager's own journal of the week */
     brandSubscribe();        /* the letterhead on her report */
     /* Firestore TERMINATES a listener that hits permission-denied — it does not
@@ -4554,7 +4583,8 @@ var edSaved = true;           /* false while an edit is on its way to the cloud 
 var ED_GROUPS = [
   ["Work", [["jobs", "💼", "Jobs &amp; Bids"], ["overview", "📊", "Overview"]]],
   ["Who we use", [["contractors", "👷", "Contractors"], ["contracts", "📄", "Contracts"]]],
-  ["For the board", [["activity", "📝", "Activity"], ["weekly", "📰", "Board report"]]]
+  ["For the board", [["activity", "📝", "Activity"], ["weekly", "📰", "Board report"],
+                     ["minutes", "⚖️", "Minutes"]]]
 ];
 if (VOTING_ON) ED_GROUPS.push(["Decisions", [["board", "🗳", "Board &amp; Voting"]]]);
 var ED_FOOT = [["settings", "⚙️", "Settings"]];
@@ -4570,6 +4600,9 @@ function renderEditor() {
   else if (edNav === "weekly") h.push(edSecHead("Report to the board",
     "The week (or the month) as one document: what was carried out, what is booked, what the board " +
     "needs to decide, and your own reports joined on the end.") + wkCardHTML());
+  else if (edNav === "minutes") h.push(edSecHead("Board meeting minutes",
+    "The meetings on file, and the passage of each one that decided a job. Yours and the " +
+    "property manager's only — board members cannot open these.") + minCardHTML());
   else if (edNav === "contracts") h.push(edSecHead("Contracts",
     "Agreements with contractors — what they cover, until when, and what they cost. " +
     "Everyone who can read the report can read these.") + conCardHTML());
@@ -4902,6 +4935,9 @@ function edJobCardHTML(j, ji) {
     (VOTING_ON && voteOpen ? '<span class="qst over">🗳 Vote open</span>' : "") +
     (VOTING_ON ? '<button class="edbtn" type="button" data-act="openvote">🗳 Board vote</button>' : "") +
     "</div></div>");
+
+  /* ---- 4. what the board actually decided, and where it says so ---- */
+  h.push(minJobLinksHTML(j));
   return h.join("") + "</div></div>";
 }
 
@@ -5719,6 +5755,10 @@ document.getElementById("editor").addEventListener("click", function (e) {
   if (act === "alert-replacekey") { alertShowKeyRow = true; renderEditor(); return; }
   if (act === "alert-send") { alertSendNow(); return; }
   if (act === "ai-savekey") { aiSaveKey(); return; }
+  if (act === "min-pick") { minPick(); return; }
+  if (act === "min-open") { minOpen(e.target.closest("[data-mid]")); return; }
+  if (act === "min-draft") { minToggleDraft(e.target.closest("[data-mid]")); return; }
+  if (act === "min-del") { minDelete(e.target.closest("[data-mid]")); return; }
   if (act === "qc-savekey") { qcSaveKey(); return; }
   if (act === "ai-replacekey") { aiShowKeyRow = true; renderEditor(); return; }
   if (act === "ai-generate") { aiGenerate(); return; }
@@ -5904,6 +5944,51 @@ function edWorkspaceAction(act, el, e) {
           " instead of the lowest quote"], pj.id);
       }
       renderEditor(); renderReport(); return true;
+    }
+    /* --- the minute book, and a job's pointer into it --- */
+    case "minlink-add": {
+      var ma = el.closest(".jcard"); if (!ma) return true;
+      var mj = state.jobs[+ma.dataset.ji]; if (!mj) return true;
+      minLinkFor = (minLinkFor === mj.id) ? null : mj.id;
+      renderEditor(); return true;
+    }
+    case "minlink-cancel": { minLinkFor = null; renderEditor(); return true; }
+    case "minlink-save": {
+      var mc = el.closest(".jcard"); if (!mc) return true;
+      var mjb = state.jobs[+mc.dataset.ji]; if (!mjb) return true;
+      var mid = (document.getElementById("minLinkMid") || {}).value || "";
+      var pg = parseInt((document.getElementById("minLinkPage") || {}).value, 10);
+      var qt = String((document.getElementById("minLinkQuote") || {}).value || "").trim();
+      if (!mid) return true;
+      mjb.minutes = mjb.minutes || [];
+      mjb.minutes.push({ id: mid, page: pg > 0 ? pg : null,
+                         quote: qt.slice(0, MIN_QUOTE_MAX), at: todayISO() });
+      minLinkFor = null;
+      persist(null, [jobLabel(mjb) + ": linked to the minutes of " + minLabel(minById(mid))], mjb.id);
+      renderEditor(); return true;
+    }
+    case "minlink-del": {
+      var md = el.closest(".jcard"); if (!md) return true;
+      var mjd = state.jobs[+md.dataset.ji]; if (!mjd || !mjd.minutes) return true;
+      var gone = mjd.minutes.splice(+el.dataset.li, 1)[0];
+      persist(null, [jobLabel(mjd) + ": unlinked the minutes of " +
+        minLabel(gone && minById(gone.id))], mjd.id);
+      renderEditor(); return true;
+    }
+    /* the passage, the meeting and the page — what goes in the email */
+    case "minlink-copy": {
+      var mp = el.closest(".jcard"); if (!mp) return true;
+      var mjp = state.jobs[+mp.dataset.ji]; if (!mjp) return true;
+      var lk = (mjp.minutes || [])[+el.dataset.li]; if (!lk) return true;
+      var mm = minById(lk.id);
+      var txt = jobLabel(mjp) + "\n" + minLabel(mm) + (lk.page ? ", page " + lk.page : "") +
+        (lk.quote ? "\n\n\u201C" + lk.quote + "\u201D" : "");
+      try {
+        navigator.clipboard.writeText(txt);
+        el.textContent = "Copied";
+        setTimeout(function () { el.textContent = "Copy as proof"; }, 1400);
+      } catch (e) {}
+      return true;
     }
     /* --- reading the quotes against each other --- */
     case "qc-fold": {
@@ -6695,6 +6780,211 @@ document.addEventListener("click", function (e) {
    What the corporation is committed to, and until when. Held in its own
    document so a passcode reader never receives it: signing in is the price of
    seeing the agreements, and the same goes for the signed PDFs in Storage. */
+/* ---------- the minute book ----------
+   Board members forget what they decided, and the manager is left arguing from
+   memory about a job deferred two meetings ago. Every meeting's minutes are
+   filed here, and a job can carry a pointer into one: the meeting, the page,
+   and the sentence itself. What proves it to a director is the sentence, shown
+   beside the job; the document stays with the manager. */
+var minState = { list: [] }, minUnsub = null;
+function minSave() {
+  if (!cloud.on || !isEditor()) return;
+  cloud.db.doc(MINUTES_PATH).set({ list: minState.list.map(function (m) {
+    return { id: m.id || genId(), date: m.date || "", title: m.title || "",
+             draft: !!m.draft, pages: m.pages || 0,
+             file: m.file ? { name: m.file.name || "", path: m.file.path || "", size: m.file.size || 0 } : null,
+             addedBy: m.addedBy || "", addedAt: m.addedAt || "" };
+  }) }).catch(function () {});
+}
+function minSubscribe() {
+  if (minUnsub) { minUnsub(); minUnsub = null; }
+  if (!cloud.on || !cloud.user || !isEditor()) { minState = { list: [] }; return; }
+  minUnsub = cloud.db.doc(MINUTES_PATH).onSnapshot(function (snap) {
+    var mine = !!(snap.metadata && snap.metadata.hasPendingWrites);
+    minState = { list: (snap.exists && Array.isArray(snap.data().list)) ? snap.data().list : [] };
+    minState.list.forEach(function (m) { if (!m.id) m.id = genId(); });
+    minSort();
+    if (mine) return;
+    if (document.body.dataset.view === "edit") renderEditor();
+  }, function () { minState = { list: [] }; });    /* denied: no minute book, no noise */
+}
+function minSort() {
+  minState.list.sort(function (a, b) { return String(b.date || "").localeCompare(String(a.date || "")); });
+}
+function minById(id) {
+  var out = null;
+  minState.list.forEach(function (m) { if (m.id === id) out = m; });
+  return out;
+}
+/* how a meeting is named wherever it is referred to */
+function minLabel(m) {
+  if (!m) return "a meeting no longer on file";
+  return (m.date ? jdDate(m.date) : "undated") + (m.title ? " · " + m.title : "") +
+    (m.draft ? " (draft)" : "");
+}
+
+/* ---------- filing a meeting ----------
+   The date is asked for before the file, because a minute book is ordered by
+   meeting and a PDF called "Minutes-final-v3.pdf" says nothing about when the
+   board sat. */
+function minPick() {
+  var note = document.getElementById("minNote");
+  var dt = (document.getElementById("minNewDate") || {}).value || "";
+  if (!dt) { if (note) note.textContent = "Give the meeting date first."; return; }
+  if (!cloud.store || !isEditor()) {
+    if (note) note.textContent = "Sign in as the property manager to file minutes."; return;
+  }
+  document.getElementById("minFile").click();
+}
+document.getElementById("minFile").addEventListener("change", function () {
+  var f = this.files && this.files[0];
+  this.value = "";
+  var note = document.getElementById("minNote");
+  if (!f) return;
+  if (f.size > 25 * 1024 * 1024) { if (note) note.textContent = "That file is over 25 MB — file a smaller copy."; return; }
+  var dt = (document.getElementById("minNewDate") || {}).value || "";
+  var ttl = String((document.getElementById("minNewTitle") || {}).value || "").trim();
+  var draft = !!(document.getElementById("minNewDraft") || {}).checked;
+  if (!dt) { if (note) note.textContent = "Give the meeting date first."; return; }
+  if (note) note.textContent = "Filing “" + f.name + "”…";
+  var id = genId();
+  var path = "boardMinutes/" + id + "/" + Date.now() + "-" + f.name.replace(/[^\w.\-() ]+/g, "_");
+  cloud.store.ref(path).put(f).then(function () {
+    minState.list.push({ id: id, date: dt, title: ttl, draft: draft,
+      file: { name: f.name, path: path, size: f.size },
+      addedBy: (cloud.user && cloud.user.email) || "", addedAt: todayISO() });
+    minSort(); minSave();
+    if (note) note.textContent = "";
+    renderEditor();
+  }).catch(function (err) {
+    if (note) note.textContent = "Upload failed (" + ((err && err.code) || "error") + ") — nothing was filed.";
+  });
+});
+/* Opened with the reader's own credentials rather than a public link: the
+   rules are what keep this document to the two of us, and a download token
+   would hand it to anyone the URL reached. */
+function minOpen(el) {
+  if (!el) return;
+  var m = minById(el.getAttribute("data-mid"));
+  if (!m || !m.file || !cloud.store) return;
+  var page = el.getAttribute("data-page");
+  cloud.store.ref(m.file.path).getDownloadURL().then(function (url) {
+    window.open(url + (page ? "#page=" + encodeURIComponent(page) : ""), "_blank", "noopener");
+  }).catch(function () { alert("Could not open that document."); });
+}
+function minToggleDraft(el) {
+  if (!el) return;
+  var m = minById(el.getAttribute("data-mid"));
+  if (!m) return;
+  m.draft = !m.draft;
+  minSave(); renderEditor();
+}
+function minDelete(el) {
+  if (!el) return;
+  var m = minById(el.getAttribute("data-mid"));
+  if (!m) return;
+  var used = minUseCount(m.id);
+  if (!confirm(used
+    ? "The minutes of " + minLabel(m) + " are cited by " + used + " job" + (used === 1 ? "" : "s") +
+      ". Removing them leaves those jobs quoting a meeting no longer on file.\n\nRemove anyway?"
+    : "Remove the minutes of " + minLabel(m) + "?")) return;
+  if (m.file && m.file.path && cloud.store) {
+    try { cloud.store.ref(m.file.path).delete().catch(function () {}); } catch (e) {}
+  }
+  minState.list = minState.list.filter(function (x) { return x.id !== m.id; });
+  minSave(); renderEditor();
+}
+
+/* ---------- a job's board decisions ----------
+   The pointer lives on the job rather than in the minute book, so it travels
+   with the report into the archive: a past period keeps the proof of what was
+   decided in it. The passage is stored with the pointer for the same reason —
+   and because the passage, not the PDF, is what a director is shown. */
+var MIN_QUOTE_MAX = 700;
+
+function minJobLinksHTML(j) {
+  var links = j.minutes || [];
+  var h = ['<div class="jsec"><div class="jsechead"><span class="n">4</span><h4>Board decisions on file</h4></div>'];
+  if (!links.length)
+    h.push('<p class="updempty" style="margin:2px 0 8px">Nothing linked yet. When the board decides this job, ' +
+      "point at the passage in the minutes that says so.</p>");
+  links.forEach(function (l, li) {
+    var m = minById(l.id);
+    h.push('<div class="minlink"><div class="minlinkhead"><b>' + esc(minLabel(m)) + "</b>" +
+      (l.page ? '<span class="minpg">page ' + esc(l.page) + "</span>" : "") +
+      '<span class="spacer"></span>' +
+      (m && m.file ? '<button class="edbtn" type="button" data-act="min-open" data-mid="' + esc(l.id) +
+        '" data-page="' + esc(l.page || "") + '">Open the minutes</button>' : "") +
+      '<button class="edbtn" type="button" data-act="minlink-copy" data-li="' + li + '">Copy as proof</button>' +
+      '<button class="xbtn" type="button" data-act="minlink-del" data-li="' + li + '" title="Unlink">✕</button></div>' +
+      (l.quote ? '<blockquote class="minquote">' + esc(l.quote) + "</blockquote>" : "") + "</div>");
+  });
+  h.push('<button class="edbtn" type="button" data-act="minlink-add">+ Link a board decision</button>');
+  if (minLinkFor === j.id) h.push(minLinkFormHTML(j));
+  h.push("</div>");
+  return h.join("");
+}
+var minLinkFor = null;      /* the job whose "link a decision" form is open */
+
+function minLinkFormHTML(j) {
+  if (!minState.list.length)
+    return '<p class="updempty">No minutes on file yet — add the meeting under <strong>Minutes</strong> first.</p>';
+  var opts = minState.list.map(function (m) {
+    return '<option value="' + esc(m.id) + '">' + esc(minLabel(m)) + "</option>";
+  }).join("");
+  return '<div class="minform"><div class="minformrow"><select id="minLinkMid">' + opts + "</select>" +
+    '<input type="number" id="minLinkPage" min="1" step="1" placeholder="page" style="width:88px">' +
+    '<button class="btn" type="button" data-act="minlink-save">Link it</button>' +
+    '<button class="edbtn" type="button" data-act="minlink-cancel">Cancel</button></div>' +
+    '<textarea id="minLinkQuote" rows="3" placeholder="Paste the sentence from the minutes — the words the board will be shown"></textarea>' +
+    '<div class="savenote">Paste it exactly as written. It is what proves the decision, and in the next step it is ' +
+    "what the highlight in the PDF is found from.</div></div>";
+}
+
+/* the Minutes screen: the meetings on file, and what each one is */
+function minCardHTML() {
+  var h = ['<div class="ecard esettings" id="minCard"><div class="ehead"><strong>Meetings on file</strong>' +
+    '<span style="font-size:12.5px;color:var(--ink2)">— newest first</span>' +
+    '</div><div class="ebids">'];
+  if (!cloud.on) {
+    h.push('<p class="edithint" style="margin:4px 0">Available on the live site (cloud copy) only.</p></div></div>');
+    return h.join("");
+  }
+  h.push('<div class="esrow"><label>Add a meeting</label><div style="flex:1">' +
+    '<div class="minadd"><input type="date" id="minNewDate" title="Meeting date">' +
+    '<input type="text" id="minNewTitle" placeholder="Board meeting (optional label)">' +
+    '<label class="minchk"><input type="checkbox" id="minNewDraft"> Draft minutes</label>' +
+    '<button class="btn" type="button" data-act="min-pick">Choose PDF…</button></div>' +
+    '<div class="savenote" id="minNote">The PDF is stored where only you and the property manager can open it.</div>' +
+    "</div></div>");
+  if (!minState.list.length)
+    h.push('<p class="updempty">No minutes on file yet. Add the meeting date, then choose the PDF.</p>');
+  minState.list.forEach(function (m) {
+    var used = minUseCount(m.id);
+    h.push('<div class="minrow' + (m.draft ? " draft" : "") + '">' +
+      '<div class="minmain"><b>' + esc(m.date ? jdDate(m.date) : "Undated") + "</b>" +
+      (m.title ? ' <span class="minttl">' + esc(m.title) + "</span>" : "") +
+      (m.draft ? ' <span class="mindraft">Draft</span>' : "") +
+      '<span class="minsub">' + (m.file ? esc(m.file.name) : "no document attached") +
+      (used ? " · linked to " + used + " job" + (used === 1 ? "" : "s") : "") + "</span></div>" +
+      (m.file ? '<button class="edbtn" type="button" data-act="min-open" data-mid="' + esc(m.id) + '">Open</button>' : "") +
+      '<button class="edbtn" type="button" data-act="min-draft" data-mid="' + esc(m.id) + '">' +
+      (m.draft ? "Mark approved" : "Mark draft") + "</button>" +
+      '<button class="xbtn" type="button" data-act="min-del" data-mid="' + esc(m.id) + '" title="Remove">✕</button></div>');
+  });
+  h.push("</div></div>");
+  return h.join("");
+}
+/* how many jobs point at this meeting — deleting one that is cited is a
+   different act from deleting one nobody has used */
+function minUseCount(id) {
+  var n = 0;
+  (state.jobs || []).forEach(function (j) {
+    (j.minutes || []).forEach(function (l) { if (l.id === id) n++; });
+  });
+  return n;
+}
+
 var conState = { list: [] }, conUnsub = null;
 /* a reader who came in with the passcode rather than a Google account: the
    register travels with the report, and the passcode fetches the PDFs too */

@@ -39,6 +39,16 @@ service cloud.firestore {
       }
     }
 
+    // Board meeting minutes — the register of meetings, and which passage of
+    // which meeting decided which job. Manager-only BOTH ways, unlike the
+    // report and the contract register: minutes carry legal advice, arrears
+    // and personnel matters that a board member reading the report has no
+    // business seeing here. The proof a director is shown is the passage the
+    // manager puts in front of them, not the document.
+    match /nnsccMinutes/{docId} {
+      allow read, write: if nnsccEditor();
+    }
+
     // Daily copies of the whole report, so a wrong click is never final.
     // The manager's own safety net: editor read, write and prune.
     match /nnsccQuoteSnapshots/{day} {
@@ -184,6 +194,11 @@ service cloud.firestore {
         allow update, delete: if false;
       }
     }
+    // Board meeting minutes (beta sandbox) — manager-only, as live.
+    match /nnsccMinutesBeta/{docId} {
+      allow read, write: if nnsccEditor();
+    }
+
     match /nnsccQuoteReportsBeta/{reportId} {
       allow read, write: if nnsccEditor();
       match /audit/{entryId} {
