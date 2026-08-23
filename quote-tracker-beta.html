@@ -1468,6 +1468,23 @@ body[data-view="edit"] .wrap { max-width:none; }
 .minform textarea { width:100%; box-sizing:border-box; font:inherit; font-size:13px; padding:7px 9px;
   border:1px solid var(--line); border-radius:6px; resize:vertical; }
 
+/* the minutes viewer */
+.minbox { width:min(980px, 96vw); max-height:92vh; display:flex; flex-direction:column; gap:0; padding:0; overflow:hidden; }
+.minvhead { display:flex; align-items:center; gap:9px; padding:11px 14px; border-bottom:1px solid var(--line);
+  background:var(--paper); flex-wrap:wrap; }
+.minvttl { font-weight:700; font-size:14px; color:var(--ink); }
+.minvnav { display:flex; align-items:center; gap:6px; }
+.minvpg { font-size:12px; color:var(--muted); font-variant-numeric:tabular-nums; min-width:96px; text-align:center; }
+.minvnote { padding:8px 14px; font-size:12.5px; color:var(--ink2); background:var(--card);
+  border-bottom:1px solid var(--line-soft); }
+.minvstage { flex:1 1 auto; overflow:auto; background:#5b6470; padding:14px; display:flex; justify-content:center; }
+.minvpaper { position:relative; align-self:flex-start; box-shadow:0 10px 30px rgba(0,0,0,.35); background:#fff; }
+.minvpaper canvas { display:block; }
+.minvmarks { position:absolute; inset:0; pointer-events:none; }
+/* struck over the words rather than under them, so it reads as a marker pen */
+.minvmark { position:absolute; background:rgba(255,214,0,.42); border-radius:2px;
+  box-shadow:0 0 0 1px rgba(190,140,0,.45); }
+
 /* quotes table */
 .qwrap { border:1px solid var(--line-soft); border-radius:9px; overflow-x:auto; }
 .qtable { width:100%; border-collapse:collapse; font-size:13px; }
@@ -2198,6 +2215,29 @@ body[data-view="edit"] .wrap { max-width:none; }
   </div>
 </div>
 
+<div class="overlay" id="minViewOverlay" role="dialog" aria-modal="true" aria-label="Minutes">
+  <div class="pinbox minbox">
+    <div class="minvhead">
+      <div class="minvttl" id="minvTitle">Minutes</div>
+      <div class="minvnav">
+        <button class="edbtn" type="button" id="minvPrev" title="Previous page">◀</button>
+        <span id="minvPage" class="minvpg">–</span>
+        <button class="edbtn" type="button" id="minvNext" title="Next page">▶</button>
+      </div>
+      <span class="spacer"></span>
+      <button class="edbtn" type="button" id="minvOrig">Open the original</button>
+      <button class="btn ghost" type="button" id="minvClose">Close</button>
+    </div>
+    <div class="minvnote" id="minvNote"></div>
+    <div class="minvstage" id="minvStage">
+      <div class="minvpaper" id="minvPaper">
+        <canvas id="minvCanvas"></canvas>
+        <div class="minvmarks" id="minvMarks"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="overlay" id="statOverlay" role="dialog" aria-modal="true" aria-label="Figure breakdown">
   <div class="pinbox dashbox">
     <h3 id="statTitle">Breakdown</h3>
@@ -2588,7 +2628,7 @@ var BRAND_PATH = "nnsccQuoteTrackerBeta/brand";               /* the letterhead 
 var WEEKLY_DRAFT_PATH = "nnsccQuoteTrackerBeta/weeklyDraft";   /* the report she is working on */
 var WEEKLY_COLL = "nnsccWeeklyReportsBeta";                   /* every one she has finished */
 var VIEW_BETA = CURRENT_PATH.indexOf("Beta") >= 0;   /* which report the passcode gate reads/protects */
-var BUILD_STAMP = "2026-08-22 18:52";   /* filled in by build.js — which copy of the page this is */
+var BUILD_STAMP = "2026-08-22 21:27";   /* filled in by build.js — which copy of the page this is */
 /* path of the report currently on screen */
 function reportPath() {
   return cloud.active.kind === "current" ? CURRENT_PATH : (REPORTS_COLL + "/" + cloud.active.id);
@@ -5953,6 +5993,14 @@ function edWorkspaceAction(act, el, e) {
       renderEditor(); return true;
     }
     case "minlink-cancel": { minLinkFor = null; renderEditor(); return true; }
+    case "minlink-see": {
+      var ms = el.closest(".jcard"); if (!ms) return true;
+      var mjs = state.jobs[+ms.dataset.ji]; if (!mjs) return true;
+      var lks = (mjs.minutes || [])[+el.dataset.li]; if (!lks) return true;
+      minViewOpen(lks.id, lks.page, lks.quote, minLabel(minById(lks.id)) +
+        (lks.page ? " · page " + lks.page : ""));
+      return true;
+    }
     case "minlink-save": {
       var mc = el.closest(".jcard"); if (!mc) return true;
       var mjb = state.jobs[+mc.dataset.ji]; if (!mjb) return true;
@@ -6823,6 +6871,279 @@ function minLabel(m) {
     (m.draft ? " (draft)" : "");
 }
 
+/* ---------- showing the board what it decided ----------
+   A page number is not proof; the sentence is. So the minutes open inside the
+   report, at the page, with the passage marked — and the mark is found rather
+   than trusted. The model, later, will supply the words it quoted; this looks
+   for those words in the page's own text layer and highlights what it finds.
+   A highlight is therefore either right or absent: it cannot be confidently
+   wrong, which is the whole point of showing it to a sceptical director.
+
+   pdf.js is fetched the first time a passage is opened and not before — a
+   reader who never opens one never pays for it. */
+var MIN_PDFJS = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
+var MIN_PDFJS_WORKER = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+var minPdfLoading = null;
+
+function minPdfLoad() {
+  if (window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
+  if (minPdfLoading) return minPdfLoading;
+  minPdfLoading = new Promise(function (resolve, reject) {
+    var sc = document.createElement("script");
+    sc.src = MIN_PDFJS;
+    sc.onload = function () {
+      if (!window.pdfjsLib) { reject(new Error("pdf.js did not load")); return; }
+      /* A worker cannot be started from another origin, and pointing at the CDN
+         copy leaves pdf.js waiting on a worker that never starts — the document
+         simply never opens, with no error to show for it. Fetch the worker's
+         source and start it from a blob of our own instead. */
+      fetch(MIN_PDFJS_WORKER).then(function (r) {
+        if (!r.ok) throw new Error("worker " + r.status);
+        return r.text();
+      }).then(function (src) {
+        window.pdfjsLib.GlobalWorkerOptions.workerSrc =
+          URL.createObjectURL(new Blob([src], { type: "text/javascript" }));
+        resolve(window.pdfjsLib);
+      }).catch(function (e) { reject(e); });
+    };
+    sc.onerror = function () { reject(new Error("pdf.js could not be fetched")); };
+    document.head.appendChild(sc);
+  });
+  return minPdfLoading;
+}
+
+/* Word's quotation marks and dashes are not the PDF's, and a pasted passage
+   carries whatever whitespace came with it. Both sides are flattened before
+   anything is compared. */
+function minNorm(t) {
+  return String(t || "").replace(/[\u2018\u2019]/g, "'").replace(/[\u201C\u201D]/g, '"')
+    .replace(/[\u2013\u2014]/g, "-").replace(/\s+/g, " ").trim();
+}
+/* the page as one string, with every character remembering which text item it
+   came from — that map is what turns a match back into boxes on the page */
+function minPageIndex(items) {
+  var text = "", map = [];
+  items.forEach(function (it, i) {
+    var raw = minNorm(it.str);
+    if (!raw) return;
+    if (text && !/\s$/.test(text)) { text += " "; map.push(-1); }
+    for (var c = 0; c < raw.length; c++) map.push(i);
+    text += raw;
+  });
+  return { text: text, map: map };
+}
+/* Every run of the passage that is present on this page, not merely the
+   longest. A minute item reads "16 - Water Shut Off Labels: On a Motion by…",
+   and the bold lead-in and the body arrive as separate text items with the
+   running header sometimes between them; matching only the longest run left
+   the heading unmarked. So: take the whole passage if it is there, and
+   otherwise take the longest window that is, then look for what is left of the
+   passage on either side of it, down to about four words. */
+function minFindRuns(idx, quote) {
+  var runs = [];
+  collect(minNorm(quote).split(" "));
+  runs.sort(function (a, b) { return a.at - b.at; });
+  /* Two runs a few characters apart on the page are one passage with a word
+     between them that was too short to match on its own — "Owners:", between
+     the bold lead-in and the sentence it introduces. Close over it, so the
+     highlight reads as the single passage it is. */
+  var joined = [];
+  runs.forEach(function (r) {
+    var last = joined[joined.length - 1];
+    if (last && r.at - (last.at + last.len) <= 14) {
+      last.len = Math.max(last.len, r.at + r.len - last.at);
+      last.words += r.words;
+    } else joined.push({ at: r.at, len: r.len, words: r.words });
+  });
+  return joined;
+
+  function collect(words) {
+    if (words.length < 4) return;
+    var whole = words.join(" ");
+    if (whole.length < 20) return;
+    var at = idx.text.indexOf(whole);
+    if (at >= 0) { runs.push({ at: at, len: whole.length, words: words.length }); return; }
+    var best = null;
+    for (var a = 0; a < words.length; a++) {
+      for (var b = words.length; b > a + 3; b--) {
+        var win = words.slice(a, b).join(" ");
+        if (win.length < 20) break;
+        var p = idx.text.indexOf(win);
+        if (p >= 0) {
+          if (!best || win.length > best.len) best = { at: p, len: win.length, a: a, b: b, words: b - a };
+          break;
+        }
+      }
+    }
+    if (!best) return;
+    runs.push({ at: best.at, len: best.len, words: best.words });
+    collect(words.slice(0, best.a));
+    collect(words.slice(best.b));
+  }
+}
+
+/* what is on screen at the moment */
+var minView = { doc: null, page: 1, quote: "", label: "", url: "", found: 0, busy: false };
+
+function minViewOpen(mid, page, quote, label) {
+  var m = minById(mid);
+  if (!m || !m.file || !cloud.store) { alert("That document is not on file."); return; }
+  minView = { doc: null, page: Math.max(1, parseInt(page, 10) || 1), quote: quote || "",
+              label: label || minLabel(m), url: "", found: 0, busy: true };
+  document.getElementById("minvTitle").textContent = minView.label;
+  document.getElementById("minvNote").textContent = "Opening…";
+  document.getElementById("minvMarks").innerHTML = "";
+  document.getElementById("minViewOverlay").classList.add("open");
+  Promise.all([minPdfLoad(), cloud.store.ref(m.file.path).getDownloadURL()])
+    .then(function (r) {
+      minView.url = r[1];
+      return r[0].getDocument({ url: r[1] }).promise;
+    })
+    .then(function (doc) {
+      minView.doc = doc;
+      if (minView.page > doc.numPages) minView.page = 1;
+      return minView.quote ? minLocate() : null;
+    })
+    .then(function () { return minRender(); })
+    .catch(function (e) {
+      minView.busy = false;
+      document.getElementById("minvNote").textContent =
+        "Could not open the document (" + ((e && e.message) || "error") + ").";
+    });
+}
+/* The page recorded against the job is where we look first. If the passage is
+   not there — a page was renumbered, or she noted it from the Word copy — the
+   rest of the document is searched rather than showing a page with nothing
+   marked on it and leaving her to hunt. */
+function minLocate() {
+  var doc = minView.doc, want = minView.page;
+  return doc.getPage(want).then(function (pg) { return pg.getTextContent(); })
+    .then(function (tc) {
+      if (minFindRuns(minPageIndex(tc.items), minView.quote).length) return want;
+      var chain = Promise.resolve(null);
+      for (var p = 1; p <= doc.numPages; p++) (function (n) {
+        chain = chain.then(function (hit) {
+          if (hit || n === want) return hit;
+          return doc.getPage(n).then(function (pg) { return pg.getTextContent(); })
+            .then(function (tc2) { return minFindRuns(minPageIndex(tc2.items), minView.quote).length ? n : null; });
+        });
+      })(p);
+      return chain.then(function (hit) {
+        if (hit) { minView.page = hit; minView.moved = want; }
+        return minView.page;
+      });
+    });
+}
+
+function minRender() {
+  var doc = minView.doc;
+  if (!doc) return Promise.resolve();
+  var stage = document.getElementById("minvStage");
+  var canvas = document.getElementById("minvCanvas");
+  var marks = document.getElementById("minvMarks");
+  return doc.getPage(minView.page).then(function (pg) {
+    var wide = Math.max(360, Math.min(stage.clientWidth - 28, 900));
+    var base = pg.getViewport({ scale: 1 });
+    var scale = wide / base.width;
+    var vp = pg.getViewport({ scale: scale });
+    var ratio = window.devicePixelRatio || 1;
+    canvas.width = Math.floor(vp.width * ratio);
+    canvas.height = Math.floor(vp.height * ratio);
+    canvas.style.width = Math.floor(vp.width) + "px";
+    canvas.style.height = Math.floor(vp.height) + "px";
+    marks.style.width = canvas.style.width;
+    marks.style.height = canvas.style.height;
+    var ctx = canvas.getContext("2d");
+    ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+    return pg.render({ canvasContext: ctx, viewport: vp }).promise
+      .then(function () { return pg.getTextContent(); })
+      .then(function (tc) { minMark(tc.items, vp, marks); });
+  });
+}
+
+/* the boxes themselves: every text item the matched run touches, merged where
+   they sit on the same line so a sentence reads as one band and not as words */
+function minMark(items, vp, host) {
+  host.innerHTML = "";
+  minView.busy = false;
+  var note = document.getElementById("minvNote");
+  var pageTxt = "Page " + minView.page + " of " + minView.doc.numPages;
+  document.getElementById("minvPage").textContent = pageTxt;
+  if (!minView.quote) { note.textContent = ""; return; }
+  var idx = minPageIndex(items);
+  var runs = minFindRuns(idx, minView.quote);
+  if (!runs.length) {
+    note.innerHTML = "<b>The passage is not on this page.</b> The document is shown as filed — " +
+      "the wording may have been edited since it was linked.";
+    return;
+  }
+  var touched = {}, marked = 0;
+  runs.forEach(function (run) {
+    marked += run.words;
+    for (var c = run.at; c < run.at + run.len && c < idx.map.length; c++)
+      if (idx.map[c] >= 0) touched[idx.map[c]] = 1;
+  });
+  var wanted = minNorm(minView.quote).split(" ").length;
+  var boxes = [];
+  Object.keys(touched).forEach(function (k) {
+    var it = items[+k];
+    if (!it || !it.transform) return;
+    var t = pdfjsLib.Util.transform(vp.transform, it.transform);
+    var hgt = Math.hypot(t[1], t[3]) || 10;
+    boxes.push({ x: t[4], y: t[5] - hgt, w: (it.width || 0) * vp.scale, h: hgt * 1.18 });
+  });
+  boxes.sort(function (a, b) { return (a.y - b.y) || (a.x - b.x); });
+  var merged = [];
+  boxes.forEach(function (b) {
+    var last = merged[merged.length - 1];
+    /* a word or two between two matched runs — "Owners:" between the bold
+       lead-in and the sentence — leaves a hole in what is plainly one passage.
+       Boxes on the same line close up over a gap of about two characters'
+       worth; anything wider is left alone so a second column is never joined
+       to the first. */
+    if (last && Math.abs(last.y - b.y) < 3 && b.x - (last.x + last.w) < b.h * 2.2) {
+      last.w = Math.max(last.w, b.x + b.w - last.x);
+    } else merged.push(b);
+  });
+  merged.forEach(function (b) {
+    var d = document.createElement("div");
+    d.className = "minvmark";
+    d.style.left = Math.round(b.x - 1) + "px";
+    d.style.top = Math.round(b.y - 1) + "px";
+    d.style.width = Math.round(b.w + 2) + "px";
+    d.style.height = Math.round(b.h) + "px";
+    host.appendChild(d);
+  });
+  /* the words bridged when two runs were joined are not counted, so near-total
+     coverage is reported as total rather than as a suspicious 95% */
+  note.innerHTML = (marked >= wanted * 0.9 ? "The linked passage is marked below." :
+      "<b>" + Math.round(marked / wanted * 100) + "% of the passage is marked below</b> — " +
+      "the rest does not appear on this page as written.") +
+    (minView.moved ? " Found on page " + minView.page + " rather than page " + minView.moved + "." : "");
+  var first = host.firstChild;
+  if (first) first.scrollIntoView({ block: "center" });
+}
+
+document.getElementById("minvClose").onclick = function () {
+  document.getElementById("minViewOverlay").classList.remove("open");
+  if (minView.doc) { try { minView.doc.destroy(); } catch (e) {} }
+  minView.doc = null;
+};
+document.getElementById("minViewOverlay").addEventListener("click", function (e) {
+  if (e.target === this) document.getElementById("minvClose").click();
+});
+document.getElementById("minvPrev").onclick = function () {
+  if (!minView.doc || minView.page <= 1) return;
+  minView.page--; minRender();
+};
+document.getElementById("minvNext").onclick = function () {
+  if (!minView.doc || minView.page >= minView.doc.numPages) return;
+  minView.page++; minRender();
+};
+document.getElementById("minvOrig").onclick = function () {
+  if (minView.url) window.open(minView.url + "#page=" + minView.page, "_blank", "noopener");
+};
+
 /* ---------- filing a meeting ----------
    The date is asked for before the file, because a minute book is ordered by
    meeting and a PDF called "Minutes-final-v3.pdf" says nothing about when the
@@ -6913,8 +7234,8 @@ function minJobLinksHTML(j) {
     h.push('<div class="minlink"><div class="minlinkhead"><b>' + esc(minLabel(m)) + "</b>" +
       (l.page ? '<span class="minpg">page ' + esc(l.page) + "</span>" : "") +
       '<span class="spacer"></span>' +
-      (m && m.file ? '<button class="edbtn" type="button" data-act="min-open" data-mid="' + esc(l.id) +
-        '" data-page="' + esc(l.page || "") + '">Open the minutes</button>' : "") +
+      (m && m.file ? '<button class="edbtn" type="button" data-act="minlink-see" data-li="' + li +
+        '">Show me the passage</button>' : "") +
       '<button class="edbtn" type="button" data-act="minlink-copy" data-li="' + li + '">Copy as proof</button>' +
       '<button class="xbtn" type="button" data-act="minlink-del" data-li="' + li + '" title="Unlink">✕</button></div>' +
       (l.quote ? '<blockquote class="minquote">' + esc(l.quote) + "</blockquote>" : "") + "</div>");
