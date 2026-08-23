@@ -1398,6 +1398,11 @@ body[data-view="edit"] .wrap { max-width:none; }
 .jctl .f { min-width:0; }
 .jctl select, .jctl input[type=date], .jctl input[type=text] { font:inherit; font-size:13px; padding:7px 9px;
   border:1px solid var(--line); border-radius:8px; background:var(--card); color:var(--ink); max-width:100%; }
+/* the one thing the old "Board actions" strip said that nothing else did:
+   approved work with nobody recorded against it. It belongs on the field that
+   is empty, not in a section of its own three headings further down. */
+.jctl .fwarn { display:block; margin-top:4px; font-size:11px; font-weight:650; color:var(--amber);
+  letter-spacing:0; text-transform:none; }
 .jctl .pgrp { display:flex; align-items:center; gap:9px; min-width:190px; }
 .jctl input[type=range] { flex:1; min-width:110px; accent-color:var(--accent); }
 .jctl .pval { font-size:13px; font-weight:700; color:var(--ink); font-variant-numeric:tabular-nums; width:42px; }
@@ -4901,7 +4906,9 @@ function edJobCardHTML(j, ji) {
     '" data-f="created" title="When this job was raised"></div>' +
     '<div class="f"><label>Status</label><select data-f="status">' + sopts + "</select></div>" +
     '<div class="f"><label>Decision date</label><input type="date" value="' + esc(j.statusDate || "") + '" data-f="statusDate"></div>' +
-    '<div class="f"><label>Awarded to</label><select data-f="awardedTo">' + awOpts + "</select></div>" +
+    '<div class="f"><label>Awarded to</label><select data-f="awardedTo">' + awOpts + "</select>" +
+      (APPROVED_SET[j.status || "quoted"] && !j.awardedTo
+        ? '<span class="fwarn">\u2691 Approved with no contractor recorded</span>' : "") + "</div>" +
     '<div class="f"><label>Award date</label><input type="date" value="' + esc(j.awardDate || "") + '" data-f="awardDate"></div>' +
     '<div class="f" style="flex:1;min-width:210px"><label>Site progress</label><div class="pgrp">' +
     '<input type="range" min="0" max="100" step="5" value="' + pv + '" data-f="pct" data-live="1">' +
@@ -4992,24 +4999,13 @@ function edJobCardHTML(j, ji) {
   h.push(qcCardHTML(j));       /* what each of these prices actually buys */
   h.push("</div>");
 
-  /* ---- 3. board actions ---- */
-  var voteOpen = !!(votesCache.openJobs && votesCache.openJobs[j.id]);
-  var stk = j.status || "quoted";
-  var bl = APPROVED_SET[stk]
-    ? (j.awardedTo ? "Awarded to <b>" + esc(j.awardedTo) + "</b>" + (j.awardDate ? " on " + esc(j.awardDate) : "") +
-        (stk === "completed" ? " · work complete" : "") : "Approved — no contractor recorded yet")
-    : (STOPPED_SET[stk]
-      ? statusLabel(stk) + (j.statusDate ? " on " + esc(j.statusDate) : "") + (j.statusNote ? " — " + esc(j.statusNote) : "")
-      : "Not yet before the board.");
-  h.push('<div class="jsec"><div class="jsechead"><span class="n">3</span><h4>Board actions</h4></div>' +
-    '<div class="bact"><span class="jchip st-' + esc(stk) + '">' +
-    (APPROVED_SET[stk] ? "✓ " : "") + esc(statusLabel(stk)) + "</span>" +
-    '<span class="bl">' + bl + "</span>" +
-    (VOTING_ON && voteOpen ? '<span class="qst over">🗳 Vote open</span>' : "") +
-    (VOTING_ON ? '<button class="edbtn" type="button" data-act="openvote">🗳 Board vote</button>' : "") +
-    "</div></div>");
-
-  /* ---- 4. what the board actually decided, and where it says so ---- */
+  /* ---- 3. what the board actually decided, and where it says so ----
+     There used to be a "Board actions" strip above this one, restating the
+     status chip in the header, the status dropdown at the top of the card and
+     the chip in the summary rail — the same word a fourth time — and reading
+     back the decision date, award and note from the fields directly above it.
+     The tabs already sort the jobs by status. What is left here is the only
+     thing that was ever news: what the board actually decided, in its words. */
   h.push(minJobLinksHTML(j));
   return h.join("") + "</div></div>";
 }
@@ -7263,7 +7259,7 @@ var MIN_QUOTE_MAX = 700;
 
 function minJobLinksHTML(j) {
   var links = j.minutes || [];
-  var h = ['<div class="jsec"><div class="jsechead"><span class="n">4</span><h4>Board decisions on file</h4></div>'];
+  var h = ['<div class="jsec"><div class="jsechead"><span class="n">3</span><h4>Board decisions on file</h4></div>'];
   if (!links.length)
     h.push('<p class="updempty" style="margin:2px 0 8px">Nothing linked yet. When the board decides this job, ' +
       "point at the passage in the minutes that says so.</p>");
@@ -10033,7 +10029,11 @@ function subscribeBoard(u) {
     updateReportsButton();
     if (document.body.dataset.view === "edit") renderEditor();
   }, function () {});
-  /* open-vote count for the toolbar badge + report banner (board/editor read only) */
+  /* Open-vote count for the toolbar badge + report banner (board/editor read
+     only). With voting switched off there is no badge, no banner and no button
+     — so this was a live query and a full editor re-render on every snapshot,
+     for a result that can only ever be empty. */
+  if (!VOTING_ON) { updateReportsButton(); return; }
   votesUnsub = cloud.db.collection(VOTES_COLL).where("status", "==", "open").onSnapshot(function (qs) {
     var was = votesCache.open;
     votesCache.open = qs.size;
