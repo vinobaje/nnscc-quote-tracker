@@ -1485,6 +1485,27 @@ body[data-view="edit"] .wrap { max-width:none; }
 .minvmark { position:absolute; background:rgba(255,214,0,.42); border-radius:2px;
   box-shadow:0 0 0 1px rgba(190,140,0,.45); }
 
+/* what Claude found in a meeting, before any of it is believed */
+.minrevbox { width:min(880px,96vw); max-height:92vh; display:flex; flex-direction:column; gap:0; padding:0; overflow:hidden; }
+.minrevhead { display:flex; align-items:center; gap:9px; padding:12px 14px; border-bottom:1px solid var(--line); background:var(--paper); }
+.minrevttl { font-weight:700; font-size:14px; color:var(--ink); }
+.minrevnote { padding:9px 14px; font-size:12.5px; color:var(--ink2); background:var(--card); border-bottom:1px solid var(--line-soft); }
+.minrevlist { flex:1 1 auto; overflow:auto; padding:12px 14px; background:var(--paper); }
+.minrevitem { border:1px solid var(--line); border-radius:10px; padding:11px 12px; margin:0 0 10px; background:var(--card); }
+.minrevitem.done { border-color:var(--ok,#2f855a); background:var(--ok-soft,rgba(47,133,90,.07)); }
+.minrevitem.lost { opacity:.72; border-style:dashed; }
+.minrevitem.gone { display:none; }
+.minrevhd { display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-size:13.5px; font-weight:650; color:var(--ink); }
+.minrevdec { display:inline-block; font-size:10.5px; font-weight:800; letter-spacing:.05em; text-transform:uppercase;
+  padding:2px 7px; border-radius:999px; background:var(--accent-soft); color:var(--accent); }
+.minrevdec.deferred { background:rgba(180,120,0,.12); color:#8a5a00; }
+.minrevdec.rejected, .minrevdec.cancelled { background:rgba(190,60,60,.12); color:#9b2c2c; }
+.minrevwhy { font-size:12px; color:var(--muted); margin:6px 0 0; }
+.minrevrow { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-top:9px; }
+.minrevrow select { flex:1 1 240px; min-width:0; }
+.minrevfound { font-size:11.5px; color:var(--muted); }
+.minrevfound.bad { color:#9b2c2c; font-weight:650; }
+
 /* quotes table */
 .qwrap { border:1px solid var(--line-soft); border-radius:9px; overflow-x:auto; }
 .qtable { width:100%; border-collapse:collapse; font-size:13px; }
@@ -2215,6 +2236,18 @@ body[data-view="edit"] .wrap { max-width:none; }
   </div>
 </div>
 
+<div class="overlay" id="minRevOverlay" role="dialog" aria-modal="true" aria-label="Decisions found in the minutes">
+  <div class="pinbox minrevbox">
+    <div class="minrevhead">
+      <div class="minrevttl" id="minRevTitle">Decisions in these minutes</div>
+      <span class="spacer"></span>
+      <button class="btn ghost" type="button" id="minRevClose">Close</button>
+    </div>
+    <div class="minrevnote" id="minRevNote"></div>
+    <div class="minrevlist" id="minRevBody"></div>
+  </div>
+</div>
+
 <div class="overlay" id="minViewOverlay" role="dialog" aria-modal="true" aria-label="Minutes">
   <div class="pinbox minbox">
     <div class="minvhead">
@@ -2628,7 +2661,7 @@ var BRAND_PATH = "nnsccQuoteTrackerBeta/brand";               /* the letterhead 
 var WEEKLY_DRAFT_PATH = "nnsccQuoteTrackerBeta/weeklyDraft";   /* the report she is working on */
 var WEEKLY_COLL = "nnsccWeeklyReportsBeta";                   /* every one she has finished */
 var VIEW_BETA = CURRENT_PATH.indexOf("Beta") >= 0;   /* which report the passcode gate reads/protects */
-var BUILD_STAMP = "2026-08-22 21:27";   /* filled in by build.js — which copy of the page this is */
+var BUILD_STAMP = "2026-08-23 13:26";   /* filled in by build.js — which copy of the page this is */
 /* path of the report currently on screen */
 function reportPath() {
   return cloud.active.kind === "current" ? CURRENT_PATH : (REPORTS_COLL + "/" + cloud.active.id);
@@ -5797,6 +5830,11 @@ document.getElementById("editor").addEventListener("click", function (e) {
   if (act === "ai-savekey") { aiSaveKey(); return; }
   if (act === "min-pick") { minPick(); return; }
   if (act === "min-open") { minOpen(e.target.closest("[data-mid]")); return; }
+  if (act === "min-read") {
+    var mr = e.target.closest("[data-mid]");
+    if (mr) minReadMeeting(mr.getAttribute("data-mid"));
+    return;
+  }
   if (act === "min-draft") { minToggleDraft(e.target.closest("[data-mid]")); return; }
   if (act === "min-del") { minDelete(e.target.closest("[data-mid]")); return; }
   if (act === "qc-savekey") { qcSaveKey(); return; }
@@ -7289,6 +7327,8 @@ function minCardHTML() {
       '<span class="minsub">' + (m.file ? esc(m.file.name) : "no document attached") +
       (used ? " · linked to " + used + " job" + (used === 1 ? "" : "s") : "") + "</span></div>" +
       (m.file ? '<button class="edbtn" type="button" data-act="min-open" data-mid="' + esc(m.id) + '">Open</button>' : "") +
+      (m.file ? '<button class="edbtn" type="button" data-act="min-read" data-mid="' + esc(m.id) +
+        '" title="Claude reads this meeting and suggests which jobs it decided">Read for decisions</button>' : "") +
       '<button class="edbtn" type="button" data-act="min-draft" data-mid="' + esc(m.id) + '">' +
       (m.draft ? "Mark approved" : "Mark draft") + "</button>" +
       '<button class="xbtn" type="button" data-act="min-del" data-mid="' + esc(m.id) + '" title="Remove">✕</button></div>');
@@ -7304,6 +7344,342 @@ function minUseCount(id) {
     (j.minutes || []).forEach(function (l) { if (l.id === id) n++; });
   });
   return n;
+}
+
+/* ---------- reading a meeting for the decisions in it ----------
+   Claude reads the minutes and PROPOSES links. It does not make them, and it
+   does not touch a single job. Three things keep a proposal honest:
+
+     * it quotes from the same text layer the highlighter searches, because the
+       browser pulls that text out with pdf.js and sends that rather than the
+       PDF. A model asked to quote from an image will paraphrase; a model given
+       the exact characters has no reason to;
+     * every quote is looked for in the document again, here, before she is
+       shown it. A passage that cannot be found is shown as unfindable and
+       cannot be linked at all — so a citation that would highlight nothing
+       never reaches a director;
+     * "I cannot place this" is an ordinary answer. Fuzzy matching of minute
+       wording to job titles is confidently wrong far more often than it is
+       right, so an unplaced item arrives with an empty dropdown and waits.
+
+   Nothing is written until she presses Link it, one item at a time. */
+var minRev = { mid: "", label: "", items: [], pages: [], note: "", busy: false };
+
+function minReadMeeting(mid) {
+  var m = minById(mid);
+  if (!m || !m.file || !cloud.store) { alert("That document is not on file."); return; }
+  if (!isEditor()) return;
+  minRev = { mid: mid, label: minLabel(m), items: [], pages: [], busy: true,
+             note: "Opening the document…" };
+  document.getElementById("minRevTitle").textContent = "Decisions in the minutes of " + minRev.label;
+  document.getElementById("minRevOverlay").classList.add("open");
+  minRevRender();
+
+  minPdfLoad()
+    .then(function (pdfjs) {
+      return cloud.store.ref(m.file.path).getDownloadURL().then(function (url) {
+        return pdfjs.getDocument({ url: url }).promise;
+      });
+    })
+    .then(function (doc) {
+      minRev.note = "Reading " + doc.numPages + " page" + (doc.numPages === 1 ? "" : "s") + "…";
+      minRevRender();
+      var chain = Promise.resolve();
+      for (var n = 1; n <= doc.numPages; n++) (function (pn) {
+        chain = chain.then(function () {
+          return doc.getPage(pn).then(function (pg) { return pg.getTextContent(); })
+            .then(function (tc) {
+              var idx = minPageIndex(tc.items);
+              minRev.pages.push({ n: pn, text: idx.text, idx: idx });
+            });
+        });
+      })(n);
+      return chain.then(function () { return doc; });
+    })
+    .then(function (doc) {
+      var total = minRev.pages.reduce(function (a, p) { return a + p.text.length; }, 0);
+      if (total < 200) {
+        minRev.busy = false;
+        minRev.note = "There is no readable text in this PDF — it is a scan of a printed page. " +
+          "The highlight cannot work on a scan either, so file a copy saved straight from Word.";
+        minRevRender(); return null;
+      }
+      minRev.note = "Claude is reading the meeting. Nothing will be changed — it comes back with " +
+        "suggestions for you to accept or refuse.";
+      minRevRender();
+      /* pages sorted, because the chain above appends in order but a retry may not */
+      minRev.pages.sort(function (a, b) { return a.n - b.n; });
+      return cloud.fns.httpsCallable("nnsccTrackerAi")({
+        minutes: true,
+        label: minRev.label,
+        pages: minRev.pages.map(function (p) { return { n: p.n, text: p.text }; }),
+        jobs: minRevJobs()
+      });
+    })
+    .then(function (res) {
+      if (!res) return;
+      minRev.busy = false;
+      var items = (res.data && res.data.items) || [];
+      minRev.items = items.map(minRevVerify).filter(function (it) { return !!it; });
+      var lost = minRev.items.filter(function (it) { return !it.found; }).length;
+      minRev.note = minRev.items.length
+        ? "Claude read " + minRev.pages.length + " page" + (minRev.pages.length === 1 ? "" : "s") +
+          " and found " + minRev.items.length + " decision" + (minRev.items.length === 1 ? "" : "s") +
+          " about work on the building. Nothing has been changed. Link the ones that are right." +
+          (lost ? " " + lost + " could not be found again in the document and cannot be linked." : "")
+        : "Claude found nothing in this meeting that decides work on the building.";
+      minRevRender();
+    })
+    .catch(function (e) {
+      minRev.busy = false;
+      minRev.note = "Could not read the meeting (" + ((e && e.message) || "error") + "). Nothing was changed.";
+      minRevRender();
+    });
+}
+
+/* what the model is told about the jobs it may point at */
+function minRevJobs() {
+  return (state.jobs || []).filter(function (j) { return !j.archived; }).map(function (j) {
+    var who = (j.bids || []).map(function (b) { return ((b && b.contractor) || "").trim(); })
+      .filter(Boolean).join(", ");
+    var amt = "";
+    try { var c = jobCalc(j); if (c && c.cost) amt = money(c.cost); } catch (e) {}
+    return { id: j.id, no: j.no, desc: String(j.desc || "").slice(0, 200),
+             status: statusLabel(j.status || "quoted"), who: who.slice(0, 120), amount: amt };
+  });
+}
+
+/* The proposal is not believed until the passage is found again. It is looked
+   for on the page the model named, and then everywhere else — a page number can
+   be off by one where a header is repeated, but the sentence either exists or
+   it does not. */
+function minRevVerify(raw) {
+  var quote = String((raw && raw.quote) || "").trim();
+  if (!quote) return null;
+  var want = parseInt(raw.page, 10) || 0;
+  var best = { cover: 0, text: "", n: 0 };
+  minRev.pages.forEach(function (p) {
+    var sp = minRevSpan(p.idx, quote);
+    /* the page the minutes named wins a tie: a header repeated on two pages
+       can match equally well on both */
+    if (sp.cover > best.cover || (sp.cover === best.cover && p.n === want && sp.cover > 0)) {
+      best = { cover: sp.cover, text: sp.text, n: p.n };
+    }
+  });
+  var found = best.cover >= MINREV_COVER ? best.n : 0;
+  var span = "";
+  /* A minute item can run over a page break. Neither page then holds enough of
+     it on its own, and refusing it would lose exactly the long decisions that
+     matter most. So consecutive pages are tried as one, and the highlight is
+     anchored where most of the passage lies. */
+  if (!found) {
+    for (var i = 0; i + 1 < minRev.pages.length; i++) {
+      var a = minRev.pages[i], b = minRev.pages[i + 1];
+      var pair = minRevSpan({ text: a.idx.text + " " + b.idx.text, map: [] }, quote);
+      if (pair.cover >= MINREV_COVER) {
+        var ca = minRevSpan(a.idx, quote), cb = minRevSpan(b.idx, quote);
+        found = ca.cover >= cb.cover ? a.n : b.n;
+        best = { cover: pair.cover, text: pair.text, n: found };
+        span = "pages " + a.n + "–" + b.n;
+        break;
+      }
+    }
+  }
+  var jid = String(raw.job_id || "");
+  if (jid && !jobById(jid)) jid = "";
+  return { heading: String(raw.heading || "").slice(0, 160),
+           /* the document's words, not the model's */
+           quote: found && best.text ? best.text : quote,
+           said: quote, page: want, found: found, cover: best.cover,
+           moved: found && want && found !== want ? want : 0, across: span,
+           decision: String(raw.decision || "other"), jobId: jid,
+           why: String(raw.why || "").slice(0, 300), linked: false, skipped: false };
+}
+/* How much of the passage is on this page, and — the point of it — the page's
+   OWN words for that passage.
+
+   The model chooses WHERE the decision is. It never supplies WHAT the board is
+   shown: the passage stored against the job is lifted out of the PDF's text
+   layer between the first and last words that matched. So a model that quietly
+   improves a sentence, or writes "declined" where the minutes say "deferred",
+   changes nothing a director ever reads — its version is used to find the
+   place and is then thrown away.
+
+   Coverage still matters, because it is what says the model found a real
+   passage rather than half-invented one. The viewer is deliberately forgiving
+   — a manager pastes a sentence and a mangled paste should still highlight —
+   but a proposal is held to nearly all of it or none. */
+var MINREV_COVER = 0.95;
+function minRevSpan(idx, quote) {
+  var wanted = minNorm(quote).split(" ").length;
+  if (!wanted) return { cover: 0, text: "" };
+  var runs = minFindRuns(idx, quote), marked = 0;
+  runs.forEach(function (r) { marked += r.words; });
+  var cover = Math.min(1, marked / wanted);
+  if (!runs.length) return { cover: cover, text: "" };
+  var a = runs[0].at, last = runs[runs.length - 1];
+  var b = last.at + last.len;
+  var span = idx.text.slice(a, b);
+  /* Between two matched runs there can be a running header the passage never
+     contained. A little of that is the passage's own missing word and belongs;
+     a lot of it is another part of the page, so the runs are shown as the
+     separate pieces they are rather than swallowing what sits between them. */
+  if (span.length > minNorm(quote).length * 1.3) {
+    span = runs.map(function (r) { return idx.text.slice(r.at, r.at + r.len); }).join(" … ");
+  }
+  return { cover: cover, text: span };
+}
+function minRevPage(n) {
+  for (var i = 0; i < minRev.pages.length; i++) if (minRev.pages[i].n === n) return minRev.pages[i];
+  return null;
+}
+function jobById(id) {
+  var out = null;
+  (state.jobs || []).forEach(function (j) { if (j.id === id) out = j; });
+  return out;
+}
+/* the same passage already cited on the same job — reading a meeting twice
+   should not double every link in it */
+function minRevAlready(jid, quote) {
+  var j = jobById(jid);
+  if (!j) return false;
+  var q = minNorm(quote).slice(0, 120);
+  return (j.minutes || []).some(function (l) {
+    return l.id === minRev.mid && minNorm(l.quote || "").slice(0, 120) === q;
+  });
+}
+
+var MINREV_STATUS = { approved: "approved", deferred: "deferred",
+                      rejected: "rejected", cancelled: "cancelled" };
+
+function minRevRender() {
+  var note = document.getElementById("minRevNote");
+  var body = document.getElementById("minRevBody");
+  if (!note || !body) return;
+  note.textContent = minRev.note || "";
+  if (minRev.busy) { body.innerHTML = '<p class="updempty">Working…</p>'; return; }
+  if (!minRev.items.length) { body.innerHTML = ""; return; }
+
+  var opts = '<option value="">— which job is this? —</option>' +
+    (state.jobs || []).filter(function (j) { return !j.archived; }).map(function (j) {
+      return '<option value="' + esc(j.id) + '">Job ' + esc(j.no) + " — " +
+        esc(String(j.desc || "(untitled)").slice(0, 70)) + "</option>";
+    }).join("");
+
+  var h = [];
+  minRev.items.forEach(function (it, ri) {
+    if (it.skipped) return;
+    h.push('<div class="minrevitem ' + (it.linked ? "done" : (it.found ? "" : "lost")) + '" data-ri="' + ri + '">');
+    h.push('<div class="minrevhd"><span class="minrevdec ' + esc(it.decision) + '">' +
+      esc(it.decision) + "</span><span>" + esc(it.heading || "Decision") + "</span></div>");
+    h.push('<blockquote class="minquote">' + esc(it.quote) + "</blockquote>");
+    h.push('<div class="minrevfound' + (it.found ? "" : " bad") + '">' +
+      (it.found
+        ? (it.across
+            ? "Found across " + it.across + " — it will highlight from page " + it.found
+            : it.moved
+              ? "Found on page " + it.found + " (Claude said page " + it.moved + ")"
+              : "Found on page " + it.found + " — it will highlight")
+        : (it.cover > 0.4
+            ? "Only " + Math.round(it.cover * 100) + "% of these words are in the document — " +
+              "the rest was not copied out of it, so this one cannot be linked"
+            : "These words are not in the document — this one cannot be linked")) + "</div>");
+    if (it.found && minNorm(it.said) !== minNorm(it.quote))
+      h.push('<div class="minrevfound">Claude\u2019s wording differed slightly; the passage above is ' +
+        "the document\u2019s own, taken from the page.</div>");
+    if (it.why) h.push('<p class="minrevwhy">' + esc(it.why) + "</p>");
+
+    if (it.linked) {
+      var lj = jobById(it.jobId);
+      h.push('<div class="minrevrow"><span class="minrevfound">Linked to ' +
+        esc(lj ? jobLabel(lj) : "the job") + ".</span>");
+      /* The minutes say one thing and the job still says another. She is told,
+         and given the button — the app does not press it. */
+      var want = MINREV_STATUS[it.decision];
+      if (lj && want && (lj.status || "quoted") !== want) {
+        h.push('<button class="edbtn" type="button" data-act="minrev-status" data-ri="' + ri + '">' +
+          "This job still says " + esc(statusLabel(lj.status || "quoted")) + " — mark it " +
+          esc(statusLabel(want)) + "?</button>");
+      }
+      h.push("</div>");
+    } else if (it.found) {
+      h.push('<div class="minrevrow"><select data-ri="' + ri + '">' +
+        opts.replace('value="' + esc(it.jobId) + '"', 'value="' + esc(it.jobId) + '" selected') + "</select>" +
+        '<button class="btn" type="button" data-act="minrev-link" data-ri="' + ri + '">Link it</button>' +
+        '<button class="edbtn" type="button" data-act="minrev-see" data-ri="' + ri + '">Show me the passage</button>' +
+        '<button class="edbtn" type="button" data-act="minrev-skip" data-ri="' + ri + '">Not this</button></div>');
+      if (!it.jobId)
+        h.push('<div class="minrevfound">Claude could not tell which job this is. Choose it yourself, ' +
+          "or leave it — an unlinked decision is better than a wrong one.</div>");
+      if (it.jobId && minRevAlready(it.jobId, it.quote))
+        h.push('<div class="minrevfound">This passage is already linked to that job.</div>');
+    } else {
+      h.push('<div class="minrevrow"><button class="edbtn" type="button" data-act="minrev-skip" ' +
+        'data-ri="' + ri + '">Dismiss</button></div>');
+    }
+    h.push("</div>");
+  });
+  body.innerHTML = h.join("") ||
+    '<p class="updempty">Nothing left to review — every item was linked or set aside.</p>';
+}
+
+document.getElementById("minRevOverlay").addEventListener("change", function (e) {
+  var sel = e.target.closest("select[data-ri]");
+  if (!sel) return;
+  var it = minRev.items[+sel.dataset.ri];
+  if (it) { it.jobId = sel.value; minRevRender(); }
+});
+document.getElementById("minRevOverlay").addEventListener("click", function (e) {
+  if (e.target === this) { this.classList.remove("open"); return; }
+  var el = e.target.closest("[data-act]");
+  if (!el) return;
+  var it = minRev.items[+el.dataset.ri];
+  var act = el.dataset.act;
+  if (act === "minrev-skip") { if (it) { it.skipped = true; minRevRender(); } return; }
+  if (act === "minrev-see") {
+    if (it && it.found) minViewOpen(minRev.mid, it.found, it.quote, minRev.label + " · page " + it.found);
+    return;
+  }
+  if (act === "minrev-link") {
+    if (!it || !it.found) return;
+    var sel = el.closest(".minrevitem").querySelector("select[data-ri]");
+    var jid = (sel && sel.value) || it.jobId;
+    if (!jid) { alert("Choose the job this decision belongs to first."); return; }
+    var j = jobById(jid);
+    if (!j) return;
+    if (minRevAlready(jid, it.quote)) { it.jobId = jid; it.linked = true; minRevRender(); return; }
+    j.minutes = j.minutes || [];
+    j.minutes.push({ id: minRev.mid, page: it.found, quote: minRevCut(it.quote), at: todayISO() });
+    it.jobId = jid; it.linked = true;
+    persist(null, [jobLabel(j) + ": linked to the minutes of " + minRev.label], j.id);
+    renderEditor(); minRevRender();
+    return;
+  }
+  /* her click, not the model's: the status changes here and nowhere else in
+     this whole feature */
+  if (act === "minrev-status") {
+    if (!it) return;
+    var sj = jobById(it.jobId);
+    var st = MINREV_STATUS[it.decision];
+    if (!sj || !st) return;
+    if (!confirm("Mark " + jobLabel(sj) + " as " + statusLabel(st) + "?\n\nThe minutes of " +
+      minRev.label + " record it that way. Nothing else will change.")) return;
+    sj.status = st;
+    if (!sj.statusDate) sj.statusDate = minById(minRev.mid) && minById(minRev.mid).date ? minById(minRev.mid).date : todayISO();
+    persist(null, [jobLabel(sj) + " marked " + statusLabel(st) + " (from the minutes of " + minRev.label + ")"], sj.id);
+    renderEditor(); renderReport(); minRevRender();
+    return;
+  }
+});
+document.getElementById("minRevClose").onclick = function () {
+  document.getElementById("minRevOverlay").classList.remove("open");
+};
+/* cut at a word so the stored passage still reads as a sentence */
+function minRevCut(q) {
+  if (q.length <= MIN_QUOTE_MAX) return q;
+  var cut = q.slice(0, MIN_QUOTE_MAX);
+  var sp = cut.lastIndexOf(" ");
+  return (sp > MIN_QUOTE_MAX - 80 ? cut.slice(0, sp) : cut) + "…";
 }
 
 var conState = { list: [] }, conUnsub = null;

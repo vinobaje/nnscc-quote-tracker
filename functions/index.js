@@ -200,6 +200,62 @@ const SCHEDULE_SCHEMA = {
   additionalProperties: false,
 };
 
+// Reading a board meeting for the decisions it records about work on the
+// building. Three rules make this safe enough to put in front of a director:
+//   * the quote must be copied out of the page text word for word, because the
+//     report finds it again in the PDF and highlights what it finds — a
+//     paraphrase highlights nothing and is thrown away before she sees it;
+//   * "I cannot place this" is a correct answer, not a failure. Fuzzy matching
+//     of minute wording to job titles is confidently wrong: "Leak in unit
+//     550-912" is not "Repairs unit 550-318", and a wrong citation shown to a
+//     board is worse than no citation;
+//   * nothing here changes a job. The reply is a list of proposals; the
+//     property manager accepts them one at a time.
+const MINUTES_SYSTEM =
+  "You read the minutes of a condominium board meeting and list the decisions the board recorded " +
+  "about work on the building: quotes approved, work deferred or declined, contracts awarded, " +
+  "expenditure authorised, work called off.\n\n" +
+  "RULES, in order of importance:\n" +
+  "1. `quote` MUST be copied from the supplied page text character for character — no paraphrase, no " +
+  "tidying, no ellipsis, no correcting of spelling or punctuation. Copy the whole passage that records " +
+  "the decision, including its numbered heading if it has one. If you cannot copy an exact passage, omit " +
+  "the item entirely.\n" +
+  "2. `page` is the page number the passage was printed on, as labelled in the supplied text.\n" +
+  "3. `job_id` must be exactly one of the ids in the job list, or the empty string. Use an id ONLY when " +
+  "the passage is plainly about that same job — the same location, the same equipment, the same " +
+  "contractor, the same amount. Unit numbers, floor numbers and amounts must match, not merely " +
+  "resemble each other. If two jobs could fit, or none clearly does, return \"\" and say why in " +
+  "`why`. Returning \"\" is a correct, expected answer and is much better than a plausible guess.\n" +
+  "4. `decision` is what the board did: approved, deferred, rejected, cancelled, discussed (raised but " +
+  "not decided) or other.\n" +
+  "5. `heading` is a short plain-English label for the item, in your own words — this one is not a quote.\n" +
+  "6. `why` is one short sentence: why this passage belongs to that job, or why you could not place it.\n" +
+  "Skip routine business that is not about work on the building — minutes approved, meeting adjourned, " +
+  "elections, correspondence noted. List at most 40 items.";
+const MINUTES_SCHEMA = {
+  type: "object",
+  properties: {
+    items: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          heading: { type: "string" },
+          quote: { type: "string" },
+          page: { type: ["number", "null"] },
+          decision: { type: "string", enum: ["approved", "deferred", "rejected", "cancelled", "discussed", "other"] },
+          job_id: { type: "string" },
+          why: { type: "string" },
+        },
+        required: ["heading", "quote", "page", "decision", "job_id", "why"],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ["items"],
+  additionalProperties: false,
+};
+
 // Two prices for one job are not two prices for the same thing. One quote covers
 // a single extinguisher, the next covers two and the cabinet; one carries ten
 // years on a waterproofing membrane and the next says nothing. The report used to
@@ -590,6 +646,44 @@ exports.nnsccTrackerAi = onCall(
           CONTRACT_SCHEMA, 1500, CONTRACT_MODEL);
       }
       throw new HttpsError("invalid-argument", "Unsupported file — a contract must be a PDF or a Word .docx file.");
+    }
+
+    // ----- mode: read a filed meeting for the decisions it records -----
+    // The pages arrive as text the browser already pulled out of the PDF with
+    // pdf.js — the very text layer the highlighter searches. Sending that
+    // rather than the PDF means the model is quoting from the same copy the
+    // highlight is found in, so a quote that comes back either matches or is
+    // discarded before anyone sees it.
+    if (request.data && request.data.minutes === true) {
+      const pages = Array.isArray(request.data.pages) ? request.data.pages : [];
+      if (!pages.length) throw new HttpsError("invalid-argument", "No pages were provided.");
+      let body = "", used = 0;
+      for (const pg of pages) {
+        const t = String((pg && pg.text) || "").trim();
+        if (!t) continue;
+        const chunk = "\n\n===== PAGE " + (Number(pg.n) || used + 1) + " =====\n" + t;
+        if (body.length + chunk.length > 140000) break;
+        body += chunk; used++;
+      }
+      if (!body.trim()) {
+        throw new HttpsError("invalid-argument",
+          "There is no readable text in that PDF — it is a scan of a printed page. " +
+          "Highlighting cannot work on a scan either, so file a copy saved from Word.");
+      }
+      const jobs = (Array.isArray(request.data.jobs) ? request.data.jobs : []).slice(0, 200);
+      const jobList = jobs.length
+        ? jobs.map((j) => "  " + String(j.id || "") + " | job " + String(j.no || "") + " | " +
+            String(j.desc || "(untitled)") + " | now: " + String(j.status || "") +
+            (j.who ? " | quoted by " + String(j.who) : "") +
+            (j.amount ? " | " + String(j.amount) : "")).join("\n")
+        : "  (no jobs are open)";
+      return await callClaude(key, MINUTES_SYSTEM,
+        "The meeting is " + String(request.data.label || "a board meeting") + ".\n\n" +
+        "The jobs currently tracked, as `id | job no | description | status`:\n" + jobList +
+        "\n\nThe minutes, page by page:" + body +
+        "\n\nList the decisions this meeting recorded about work on the building. " +
+        "Copy each passage word for word from the text above.",
+        MINUTES_SCHEMA, 12000, CONTRACT_MODEL);
     }
 
     // ----- mode: compare the quotes on one job (what each price actually buys) -----
