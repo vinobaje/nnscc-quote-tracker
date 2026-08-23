@@ -7362,7 +7362,11 @@ function minUseCount(id) {
        wording to job titles is confidently wrong far more often than it is
        right, so an unplaced item arrives with an empty dropdown and waits.
 
-   Nothing is written until she presses Link it, one item at a time. */
+   Nothing is written until she presses Link it, one item at a time, and what
+   is written is a citation and only ever a citation. No job's status changes
+   anywhere in this feature — not automatically, and not by a button offered
+   here. A meeting is evidence of what the board decided; deciding that the
+   record should now say so is hers, on the job card, as it was before. */
 var minRev = { mid: "", label: "", items: [], pages: [], note: "", busy: false };
 
 function minReadMeeting(mid) {
@@ -7549,9 +7553,6 @@ function minRevAlready(jid, quote) {
   });
 }
 
-var MINREV_STATUS = { approved: "approved", deferred: "deferred",
-                      rejected: "rejected", cancelled: "cancelled" };
-
 function minRevRender() {
   var note = document.getElementById("minRevNote");
   var body = document.getElementById("minRevBody");
@@ -7590,18 +7591,13 @@ function minRevRender() {
     if (it.why) h.push('<p class="minrevwhy">' + esc(it.why) + "</p>");
 
     if (it.linked) {
+      /* The passage is attached and that is the whole of it. Where the minutes
+         and the job disagree the app says nothing: reading a meeting must never
+         become a way of being nudged into changing a status, and the job card
+         is where a status is set. */
       var lj = jobById(it.jobId);
       h.push('<div class="minrevrow"><span class="minrevfound">Linked to ' +
-        esc(lj ? jobLabel(lj) : "the job") + ".</span>");
-      /* The minutes say one thing and the job still says another. She is told,
-         and given the button — the app does not press it. */
-      var want = MINREV_STATUS[it.decision];
-      if (lj && want && (lj.status || "quoted") !== want) {
-        h.push('<button class="edbtn" type="button" data-act="minrev-status" data-ri="' + ri + '">' +
-          "This job still says " + esc(statusLabel(lj.status || "quoted")) + " — mark it " +
-          esc(statusLabel(want)) + "?</button>");
-      }
-      h.push("</div>");
+        esc(lj ? jobLabel(lj) : "the job") + ".</span></div>");
     } else if (it.found) {
       h.push('<div class="minrevrow"><select data-ri="' + ri + '">' +
         opts.replace('value="' + esc(it.jobId) + '"', 'value="' + esc(it.jobId) + '" selected') + "</select>" +
@@ -7653,21 +7649,6 @@ document.getElementById("minRevOverlay").addEventListener("click", function (e) 
     it.jobId = jid; it.linked = true;
     persist(null, [jobLabel(j) + ": linked to the minutes of " + minRev.label], j.id);
     renderEditor(); minRevRender();
-    return;
-  }
-  /* her click, not the model's: the status changes here and nowhere else in
-     this whole feature */
-  if (act === "minrev-status") {
-    if (!it) return;
-    var sj = jobById(it.jobId);
-    var st = MINREV_STATUS[it.decision];
-    if (!sj || !st) return;
-    if (!confirm("Mark " + jobLabel(sj) + " as " + statusLabel(st) + "?\n\nThe minutes of " +
-      minRev.label + " record it that way. Nothing else will change.")) return;
-    sj.status = st;
-    if (!sj.statusDate) sj.statusDate = minById(minRev.mid) && minById(minRev.mid).date ? minById(minRev.mid).date : todayISO();
-    persist(null, [jobLabel(sj) + " marked " + statusLabel(st) + " (from the minutes of " + minRev.label + ")"], sj.id);
-    renderEditor(); renderReport(); minRevRender();
     return;
   }
 });
