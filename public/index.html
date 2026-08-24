@@ -414,6 +414,17 @@ input:focus, select:focus { outline:2px solid var(--accent); outline-offset:-1px
 .progmedia .pmchip img { width:34px; height:34px; object-fit:cover; border-radius:5px; }
 .progmedia .pmchip .nm { max-width:150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .progmedia .pmchip .fx { cursor:pointer; color:var(--prio); font-weight:700; padding:0 2px; }
+.progmedia .pmchip .nm { display:flex; flex-direction:column; line-height:1.25; }
+.progmedia .pmchip small { font-size:10.5px; color:var(--muted); font-variant-numeric:tabular-nums; }
+.progmedia .pmchip.busy { border-style:dashed; opacity:.85; }
+/* compressing a video runs at real time, so it needs somewhere to say so that
+   does not trap her in a modal while it works */
+.edbusy { position:fixed; left:50%; bottom:22px; transform:translateX(-50%); z-index:80;
+  background:var(--ink); color:#fff; font-size:12.5px; font-weight:600; padding:9px 15px;
+  border-radius:999px; box-shadow:0 8px 24px rgba(0,0,0,.28); max-width:min(520px,92vw);
+  text-align:center; }
+
+
 .histbox { width:min(560px, 92vw); }
 .histlist { max-height:min(420px, 60vh); overflow-y:auto; margin:10px 0 4px; }
 .histentry { border-top:1px solid var(--line-soft); padding:9px 2px; }
@@ -2161,6 +2172,7 @@ body[data-view="edit"] .wrap { max-width:none; }
   <input type="file" id="fileAttach" accept=".pdf,.png,.jpg,.jpeg,.webp,.heic,.doc,.docx,.xls,.xlsx,.eml,.txt" style="display:none">
   <input type="file" id="minFile" accept=".pdf" style="display:none">
   <input type="file" id="progMediaFile" accept="image/*,video/*" multiple style="display:none">
+  <input type="file" id="updMediaFile" accept="image/*,video/*" multiple style="display:none">
   <input type="file" id="aiIntakeFile" accept=".pdf,.docx" style="display:none">
 </div></div>
 
@@ -2666,7 +2678,7 @@ var BRAND_PATH = "nnsccQuoteTracker/brand";               /* the letterhead the 
 var WEEKLY_DRAFT_PATH = "nnsccQuoteTracker/weeklyDraft";   /* the report she is working on */
 var WEEKLY_COLL = "nnsccWeeklyReports";                   /* every one she has finished */
 var VIEW_BETA = CURRENT_PATH.indexOf("Beta") >= 0;   /* which report the passcode gate reads/protects */
-var BUILD_STAMP = "2026-08-23 14:07";   /* filled in by build.js — which copy of the page this is */
+var BUILD_STAMP = "2026-08-24 09:26";   /* filled in by build.js — which copy of the page this is */
 /* path of the report currently on screen */
 function reportPath() {
   return cloud.active.kind === "current" ? CURRENT_PATH : (REPORTS_COLL + "/" + cloud.active.id);
@@ -4933,6 +4945,7 @@ function edJobCardHTML(j, ji) {
         ((u.media && u.media.length) ? '<span class="qst hi" data-attstash="' + fvStashRef(u.media) +
           '" data-attcap="' + esc(u.d || "") + ' site update" style="cursor:pointer" title="View the photos on this update">📎 ' +
           u.media.length + "</span>" : "") +
+        '<button class="edbtn" data-act="updmedia" title="Add photos or a video to this update">📎</button>' +
         '<button class="xbtn" data-act="delupd" title="Remove this update">✕</button></div>');
     });
     h.push("</div>");
@@ -5871,6 +5884,15 @@ document.getElementById("editor").addEventListener("click", function (e) {
     persist(); renderEditor(); renderReport();
     var nc = document.querySelector('#editor .ecard[data-jid="' + auj.id + '"] [data-ui]:last-of-type input[data-f="upd-t"]');
     if (nc) nc.focus();
+    return;
+  }
+  if (act === "updmedia") {
+    var muc = e.target.closest(".ecard"), mur = e.target.closest("[data-ui]");
+    if (!muc || !mur) return;
+    var muj = state.jobs[+muc.dataset.ji]; if (!muj || !muj.updates) return;
+    if (!cloud.store) { alert("Photos and videos need the cloud site."); return; }
+    updMediaFor = { jid: muj.id, ui: +mur.dataset.ui };
+    document.getElementById("updMediaFile").click();
     return;
   }
   if (act === "delupd") {
@@ -9284,8 +9306,349 @@ function aiIntakeCommit() {
   intakeStatus("Added as job " + nj.no + " — the full details are in the list below.");
 }
 
+/* ---------- making a phone's camera fit a condominium's budget ----------
+   A photo off an iPhone is four megabytes and a thirty-second clip of a leak
+   is well over a hundred. None of that is stored: Firestore holds only the
+   path (a document caps at 1 MB, so it could not hold a video if we wanted it
+   to), and the file itself goes to Storage, which is billed by the gigabyte
+   held and by the gigabyte sent — every time a director opens the report.
+
+   So the browser shrinks it before a byte leaves the building. A photo is
+   redrawn at 1600px and re-encoded as JPEG; a video is played through a canvas
+   at 720p and re-recorded at a bitrate calculated to land the whole clip inside
+   a fixed budget, whatever its length. What the board needs to see is a crack,
+   a puddle, a crew on site — none of which needs 4K.
+
+   Nothing here is trusted to work. Every path can hand back the original file
+   instead, and the only hard rule is the one at the end: if the result will not
+   fit, she is told so plainly rather than watching an upload fail. */
+var MEDIA_IMG_MAX = 1600;                    /* px on the long side */
+var MEDIA_IMG_Q   = 0.82;
+var MEDIA_VID_MAX = 1280;                    /* 720p, in either orientation */
+var MEDIA_VID_FPS = 24;
+/* The storage rule refuses anything at or over 15 MB. Aiming at 11 leaves room
+   for the container overhead and for a bitrate that overshoots slightly. */
+var MEDIA_BUDGET  = 11 * 1024 * 1024;
+var MEDIA_VID_MIN = 500000;                  /* below this the picture is mush */
+var MEDIA_SRC_MAX = 600 * 1024 * 1024;       /* what we will even try to read */
+
+/* one file in, one file out, and a sentence saying what happened to it */
+function mediaShrink(file, onProg) {
+  if (!file) return Promise.resolve(null);
+  if (file.size > MEDIA_SRC_MAX)
+    return Promise.reject(new Error("“" + file.name + "” is " + fvSize(file.size) +
+      " — too big to even open. Trim it on the phone first."));
+  var isVid = /^video\//.test(file.type || "");
+  var work = isVid ? mediaVideo(file, onProg) : mediaImage(file);
+  return work.catch(function () { return null; }).then(function (out) {
+    /* a shrink that made it bigger is not a shrink */
+    if (!out || out.size >= file.size) out = null;
+    var kept = out || file;
+    if (kept.size >= MEDIA_BUDGET + 2 * 1024 * 1024) {
+      /* Too big is two different problems wearing the same number. Either it
+         was compressed and is still huge — a long clip — or this browser could
+         not read the file at all and handed it back untouched, which is what
+         an iPhone's HEVC video does everywhere except Safari. Saying "trim it"
+         to someone whose thirty-second clip was never opened sends them to fix
+         the wrong thing. */
+      throw new Error(out
+        ? "“" + file.name + "” is still " + fvSize(kept.size) + " after compressing" +
+          (isVid ? " — it is too long. Trim it to about two minutes." : ".")
+        : "This browser cannot open “" + file.name + "” to compress it, and at " +
+          fvSize(kept.size) + " it is too big to file as it is." +
+          (isVid ? " iPhone video is the usual reason: open the report in Safari, or set " +
+                   "Camera → Formats to “Most Compatible” on the phone." : ""));
+    }
+    return { file: kept, from: file.size,
+             note: out ? fvSize(file.size) + " → " + fvSize(kept.size)
+                       : fvSize(kept.size) + " (kept as it is)" };
+  });
+}
+
+/* A photo: redrawn at 1600px and re-encoded. createImageBitmap is asked to
+   apply the EXIF rotation, because a picture taken sideways and stored
+   sideways is how a wall ends up on its back in the board's report. */
+function mediaImage(file) {
+  return mediaBitmap(file).then(function (bmp) {
+    var scale = Math.min(1, MEDIA_IMG_MAX / Math.max(bmp.width, bmp.height));
+    if (scale === 1 && file.size < 900 * 1024) { mediaClose(bmp); return null; }
+    var cv = document.createElement("canvas");
+    cv.width = Math.round(bmp.width * scale);
+    cv.height = Math.round(bmp.height * scale);
+    cv.getContext("2d").drawImage(bmp, 0, 0, cv.width, cv.height);
+    mediaClose(bmp);
+    return new Promise(function (res) {
+      cv.toBlob(function (b) {
+        res(b ? new File([b], mediaRename(file.name, "jpg"), { type: "image/jpeg" }) : null);
+      }, "image/jpeg", MEDIA_IMG_Q);
+    });
+  });
+}
+function mediaBitmap(file) {
+  if (window.createImageBitmap) {
+    try {
+      return createImageBitmap(file, { imageOrientation: "from-image" })
+        .catch(function () { return mediaImgEl(file); });
+    } catch (e) { /* older signature: no options argument */ }
+  }
+  return mediaImgEl(file);
+}
+function mediaImgEl(file) {
+  return new Promise(function (res, rej) {
+    var url = URL.createObjectURL(file), im = new Image();
+    im.onload = function () { URL.revokeObjectURL(url); res(im); };
+    im.onerror = function () { URL.revokeObjectURL(url); rej(new Error("unreadable image")); };
+    im.src = url;
+  });
+}
+function mediaClose(b) { try { if (b.close) b.close(); } catch (e) {} }
+function mediaRename(name, ext) {
+  return String(name || "clip").replace(/\.[^.]+$/, "") + "." + ext;
+}
+
+/* A video: played once, drawn frame by frame into a canvas at 720p, and
+   re-recorded off that canvas. It runs at real time — a thirty-second clip
+   takes thirty seconds — which is why the caller shows a percentage.
+
+   The bitrate is not a constant but a division: whatever will fit the whole
+   clip inside the budget. A ten-second clip gets the good rate; a two-minute
+   one gets what is left over. Below the floor the picture stops being worth
+   keeping, so the file is refused rather than stored as a smear.
+
+   Audio is taken when the browser will give it and dropped when it will not.
+   A site video is watched for what it shows. */
+/* A file written by a browser's own recorder carries no duration in its header
+   — it was a live stream when it was written — and reports Infinity. The
+   obvious repair is to seek past the end and let the browser work the length
+   out. Do not: such a file has no seek index either, so the playhead does not
+   come home, and what comes back is half a second of a four-second clip with
+   nothing reporting a fault. Measured: source 3.93s in, 0.45s out.
+
+   An unmeasurable clip is therefore given the middling bitrate and checked
+   against the budget at the end like everything else, and the playhead is
+   never touched. Phone video — which is all of this in practice — states its
+   duration up front and gets the rate calculated for its length. */
+function mediaDuration(v) {
+  return isFinite(v.duration) && v.duration > 0 ? v.duration : 0;
+}
+/* Does the compressed clip still run as long as the one it replaces? Only
+   answerable when the source stated its own length; when it did not, the
+   compression is taken on trust, because there is nothing to compare it to. */
+function mediaHolds(out, srcDur) {
+  if (!(srcDur > 0)) return Promise.resolve(true);
+  return new Promise(function (res) {
+    var v = document.createElement("video");
+    var url = URL.createObjectURL(out);
+    function give(ok) { try { URL.revokeObjectURL(url); } catch (e) {} res(ok); }
+    v.onloadedmetadata = function () {
+      give(isFinite(v.duration) ? v.duration >= srcDur * 0.8 : true);
+    };
+    v.onerror = function () { give(false); };
+    setTimeout(function () { give(true); }, 8000);
+    v.preload = "metadata"; v.src = url;
+  });
+}
+function mediaVideo(file, onProg) {
+  return new Promise(function (resolve) {
+    var canRecord = window.MediaRecorder && HTMLCanvasElement.prototype.captureStream;
+    if (!canRecord) return resolve(null);
+    /* Plain container names only. Pinning the codecs — avc1.42E01E with
+       mp4a.40.2 — is accepted by isTypeSupported and then fails half a second
+       into the recording with an EncodingError, which is exactly as useful as
+       it sounds. Let the browser choose. */
+    var mime = ["video/mp4", "video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm"]
+      .filter(function (t) { try { return MediaRecorder.isTypeSupported(t); } catch (e) { return false; } })[0];
+    if (!mime) return resolve(null);
+
+    var url = URL.createObjectURL(file);
+    var v = document.createElement("video");
+    var done = false;
+    function finish(out) {
+      if (done) return; done = true;
+      try { URL.revokeObjectURL(url); } catch (e) {}
+      resolve(out);
+    }
+    v.preload = "auto"; v.playsInline = true; v.setAttribute("playsinline", "");
+    /* the element itself is silenced by never wiring it to the speakers, not by
+       .muted — muting it silences the recording too */
+    v.volume = 0;
+    v.onerror = function () { finish(null); };      /* a codec this browser cannot decode */
+    v.onloadedmetadata = function () {
+      var W = v.videoWidth, H = v.videoHeight;
+      if (!W || !H) return finish(null);
+      start(W, H, mediaDuration(v));
+    };
+    function start(W, H, dur) {
+      /* A clip whose length cannot be established is given the middling rate
+         rather than refused: the budget is a target, and one unmeasurable file
+         is checked against it at the end like every other. */
+      var rate = dur > 0 ? Math.min(1600000, Math.floor((MEDIA_BUDGET * 8) / dur) - 64000) : 1200000;
+      if (rate < MEDIA_VID_MIN) return finish(null);   /* too long: kept whole, then refused with a reason */
+      var scale = Math.min(1, MEDIA_VID_MAX / Math.max(W, H));
+      var cv = document.createElement("canvas");
+      cv.width = Math.round(W * scale / 2) * 2;       /* even dimensions: H.264 insists */
+      cv.height = Math.round(H * scale / 2) * 2;
+      var ctx = cv.getContext("2d");
+      var stream = cv.captureStream(MEDIA_VID_FPS);
+      var ac = null;
+      try {
+        ac = new (window.AudioContext || window.webkitAudioContext)();
+        var dest = ac.createMediaStreamDestination();
+        ac.createMediaElementSource(v).connect(dest);   /* into the recording, never to the speakers */
+        dest.stream.getAudioTracks().forEach(function (t) { stream.addTrack(t); });
+      } catch (e) { ac = null; }
+
+      var rec, chunks = [];
+      try {
+        /* the audio rate is left to the browser too: 64 kbps was the other
+           half of the EncodingError */
+        rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: rate });
+      } catch (e) { return finish(null); }
+      var failed = false;
+      rec.ondataavailable = function (ev) { if (ev.data && ev.data.size) chunks.push(ev.data); };
+      /* A recorder that fails stops itself, hands over what it had, and says
+         nothing unless asked. Unasked, this shipped forty seconds of site video
+         as half a second and called it compression. */
+      rec.onerror = function () { failed = true; };
+      rec.onstop = function () {
+        try { if (ac) ac.close(); } catch (e) {}
+        clearInterval(tick);
+        if (failed) return finish(null);
+        var blob = new Blob(chunks, { type: mime.split(";")[0] });
+        var ext = mime.indexOf("mp4") >= 0 ? "mp4" : "webm";
+        if (!blob.size) return finish(null);
+        var out = new File([blob], mediaRename(file.name, ext), { type: blob.type });
+        /* And then the result is checked against the thing it replaces. If the
+           clip that comes out is shorter than the one that went in, the
+           compression is thrown away and the original kept: a video the board
+           cannot watch to the end is worse than a big one. */
+        mediaHolds(out, dur).then(function (ok) { finish(ok ? out : null); });
+      };
+
+      /* Drawn off a timer rather than an animation frame. Animation frames stop
+         entirely in a tab that is not being looked at, and the recorder does
+         not stop with them — it would go on writing the last frame it was
+         given while the sound and the clock ran on, and hand back a slideshow
+         with no warning. A timer keeps drawing; and if she does leave the tab,
+         the clip is paused outright and resumed when she comes back, so it
+         takes longer and stays whole. */
+      var tick = setInterval(function () {
+        if (v.ended || v.paused) return;
+        ctx.drawImage(v, 0, 0, cv.width, cv.height);
+        if (onProg && dur > 0) onProg(Math.min(0.99, v.currentTime / dur));
+      }, Math.round(1000 / MEDIA_VID_FPS));
+      function onHide() {
+        if (done) return;
+        if (document.hidden) {
+          v.pause();
+          try { if (rec.state === "recording") rec.pause(); } catch (e) {}
+        } else {
+          try { if (rec.state === "paused") rec.resume(); } catch (e) {}
+          v.play().catch(function () {});
+        }
+      }
+      document.addEventListener("visibilitychange", onHide);
+      v.onended = function () {
+        clearInterval(tick);
+        document.removeEventListener("visibilitychange", onHide);
+        try { rec.stop(); } catch (e) { finish(null); }
+      };
+      rec.start(1000);
+      v.play().then(function () { /* the timer is already drawing */ }).catch(function () {
+        /* autoplay refused with sound: try again without it rather than give up */
+        try { rec.stop(); } catch (e) {}
+        v.muted = true;
+        v.play().then(function () {
+          chunks = [];
+          try { rec = new MediaRecorder(cv.captureStream(MEDIA_VID_FPS),
+                  { mimeType: mime, videoBitsPerSecond: rate }); } catch (e) { return finish(null); }
+          rec.ondataavailable = function (ev) { if (ev.data && ev.data.size) chunks.push(ev.data); };
+          rec.onerror = function () { failed = true; };
+          rec.onstop = function () {
+            clearInterval(tick);
+            if (failed) return finish(null);
+            var blob = new Blob(chunks, { type: mime.split(";")[0] });
+            var ext = mime.indexOf("mp4") >= 0 ? "mp4" : "webm";
+            if (!blob.size) return finish(null);
+            var out2 = new File([blob], mediaRename(file.name, ext), { type: blob.type });
+            mediaHolds(out2, dur).then(function (ok) { finish(ok ? out2 : null); });
+          };
+          rec.start(1000);
+        }).catch(function () { finish(null); });
+      });
+    }
+    v.src = url;
+  });
+}
+
 /* ---------- quote attachments (beta, Firebase Storage) ---------- */
 var attachTarget = null;
+/* ---------- adding media to an update that already exists ----------
+   The overlay is for writing a new update. This is for the far commoner case:
+   the note was typed on Monday and the photograph is on the phone on Tuesday. */
+var updMediaFor = null;
+function mediaUpload(files, jobId, onStep) {
+  var out = [], i = 0;
+  function next() {
+    if (i >= files.length) return Promise.resolve(out);
+    var f = files[i++];
+    if (onStep) onStep(i, files.length);
+    var path = "quoteAttachments/progress/" + jobId + "/" + Date.now() + "-" +
+      f.name.replace(/[^\w.\-() ]+/g, "_");
+    return cloud.store.ref(path).put(f)
+      .then(function (snap) { return snap.ref.getDownloadURL(); })
+      .then(function (url) {
+        out.push({ name: f.name, url: url, path: path, size: f.size,
+                   type: /^video\//.test(f.type) ? "video" : "image" });
+        return next();
+      });
+  }
+  return next();
+}
+document.getElementById("updMediaFile").addEventListener("change", function () {
+  var files = [].slice.call(this.files), where = updMediaFor;
+  this.value = ""; updMediaFor = null;
+  if (!files.length || !where || !cloud.store) return;
+  var j = null;
+  (state.jobs || []).forEach(function (x) { if (x.id === where.jid) j = x; });
+  var u = j && (j.updates || [])[where.ui];
+  if (!u) return;
+  var note = "Compressing " + files.length + " file" + (files.length === 1 ? "" : "s") + "…";
+  edBusy(note);
+  var ready = [], k = 0;
+  function step() {
+    if (k >= files.length) return mediaUpload(ready, j.id, function (n, of) {
+      edBusy("Uploading " + n + " of " + of + "…");
+    });
+    var f = files[k++];
+    return mediaShrink(f, function (p) {
+      edBusy("Compressing " + f.name + " — " + Math.round(p * 100) + "%");
+    }).then(function (out) { ready.push(out.file); return step(); });
+  }
+  step().then(function (media) {
+    u.media = (u.media || []).concat(media);
+    edBusy("");
+    persist(null, [jobLabel(j) + ": " + media.length + " file" + (media.length === 1 ? "" : "s") +
+      " added to the update of " + (u.d || "no date")], j.id);
+    renderEditor(); renderReport();
+  }).catch(function (err) {
+    edBusy("");
+    alert((err && err.message) || "That file could not be added.");
+  });
+});
+/* a one-line status where the editor can show it without a modal */
+function edBusy(msg) {
+  var el = document.getElementById("edBusy");
+  if (!el) {
+    if (!msg) return;
+    el = document.createElement("div");
+    el.id = "edBusy"; el.className = "edbusy";
+    document.body.appendChild(el);
+  }
+  el.textContent = msg || "";
+  el.style.display = msg ? "" : "none";
+}
+
 /* ---------- "Add progress update" form (opened from a Work-in-progress card) ---------- */
 var progTarget = null;     /* the job being updated */
 var progMedia = [];        /* pending File objects picked but not yet uploaded */
@@ -9310,24 +9673,43 @@ function openProgressModal(j) {
 }
 function progMediaRender() {
   var el = document.getElementById("progMediaList");
-  el.innerHTML = progMedia.map(function (f, i) {
-    var img = /^image\//.test(f.type) ? '<img src="' + URL.createObjectURL(f) + '" alt="">' : '🎬';
-    return '<span class="pmchip">' + img + '<span class="nm">' + esc(f.name) + '</span>' +
-      '<span class="fx" data-pmi="' + i + '" title="Remove">✕</span></span>';
+  el.innerHTML = progMedia.map(function (m, i) {
+    var f = m.file;
+    var img = /^image\//.test(f.type) ? '<img src="' + URL.createObjectURL(f) + '" alt="">' : "🎬";
+    return '<span class="pmchip' + (m.busy ? " busy" : "") + '">' + img +
+      '<span class="nm">' + esc(f.name) +
+      '<small>' + esc(m.busy
+        ? (m.prog ? "Compressing " + Math.round(m.prog * 100) + "% — this runs at real time" : "Compressing…")
+        : (m.note || fvSize(f.size))) + "</small></span>" +
+      (m.busy ? "" : '<span class="fx" data-pmi="' + i + '" title="Remove">✕</span>') + "</span>";
   }).join("");
 }
 document.getElementById("progPct").addEventListener("input", function () {
   document.getElementById("progPctVal").textContent = this.value + "%";
 });
 document.getElementById("progMediaBtn").onclick = function () { document.getElementById("progMediaFile").click(); };
+/* Shrinking happens here, at the moment she picks the file, not at save: she
+   sees what it came down to before committing, and Save is then only an
+   upload. */
 document.getElementById("progMediaFile").addEventListener("change", function () {
-  for (var i = 0; i < this.files.length; i++) {
-    var f = this.files[i];
-    if (f.size > 15 * 1024 * 1024) { alert("“" + f.name + "” is over 15 MB — please pick a smaller file."); continue; }
-    progMedia.push(f);
-  }
+  var files = [].slice.call(this.files);
   this.value = "";
-  progMediaRender();
+  files.forEach(function (f) {
+    var m = { file: f, busy: true, prog: 0, note: "" };
+    progMedia.push(m);
+    progMediaRender();
+    mediaShrink(f, function (p) { m.prog = p; progMediaRender(); })
+      .then(function (out) {
+        m.busy = false; m.file = out.file; m.note = out.note;
+        progMediaRender();
+      })
+      .catch(function (err) {
+        progMedia.splice(progMedia.indexOf(m), 1);
+        progMediaRender();
+        var pe = document.getElementById("progErr");
+        if (pe) pe.textContent = (err && err.message) || "That file could not be used.";
+      });
+  });
 });
 document.getElementById("progMediaList").addEventListener("click", function (e) {
   if (e.target.dataset.pmi != null) { progMedia.splice(+e.target.dataset.pmi, 1); progMediaRender(); }
@@ -9341,13 +9723,16 @@ document.getElementById("progSave").onclick = function () {
   var txt = document.getElementById("progText").value.replace(/\s+/g, " ").trim();
   var errEl = document.getElementById("progErr");
   if (!txt && !progMedia.length) { errEl.textContent = "Type what happened, or attach a photo."; return; }
+  if (progMedia.some(function (m) { return m.busy; })) {
+    errEl.textContent = "Still compressing — one moment."; return;
+  }
   if (progMedia.length && !cloud.store) { errEl.textContent = "Photo/video upload needs the cloud site — save the text and retry the media online."; return; }
   var btn = this; btn.disabled = true; errEl.textContent = "";
   /* upload the media one by one (each ≤15 MB, same storage rules as bid attachments) */
   var media = [], idx = 0;
   function next() {
     if (idx >= progMedia.length) return done();
-    var f = progMedia[idx++];
+    var f = progMedia[idx++].file;
     btn.textContent = "Uploading " + idx + " of " + progMedia.length + "…";
     var path = "quoteAttachments/progress/" + j.id + "/" + Date.now() + "-" + f.name.replace(/[^\w.\-() ]+/g, "_");
     cloud.store.ref(path).put(f)
