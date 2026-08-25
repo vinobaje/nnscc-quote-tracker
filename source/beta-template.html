@@ -547,7 +547,7 @@ li.jrow, div.jrow { border-radius:5px; }
 .tpl-packet .pk-cmphead.jrow { border-radius:0; }
 .tpl-packet .pk-cmphead.jrow:hover, .tpl-packet .pk-cmphead.jrow:focus { background:#1e3550; }
 .tpl-packet .pk-cmphead.jrow::after { content:"View job ›"; margin-left:auto; font-size:11px;
-  font-weight:600; letter-spacing:.02em; opacity:.6; }
+  font-weight:600; letter-spacing:.02em; opacity:.6; white-space:nowrap; flex:none; }
 .tpl-packet .pk-cmphead.jrow:hover::after, .tpl-packet .pk-cmphead.jrow:focus::after { opacity:1; }
 .jrow:focus { outline:2px solid var(--accent); outline-offset:-2px; }
 tr.jrow > td.num::after { content:"›"; margin-left:5px; color:var(--muted); opacity:0; }
@@ -981,9 +981,32 @@ body:has(#report.tpl-packet) .wrap { max-width:1560px; }
 .tpl-packet .pk-chip b { display:block; font-size:19px; color:var(--ink); font-weight:700; line-height:1.1; }
 .tpl-packet .pk-chip span { font-size:11px; color:var(--ink2); }
 .tpl-packet .pk-cmpcard { border:1px solid var(--line); border-radius:9px; overflow:hidden; margin-bottom:14px; }
-.tpl-packet .pk-cmphead { background:#16283b; color:#fff; padding:9px 12px; font-size:13px; font-weight:600; display:flex; align-items:center; gap:9px; flex-wrap:wrap; }
-.tpl-packet .pk-cmpno { flex:none; width:20px; height:20px; border-radius:5px; background:rgba(255,255,255,.16); font-size:11px; font-weight:700; display:flex; align-items:center; justify-content:center; }
-.tpl-packet .pk-prio { background:#f7ecec; color:var(--prio); font-size:10px; font-weight:700; padding:2px 8px; border-radius:99px; }
+/* The job is the thing being decided; the quotes under it are the evidence.
+   This bar read at 13px over a table set at 15px — the heading smaller than
+   its own rows — so a director scanning the packet met the contractors'
+   names before the work they were quoting for. The title now leads, and the
+   furniture around it (the number, the flag, "View job") stays quiet. */
+.tpl-packet .pk-cmphead { background:#16283b; color:#fff; padding:11px 13px; font-size:13px; font-weight:600; display:flex; align-items:center; gap:10px; flex-wrap:nowrap; }
+/* takes the room that is left so the flag and "View job" stay on the line
+   with it — a bigger title should not push the furniture onto a second row
+   in the packet's narrower two-column layout */
+/* flex-basis 0, not auto: with auto the title's own text length is its
+   starting width, so a long description shoulders past the number badge and
+   drops to the next line, leaving a "1" sitting alone above it. From zero it
+   takes what is left of the row and wraps inside itself. */
+.tpl-packet .pk-cmptitle { flex:1 1 0; min-width:0; font-size:17.5px; font-weight:700;
+  line-height:1.3; letter-spacing:.005em; }
+.tpl-packet .pk-cmpno { flex:none; width:24px; height:24px; border-radius:6px; background:rgba(255,255,255,.16); font-size:12px; font-weight:700; display:flex; align-items:center; justify-content:center; }
+.tpl-packet .pk-prio { flex:none; background:#f7ecec; color:var(--prio); font-size:10.5px; font-weight:700; padding:3px 9px; border-radius:99px; }
+/* On a phone the flag and "View job" would take a third of the bar and leave
+   the title running down the page three words wide. Below the packet's
+   one-column breakpoint the title takes the row and they drop beneath it. */
+@media screen and (max-width:900px){
+  .tpl-packet .pk-cmphead { flex-wrap:wrap; row-gap:6px; }
+  /* a hover cue on a phone is a sixth of the bar spent on nothing: there is no
+     hover, and the whole bar is the tap target either way */
+  .tpl-packet .pk-cmphead.jrow::after { display:none; }
+}
 .tpl-packet .pk-cmptable { width:100%; border-collapse:collapse; table-layout:fixed; }
 .tpl-packet .pk-cmptable th { font-size:12px; letter-spacing:.03em; text-transform:uppercase; color:var(--muted);
   font-weight:600; text-align:left; padding:8px 10px 6px; border-bottom:1px solid var(--line-soft); }
@@ -3992,7 +4015,8 @@ function packetSecB(d, ctx) {
     });
     rows.push(qcNoteHTML(x.j, 4));   /* where the quotes are not for the same thing, say so */
     cards.push('<div class="pk-cmpcard"><div class="pk-cmphead jrow"' + jdData(x.j) + '><span class="pk-cmpno">' + (idx + 1) + "</span> " +
-      esc(x.j.desc) + (x.j.priority ? ' <span class="pk-prio">High priority</span>' : "") + "</div>" +
+      '<span class="pk-cmptitle">' + esc(x.j.desc) + "</span>" +
+      (x.j.priority ? '<span class="pk-prio">High priority</span>' : "") + "</div>" +
       '<table class="pk-cmptable"><colgroup><col style="width:27%"><col><col style="width:16%"><col style="width:21%"></colgroup>' +
       '<thead><tr><th>Contractor</th><th>Scope summary</th><th>Quote date</th>' +
       '<th class="pk-c-amt">Total (incl. HST)</th></tr></thead><tbody>' + rows.join("") + "</tbody></table></div>");
