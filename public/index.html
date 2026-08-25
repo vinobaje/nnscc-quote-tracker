@@ -2678,7 +2678,7 @@ var BRAND_PATH = "nnsccQuoteTracker/brand";               /* the letterhead the 
 var WEEKLY_DRAFT_PATH = "nnsccQuoteTracker/weeklyDraft";   /* the report she is working on */
 var WEEKLY_COLL = "nnsccWeeklyReports";                   /* every one she has finished */
 var VIEW_BETA = CURRENT_PATH.indexOf("Beta") >= 0;   /* which report the passcode gate reads/protects */
-var BUILD_STAMP = "2026-08-24 09:26";   /* filled in by build.js — which copy of the page this is */
+var BUILD_STAMP = "2026-08-25 17:46";   /* filled in by build.js — which copy of the page this is */
 /* path of the report currently on screen */
 function reportPath() {
   return cloud.active.kind === "current" ? CURRENT_PATH : (REPORTS_COLL + "/" + cloud.active.id);
@@ -2701,11 +2701,16 @@ function cloudLine() {
    only these signed-in accounts ever see click-to-edit or the Edit tab.
    If you authorize a new editor in Firestore, add their address here too (lower-case). */
 var EDITOR_EMAILS = ["mvinobaje@gmail.com", "nnscc292connect@cpomanagement.ca"];
-/* The design everyone EXCEPT the property manager sees. The board and anyone
-   opening the report with the passcode get this layout; the manager keeps
-   whichever design they picked, so they can work in one and hand the board
-   another. Set to null to give every reader the manager's choice. */
-var VIEWER_TEMPLATE = "classic";
+/* An override forcing every reader EXCEPT the property manager onto one
+   layout, whatever she picked — so she could work in one design and hand the
+   board another. It is off, and the Settings picker now means what it has
+   always said it means: the layout every reader sees, chosen in one place.
+
+   It was set to "classic" while the board packet was being built, and stayed
+   that way after five of the six directors preferred the packet — one holdout
+   is not a reason to hold the other five to the old design. Set it back to a
+   template name only to pin readers to one again. */
+var VIEWER_TEMPLATE = null;
 function isAuthorizedEmail(e) { return EDITOR_EMAILS.indexOf(String(e || "").toLowerCase()) >= 0; }
 function cloudStatusMsg(t) { document.getElementById("cloudStatus").textContent = t; }
 function cloudInit() {
