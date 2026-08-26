@@ -499,10 +499,20 @@ input:focus, select:focus { outline:2px solid var(--accent); outline-offset:-1px
 .jdwhat { font-size:14px; line-height:1.45; }
 .jdwhat b { font-weight:650; }
 .jdwho { font-size:12px; color:var(--muted); }
-.jdmedia { margin-top:5px; }
-.jdmedia img { width:54px; height:54px; object-fit:cover; border-radius:6px;
-  margin:0 6px 0 0; cursor:zoom-in; vertical-align:middle; }
-.jdmedia .pk-vid { font-size:12.5px; margin-right:8px; }
+/* One tile per photograph or clip, all the same size, laid out as a row that
+   wraps — so an update with six of them reads as six pictures on a phone
+   instead of six filenames. Sized per context: bigger in the board packet. */
+.mtile { display:inline-flex; align-items:center; justify-content:center; flex:none;
+  width:62px; height:62px; border-radius:8px; overflow:hidden; text-decoration:none;
+  border:1px solid var(--line); background:var(--paper); cursor:zoom-in; }
+.mtile img { width:100%; height:100%; object-fit:cover; display:block; }
+.mtile.vid { background:#1d2b3a; color:#fff; font-size:18px; cursor:pointer; border-color:#1d2b3a; }
+.mtile.more { background:var(--line-soft); color:var(--ink2); font-size:13.5px; font-weight:700; }
+/* six on the screen and a count for the rest, which opens the viewer at the
+   seventh; the hidden ones are still in the page for the printer */
+.jdmedia .mtile:nth-child(n+7), .pk-updmedia .mtile:nth-child(n+7) { display:none; }
+.jdmedia .mtile.more, .pk-updmedia .mtile.more { display:inline-flex; }
+.jdmedia { margin-top:6px; display:flex; flex-wrap:wrap; gap:6px; }
 .jdmore { display:inline-block; margin-top:8px; font-size:13px; color:var(--accent-ink); cursor:pointer; }
 /* quotes table: the one counted in the totals is marked, not just bolded */
 .jdqt { width:100%; border-collapse:collapse; }
@@ -623,8 +633,8 @@ tr.jlink td:first-child::after { content:" ›"; color:var(--muted); }
    Quotes are read inside the report (no new tab, no lost place in the
    packet). PDFs render in an iframe with the browser's own PDF viewer;
    images render directly; anything else offers a download. */
-.filebox { width:min(1080px,96vw); padding:0; overflow:hidden; display:flex; flex-direction:column;
-  height:min(88vh,900px); }
+.filebox { width:min(1080px,96vw); min-width:0; padding:0; overflow:hidden; display:flex;
+  flex-direction:column; height:min(88vh,900px); }
 .fvhead { display:flex; align-items:center; gap:12px; padding:11px 14px 11px 16px;
   border-bottom:1px solid var(--line); background:var(--paper); flex:none; }
 .fvname { min-width:0; flex:1; }
@@ -644,12 +654,20 @@ tr.jlink td:first-child::after { content:" ›"; color:var(--muted); }
   border:1px solid var(--line); border-radius:99px; padding:4px 11px; cursor:pointer; max-width:260px;
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .fvtab.on { background:var(--accent); border-color:var(--accent); color:#fff; }
-.fvbody { flex:1; min-height:0; background:#525659; display:flex; align-items:flex-start;
+.fvbody { flex:1; min-height:0; background:#525659; display:flex; align-items:center;
   justify-content:center; overflow:auto; }
 .fvbody iframe { width:100%; height:100%; border:0; display:block; background:#fff; flex:none; }
-/* screenshots of quotes are often tall: fit the width and scroll, rather
-   than shrinking the whole page down to something unreadable */
-.fvbody img { max-width:100%; height:auto; display:block; flex:none; }
+/* A photograph is shown whole. It used to be shown at the full width of the
+   viewer whatever its shape, which for a picture taken on a phone — twice as
+   tall as it is wide — meant the board saw the top third of it and had to
+   scroll for the rest, on the one screen whose whole job is showing them the
+   photograph. Screenshots of quotes are the reason it was ever that way, and
+   they still are: one tap swaps to full width and scrolls, for the picture
+   that is really a page of writing. */
+.fvbody img { max-width:100%; max-height:100%; width:auto; height:auto;
+  object-fit:contain; display:block; margin:auto; flex:none; cursor:zoom-in; }
+.fvbody.fvzoom { align-items:flex-start; }
+.fvbody.fvzoom img { max-height:none; margin:0; cursor:zoom-out; }
 .fvbody video { max-width:100%; max-height:100%; display:block; margin:auto; }
 .fvmsg { color:#e8ecef; font-size:13.5px; text-align:center; padding:30px 24px; line-height:1.6; }
 .fvmsg .fvbig { font-size:34px; display:block; margin-bottom:10px; }
@@ -657,6 +675,11 @@ tr.jlink td:first-child::after { content:" ›"; color:var(--muted); }
 @media screen and (max-width:600px){
   .filebox { height:94vh; width:100vw; border-radius:0; }
   .fvacts .fvlabel { display:none; }
+  /* nine attachments used to be nine rows of filename before the picture got
+     a look in. One line that scrolls sideways instead — the name of the one
+     being looked at is in the header anyway. */
+  .fvtabs { flex-wrap:nowrap; overflow-x:auto; -webkit-overflow-scrolling:touch; }
+  .fvtab { max-width:120px; flex:none; }
 }
 /* the report's attachment lines are buttons, not decoration */
 .attlink { cursor:pointer; color:var(--accent-ink); text-decoration:underline dotted; text-underline-offset:2px; }
@@ -1090,10 +1113,13 @@ body:has(#report.tpl-packet) .wrap { max-width:1560px; }
 .tpl-packet .pk-updmore:hover { text-decoration:underline; }
 /* update-row extras: photos/videos, internal + issue flags, job-health chip */
 .tpl-packet .pk-updmedia { display:flex; flex-wrap:wrap; gap:7px; margin-top:6px; }
-.tpl-packet .pk-updmedia a { display:block; line-height:0; }
-.tpl-packet .pk-updmedia img { height:66px; width:88px; object-fit:cover; border-radius:7px; border:1px solid var(--line); }
-.tpl-packet .pk-updmedia .pk-vid { display:inline-flex; align-items:center; gap:6px; line-height:1.3; height:66px;
-  padding:0 12px; border:1px solid var(--line); border-radius:7px; font-size:12.5px; font-weight:600; color:var(--pkg); }
+.tpl-packet .pk-updmedia .mtile { width:88px; height:66px; border-radius:7px; }
+/* An update row is already indented by its date on a phone, so the packet's
+   larger tiles fit two to a line and six of them become four rows of pictures
+   in the middle of a sentence. Back to the drawer's size, four to a line. */
+@media screen and (max-width:600px){
+  .tpl-packet .pk-updmedia .mtile { width:62px; height:62px; }
+}
 .tpl-packet .pk-updrow.issue { background:#fdf4e3; border-radius:8px; padding:6px 8px; margin:5px -8px; }
 .tpl-packet .pk-updrow.issue .pk-updt { color:#7a5210; }
 .tpl-packet .pk-updflag { display:inline-block; font-size:10px; font-weight:700; border-radius:99px; padding:1px 8px;
@@ -2123,8 +2149,11 @@ body[data-view="edit"] .wrap { max-width:none; }
   .pk-viewall, .pk-spendmore, .pk-updmore, .pk-addupd, .pk-prow,
   .tpl-packet .pk-nav, .tpl-packet .bids.expand { display:none !important; }
   /* progress cards: photos print smaller so a card still fits a page */
-  .tpl-packet .pk-updmedia img { height:54px; width:72px; }
-  .tpl-packet .pk-updmedia .pk-vid { height:54px; }
+  .tpl-packet .pk-updmedia .mtile { width:72px; height:54px; }
+  /* on paper there is nothing to tap, so every photograph is printed and the
+     count that stood in for them is not */
+  .jdmedia .mtile:nth-child(n+7), .pk-updmedia .mtile:nth-child(n+7) { display:inline-flex; }
+  .jdmedia .mtile.more, .pk-updmedia .mtile.more { display:none !important; }
   .tpl-packet .pk-step[data-stage] { cursor:default; }
 
 
@@ -2701,7 +2730,7 @@ var BRAND_PATH = "nnsccQuoteTrackerBeta/brand";               /* the letterhead 
 var WEEKLY_DRAFT_PATH = "nnsccQuoteTrackerBeta/weeklyDraft";   /* the report she is working on */
 var WEEKLY_COLL = "nnsccWeeklyReportsBeta";                   /* every one she has finished */
 var VIEW_BETA = CURRENT_PATH.indexOf("Beta") >= 0;   /* which report the passcode gate reads/protects */
-var BUILD_STAMP = "2026-08-25 22:02";   /* filled in by build.js — which copy of the page this is */
+var BUILD_STAMP = "2026-08-26 09:07";   /* filled in by build.js — which copy of the page this is */
 /* path of the report currently on screen */
 function reportPath() {
   return cloud.active.kind === "current" ? CURRENT_PATH : (REPORTS_COLL + "/" + cloud.active.id);
@@ -3277,16 +3306,40 @@ function jdFact(label, val, sub) {
   return '<div class="jdfact"><b>' + esc(label) + "</b><span>" + esc(val) + "</span>" +
     (sub ? "<small>" + esc(sub) + "</small>" : "") + "</div>";
 }
-/* photos and clips on a site update open in the same in-page viewer as quotes */
+/* photos and clips on a site update open in the same in-page viewer as quotes.
+
+   Everything is a tile the same size, whatever it is. A clip used to be its own
+   filename — "WhatsApp Video 2026-08-26 at 12.41.07.mp4" — which is a line and
+   a half of text on a phone, so three clips on one update pushed the
+   photographs off the bottom of the screen and the update became a list of
+   filenames nobody can read anything from. The name is kept for the viewer,
+   where there is room for it. And only the first few are laid out: the rest
+   are one more tile saying how many, which opens the viewer at the seventh. */
+var MEDIA_TILES = 6;
+function mediaTilesHTML(list, cap) {
+  if (!list || !list.length) return "";
+  var ref = fvStashRef(list), c = esc(cap || "");
+  function tile(m, i, cls, inner) {
+    return '<a class="mtile' + cls + '" href="' + esc(m.url) + '" data-attstash="' + ref +
+      '" data-atti="' + i + '" data-attcap="' + c + '" title="' + esc(m.name || "attachment") + '">' +
+      inner + "</a>";
+  }
+  /* All of them are written, and the ones past the sixth are hidden by the
+     stylesheet rather than left out — so that a packet printed for the meeting
+     still carries every photograph, where there is no "+3" to tap. */
+  var html = list.map(function (m, i) {
+    return m.type === "video"
+      ? tile(m, i, " vid", "<span>\u25b6</span>")
+      : tile(m, i, "", '<img src="' + esc(m.url) + '" alt="" loading="lazy">');
+  }).join("");
+  if (list.length > MEDIA_TILES)
+    html += tile(list[MEDIA_TILES], MEDIA_TILES, " more",
+      "+" + (list.length - MEDIA_TILES));
+  return html;
+}
 function jdMediaHTML(u) {
   if (!u.media || !u.media.length) return "";
-  var ref = fvStashRef(u.media), cap = (u.d || "") + " site update";
-  return '<div class="jdmedia">' + u.media.map(function (m, i) {
-    var d = ' data-attstash="' + ref + '" data-atti="' + i + '" data-attcap="' + esc(cap) + '"';
-    return m.type === "video"
-      ? '<a class="pk-vid" href="' + esc(m.url) + '"' + d + ' title="Play this clip">▶ ' + esc(m.name || "video") + "</a>"
-      : '<a href="' + esc(m.url) + '"' + d + ' title="View this photo"><img src="' + esc(m.url) + '" alt="" loading="lazy"></a>';
-  }).join("") + "</div>";
+  return '<div class="jdmedia">' + mediaTilesHTML(u.media, (u.d || "") + " site update") + "</div>";
 }
 /* the earliest date on any quote for this job — a real date from the paperwork,
    and for jobs that predate the tracker the only one anyone has */
@@ -4140,13 +4193,8 @@ function packetProgress(d, ctx) {
         var mh = "";
         if (u.media && u.media.length) {
           /* site photos and clips open in the in-page viewer, same as quotes */
-          var sref = fvStashRef(u.media), scap = esc(u.d || "") + " site update";
-          mh = '<span class="pk-updmedia">' + u.media.map(function (m, mi) {
-            var d = ' data-attstash="' + sref + '" data-atti="' + mi + '" data-attcap="' + scap + '"';
-            return m.type === "video"
-              ? '<a class="pk-vid" href="' + esc(m.url) + '"' + d + ' title="Play this clip">▶ ' + esc(m.name || "video") + '</a>'
-              : '<a href="' + esc(m.url) + '"' + d + ' title="View this photo"><img src="' + esc(m.url) + '" alt="" loading="lazy"></a>';
-          }).join("") + '</span>';
+          mh = '<span class="pk-updmedia">' +
+            mediaTilesHTML(u.media, (u.d || "") + " site update") + '</span>';
         }
         return '<div class="pk-updrow' + (u.issue ? " issue" : "") + '"><span class="pk-updd">' + esc(u.d || "—") + '</span>' +
           '<span class="pk-updt">' + tEdit("upd:" + j.id + ":" + idx + ":t", u.t, "What happened…") + flags + mh + '</span></div>';
@@ -10006,6 +10054,7 @@ function openFileViewer(files, idx, caption) {
 function fvShow() {
   var f = fvFiles[fvIdx] || {};
   var body = document.getElementById("fvBody");
+  body.classList.remove("fvzoom"); body.scrollTop = 0;
   var bits = [];
   if (fvCap) bits.push(fvCap);
   if (f.size) bits.push(fvSize(f.size));
@@ -10019,7 +10068,16 @@ function fvShow() {
   if (kind === "pdf") {
     body.innerHTML = '<iframe src="' + esc(f.url) + '#view=FitH" title="' + esc(f.name || "Attachment") + '"></iframe>';
   } else if (kind === "img") {
-    body.innerHTML = '<img src="' + esc(f.url) + '" alt="' + esc(f.name || "Attachment") + '">';
+    body.innerHTML = '<img src="' + esc(f.url) + '" alt="' + esc(f.name || "Attachment") +
+      '" title="Tap to zoom in">';
+    /* and the offer to zoom is only made where zooming would show her
+       something — a photograph already displayed at its own size has nothing
+       further to give, and saying so would be noise on every picture */
+    var im = body.firstChild, sub = document.getElementById("fvSub");
+    im.onload = function () {
+      if (im.naturalWidth > im.clientWidth + 4)
+        sub.textContent = bits.concat("tap the photo to zoom").join(" · ");
+    };
   } else if (kind === "vid") {
     body.innerHTML = '<video src="' + esc(f.url) + '" controls playsinline></video>';
   } else {
@@ -10034,6 +10092,12 @@ function fvShow() {
     t.classList.toggle("on", +t.getAttribute("data-fvt") === fvIdx);
   });
 }
+document.getElementById("fvBody").addEventListener("click", function (e) {
+  if (!e.target || e.target.tagName !== "IMG") return;
+  var on = this.classList.toggle("fvzoom");
+  e.target.title = on ? "Tap to fit it on the screen" : "Tap to zoom in";
+  if (!on) this.scrollTop = 0;
+});
 function closeFileViewer() {
   document.getElementById("fileOverlay").classList.remove("open");
   document.getElementById("fvBody").innerHTML = "";   /* stop the PDF plugin */
