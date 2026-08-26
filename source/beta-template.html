@@ -648,14 +648,19 @@ tr.jlink td:first-child::after { content:" ›"; color:var(--muted); }
 .fvacts a:hover, .fvacts button:hover { background:var(--accent); color:#fff; }
 .fvacts .fvclose { background:none; color:var(--ink2); font-size:16px; line-height:1; padding:6px 9px; }
 .fvacts .fvclose:hover { background:var(--line-soft); color:var(--ink); }
-.fvtabs { display:flex; gap:6px; flex-wrap:wrap; padding:8px 14px; border-bottom:1px solid var(--line-soft);
-  background:var(--card); flex:none; }
-.fvtab { font-size:12px; font-weight:600; color:var(--ink2); background:var(--paper);
-  border:1px solid var(--line); border-radius:99px; padding:4px 11px; cursor:pointer; max-width:260px;
-  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.fvtab.on { background:var(--accent); border-color:var(--accent); color:#fff; }
+.fvstage { position:relative; flex:1; min-height:0; display:flex; }
 .fvbody { flex:1; min-height:0; background:#525659; display:flex; align-items:center;
   justify-content:center; overflow:auto; }
+/* Nine photographs on one update, and the only way through them was the row of
+   filenames at the top — back to the top, read nine near-identical names, pick
+   the next one. An arrow either side, the keyboard, or a swipe. */
+.fvnav { position:absolute; top:50%; transform:translateY(-50%); z-index:2; padding:0;
+  width:44px; height:62px; border:0; border-radius:9px; cursor:pointer; font:inherit;
+  background:rgba(18,24,31,.46); color:#fff; font-size:27px; line-height:1;
+  display:flex; align-items:center; justify-content:center; }
+.fvnav:hover { background:rgba(18,24,31,.8); }
+.fvnav.prev { left:9px; }
+.fvnav.next { right:9px; }
 .fvbody iframe { width:100%; height:100%; border:0; display:block; background:#fff; flex:none; }
 /* A photograph is shown whole. It used to be shown at the full width of the
    viewer whatever its shape, which for a picture taken on a phone — twice as
@@ -675,11 +680,7 @@ tr.jlink td:first-child::after { content:" ›"; color:var(--muted); }
 @media screen and (max-width:600px){
   .filebox { height:94vh; width:100vw; border-radius:0; }
   .fvacts .fvlabel { display:none; }
-  /* nine attachments used to be nine rows of filename before the picture got
-     a look in. One line that scrolls sideways instead — the name of the one
-     being looked at is in the header anyway. */
-  .fvtabs { flex-wrap:nowrap; overflow-x:auto; -webkit-overflow-scrolling:touch; }
-  .fvtab { max-width:120px; flex:none; }
+  .fvnav { width:38px; height:54px; font-size:23px; background:rgba(18,24,31,.55); }
 }
 /* the report's attachment lines are buttons, not decoration */
 .attlink { cursor:pointer; color:var(--accent-ink); text-decoration:underline dotted; text-underline-offset:2px; }
@@ -2383,8 +2384,11 @@ body[data-view="edit"] .wrap { max-width:none; }
         <button class="fvclose" id="fvClose" type="button" title="Close (Esc)">✕</button>
       </div>
     </div>
-    <div class="fvtabs" id="fvTabs" style="display:none"></div>
-    <div class="fvbody" id="fvBody"></div>
+    <div class="fvstage">
+      <button class="fvnav prev" id="fvPrev" type="button" title="Previous (←)" aria-label="Previous attachment">&#8249;</button>
+      <div class="fvbody" id="fvBody"></div>
+      <button class="fvnav next" id="fvNext" type="button" title="Next (→)" aria-label="Next attachment">&#8250;</button>
+    </div>
   </div>
 </div>
 
@@ -10040,14 +10044,6 @@ function fvFilesFor(key) {
 function openFileViewer(files, idx, caption) {
   if (!files || !files.length) return;
   fvFiles = files; fvIdx = Math.min(Math.max(+idx || 0, 0), files.length - 1); fvCap = caption || "";
-  var tabs = document.getElementById("fvTabs");
-  if (files.length > 1) {
-    tabs.innerHTML = files.map(function (f, i) {
-      return '<span class="fvtab' + (i === fvIdx ? " on" : "") + '" data-fvt="' + i + '" role="button" tabindex="0">' +
-        esc(f.name || "Attachment " + (i + 1)) + "</span>";
-    }).join("");
-    tabs.style.display = "";
-  } else { tabs.innerHTML = ""; tabs.style.display = "none"; }
   fvShow();
   document.getElementById("fileOverlay").classList.add("open");
 }
@@ -10088,10 +10084,20 @@ function fvShow() {
                        : "This file type can’t be previewed in the browser.") +
       '<br><a href="' + esc(f.url) + '" download="' + esc(f.name || "attachment") + '">Download it</a> to open on your computer.</div>';
   }
-  Array.prototype.forEach.call(document.querySelectorAll("#fvTabs .fvtab"), function (t) {
-    t.classList.toggle("on", +t.getAttribute("data-fvt") === fvIdx);
-  });
+  var many = fvFiles.length > 1 ? "" : "none";
+  document.getElementById("fvPrev").style.display = many;
+  document.getElementById("fvNext").style.display = many;
 }
+/* Round the ends rather than stopping at them: nine photographs of one wall
+   are a loop, not a document with a first page and a last. */
+function fvGo(step) {
+  var n = fvFiles.length;
+  if (n < 2) return;
+  fvIdx = (fvIdx + step + n) % n;
+  fvShow();
+}
+document.getElementById("fvPrev").onclick = function () { fvGo(-1); };
+document.getElementById("fvNext").onclick = function () { fvGo(1); };
 document.getElementById("fvBody").addEventListener("click", function (e) {
   if (!e.target || e.target.tagName !== "IMG") return;
   var on = this.classList.toggle("fvzoom");
@@ -10105,14 +10111,32 @@ function closeFileViewer() {
 document.getElementById("fvClose").onclick = closeFileViewer;
 document.getElementById("fileOverlay").addEventListener("click", function (e) {
   if (e.target === this) closeFileViewer();
-  var t = e.target.closest ? e.target.closest("[data-fvt]") : null;
-  if (t) { fvIdx = +t.getAttribute("data-fvt"); fvShow(); }
 });
 document.addEventListener("keydown", function (e) {
-  if (e.key !== "Escape") return;
   var ov = document.getElementById("fileOverlay");
-  if (ov && ov.classList.contains("open")) closeFileViewer();
+  if (!ov || !ov.classList.contains("open")) return;
+  if (e.key === "Escape") return closeFileViewer();
+  if (e.key === "ArrowLeft") { e.preventDefault(); fvGo(-1); }
+  else if (e.key === "ArrowRight") { e.preventDefault(); fvGo(1); }
 });
+/* And a swipe, which is what a phone does with a row of photographs. Not while
+   zoomed in: there a sideways drag is how she moves across a wide quote. */
+(function () {
+  var x0 = 0, y0 = 0, live = false;
+  var body = document.getElementById("fvBody");
+  body.addEventListener("touchstart", function (e) {
+    if (e.touches.length !== 1 || body.classList.contains("fvzoom")) { live = false; return; }
+    live = true; x0 = e.touches[0].clientX; y0 = e.touches[0].clientY;
+  }, { passive: true });
+  body.addEventListener("touchend", function (e) {
+    if (!live) return;
+    live = false;
+    var t = e.changedTouches && e.changedTouches[0];
+    if (!t) return;
+    var dx = t.clientX - x0, dy = t.clientY - y0;
+    if (Math.abs(dx) > 45 && Math.abs(dx) > Math.abs(dy) * 1.4) fvGo(dx < 0 ? 1 : -1);
+  }, { passive: true });
+})();
 /* any "📎 …" in the report, the Edit tab or an overlay opens the viewer */
 document.addEventListener("click", function (e) {
   if (!e.target || !e.target.closest) return;
