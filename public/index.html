@@ -2701,7 +2701,7 @@ var BRAND_PATH = "nnsccQuoteTracker/brand";               /* the letterhead the 
 var WEEKLY_DRAFT_PATH = "nnsccQuoteTracker/weeklyDraft";   /* the report she is working on */
 var WEEKLY_COLL = "nnsccWeeklyReports";                   /* every one she has finished */
 var VIEW_BETA = CURRENT_PATH.indexOf("Beta") >= 0;   /* which report the passcode gate reads/protects */
-var BUILD_STAMP = "2026-08-25 17:52";   /* filled in by build.js — which copy of the page this is */
+var BUILD_STAMP = "2026-08-25 22:02";   /* filled in by build.js — which copy of the page this is */
 /* path of the report currently on screen */
 function reportPath() {
   return cloud.active.kind === "current" ? CURRENT_PATH : (REPORTS_COLL + "/" + cloud.active.id);
@@ -9360,6 +9360,10 @@ var MEDIA_VID_FPS = 24;
 var MEDIA_BUDGET  = 11 * 1024 * 1024;
 var MEDIA_VID_MIN = 500000;                  /* below this the picture is mush */
 var MEDIA_SRC_MAX = 600 * 1024 * 1024;       /* what we will even try to read */
+/* Why the last compression gave up, so that the sentence she is shown names
+   the thing she can actually do something about. Safe as one variable because
+   files are compressed one at a time, which is now enforced at both callers. */
+var mediaFailWhy = "";
 
 /* one file in, one file out, and a sentence saying what happened to it */
 function mediaShrink(file, onProg) {
@@ -9368,6 +9372,7 @@ function mediaShrink(file, onProg) {
     return Promise.reject(new Error("“" + file.name + "” is " + fvSize(file.size) +
       " — too big to even open. Trim it on the phone first."));
   var isVid = /^video\//.test(file.type || "");
+  mediaFailWhy = "";
   var work = isVid ? mediaVideo(file, onProg) : mediaImage(file);
   return work.catch(function () { return null; }).then(function (out) {
     /* a shrink that made it bigger is not a shrink */
@@ -9383,6 +9388,9 @@ function mediaShrink(file, onProg) {
       throw new Error(out
         ? "“" + file.name + "” is still " + fvSize(kept.size) + " after compressing" +
           (isVid ? " — it is too long. Trim it to about two minutes." : ".")
+        : mediaFailWhy === "stalled"
+        ? "“" + file.name + "” stopped part-way through compressing, and at " +
+          fvSize(kept.size) + " it is too big to file as it is. Trim it on the phone and try again."
         : "This browser cannot open “" + file.name + "” to compress it, and at " +
           fvSize(kept.size) + " it is too big to file as it is." +
           (isVid ? " iPhone video is the usual reason: open the report in Safari, or set " +
@@ -9491,9 +9499,17 @@ function mediaVideo(file, onProg) {
 
     var url = URL.createObjectURL(file);
     var v = document.createElement("video");
-    var done = false;
+    var done = false, tick = null, ac = null, onHide = null;
+    /* Every road out of here comes through this door, and it shuts everything
+       behind it: the timer, the listener, the playing clip, the audio context,
+       the object URL. A clip that was given up on used to go on playing to an
+       empty room for the rest of the afternoon. */
     function finish(out) {
       if (done) return; done = true;
+      if (tick) { clearInterval(tick); tick = null; }
+      if (onHide) document.removeEventListener("visibilitychange", onHide);
+      try { v.pause(); } catch (e) {}
+      try { if (ac) ac.close(); } catch (e) {}
       try { URL.revokeObjectURL(url); } catch (e) {}
       resolve(out);
     }
@@ -9519,40 +9535,106 @@ function mediaVideo(file, onProg) {
       cv.height = Math.round(H * scale / 2) * 2;
       var ctx = cv.getContext("2d");
       var stream = cv.captureStream(MEDIA_VID_FPS);
-      var ac = null;
-      try {
-        ac = new (window.AudioContext || window.webkitAudioContext)();
-        var dest = ac.createMediaStreamDestination();
-        ac.createMediaElementSource(v).connect(dest);   /* into the recording, never to the speakers */
-        dest.stream.getAudioTracks().forEach(function (t) { stream.addTrack(t); });
-      } catch (e) { ac = null; }
+      withAudio(stream, function () { play(cv, ctx, stream, dur, rate); });
+    }
 
-      var rec, chunks = [];
+    /* Sound is taken through an AudioContext rather than off the element,
+       because the element's own output goes to the speakers and this must not.
+       But a context built without a live user gesture starts suspended, and a
+       suspended context never produces a sample: the audio track joins the
+       recording and then stays empty for the whole clip. That is not a quiet
+       video. The muxer holds the file open at the end waiting for a stream
+       that was never coming, stop() never completes, and the chip sits at
+       "Compressing 99%" until she gives up on it — a file picker's change
+       event is a gesture that has usually expired by the time the metadata
+       arrives, so this is the ordinary case, not the rare one.
+
+       So the context is started first and given a second and a half to say it
+       is running. If it will not, the clip is recorded without sound, which is
+       a loss worth taking for a video of a crack in a wall. */
+    function withAudio(stream, go) {
+      try { ac = new (window.AudioContext || window.webkitAudioContext)(); }
+      catch (e) { ac = null; return go(); }
+      var settled = false;
+      function ready() {
+        if (settled || done) return; settled = true;
+        if (ac && ac.state === "running") {
+          try {
+            var dest = ac.createMediaStreamDestination();
+            ac.createMediaElementSource(v).connect(dest);   /* into the recording, never to the speakers */
+            dest.stream.getAudioTracks().forEach(function (t) { stream.addTrack(t); });
+          } catch (e) {}
+        } else {
+          try { if (ac) ac.close(); } catch (e) {}
+          ac = null;
+        }
+        go();
+      }
+      setTimeout(ready, 1500);
+      try {
+        var p = ac.resume && ac.resume();
+        if (p && p.then) p.then(ready, ready); else ready();
+      } catch (e) { ready(); }
+    }
+
+    /* Played before it is recorded, not after. A browser that will not start an
+       audible clip refuses at play(), and the answer is to drop the sound and
+       ask again — which is a thing to settle before a recorder is holding an
+       audio track nothing will ever be written to. */
+    function play(cv, ctx, stream, dur, rate) {
+      if (done) return;
+      v.play().then(function () { record(cv, ctx, stream, dur, rate); }, function () {
+        stream.getAudioTracks().forEach(function (t) {
+          try { stream.removeTrack(t); t.stop(); } catch (e) {}
+        });
+        try { if (ac) ac.close(); } catch (e) {}
+        ac = null;
+        v.muted = true;
+        v.play().then(function () { record(cv, ctx, stream, dur, rate); },
+                      function () { finish(null); });
+      });
+    }
+
+    function record(cv, ctx, stream, dur, rate) {
+      if (done) return;
+      var rec, chunks = [], failed = false, stopping = false;
       try {
         /* the audio rate is left to the browser too: 64 kbps was the other
            half of the EncodingError */
         rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: rate });
       } catch (e) { return finish(null); }
-      var failed = false;
       rec.ondataavailable = function (ev) { if (ev.data && ev.data.size) chunks.push(ev.data); };
       /* A recorder that fails stops itself, hands over what it had, and says
          nothing unless asked. Unasked, this shipped forty seconds of site video
          as half a second and called it compression. */
       rec.onerror = function () { failed = true; };
-      rec.onstop = function () {
-        try { if (ac) ac.close(); } catch (e) {}
-        clearInterval(tick);
+      rec.onstop = function () { deliver(); };
+
+      function deliver() {
+        if (done) return;
         if (failed) return finish(null);
         var blob = new Blob(chunks, { type: mime.split(";")[0] });
-        var ext = mime.indexOf("mp4") >= 0 ? "mp4" : "webm";
         if (!blob.size) return finish(null);
+        var ext = mime.indexOf("mp4") >= 0 ? "mp4" : "webm";
         var out = new File([blob], mediaRename(file.name, ext), { type: blob.type });
         /* And then the result is checked against the thing it replaces. If the
            clip that comes out is shorter than the one that went in, the
            compression is thrown away and the original kept: a video the board
            cannot watch to the end is worse than a big one. */
         mediaHolds(out, dur).then(function (ok) { finish(ok ? out : null); });
-      };
+      }
+      /* stop() is asked, not trusted. It is supposed to flush the file and call
+         back; when it does not — and a recorder handed a track that never
+         carried anything does not — nothing else in here was ever going to
+         happen. The recording is written every second, so after eight seconds
+         of silence we take the seconds we already hold and build the file from
+         those, which is all but the last of it. */
+      function wrap() {
+        if (stopping || done) return; stopping = true;
+        if (tick) { clearInterval(tick); tick = null; }
+        try { rec.stop(); } catch (e) { return deliver(); }
+        setTimeout(deliver, 8000);
+      }
 
       /* Drawn off a timer rather than an animation frame. Animation frames stop
          entirely in a tab that is not being looked at, and the recorder does
@@ -9561,12 +9643,35 @@ function mediaVideo(file, onProg) {
          with no warning. A timer keeps drawing; and if she does leave the tab,
          the clip is paused outright and resumed when she comes back, so it
          takes longer and stays whole. */
-      var tick = setInterval(function () {
-        if (v.ended || v.paused) return;
-        ctx.drawImage(v, 0, 0, cv.width, cv.height);
-        if (onProg && dur > 0) onProg(Math.min(0.99, v.currentTime / dur));
-      }, Math.round(1000 / MEDIA_VID_FPS));
-      function onHide() {
+      var iv = Math.round(1000 / MEDIA_VID_FPS);
+      var seen = -1, still = 0, ran = 0;
+      tick = setInterval(function () {
+        ran += iv;
+        if (!v.paused && !v.ended) ctx.drawImage(v, 0, 0, cv.width, cv.height);
+        var at = v.currentTime;
+        if (onProg && dur > 0) onProg(Math.min(0.99, at / dur));
+        if (v.ended) return wrap();
+        if (document.hidden) { seen = at; still = 0; return; }   /* paused on purpose */
+        /* A clip that has stopped moving has either finished without saying so
+           or stalled on a frame it cannot decode. Both look identical from
+           here — the percentage simply stops — and both used to sit at 99 for
+           the rest of the afternoon with Save refusing to go. Within a second
+           of the end it is taken as finished and the recording closed; anywhere
+           earlier it is abandoned and the original file kept, which she can
+           still file and the board can still watch. */
+        if (at > seen + 0.02) { seen = at; still = 0; } else { still += iv; }
+        if (still >= 5000) {
+          if (dur > 0 && at >= dur - 1) return wrap();
+          mediaFailWhy = "stalled"; return finish(null);
+        }
+        /* and a ceiling on the whole thing, for the stall that stops the clock
+           along with the picture */
+        if (ran > (dur > 0 ? dur * 3000 + 30000 : 300000)) {
+          mediaFailWhy = "stalled"; return finish(null);
+        }
+      }, iv);
+
+      onHide = function () {
         if (done) return;
         if (document.hidden) {
           v.pause();
@@ -9575,36 +9680,10 @@ function mediaVideo(file, onProg) {
           try { if (rec.state === "paused") rec.resume(); } catch (e) {}
           v.play().catch(function () {});
         }
-      }
-      document.addEventListener("visibilitychange", onHide);
-      v.onended = function () {
-        clearInterval(tick);
-        document.removeEventListener("visibilitychange", onHide);
-        try { rec.stop(); } catch (e) { finish(null); }
       };
+      document.addEventListener("visibilitychange", onHide);
+      v.onended = wrap;
       rec.start(1000);
-      v.play().then(function () { /* the timer is already drawing */ }).catch(function () {
-        /* autoplay refused with sound: try again without it rather than give up */
-        try { rec.stop(); } catch (e) {}
-        v.muted = true;
-        v.play().then(function () {
-          chunks = [];
-          try { rec = new MediaRecorder(cv.captureStream(MEDIA_VID_FPS),
-                  { mimeType: mime, videoBitsPerSecond: rate }); } catch (e) { return finish(null); }
-          rec.ondataavailable = function (ev) { if (ev.data && ev.data.size) chunks.push(ev.data); };
-          rec.onerror = function () { failed = true; };
-          rec.onstop = function () {
-            clearInterval(tick);
-            if (failed) return finish(null);
-            var blob = new Blob(chunks, { type: mime.split(";")[0] });
-            var ext = mime.indexOf("mp4") >= 0 ? "mp4" : "webm";
-            if (!blob.size) return finish(null);
-            var out2 = new File([blob], mediaRename(file.name, ext), { type: blob.type });
-            mediaHolds(out2, dur).then(function (ok) { finish(ok ? out2 : null); });
-          };
-          rec.start(1000);
-        }).catch(function () { finish(null); });
-      });
     }
     v.src = url;
   });
@@ -9708,7 +9787,9 @@ function progMediaRender() {
     return '<span class="pmchip' + (m.busy ? " busy" : "") + '">' + img +
       '<span class="nm">' + esc(f.name) +
       '<small>' + esc(m.busy
-        ? (m.prog ? "Compressing " + Math.round(m.prog * 100) + "% — this runs at real time" : "Compressing…")
+        ? (m.wait ? "Waiting its turn…"
+          : m.prog ? "Compressing " + Math.round(m.prog * 100) + "% — this runs at real time"
+          : "Compressing…")
         : (m.note || fvSize(f.size))) + "</small></span>" +
       (m.busy ? "" : '<span class="fx" data-pmi="' + i + '" title="Remove">✕</span>') + "</span>";
   }).join("");
@@ -9723,22 +9804,32 @@ document.getElementById("progMediaBtn").onclick = function () { document.getElem
 document.getElementById("progMediaFile").addEventListener("change", function () {
   var files = [].slice.call(this.files);
   this.value = "";
-  files.forEach(function (f) {
-    var m = { file: f, busy: true, prog: 0, note: "" };
+  var queue = files.map(function (f) {
+    var m = { file: f, busy: true, wait: true, prog: 0, note: "" };
     progMedia.push(m);
-    progMediaRender();
-    mediaShrink(f, function (p) { m.prog = p; progMediaRender(); })
+    return m;
+  });
+  progMediaRender();
+  /* One at a time, and the rest say so. Two clips compressing at once are two
+     videos decoding, two canvases drawing and two encoders competing for the
+     same machine, each halving the other's chance of keeping up — and "this
+     runs at real time" stops being true the moment there are two of them. */
+  (function next(i) {
+    if (i >= queue.length) return;
+    var m = queue[i];
+    m.wait = false; progMediaRender();
+    mediaShrink(m.file, function (p) { m.prog = p; progMediaRender(); })
       .then(function (out) {
         m.busy = false; m.file = out.file; m.note = out.note;
         progMediaRender();
-      })
-      .catch(function (err) {
+      }, function (err) {
         progMedia.splice(progMedia.indexOf(m), 1);
         progMediaRender();
         var pe = document.getElementById("progErr");
         if (pe) pe.textContent = (err && err.message) || "That file could not be used.";
-      });
-  });
+      })
+      .then(function () { next(i + 1); });
+  })(0);
 });
 document.getElementById("progMediaList").addEventListener("click", function (e) {
   if (e.target.dataset.pmi != null) { progMedia.splice(+e.target.dataset.pmi, 1); progMediaRender(); }
