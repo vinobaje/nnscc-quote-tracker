@@ -2734,7 +2734,7 @@ var BRAND_PATH = "nnsccQuoteTrackerBeta/brand";               /* the letterhead 
 var WEEKLY_DRAFT_PATH = "nnsccQuoteTrackerBeta/weeklyDraft";   /* the report she is working on */
 var WEEKLY_COLL = "nnsccWeeklyReportsBeta";                   /* every one she has finished */
 var VIEW_BETA = CURRENT_PATH.indexOf("Beta") >= 0;   /* which report the passcode gate reads/protects */
-var BUILD_STAMP = "2026-08-26 09:56";   /* filled in by build.js — which copy of the page this is */
+var BUILD_STAMP = "2026-08-26 19:56";   /* filled in by build.js — which copy of the page this is */
 /* path of the report currently on screen */
 function reportPath() {
   return cloud.active.kind === "current" ? CURRENT_PATH : (REPORTS_COLL + "/" + cloud.active.id);
@@ -3108,7 +3108,9 @@ function computeAll() {
   });
   return { jobs: jobs, spend: spend, dead: dead, hp: hp, nhp: nhp, total: total, hpTotal: hpTotal,
            wait: wait, decided: decided, drafts: drafts, hpW: hpW, nhpW: nhpW,
-           hpWTotal: sum(hpW), nhpWTotal: sum(nhpW),
+           /* what the board is being asked about, which is what the tables,
+              the donut and now the cards all count */
+           waitTotal: sum(wait), hpWTotal: sum(hpW), nhpWTotal: sum(nhpW),
            savings: savings, pendingCount: pendingCount, roll: roll,
            approvedTotal: approvedTotal, stCounts: stCounts, staleBids: staleBids };
 }
@@ -3143,10 +3145,13 @@ function openStatBreakdown(kind) {
              amt: x.c.cost, st: x.j.status };
   }
   if (kind === "total" || kind === "hp" || kind === "std") {
-    var set = kind === "hp" ? d.hp : (kind === "std" ? d.nhp : d.spend);
-    title = kind === "hp" ? "High-priority jobs" : (kind === "std" ? "Standard-priority jobs" : "Every job in this report");
+    /* the same set the card counts: what is still waiting for the board */
+    var set = kind === "hp" ? d.hpW : (kind === "std" ? d.nhpW : d.wait);
+    title = kind === "hp" ? "High-priority jobs before the board"
+          : (kind === "std" ? "Standard-priority jobs before the board" : "Every job before the board");
     lede = set.length + " job" + (set.length === 1 ? "" : "s") +
-      ", each counted at the quote in the report totals — the lowest, unless another was chosen.";
+      " still awaiting a decision, each counted at the quote in the report totals — the lowest, " +
+      "unless another was chosen. Jobs the board has already decided are not here.";
     rows = set.map(jobRow).sort(function (a, b) { return b.amt - a.amt; });
     total = rows.reduce(function (t, r) { return t + r.amt; }, 0);
   } else if (kind === "approved") {
@@ -3757,7 +3762,7 @@ function decidedNote(d, which) {
   return '<p class="decnote">' + gone.length + (gone.length === 1 ? " job is" : " jobs are") +
     " not listed here — the board has already decided " + (gone.length === 1 ? "it" : "them") +
     " (" + esc(bits.join(", ")) + "). They are in <strong>Status &amp; board decisions</strong> " +
-    "at the end of the report, and still counted in the figures above.</p>";
+    "at the end of the report, and are not in the totals above.</p>";
 }
 /* Section A rows (high-priority table body) — shared */
 function secARows(d, ctx) {
@@ -3875,17 +3880,32 @@ function donutSVG(slices, top, bot) {
     '<text x="70" y="84" text-anchor="middle" class="dn-bot">' + esc(bot) + '</text></svg>';
 }
 /* six headline stat cards (markup shared; parent class styles the look) */
+/* The three priority cards count the jobs still waiting for a decision, and
+   nothing else.
+
+   They used to count every live job that was not rejected or cancelled, which
+   meant a card reading "High priority — 10 jobs, $39,579" sat directly above
+   the table of high-priority jobs, which listed three of them and subtotalled
+   $6,356. Both figures were arrived at honestly; they were answers to
+   different questions, and only one of them is the question a board packet
+   asks. Work already approved has its own card, work already done is in Status
+   and board decisions, and a deferred job comes back when it comes back — none
+   of it is money the board is being asked to release this month.
+
+   The tables and the donut were moved onto this basis already. These were the
+   last figures on the page still counting the wider set. */
 function statCards(d) {
   /* What this number is, said on the card. It is one quote per job added up —
      the lowest priced one, unless the property manager carried a different
      quote there — and never the sum of every quote received. */
-  var carriedNote = d.spend.some(function (x) {
+  var carriedNote = d.wait.some(function (x) {
     return x.c.carriedBids.some(function (b) { return b.override; });
   }) ? "lowest each, bar carried ⚑" : "lowest quote per job";
+  var awaiting = function (n) { return n + " awaiting decision"; };
   var cards = [
-    { k: "total", c: "tt", ic: "💵", v: money(d.total), l: "Total, all jobs", s: carriedNote },
-    { k: "hp", c: "hp", ic: "🚩", v: money(d.hpTotal), l: "High priority", s: d.hp.length + " jobs" },
-    { k: "std", c: "sd", ic: "📁", v: money(d.total - d.hpTotal), l: "Standard priority", s: d.nhp.length + " jobs" },
+    { k: "total", c: "tt", ic: "💵", v: money(d.waitTotal), l: "Total before the board", s: carriedNote },
+    { k: "hp", c: "hp", ic: "🚩", v: money(d.hpWTotal), l: "High priority", s: awaiting(d.hpW.length) },
+    { k: "std", c: "sd", ic: "📁", v: money(d.nhpWTotal), l: "Standard priority", s: awaiting(d.nhpW.length) },
     { k: "saved", c: "sv", ic: "📈", v: money(d.savings), l: "Saved via bids", s: "vs. highest bids" },
     { k: "pending", c: "pd", ic: "⏳", v: String(d.pendingCount), l: "Bids pending", s: "open for quotes" },
     { k: "approved", c: "ap", ic: "✅", v: money(d.approvedTotal), l: "Board approved", s: "approved spend" }
@@ -4477,7 +4497,7 @@ function renderClassicReport() {
   h.push('<p class="seclede">Where a job received more than one priced quote, the lowest bid ' +
     "is used in all totals. All amounts include 13% HST.</p>");
   h.push('<div class="tiles">');
-  var carriedNote = d.spend.some(function (x) {
+  var carriedNote = d.wait.some(function (x) {
     return x.c.carriedBids.some(function (b) { return b.override; });
   }) ? "lowest each, bar carried ⚑" : "lowest quote per job";
   /* the figure, then what it is called, then what it counts — the third line is
@@ -4488,9 +4508,10 @@ function renderClassicReport() {
       (vstyle || "") + ">" + val + '</div><div class="l">' + esc(label) + "</div>" +
       (sub ? '<div class="s">' + sub + "</div>" : "") + "</div>");
   }
-  tile("total", "", money(d.total), "Total, all jobs", carriedNote);
-  tile("hp", "hp", money(d.hpTotal), "High priority", d.hp.length + " jobs");
-  tile("std", "", money(d.total - d.hpTotal), "Standard", d.nhp.length + " jobs");
+  /* the same three figures the tables below them subtotal — see statCards */
+  tile("total", "", money(d.waitTotal), "Total before the board", carriedNote);
+  tile("hp", "hp", money(d.hpWTotal), "High priority", d.hpW.length + " awaiting decision");
+  tile("std", "", money(d.nhpWTotal), "Standard", d.nhpW.length + " awaiting decision");
   tile("saved", "sv", money(d.savings), "Saved via bids", "vs. highest bids");
   tile("approved", "ap", money(d.approvedTotal), "Board approved", "approved spend");
   tile("pending", "pd", String(d.pendingCount), "Bids pending", "open for quotes");
