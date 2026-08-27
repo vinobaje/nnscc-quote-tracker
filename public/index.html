@@ -1619,6 +1619,10 @@ body[data-view="edit"] .wrap { max-width:none; }
 .qreadacts { display:flex; gap:9px; align-items:center; flex-wrap:wrap; margin-top:10px; }
 .qreadnote { font-size:12px; color:var(--muted); margin:0; flex:1; min-width:180px; }
 .qreadnote.bad { color:var(--prio); }
+/* the status chip, when it is a thing to press rather than a thing to read */
+.qstbtn { cursor:pointer; border:1px solid currentColor; font:inherit; font-size:11.5px;
+  font-weight:650; line-height:1.3; }
+.qstbtn:hover { background:var(--amber); color:#fff; border-color:var(--amber); }
 .qtable { width:100%; border-collapse:collapse; font-size:13px; }
 .qtable th { font-size:10.5px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color:var(--muted);
   text-align:left; padding:8px 9px; background:var(--paper); border-bottom:1px solid var(--line-soft); white-space:nowrap; }
@@ -2814,7 +2818,7 @@ var BRAND_PATH = "nnsccQuoteTracker/brand";               /* the letterhead the 
 var WEEKLY_DRAFT_PATH = "nnsccQuoteTracker/weeklyDraft";   /* the report she is working on */
 var WEEKLY_COLL = "nnsccWeeklyReports";                   /* every one she has finished */
 var VIEW_BETA = CURRENT_PATH.indexOf("Beta") >= 0;   /* which report the passcode gate reads/protects */
-var BUILD_STAMP = "2026-08-26 20:58";   /* filled in by build.js — which copy of the page this is */
+var BUILD_STAMP = "2026-08-26 21:03";   /* filled in by build.js — which copy of the page this is */
 /* path of the report currently on screen */
 function reportPath() {
   return cloud.active.kind === "current" ? CURRENT_PATH : (REPORTS_COLL + "/" + cloud.active.id);
@@ -5406,7 +5410,12 @@ function edJobCardHTML(j, ji) {
       ? '<span class="qst ' + (x.override ? "over" : "sel") + '">' +
         (x.override ? "Counted ⚑" : "Counted in totals") + "</span>"
       : (x.total != null ? '<span class="qst hi">Not counted</span>'
-        : x.unpriced ? '<span class="qst pen">\u{1F4CE} Enter the amount</span>'
+        /* A row that says "enter the amount" and offers no way to is a rebuke.
+           The quotations are attached to this very row; the button that reads
+           them belongs here, not behind the \u22ef menu where it was. */
+        : x.unpriced ? '<button class="qst pen qstbtn" type="button" data-act="readfiles" ' +
+          'title="Claude reads the attached quote' + (b.files.length > 1 ? "s and adds their totals up" : "") +
+          '">\u2728 Read ' + (b.files.length > 1 ? "the " + b.files.length + " quotes" : "the quote") + "</button>"
         : ((b.contractor || "").trim() ? '<span class="qst pen">Pending</span>' : ""));
     var files = (b.files || []).map(function (f, fi) {
       return '<a class="attlink" href="' + esc(f.url) + '" data-att="' + esc(j.id) + ":" + bi + ":" + fi +
@@ -5444,9 +5453,13 @@ function edJobCardHTML(j, ji) {
             '</a><span class="fx" data-act="delfile" data-fi="' + fi + '" title="Remove attachment">✕</span></span>';
         }).join("") +
         '<span class="spacer" style="flex:1"></span>' +
-        '<button class="edbtn danger" type="button" data-act="delbid">Delete quote</button></div>' +
-        bidReadPanelHTML(j.id, bi) + '</td></tr>');
+        '<button class="edbtn danger" type="button" data-act="delbid">Delete quote</button></div></td></tr>');
     }
+    /* what Claude read, shown under the row it belongs to whether or not the
+       row happens to be expanded */
+    if (bidRead && bidRead.jid === j.id && bidRead.bi === bi)
+      h.push('<tr class="qrow qxtra" data-bi="' + bi + '"><td colspan="9">' +
+        bidReadPanelHTML(j.id, bi) + "</td></tr>");
   });
   h.push("</tbody></table></div>");
   if (typeof j.pick === "number" && c.bids[j.pick] && c.bids[j.pick].override) {
