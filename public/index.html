@@ -948,6 +948,24 @@ body:has(#report.tpl-packet) .wrap { max-width:1560px; }
   text-transform:uppercase; letter-spacing:.04em; }
 .tpl-packet .pk-viewall:hover { background:#124f2f; }
 .tpl-packet .pk-hptable:not(.hp-all) .pk-hp-extra { display:none; }
+.tpl-packet .pk-pasttable:not(.past-all) .pk-past-extra { display:none; }
+/* how much of a record a finished job left behind, said in the row rather than
+   made to be discovered by opening each one */
+.tpl-packet .pk-pastup { font-size:11px; font-weight:600; color:var(--muted); white-space:nowrap;
+  background:var(--line-soft); border-radius:99px; padding:1px 7px; margin-left:6px; }
+/* On a phone the two facts being scanned for are when it finished and what it
+   cost. The contractor is a name in the drawer; keeping its column here pushed
+   both of them off the right-hand edge. */
+@media screen and (max-width:600px){
+  .tpl-packet .pk-pasttable .pk-hp-con, .tpl-packet .pk-pasttable th.pk-conhead { display:none; }
+  .tpl-packet .pk-pasttable col.pk-concol { width:0; }   /* or the column keeps its reserved width */
+  /* and the four that remain are given room by taking it out of the padding
+     rather than off the right-hand edge */
+  .tpl-packet .pk-pasttable table { font-size:12.5px; }
+  .tpl-packet .pk-pasttable th, .tpl-packet .pk-pasttable td { padding-left:5px; padding-right:5px; }
+  .tpl-packet .pk-pasttable col.pk-amtcol { width:80px; }
+  .tpl-packet .pk-pasttable col.pk-donecol { width:78px; }
+}
 /* "view full contractor spend report" link under the bars */
 .tpl-packet .pk-spendmore { display:block; text-align:center; margin-top:12px; padding-top:11px;
   border-top:1px solid var(--line-soft); font-size:12px; font-weight:600; color:var(--pkg); text-decoration:none; }
@@ -2146,6 +2164,7 @@ body[data-view="edit"] .wrap { max-width:none; }
   .tablewrap { overflow:visible; }
   /* everything hidden behind a "show all" control is printed in full */
   .tpl-packet .pk-hptable .pk-hp-extra { display:table-row !important; }
+  .tpl-packet .pk-pasttable .pk-past-extra { display:table-row !important; }
   .tpl-packet .pk-updrest[hidden] { display:block !important; }
   .pk-viewall, .pk-spendmore, .pk-updmore, .pk-addupd, .pk-prow,
   .tpl-packet .pk-nav, .tpl-packet .bids.expand { display:none !important; }
@@ -2521,6 +2540,38 @@ var STOPPED_SET = { rejected:1, deferred:1, cancelled:1 };
    decisions still lists them with the date — but they are out of the arithmetic. */
 var DEAD_SET = { rejected:1, cancelled:1 };
 function countsAsSpend(j) { return !DEAD_SET[j.status || "quoted"]; }
+/* A finished job stops being work in progress, but not on the day it finishes.
+   For a few weeks after the crew leaves there are still photographs to add, an
+   invoice to match against the quote, a director asking how it went — so it
+   stays on the board where everyone has been watching it. After that it is
+   history, and leaving it there is how Work in progress turned into a list of
+   things that are not in progress. A month, then it moves to Completed
+   earlier: one line each, a click from everything the card held.
+
+   (The other way to clear it is to start a fresh report each month and carry
+   the open jobs forward, which the archive has always supported. Not everyone
+   does that, and a report should not need housekeeping to stay readable.) */
+var DONE_SETTLE_DAYS = 30;
+/* The day the work finished. A completed job's status date is stamped at the
+   moment the status becomes "completed", by the stepper and by the status
+   dropdown alike, so for these jobs it means one thing only. */
+function jobDoneDate(j) {
+  return (j.status === "completed" && j.statusDate) ? String(j.statusDate).slice(0, 10) : "";
+}
+function jobDoneDaysAgo(j) {
+  var dt = jobDoneDate(j);
+  if (!dt) return null;
+  var n = conDaysUntil(dt);
+  return n == null ? null : -n;
+}
+/* A completed job carrying no date is treated as old rather than new: it was
+   finished before anything was stamping dates, which is the backlog this is
+   here to clear. Nothing is lost either way — the section below holds it. */
+function doneSettled(j) {
+  if ((j.status || "quoted") !== "completed") return false;
+  var n = jobDoneDaysAgo(j);
+  return n == null || n > DONE_SETTLE_DAYS;
+}
 function statusLabel(k) { for (var i=0;i<STATUSES.length;i++) if (STATUSES[i][0]===k) return STATUSES[i][1]; return k; }
 /* status chip for the report — quiet for the default "quoted" state */
 function stChip(j) {
@@ -2734,7 +2785,7 @@ var BRAND_PATH = "nnsccQuoteTracker/brand";               /* the letterhead the 
 var WEEKLY_DRAFT_PATH = "nnsccQuoteTracker/weeklyDraft";   /* the report she is working on */
 var WEEKLY_COLL = "nnsccWeeklyReports";                   /* every one she has finished */
 var VIEW_BETA = CURRENT_PATH.indexOf("Beta") >= 0;   /* which report the passcode gate reads/protects */
-var BUILD_STAMP = "2026-08-26 19:56";   /* filled in by build.js — which copy of the page this is */
+var BUILD_STAMP = "2026-08-26 20:17";   /* filled in by build.js — which copy of the page this is */
 /* path of the report currently on screen */
 function reportPath() {
   return cloud.active.kind === "current" ? CURRENT_PATH : (REPORTS_COLL + "/" + cloud.active.id);
@@ -3087,6 +3138,9 @@ function computeAll() {
   var drafts = jobs.filter(function (x) { return awaitingBoard(x.j) && !reportListable(x.j); });
   var hpW = hp.filter(function (x) { return reportListable(x.j); });
   var nhpW = nhp.filter(function (x) { return reportListable(x.j); });
+  /* Work in progress, and what has dropped off the back of it */
+  var progNow = jobs.filter(function (x) { return APPROVED_SET[x.j.status] && !doneSettled(x.j); });
+  var progPast = jobs.filter(function (x) { return doneSettled(x.j); });
   var sum = function (a) { return a.reduce(function (s, x) { return s + x.c.cost; }, 0); };
   var total = spend.reduce(function (s, x) { return s + x.c.cost; }, 0);
   var hpTotal = hp.reduce(function (s, x) { return s + x.c.cost; }, 0);
@@ -3111,6 +3165,7 @@ function computeAll() {
            /* what the board is being asked about, which is what the tables,
               the donut and now the cards all count */
            waitTotal: sum(wait), hpWTotal: sum(hpW), nhpWTotal: sum(nhpW),
+           progNow: progNow, progPast: progPast,
            savings: savings, pendingCount: pendingCount, roll: roll,
            approvedTotal: approvedTotal, stCounts: stCounts, staleBids: staleBids };
 }
@@ -3947,6 +4002,25 @@ function hpCompactRows(d, ctx) {
   if (!d.hpW.length) h.push('<tr><td colspan="6" style="color:var(--muted)">No high-priority jobs.</td></tr>');
   return h.join("");
 }
+/* Completed earlier: newest first, because the question asked of this list is
+   almost always "when did we last do the X" rather than "what did we ever do". */
+var PAST_ROWS = 12;
+function packetPastRows(d) {
+  return d.progPast.slice().sort(function (a, b) {
+    return String(jobDoneDate(b.j)).localeCompare(String(jobDoneDate(a.j)));
+  }).map(function (x, i) {
+    var who = (x.j.awardedTo || "").trim();
+    if (!who && x.c.carriedBids.length) who = (x.c.carriedBids[0].b.contractor || "").trim();
+    var dt = jobDoneDate(x.j);
+    var nUp = (x.j.updates || []).length;
+    return "<tr" + jrowAttrs(x.j, i >= PAST_ROWS ? "pk-past-extra" : "") + '><td class="num">' +
+      esc(x.j.no) + '</td><td class="pk-hp-job">' + esc(x.j.desc || "job") +
+      (nUp ? ' <span class="pk-pastup">' + nUp + " update" + (nUp === 1 ? "" : "s") + "</span>" : "") +
+      '</td><td class="pk-hp-con">' + (esc(who) || "\u2014") + '</td><td class="money">' +
+      (x.c.cost ? money(x.c.cost) : "\u2014") + '</td><td class="pk-hp-stat">' +
+      (dt ? esc(dt) : '<span class="pendchip">no date</span>') + "</td></tr>";
+  }).join("");
+}
 /* top-savings as a vertical list + total card (board-packet panel) */
 function topSavingsList(d, ov) {
   var h = ['<div class="pk-saves">'];
@@ -4020,7 +4094,8 @@ var PK_ICON = {
   spend: 'M12 3v18M8.5 7.5H14a2 2 0 010 4H9a2 2 0 000 4h6',
   open:  'M4 13l2-8h12l2 8M4 13v6h16v-6M4 13h5l1.2 2h3.6l1.2-2h5',
   prog:  'M12 3a9 9 0 100 18 9 9 0 000-18M12 7v5l3.5 2',
-  arch:  'M3 5a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1zM5 8v11h14V8M10 12h4'
+  arch:  'M3 5a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1zM5 8v11h14V8M10 12h4',
+  done:  'M12 3a9 9 0 100 18 9 9 0 000-18M8.2 12.2l2.6 2.6 5-5'
 };
 function pkIcon(k) {
   return '<span class="ni"><svg viewBox="0 0 24 24" fill="none" stroke="#eac986" stroke-width="1.7" ' +
@@ -4186,8 +4261,9 @@ function pkStepper(sg, ED) {
   return h.join("");
 }
 function packetProgress(d, ctx) {
-  /* jobs the board has approved (or finished) — the ones with work to track */
-  var act = d.jobs.filter(function (x) { return APPROVED_SET[x.j.status]; });
+  /* jobs the board has approved, and the ones finished inside the last month —
+     see DONE_SETTLE_DAYS for why the older ones are not here */
+  var act = d.progNow;
   if (!act.length)
     return '<p class="seclede" style="margin:0">No approved jobs to track yet — once the board approves a job, its progress pipeline appears here.</p>';
   var cards = [];
@@ -4266,6 +4342,7 @@ function renderPacketReport() {
   var bn = document.getElementById("brandName"); if (bn) bn.textContent = M.condoName;
   var cRows = secCRows(d, ctx);
   var sched = scheduleBuckets(d);
+  var nPast = d.progPast.length;    /* the rail only lists a section that exists */
   var role = ctx.ED ? "Property manager" : (isBoardMember() ? "Board member" : "Board viewer");
   var h = [];
   var goldBuilding = '<svg viewBox="0 0 24 24" fill="none" stroke="#e7cf8f" stroke-width="1.4" stroke-linejoin="round">' +
@@ -4280,6 +4357,7 @@ function renderPacketReport() {
     '<a href="#secB">' + pkIcon("bid") + ' Bid comparisons</a>' +
     '<a href="#secC">' + pkIcon("sched") + ' Standard schedule</a>' +
     '<a href="#secProg">' + pkIcon("prog") + ' Work in progress</a>' +
+    (nPast ? '<a href="#secPast">' + pkIcon("done") + ' Completed earlier</a>' : "") +
     '<a href="#secD">' + pkIcon("spend") + ' Contractor spend</a>' +
     '<a href="#secE">' + pkIcon("open") + ' Open items</a>' +
     '<a href="#" data-arch="1">' + pkIcon("arch") + ' Reports archive</a>' +
@@ -4340,14 +4418,34 @@ function renderPacketReport() {
     packetSecC(d, ctx) + decidedNote(d, "std") + '</section>');
   h.push('</div>');
   /* work-in-progress pipeline: one card per approved job (stepper + % + updates) */
-  var nAct = d.jobs.filter(function (x) { return APPROVED_SET[x.j.status]; }).length;
-  var nDone = d.stCounts.completed || 0;
+  var nDone = d.progNow.filter(function (x) { return x.j.status === "completed"; }).length;
+  var nAct = d.progNow.length - nDone;
   h.push('<section id="secProg" class="panel pk-detailcard">' +
     pkSecHead("D", "Work in progress",
-      "Every approved job from creation to completion — quotes received, board approval, contract award, work progress and dated site updates.",
-      nAct ? '<div class="pk-totalcard"><div class="tl">Active jobs</div><div class="tv">' + (nAct - nDone) +
-        (nDone ? '<small class="pk-tvsub"> +' + nDone + ' done</small>' : '') + '</div></div>' : '') +
+      "Every approved job from creation to completion — quotes received, board approval, contract award, work progress and dated site updates. " +
+      "Jobs finished more than " + DONE_SETTLE_DAYS + " days ago move to Completed earlier.",
+      d.progNow.length ? '<div class="pk-totalcard"><div class="tl">Active jobs</div><div class="tv">' + nAct +
+        (nDone ? '<small class="pk-tvsub"> +' + nDone + ' just done</small>' : '') + '</div></div>' : '') +
     packetProgress(d, ctx) + '</section>');
+  /* and the ones that have dropped off the back of it: a line each, and the
+     whole card is still one click away in the job's own drawer */
+  if (d.progPast.length)
+    h.push('<section id="secPast" class="panel pk-detailcard pk-pasttable">' +
+      pkSecHead("\u2713", "Completed earlier",
+        "Work signed off more than " + DONE_SETTLE_DAYS + " days ago. Click any job for its full history, " +
+        "photographs and site updates.",
+        '<div class="pk-totalcard"><div class="tl">Jobs completed</div><div class="tv">' + d.progPast.length + '</div></div>') +
+      '<div class="tablewrap"><table><colgroup><col style="width:22px"><col>' +
+      '<col class="pk-concol" style="width:142px">' +
+      '<col class="pk-amtcol" style="width:96px">' +
+      '<col class="pk-donecol" style="width:98px"></colgroup>' +
+      '<thead><tr><th>#</th><th>Job</th><th class="pk-conhead">Contractor</th>' +
+      '<th class="money">Amount</th><th>Completed</th></tr></thead><tbody>' +
+      packetPastRows(d) + '</tbody></table></div>' +
+      (d.progPast.length > PAST_ROWS
+        ? '<a class="pk-viewall" data-pastmore="' + d.progPast.length + '">View all ' +
+          d.progPast.length + ' completed jobs \u2193</a>' : '') +
+      '</section>');
   /* bottom 2-up: schedule | open items (kept last) */
   h.push('<div class="pk-grid2">');
   var tl = sched.length
@@ -5019,7 +5117,8 @@ function edJobCardHTML(j, ji) {
     '<div class="f"><label>Date added</label><input type="date" value="' + esc(j.created || "") +
     '" data-f="created" title="When this job was raised"></div>' +
     '<div class="f"><label>Status</label><select data-f="status">' + sopts + "</select></div>" +
-    '<div class="f"><label>Decision date</label><input type="date" value="' + esc(j.statusDate || "") + '" data-f="statusDate"></div>' +
+    '<div class="f"><label>' + (j.status === "completed" ? "Completed on" : "Decision date") +
+      '</label><input type="date" value="' + esc(j.statusDate || "") + '" data-f="statusDate"></div>' +
     '<div class="f"><label>Awarded to</label><select data-f="awardedTo">' + awOpts + "</select>" +
       (APPROVED_SET[j.status || "quoted"] && !j.awardedTo
         ? '<span class="fwarn">\u2691 Approved with no contractor recorded</span>' : "") + "</div>" +
@@ -5786,8 +5885,14 @@ document.getElementById("editor").addEventListener("change", function (e) {
   }
   else if (f === "desc") j.desc = e.target.value;
   else if (f === "status") {
+    var wasSt = j.status || "quoted";
     j.status = e.target.value;
     if (!j.statusDate && j.status !== "quoted") j.statusDate = todayISO();
+    /* On a completed job the status date is the day the work finished — it is
+       what Completed earlier sorts by and counts the thirty days from — so
+       finishing a job stamps today over whatever decision date it carried.
+       Only on the change itself: correcting the date by hand still stands. */
+    if (j.status === "completed" && wasSt !== "completed") j.statusDate = todayISO();
     if (j.status === "completed") j.pct = 100;   /* finished work is 100% by definition */
     persist(null, [jobLabel(j) + " marked " + statusLabel(j.status)], j.id);
     renderEditor(); renderReport(); return;
@@ -10470,6 +10575,18 @@ document.addEventListener("click", function (e) {
   /* board-packet sidebar "Reports archive" → open the report library overlay */
   var arch = e.target.closest("[data-arch]");
   if (arch) { e.preventDefault(); openReportsOverlay(); return; }
+  /* board-packet "View all completed jobs" → reveal the hidden rows */
+  var pmore = e.target.closest("[data-pastmore]");
+  if (pmore) {
+    e.preventDefault();
+    var ppanel = pmore.closest(".pk-pasttable");
+    if (ppanel) {
+      var popen = ppanel.classList.toggle("past-all");
+      var pn = pmore.getAttribute("data-pastmore");
+      pmore.textContent = popen ? "Show fewer \u2191" : "View all " + pn + " completed jobs \u2193";
+    }
+    return;
+  }
   /* board-packet "View all high-priority jobs" → reveal the hidden rows */
   var more = e.target.closest("[data-hpmore]");
   if (more) {
