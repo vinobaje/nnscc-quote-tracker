@@ -971,6 +971,22 @@ body:has(#report.tpl-packet) .wrap { max-width:1560px; }
   border-top:1px solid var(--line-soft); font-size:12px; font-weight:600; color:var(--pkg); text-decoration:none; }
 .tpl-packet .pk-spendmore:hover { text-decoration:underline; }
 /* open items: two columns like the mockup */
+/* a section that opens and shuts: shut by default, and its heading is the
+   control, so there is nothing else on the row to explain */
+.tpl-packet .pk-fold .pk-foldhead { cursor:pointer; display:flex; align-items:baseline; gap:9px;
+  flex-wrap:wrap; margin:0; user-select:none; }
+.tpl-packet .pk-fold .pk-foldhead:hover { color:var(--pkg); }
+.tpl-packet .pk-fold .pk-foldic { font-size:10px; color:var(--muted); transition:transform .15s;
+  display:inline-block; }
+.tpl-packet .pk-fold.open .pk-foldic { transform:rotate(90deg); }
+.tpl-packet .pk-fold .pk-foldn { font-size:12px; font-weight:600; color:var(--ink2);
+  text-transform:none; letter-spacing:0; }
+.tpl-packet .pk-fold .pk-foldn small { font-weight:500; color:var(--muted); }
+.tpl-packet .pk-fold:not(.open) .pk-foldbody { display:none; }
+/* shut, the panel is its heading and nothing else — the rule that separates a
+   heading from its contents has no contents to separate it from */
+.tpl-packet .pk-fold:not(.open) > .pk-foldhead { border-bottom:none; padding-bottom:0; margin-bottom:0; }
+.tpl-packet .pk-fold:not(.open) { padding-top:13px; padding-bottom:13px; }
 .tpl-packet #secE .notes { column-count:2; column-gap:26px; }
 .tpl-packet #secE .notes li { break-inside:avoid; }
 /* two columns of a job description on a phone is four words a line */
@@ -2159,6 +2175,8 @@ body[data-view="edit"] .wrap { max-width:none; }
   /* everything hidden behind a "show all" control is printed in full */
   .tpl-packet .pk-hptable .pk-hp-extra { display:table-row !important; }
   .tpl-packet .pk-pasttable .pk-past-extra { display:table-row !important; }
+  .tpl-packet .pk-fold .pk-foldbody { display:block !important; margin-top:12px; }
+  .tpl-packet .pk-fold .pk-foldic { display:none; }
   .tpl-packet .pk-updrest[hidden] { display:block !important; }
   .pk-viewall, .pk-spendmore, .pk-updmore, .pk-addupd, .pk-prow,
   .tpl-packet .pk-nav, .tpl-packet .bids.expand { display:none !important; }
@@ -2779,7 +2797,7 @@ var BRAND_PATH = "nnsccQuoteTrackerBeta/brand";               /* the letterhead 
 var WEEKLY_DRAFT_PATH = "nnsccQuoteTrackerBeta/weeklyDraft";   /* the report she is working on */
 var WEEKLY_COLL = "nnsccWeeklyReportsBeta";                   /* every one she has finished */
 var VIEW_BETA = CURRENT_PATH.indexOf("Beta") >= 0;   /* which report the passcode gate reads/protects */
-var BUILD_STAMP = "2026-08-26 20:26";   /* filled in by build.js — which copy of the page this is */
+var BUILD_STAMP = "2026-08-26 20:30";   /* filled in by build.js — which copy of the page this is */
 /* path of the report currently on screen */
 function reportPath() {
   return cloud.active.kind === "current" ? CURRENT_PATH : (REPORTS_COLL + "/" + cloud.active.id);
@@ -3860,6 +3878,24 @@ function secBCards(d, ctx) {
   return h.join("");
 }
 /* Section E lists (open items, decisions, savings) — shared */
+/* Open or shut, remembered across re-renders: the manager edits something on
+   the other side of the page and this used to snap closed under her. */
+var secEOpen = false;
+/* What is in the fold, said on the outside of it: how many decisions, and of
+   what kind, newest-first order being irrelevant to a count. */
+function secESummary(d) {
+  var by = {}, n = 0;
+  d.jobs.forEach(function (x) {
+    var st = x.j.status || "quoted";
+    if (st === "quoted" && !x.j.statusDate) return;
+    n++; var k = statusLabel(st); by[k] = (by[k] || 0) + 1;
+  });
+  if (!n) return "";
+  var bits = Object.keys(by).sort(function (a, b) { return by[b] - by[a]; })
+    .map(function (k) { return by[k] + " " + k.toLowerCase(); });
+  return '<span class="pk-foldn">' + n + " decision" + (n === 1 ? "" : "s") +
+    ' <small>' + esc(bits.join(" \u00b7 ")) + "</small></span>";
+}
 /* What the board decided, newest first. This is the whole of the packet's
    closing section now — see where it is pushed for what used to sit around it. */
 function secEBlocks(d, M, EDITOR) {
@@ -4425,8 +4461,22 @@ function renderPacketReport() {
      largest single job — are both said elsewhere: Bids pending is a card at the
      top with the same jobs behind it, and the largest item is the first row of
      Section C. */
-  h.push('<section id="secE" class="panel"><h3>Status &amp; board decisions</h3>' +
-    secEBlocks(d, M, ctx.ED) + '</section>');
+  /* Folded shut. Every decision here is already on the job's own card and in
+     its drawer; this is the one place they are in one list, which is worth
+     having and is not worth a screenful every time the packet is opened. The
+     heading carries the count and the breakdown, so shut is still an answer to
+     "what has the board decided" — and it prints open, because paper has no
+     triangle to press. */
+  var eSum = secESummary(d);
+  h.push(eSum
+    ? '<section id="secE" class="panel pk-fold' + (secEOpen ? " open" : "") + '">' +
+      '<h3 class="pk-foldhead" role="button" tabindex="0" data-fold="1" ' +
+      'title="Show or hide the decisions"><span class="pk-foldic">\u25b8</span>' +
+      'Status &amp; board decisions' + eSum + '</h3>' +
+      '<div class="pk-foldbody">' + secEBlocks(d, M, ctx.ED) + '</div></section>'
+    /* nothing decided yet: a fold over one sentence is worse than the sentence */
+    : '<section id="secE" class="panel"><h3>Status &amp; board decisions</h3>' +
+      secEBlocks(d, M, ctx.ED) + '</section>');
   /* the corporation's standing agreements, read alongside the report */
   if (canSeeContracts())
     h.push('<section id="secF" class="panel"><h3>Contracts with contractors</h3>' +
@@ -10249,7 +10299,8 @@ document.addEventListener("click", function (e) {
 });
 document.addEventListener("keydown", function (e) {
   if (e.key !== "Enter" && e.key !== " ") return;
-  var el = e.target && e.target.closest ? e.target.closest("[data-att],[data-attstash]") : null;
+  var el = e.target && e.target.closest
+    ? e.target.closest("[data-att],[data-attstash],[data-fold]") : null;
   if (!el) return;
   e.preventDefault(); el.click();
 });
@@ -10546,6 +10597,14 @@ document.addEventListener("click", function (e) {
   /* board-packet sidebar "Reports archive" → open the report library overlay */
   var arch = e.target.closest("[data-arch]");
   if (arch) { e.preventDefault(); openReportsOverlay(); return; }
+  /* a folding section heading (Status & board decisions) */
+  var fold = e.target.closest("[data-fold]");
+  if (fold) {
+    e.preventDefault();
+    var fsec = fold.closest(".pk-fold");
+    if (fsec) secEOpen = fsec.classList.toggle("open");
+    return;
+  }
   /* board-packet "View all completed jobs" → reveal the hidden rows */
   var pmore = e.target.closest("[data-pastmore]");
   if (pmore) {
