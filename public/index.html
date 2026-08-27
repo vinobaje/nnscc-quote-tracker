@@ -2814,7 +2814,7 @@ var BRAND_PATH = "nnsccQuoteTracker/brand";               /* the letterhead the 
 var WEEKLY_DRAFT_PATH = "nnsccQuoteTracker/weeklyDraft";   /* the report she is working on */
 var WEEKLY_COLL = "nnsccWeeklyReports";                   /* every one she has finished */
 var VIEW_BETA = CURRENT_PATH.indexOf("Beta") >= 0;   /* which report the passcode gate reads/protects */
-var BUILD_STAMP = "2026-08-26 20:54";   /* filled in by build.js — which copy of the page this is */
+var BUILD_STAMP = "2026-08-26 20:58";   /* filled in by build.js — which copy of the page this is */
 /* path of the report currently on screen */
 function reportPath() {
   return cloud.active.kind === "current" ? CURRENT_PATH : (REPORTS_COLL + "/" + cloud.active.id);
@@ -3418,8 +3418,13 @@ var PEOPLE = { "nnscc292connect@cpomanagement.ca": "Sarah" };
 /* Accounts whose edits are NOT written to the change log. The log exists so a
    board can see how the manager's report evolved; the condo super dipping in to
    maintain the system would only muddy that. Their writes still go through the
-   same rules and still land in the report — only the log entry is skipped. */
-var LOG_EXEMPT = ["mvinobaje@gmail.com", "vino@stoneycreekpm.ca", "vadim@cpomanagement.ca"];
+   same rules and still land in the report — only the log entry is skipped.
+
+   This is the owner's own two addresses and nobody else's. It is deliberately
+   NOT the administrator list: being able to edit every building is a different
+   question from whose edits a board should not be shown, and everyone else who
+   touches a report — managers and administrators alike — is recorded. */
+var LOG_EXEMPT = ["mvinobaje@gmail.com", "vino@stoneycreekpm.ca"];
 function loggedAccount() {
   var e = String((cloud.user && cloud.user.email) || "").toLowerCase();
   return !!e && LOG_EXEMPT.indexOf(e) < 0;
