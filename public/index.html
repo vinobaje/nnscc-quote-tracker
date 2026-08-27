@@ -452,6 +452,9 @@ input:focus, select:focus { outline:2px solid var(--accent); outline-offset:-1px
   border-radius:99px; padding:3px 10px; background:var(--accent-soft); color:var(--accent-ink); }
 .jdchip.prio { background:var(--prio-soft); color:var(--prio); }
 .jdchip.plain { background:var(--paper); color:var(--ink2); border:1px solid var(--line); }
+/* a quotation sitting unread: not an error, but the totals are short until
+   someone types the number off it */
+.jdchip.warn { background:var(--amber-soft); color:var(--amber); }
 .jdbody { padding:16px 22px 20px; overflow-y:auto; }
 .jdfoot { padding:11px 22px; border-top:1px solid var(--line-soft); background:var(--paper);
   font-size:12px; color:var(--muted); text-align:center; }
@@ -2797,7 +2800,7 @@ var BRAND_PATH = "nnsccQuoteTracker/brand";               /* the letterhead the 
 var WEEKLY_DRAFT_PATH = "nnsccQuoteTracker/weeklyDraft";   /* the report she is working on */
 var WEEKLY_COLL = "nnsccWeeklyReports";                   /* every one she has finished */
 var VIEW_BETA = CURRENT_PATH.indexOf("Beta") >= 0;   /* which report the passcode gate reads/protects */
-var BUILD_STAMP = "2026-08-26 20:30";   /* filled in by build.js — which copy of the page this is */
+var BUILD_STAMP = "2026-08-26 20:38";   /* filled in by build.js — which copy of the page this is */
 /* path of the report currently on screen */
 function reportPath() {
   return cloud.active.kind === "current" ? CURRENT_PATH : (REPORTS_COLL + "/" + cloud.active.id);
@@ -3087,6 +3090,18 @@ function jobCalc(j) {
   bids.forEach(function (x, i) { if (firstLowest < 0 && x.total != null && x.total === minT) firstLowest = i; });
   bids.forEach(function (x, i) {
     x.pending = (x.total == null && (x.b.contractor || "").trim() !== "");
+    /* A contractor who has sent the quotation in is not awaiting anything. What
+       is missing is the number off the front of it, which is data entry — and
+       until somebody does it the job's totals are short by exactly that quote
+       and the board is told nobody has quoted. Those are different problems and
+       they belong to different people, so they are counted apart. */
+    x.hasDoc = ((x.b.files || []).length > 0);
+    x.unpriced = x.pending && x.hasDoc;
+    /* a row with nothing on it at all: no contractor, no price, no paper. It is
+       an empty line in the editor, and counting it as an invitation made "2 of
+       5 quotes received" out of four contractors and a blank. */
+    x.blank = !x.hasDoc && x.total == null && !(x.b.contractor || "").trim() &&
+              !String(x.b.notes || "").trim() && !String(x.b.qno || "").trim();
     x.lowest = priced.length > 1 && x.total === minT;
     /* exactly one bid is carried — with tied lowest quotes the first one counts,
        so a tie can never double-count in the totals */
@@ -3111,8 +3126,11 @@ function jobCalc(j) {
   return { bids: bids, priced: priced.length, cost: cost, carriedBids: carriedBids,
            likeForLike: likeForLike,
            saving: Math.round(saving * 100) / 100,
-           pendingNames: bids.filter(function (x) { return x.pending; })
-                             .map(function (x) { return x.b.contractor; }) };
+           invited: bids.filter(function (x) { return !x.blank; }).length,
+           pendingNames: bids.filter(function (x) { return x.pending && !x.unpriced; })
+                             .map(function (x) { return x.b.contractor; }),
+           unpricedNames: bids.filter(function (x) { return x.unpriced; })
+                              .map(function (x) { return (x.b.contractor || "").trim() || "a contractor"; }) };
 }
 
 /* jobs the board sees — archived ones are parked in the editor and count for
@@ -3474,13 +3492,15 @@ function jdFactCard(icon, label, value, sub, good) {
     (sub ? "<small>" + esc(sub) + "</small>" : "") + "</span></div>";
 }
 function jdQuotesHTML(j, c) {
-  if (!j.bids.length) return '<p class="histempty">No quotes have been entered for this job yet.</p>';
-  var rows = c.bids.map(function (x) {
+  var live = c.bids.filter(function (x) { return !x.blank; });
+  if (!live.length) return '<p class="histempty">No quotes have been entered for this job yet.</p>';
+  var rows = live.map(function (x) {
     var note;
     /* "counted in the totals" is bookkeeping, not a decision — the board may
        not have approved the job at all, so never word it like an award */
     if (x.carried) note = x.override ? "Counted in totals — carried over the lowest price"
       : (c.priced > 1 ? "Lowest price — counted in totals" : "Only quote in — counted in totals");
+    else if (x.unpriced) note = "Quote received \u2014 amount not entered yet";
     else if (x.pending) note = "Awaiting quote";
     else if (x.lowest) note = "Lowest price";
     else note = "";
@@ -3513,7 +3533,11 @@ function jdSummaryHTML(j, c) {
   h.push('<div class="jdsrow"><span class="k">Job stage</span><span class="v">' +
     '<span class="stchip st-' + esc(j.status || "quoted") + '">' + esc(statusLabel(j.status || "quoted")) +
     "</span></span></div>");
-  h.push(row("Quotes received", c.priced + " of " + j.bids.length));
+  /* received counts the ones that arrived; the sub-line says how many of those
+     anyone has actually read a price off */
+  var got = c.priced + c.unpricedNames.length;
+  h.push(row("Quotes received", got + " of " + c.invited,
+    c.unpricedNames.length ? c.priced + " with an amount entered" : ""));
   var carried = c.carriedBids[0];
   if (carried) h.push(row(carried.override ? "Counted in totals" : "Current lowest quote",
     money(carried.total), (carried.b.contractor || "").trim()));
@@ -3521,9 +3545,12 @@ function jdSummaryHTML(j, c) {
   var alt = c.bids.filter(function (x) { return x.total != null && !x.carried; })
     .sort(function (a, b) { return a.total - b.total; })[0];
   if (alt) h.push(row("Next lowest quote", money(alt.total), (alt.b.contractor || "").trim()));
+  if (c.unpricedNames.length)
+    h.push(row(c.unpricedNames.length === 1 ? "Quote in, not priced" : "Quotes in, not priced",
+      c.unpricedNames.join(", "), "Attached but no amount entered \u2014 not in the totals"));
   if (c.pendingNames.length)
     h.push(row(c.pendingNames.length === 1 ? "Pending contractor" : "Pending contractors",
-      c.pendingNames.join(", "), "Awaiting quote"));
+      c.pendingNames.join(", "), "Nothing received yet"));
   if ((j.awardedTo || "").trim())
     h.push(row("Awarded to", j.awardedTo.trim(), jdDate(j.awardDate) || ""));
   if (j.status === "inprogress" && j.pct != null) h.push(row("Site work", j.pct + "%", "as last reported"));
@@ -3553,8 +3580,12 @@ function openJobDossier(id) {
   var chips = [];
   if (j.priority) chips.push('<span class="jdchip prio">⚑ High priority</span>');
   chips.push('<span class="jdchip">' + esc(statusLabel(j.status || "quoted")) + "</span>");
-  chips.push('<span class="jdchip plain">' + c.priced + " of " + j.bids.length + " quote" +
-    (j.bids.length === 1 ? "" : "s") + " received</span>");
+  var gotN = c.priced + c.unpricedNames.length;
+  chips.push('<span class="jdchip plain">' + gotN + " of " + c.invited + " quote" +
+    (c.invited === 1 ? "" : "s") + " received</span>");
+  if (c.unpricedNames.length)
+    chips.push('<span class="jdchip warn">\u26A0 ' + c.unpricedNames.length +
+      " attached with no amount entered</span>");
   document.getElementById("jdChips").innerHTML = chips.join("");
 
   /* three headline facts. Two different dates are worth having — when the job
@@ -5740,6 +5771,8 @@ function aiBuildStats() {
     return { no: x.j.no, job: x.j.desc, priority: !!x.j.priority,
       carried_cost_cad: Math.round(x.c.cost * 100) / 100,
       bids: x.j.bids.length, pending_bids_from: x.c.pendingNames,
+      /* quotations that arrived and were never priced — received, but in no total */
+      unpriced_quotes_from: x.c.unpricedNames,
       savings_vs_next_bid_cad: x.c.saving || 0 };
   });
   var roll = Object.keys(d.roll).map(function (nm) {
@@ -9266,6 +9299,17 @@ function alertList() {
             ") — get the decision made or ask for it to be held." });
     });
   });
+  /* Quotations that arrived and were never priced. The board is not shown this
+     — it is the manager's data entry, not a decision — but until it is done the
+     job's totals are short by exactly these quotes. */
+  if (ED) (state.jobs || []).forEach(function (j) {
+    if (j.archived) return;
+    var jc; try { jc = jobCalc(j); } catch (e) { return; }
+    if (!jc.unpricedNames.length) return;
+    out.push({ kind: "unpriced", audience: "manager", days: null, severity: "info",
+      jid: j.id, n: jc.unpricedNames.length,
+      title: jobLabel(j), who: jc.unpricedNames.join(", ") });
+  });
   var rank = { passed: 0, urgent: 1, soon: 2, info: 3 };
   out.sort(function (a, b) {
     return (rank[a.severity] - rank[b.severity]) ||
@@ -9288,8 +9332,12 @@ function alertUrgent(items) {
 /* the list itself — shared by the packet's banner and the report's bell, so the
    two can never drift into saying different things about the same month */
 function alertLisHTML(items) {
-  var ED = isEditor(), quotes = [], named = [], h = [];
-  items.forEach(function (i) { (i.kind === "quote" ? quotes : named).push(i); });
+  var ED = isEditor(), quotes = [], unpriced = [], named = [], h = [];
+  items.forEach(function (i) {
+    if (i.kind === "quote") quotes.push(i);
+    else if (i.kind === "unpriced") unpriced.push(i);
+    else named.push(i);
+  });
   named.slice(0, 6).forEach(function (i) {
     h.push('<li class="' + i.severity + '"><span class="alertlink" data-alertlist="contract" role="button" ' +
       'tabindex="0" title="Go to the contracts section"><strong>' + esc(i.title) + "</strong> — " +
@@ -9310,6 +9358,17 @@ function alertLisHTML(items) {
       (ED ? "Ask the contractors to re-confirm, or re-date the quotes in Edit data."
           : "The property manager is re-confirming these prices with the contractors.") +
       ' <span class="alertsee">Which ones?</span></span></li>');
+  }
+  if (unpriced.length) {
+    var nq = 0;
+    unpriced.forEach(function (i) { nq += i.n; });
+    h.push('<li class="soon"><strong>Quotes attached but not priced</strong> \u2014 ' +
+      nq + " quotation" + (nq === 1 ? "" : "s") + " on " + unpriced.length + " job" +
+      (unpriced.length === 1 ? "" : "s") + " " + (nq === 1 ? "has" : "have") +
+      " been received and filed, but no amount has been entered, so " +
+      (nq === 1 ? "it is" : "they are") + " in no total: " +
+      esc(unpriced.slice(0, 4).map(function (i) { return i.title; }).join("; ")) +
+      (unpriced.length > 4 ? " and " + (unpriced.length - 4) + " more" : "") + ".</li>");
   }
   return h.join("");
 }
