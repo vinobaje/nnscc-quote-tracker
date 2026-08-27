@@ -1605,6 +1605,20 @@ body[data-view="edit"] .wrap { max-width:none; }
 
 /* quotes table */
 .qwrap { border:1px solid var(--line-soft); border-radius:9px; overflow-x:auto; }
+/* the panel that shows what Claude read off each attached quote before any of
+   it is written to the row */
+.qread { margin-top:10px; border-top:1px dashed var(--line); padding-top:10px; }
+.qreadtbl { width:100%; border-collapse:collapse; font-size:13px; }
+.qreadtbl td { padding:5px 6px; border-bottom:1px solid var(--line-soft); vertical-align:middle; }
+.qreadtbl tr.off td { opacity:.45; text-decoration:line-through; }
+.qreadtbl tr.off td.qrck { opacity:1; text-decoration:none; }
+.qreadtbl .qrck { width:26px; }
+.qreadtbl .qrnm { font-weight:600; word-break:break-all; }
+.qreadtbl .qrwhy { color:var(--muted); font-size:12px; }
+.qreadtbl .qrsum td { border-bottom:none; border-top:2px solid var(--line); font-weight:700; padding-top:8px; }
+.qreadacts { display:flex; gap:9px; align-items:center; flex-wrap:wrap; margin-top:10px; }
+.qreadnote { font-size:12px; color:var(--muted); margin:0; flex:1; min-width:180px; }
+.qreadnote.bad { color:var(--prio); }
 .qtable { width:100%; border-collapse:collapse; font-size:13px; }
 .qtable th { font-size:10.5px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color:var(--muted);
   text-align:left; padding:8px 9px; background:var(--paper); border-bottom:1px solid var(--line-soft); white-space:nowrap; }
@@ -2800,7 +2814,7 @@ var BRAND_PATH = "nnsccQuoteTracker/brand";               /* the letterhead the 
 var WEEKLY_DRAFT_PATH = "nnsccQuoteTracker/weeklyDraft";   /* the report she is working on */
 var WEEKLY_COLL = "nnsccWeeklyReports";                   /* every one she has finished */
 var VIEW_BETA = CURRENT_PATH.indexOf("Beta") >= 0;   /* which report the passcode gate reads/protects */
-var BUILD_STAMP = "2026-08-26 20:44";   /* filled in by build.js — which copy of the page this is */
+var BUILD_STAMP = "2026-08-26 20:54";   /* filled in by build.js — which copy of the page this is */
 /* path of the report currently on screen */
 function reportPath() {
   return cloud.active.kind === "current" ? CURRENT_PATH : (REPORTS_COLL + "/" + cloud.active.id);
@@ -3524,6 +3538,10 @@ function jdQuotesHTML(j, c) {
     else note = "";
     if (x.bestValue) note = "Better value for the money — " + (note || "not counted in totals");
     if (x.b.qno) note += (note ? " · " : "") + "Quote #" + x.b.qno;
+    /* one number standing for several quotations says so, or the board is
+       reading a total it has no way to recognise as one */
+    if (x.b.parts && x.b.parts.length > 1)
+      note += (note ? " · " : "") + "total of " + x.b.parts.length + " quotations";
     if (x.b.notes) note += (note ? " · " : "") + x.b.notes;
     var n = (x.b.files || []).length;
     var files = n
@@ -4995,9 +5013,142 @@ function renderEditor() {
 }
 /* amounts are typed as money ("48,500" / "$48,500.00") and stored as a number */
 function edAmt(n) { return Number(n).toLocaleString("en-CA", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+/* Three quotations for one job arrive as three PDFs against one contractor —
+   one per building, or one per visit — and the row wants their total. Typing
+   "372.90 + 1915.35 + 3152.70" adds them up here, rather than sending her to a
+   calculator and losing the working on the way back. */
 function edParseAmt(v) {
-  var raw = String(v == null ? "" : v).replace(/[^0-9.\-]/g, "");
+  var s = String(v == null ? "" : v);
+  if (s.indexOf("+") >= 0) {
+    var parts = s.split("+").map(function (t) {
+      var r = String(t).replace(/[^0-9.\-]/g, "");
+      return r === "" ? null : Number(r);
+    }).filter(function (n) { return n != null && isFinite(n); });
+    if (!parts.length) return null;
+    return Math.round(parts.reduce(function (a, b) { return a + b; }, 0) * 100) / 100;
+  }
+  var raw = s.replace(/[^0-9.\-]/g, "");
   return raw === "" ? null : Number(raw);
+}
+/* ---------- reading the quotes that are already attached ----------
+
+   A contractor sends three PDFs for one job — one per building, or one per
+   visit — and every one of them has its total printed on it. The row had
+   nowhere to put three numbers, so it stayed empty and the report told the
+   board nobody had quoted.
+
+   So: Claude reads each attached PDF, the totals are shown one per line with
+   the file they came from, and the sum goes in the row. Nothing is written
+   until she has looked at the numbers and pressed the button — a total on a
+   board report is not something to take on trust from a machine, and a line
+   she can strike out is how she disagrees with one of them.
+
+   Amounts are levelled to HST-included before they are added, because a quote
+   that states its tax and one that does not cannot be added as they stand. */
+var bidRead = null;   /* { jid, bi, busy, err, rows:[{name, amt, incl, ok, why}] } */
+function bidReadPanelHTML(jid, bi) {
+  if (!bidRead || bidRead.jid !== jid || bidRead.bi !== bi) return "";
+  if (bidRead.busy)
+    return '<div class="qread"><p class="qreadnote">' + esc(bidRead.busy) + "</p></div>";
+  if (bidRead.err)
+    return '<div class="qread"><p class="qreadnote bad">\u26A0 ' + esc(bidRead.err) + "</p>" +
+      '<button class="edbtn" type="button" data-act="readcancel">Close</button></div>';
+  var rows = bidRead.rows || [], sum = 0, n = 0;
+  var h = ['<div class="qread"><table class="qreadtbl"><tbody>'];
+  rows.forEach(function (r, ri) {
+    if (r.ok && r.incl != null) { sum += r.incl; n++; }
+    h.push("<tr" + (r.ok ? "" : ' class="off"') + '><td class="qrck">' +
+      (r.incl == null ? "" : '<input type="checkbox" data-act="readtoggle" data-ri="' + ri + '"' +
+        (r.ok ? " checked" : "") + ' title="Include this quotation in the total">') + "</td>" +
+      '<td class="qrnm">' + esc(r.name) + "</td>" +
+      '<td class="qrwhy">' + esc(r.why || "") + "</td>" +
+      '<td class="money">' + (r.incl == null ? "\u2014" : money(r.incl)) + "</td></tr>");
+  });
+  sum = Math.round(sum * 100) / 100;
+  h.push('<tr class="qrsum"><td></td><td>Total of ' + n + " quotation" + (n === 1 ? "" : "s") +
+    '</td><td class="qrwhy">HST included</td><td class="money">' + money(sum) + "</td></tr>");
+  h.push("</tbody></table>");
+  h.push('<div class="qreadacts">' +
+    (n ? '<button class="btn primary" type="button" data-act="readapply">\u2713 Put ' + money(sum) +
+         " in the row</button>" : "") +
+    '<button class="edbtn" type="button" data-act="readcancel">Cancel</button>' +
+    '<span class="qreadnote">Nothing is saved until you press the button. Check the numbers ' +
+    "against the PDFs \u2014 they are what the board will be shown.</span></div></div>");
+  return h.join("");
+}
+/* one attached file → its total, read by Claude off the document itself */
+function bidReadOne(f) {
+  var name = String(f.name || "attachment");
+  if (!/\.pdf$/i.test(name) && !/\.docx$/i.test(name))
+    return Promise.resolve({ name: name, incl: null, ok: false, why: "not a PDF" });
+  return fetch(f.url).then(function (r) {
+    if (!r.ok) throw new Error("could not fetch");
+    return r.blob();
+  }).then(function (blob) {
+    if (blob.size > 8 * 1024 * 1024) throw new Error("over 8 MB");
+    return new Promise(function (res, rej) {
+      var fr = new FileReader();
+      fr.onload = function () { res(String(fr.result || "").split(",")[1] || ""); };
+      fr.onerror = function () { rej(new Error("could not read")); };
+      fr.readAsDataURL(blob);
+    });
+  }).then(function (b64) {
+    if (!b64) throw new Error("empty file");
+    return cloud.fns.httpsCallable("nnsccTrackerAi")({ parseFile: true, fileB64: b64,
+      mediaType: /\.docx$/i.test(name) ? "docx" : "application/pdf", fileName: name });
+  }).then(function (res) {
+    var d = (res && res.data) || {};
+    var amt = (d.amount_cad == null || d.amount_cad === "") ? null : Number(d.amount_cad);
+    if (amt == null || !isFinite(amt))
+      return { name: name, incl: null, ok: false, why: "no total found in it" };
+    /* levelled to HST-included, so that quotes stating their tax and quotes not
+       stating it can be added to each other at all */
+    var incl = d.hst_included ? amt : Math.round(amt * (1 + HST) * 100) / 100;
+    return { name: name, incl: Math.round(incl * 100) / 100, ok: true,
+             why: (d.quote_number ? "#" + d.quote_number : "") +
+                  (d.hst_included ? "" : (d.quote_number ? " \u00b7 " : "") + "HST added") };
+  }).catch(function (e) {
+    return { name: name, incl: null, ok: false, why: (e && e.message) || "could not be read" };
+  });
+}
+function bidReadRun(j, bi) {
+  var b = j.bids[bi], files = (b && b.files) || [];
+  if (!files.length) return;
+  if (!cloud.fns || !cloud.user) { alert("Sign in first."); return; }
+  bidRead = { jid: j.id, bi: bi, busy: "Claude is reading " + files.length + " file" +
+    (files.length === 1 ? "" : "s") + "\u2026", err: "", rows: [] };
+  renderEditor();
+  var out = [], i = 0;
+  (function next() {
+    if (i >= files.length) {
+      bidRead.busy = ""; bidRead.rows = out; renderEditor(); return;
+    }
+    var f = files[i++];
+    bidRead.busy = "Reading " + i + " of " + files.length + " \u2014 " + (f.name || "attachment") + "\u2026";
+    renderEditor();
+    bidReadOne(f).then(function (r) { out.push(r); next(); });
+  })();
+}
+function bidReadApply() {
+  if (!bidRead || bidRead.busy) return;
+  var j = findJob(bidRead.jid); if (!j) { bidRead = null; renderEditor(); return; }
+  var b = j.bids[bidRead.bi]; if (!b) { bidRead = null; renderEditor(); return; }
+  var kept = (bidRead.rows || []).filter(function (r) { return r.ok && r.incl != null; });
+  if (!kept.length) return;
+  var sum = Math.round(kept.reduce(function (s, r) { return s + r.incl; }, 0) * 100) / 100;
+  b.amount = sum;
+  b.hst = true;                 /* everything was levelled to HST-included above */
+  /* what the figure is made of, kept with it — the board sees one number for
+     three quotations and is entitled to know that is what it is */
+  b.parts = kept.map(function (r) { return { name: r.name, amount: r.incl }; });
+  var note = kept.length > 1
+    ? jobLabel(j) + ": " + (b.contractor || "quote") + " set to " + money(sum) + " \u2014 the total of " +
+      kept.length + " attached quotations (" + kept.map(function (r) { return money(r.amount || r.incl); }).join(" + ") + ")"
+    : jobLabel(j) + ": " + (b.contractor || "quote") + " set to " + money(sum) + " from the attached quotation";
+  bidRead = null;
+  qcTouch(j);
+  persist(null, [note], j.id);
+  renderEditor(); renderReport();
 }
 function edSecHead(t, p) {
   return '<div class="ed-sechead"><h2>' + t + "</h2><p>" + p + "</p></div>";
@@ -5276,13 +5427,20 @@ function edJobCardHTML(j, ji) {
         '<label>Valid <input type="number" min="1" style="width:64px" value="' + esc(b.validDays || 60) + '" data-f="validDays"> days</label>' +
         (bidExpired(b) ? ' <span class="expired">⚠ expired</span>' : "") +
         '<button class="edbtn" type="button" data-act="attach">📎 Attach quote…</button>' +
+        ((b.files || []).length
+          ? '<button class="edbtn" type="button" data-act="readfiles" title="Claude reads the ' +
+            'attached quotes and adds their totals up">\u2728 Read ' +
+            ((b.files || []).length > 1 ? "and add up these " + b.files.length + " quotes" : "this quote") +
+            "</button>"
+          : "") +
         (b.files || []).map(function (f, fi) {
           return '<span class="filechip"><a href="' + esc(f.url) + '" data-att="' + esc(j.id) + ":" + bi + ":" + fi +
             '" data-attcap="' + esc(b.contractor || "") + '">📎 ' + esc(f.name) +
             '</a><span class="fx" data-act="delfile" data-fi="' + fi + '" title="Remove attachment">✕</span></span>';
         }).join("") +
         '<span class="spacer" style="flex:1"></span>' +
-        '<button class="edbtn danger" type="button" data-act="delbid">Delete quote</button></div></td></tr>');
+        '<button class="edbtn danger" type="button" data-act="delbid">Delete quote</button></div>' +
+        bidReadPanelHTML(j.id, bi) + '</td></tr>');
     }
   });
   h.push("</tbody></table></div>");
@@ -6008,6 +6166,9 @@ document.getElementById("editor").addEventListener("change", function (e) {
       var parsed = edParseAmt(e.target.value);
       if (parsed != null && !isFinite(parsed)) return;      /* ignore unparseable typing */
       b.amount = parsed;
+      /* a figure typed by hand is her figure: the breakdown that said this
+         number was the sum of three quotations no longer describes it */
+      if (b.parts) delete b.parts;
     }
     else if (f === "hst") b.hst = e.target.value === "yes";
     else if (f === "validDays") b.validDays = Math.max(1, +e.target.value || 60);
@@ -6159,6 +6320,22 @@ document.getElementById("editor").addEventListener("click", function (e) {
   if (act === "attach") {
     var ac = e.target.closest(".ecard"), ar = e.target.closest("[data-bi]");
     if (ac && ar) startAttach(+ac.dataset.ji, +ar.dataset.bi);
+    return;
+  }
+  /* read the quotes already attached to this bid and add their totals up */
+  if (act === "readfiles") {
+    var rc = e.target.closest(".ecard"), rr = e.target.closest("[data-bi]");
+    if (rc && rr) { var rj = state.jobs[+rc.dataset.ji]; if (rj) bidReadRun(rj, +rr.dataset.bi); }
+    return;
+  }
+  if (act === "readcancel") { bidRead = null; renderEditor(); return; }
+  if (act === "readapply") { bidReadApply(); return; }
+  if (act === "readtoggle") {
+    var ri = +e.target.getAttribute("data-ri");
+    if (bidRead && bidRead.rows && bidRead.rows[ri]) {
+      bidRead.rows[ri].ok = !bidRead.rows[ri].ok;
+      renderEditor();
+    }
     return;
   }
   if (act === "openvote") {
