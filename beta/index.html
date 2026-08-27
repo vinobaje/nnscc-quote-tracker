@@ -2800,7 +2800,7 @@ var BRAND_PATH = "nnsccQuoteTrackerBeta/brand";               /* the letterhead 
 var WEEKLY_DRAFT_PATH = "nnsccQuoteTrackerBeta/weeklyDraft";   /* the report she is working on */
 var WEEKLY_COLL = "nnsccWeeklyReportsBeta";                   /* every one she has finished */
 var VIEW_BETA = CURRENT_PATH.indexOf("Beta") >= 0;   /* which report the passcode gate reads/protects */
-var BUILD_STAMP = "2026-08-26 20:38";   /* filled in by build.js — which copy of the page this is */
+var BUILD_STAMP = "2026-08-26 20:44";   /* filled in by build.js — which copy of the page this is */
 /* path of the report currently on screen */
 function reportPath() {
   return cloud.active.kind === "current" ? CURRENT_PATH : (REPORTS_COLL + "/" + cloud.active.id);
@@ -3222,7 +3222,8 @@ function openStatBreakdown(kind) {
       sec.classList.add("pk-flash"); setTimeout(function () { sec.classList.remove("pk-flash"); }, 1600); }
     return;
   }
-  var d = computeAll(), rows = [], title = "", lede = "", total = null, cols = ["Job", "Contractor", "Amount (incl. HST)"];
+  var d = computeAll(), rows = [], title = "", lede = "", total = null, foot = "",
+      cols = ["Job", "Contractor", "Amount (incl. HST)"];
   function jobRow(x) {
     var names = [];
     x.c.carriedBids.forEach(function (cb) { var n = (cb.b.contractor || "").trim(); if (n && names.indexOf(n) < 0) names.push(n); });
@@ -3260,14 +3261,30 @@ function openStatBreakdown(kind) {
     total = rows.reduce(function (t, r) { return t + r.amt; }, 0);
   } else if (kind === "pending") {
     title = "Bids still pending";
-    lede = "Contractors who were invited to quote and have not returned a price yet.";
+    lede = "Contractors who were invited to quote and have not sent anything back yet.";
     cols = ["Job", "Contractor", "Status"];
+    /* This is the list behind the Bids pending card, so it counts what the card
+       counts and no more. Quotations that have arrived and are waiting for
+       somebody here to type the amount off them are a different problem with a
+       different owner, so they are named underneath rather than mixed in. */
+    var waitingOn = [];
     d.spend.forEach(function (x) {
       x.c.bids.forEach(function (b) {
+        if (b.unpriced) { waitingOn.push(jobLabel(x.j)); return; }
         if (b.pending) rows.push({ id: x.j.id, no: x.j.no, desc: x.j.desc || "job",
-          who: (b.b.contractor || "").trim() || "—", amt: null });
+          who: (b.b.contractor || "").trim() || "\u2014", amt: null, st: "awaiting quote" });
       });
     });
+    if (waitingOn.length) {
+      var seen = [];
+      waitingOn.forEach(function (l) { if (seen.indexOf(l) < 0) seen.push(l); });
+      foot = '<p class="histempty" style="text-align:left">\u{1F4CE} ' + waitingOn.length +
+        " quotation" + (waitingOn.length === 1 ? " has" : "s have") + " arrived and " +
+        (waitingOn.length === 1 ? "is" : "are") + " waiting for an amount to be entered, so " +
+        (waitingOn.length === 1 ? "it is" : "they are") + " in no total: " +
+        esc(seen.slice(0, 6).join("; ")) +
+        (seen.length > 6 ? " and " + (seen.length - 6) + " more" : "") + ".</p>";
+    }
   }
   document.getElementById("statTitle").textContent = title;
   document.getElementById("statLede").textContent = lede + (rows.length ? "  Open a job for its dates, quotes and progress." : "");
@@ -3281,13 +3298,14 @@ function openStatBreakdown(kind) {
       h.push('<tr class="jlink" data-jdoss="' + esc(r.id) + '" role="button" tabindex="0"' +
         ' title="Open this job — dates, quotes and progress"><td>' + esc(r.no) + "</td><td>" + esc(r.desc) +
         "</td><td>" + esc(r.who) +
-        '</td><td class="money">' + (r.amt == null ? "awaiting quote" : money(r.amt)) + "</td></tr>");
+        '</td><td class="money">' +
+        (r.amt == null ? esc(r.st || "awaiting quote") : money(r.amt)) + "</td></tr>");
     });
     if (total != null)
       h.push('<tr style="font-weight:700"><td></td><td>Total</td><td></td><td class="money">' + money(total) + "</td></tr>");
     h.push("</tbody></table>");
   }
-  document.getElementById("statBody").innerHTML = h.join("");
+  document.getElementById("statBody").innerHTML = h.join("") + foot;
   document.getElementById("statOverlay").classList.add("open");
 }
 /* "13 things need attention" is only useful if you can find out which 13.
@@ -3896,7 +3914,7 @@ function secCRows(d, ctx) {
 }
 /* Section B cards (bid comparisons) — shared */
 function secBCards(d, ctx) {
-  var multi = d.wait.filter(function (x) { return x.j.bids.length > 1; });
+  var multi = d.wait.filter(function (x) { return x.c.invited > 1; });
   if (!multi.length) return '<p class="seclede">No jobs currently have more than one bid.</p>';
   var h = [];
   multi.forEach(function (x) {
@@ -4045,7 +4063,7 @@ function hpCompactRows(d, ctx) {
       : (x.c.cost ? money(x.c.cost) : '<span class="pendchip">Pending</span>');
     h.push("<tr" + jrowAttrs(x.j, i >= 5 ? "pk-hp-extra" : "") + '><td class="num">' + esc(x.j.no) + '</td><td class="pk-hp-job">' +
       tEdit("job:" + x.j.id + ":desc", x.j.desc, "Job description") +
-      '</td><td class="pk-hp-con">' + contractor + '</td><td class="ctr">' + x.j.bids.length + '</td><td class="money">' + amt +
+      '</td><td class="pk-hp-con">' + contractor + '</td><td class="ctr">' + x.c.invited + '</td><td class="money">' + amt +
       '</td><td class="pk-hp-stat"><span class="hi-flag">High</span></td></tr>');
   });
   if (!d.hpW.length) h.push('<tr><td colspan="6" style="color:var(--muted)">No high-priority jobs.</td></tr>');
@@ -4164,12 +4182,17 @@ function pkSecHead(letter, title, sub, right) {
 
 /* ---- Section B (packet): competitive bid comparisons ---- */
 function packetSecB(d, ctx) {
-  var multi = d.wait.filter(function (x) { return x.j.bids.length > 1; });
-  var pend = 0;
-  multi.forEach(function (x) { x.c.bids.forEach(function (b) { if (b.pending) pend++; }); });
+  var multi = d.wait.filter(function (x) { return x.c.invited > 1; });
+  /* what is genuinely still out with a contractor, and separately what has come
+     back and is waiting on somebody here to read the price off it */
+  var pend = 0, unp = 0;
+  multi.forEach(function (x) { x.c.bids.forEach(function (b) {
+    if (b.unpriced) unp++; else if (b.pending) pend++; }); });
   var chips = '<div class="pk-chips">' +
     '<div class="pk-chip"><span class="pk-chip-ic" style="background:#eaf0f6;color:#2b6ca3">🗂</span><div><b>' + multi.length + '</b><span>Compared jobs</span></div></div>' +
     '<div class="pk-chip"><span class="pk-chip-ic" style="background:#f4ecdc;color:#a8791f">⏱</span><div><b>' + pend + '</b><span>Pending quotes</span></div></div>' +
+    (unp ? '<div class="pk-chip"><span class="pk-chip-ic" style="background:#f4ecdc;color:#a8791f">\u{1F4CE}</span><div><b>' +
+      unp + '</b><span>In, awaiting an amount</span></div></div>' : "") +
     '<div class="pk-chip"><span class="pk-chip-ic" style="background:#e7f3ec;color:#1e7a46">✓</span><div><b style="font-size:12.5px;font-weight:600">Lowest bids</b><span>highlighted</span></div></div>' +
     '</div>';
   if (!multi.length) return chips + '<p class="seclede">No jobs currently have more than one bid.</p>';
@@ -4223,8 +4246,8 @@ function packetSecC(d, ctx) {
     var notes = []; x.c.carriedBids.forEach(function (cb) {
       if (cb.b.notes && notes.indexOf(cb.b.notes) < 0) notes.push(cb.b.notes); });
     var note = notes.length ? '<span class="pk-jobnote">' + esc(notes.join(" · ")) + "</span>" : "";
-    var bidsChip = x.j.bids.length > 1
-      ? ' <span class="bids expand" role="button" tabindex="0" title="Show the competing quotes">' + x.j.bids.length + " bids</span>"
+    var bidsChip = x.c.invited > 1
+      ? ' <span class="bids expand" role="button" tabindex="0" title="Show the competing quotes">' + x.c.invited + " bids</span>"
       : "";
     var amt = x.c.cost ? money(x.c.cost) : '<span class="pendchip">Pending</span>';
     rows.push("<tr" + jrowAttrs(x.j) + '><td class="pk-ord"><span class="pk-oline" style="background:' + color + '"></span>' +
@@ -4245,7 +4268,11 @@ function packetSecC(d, ctx) {
    created date, bid count, board status/date, award fields, % complete */
 function jobStages(x) {
   var j = x.j, st = j.status || "quoted";
-  var quotesIn = x.c.bids.filter(function (b) { return !b.pending; }).length;
+  /* a quotation that has arrived is in, whether or not its amount has been
+     typed yet — the stage is "have the contractors answered", not "has the
+     paperwork been done" */
+  var quotesIn = x.c.bids.filter(function (b) {
+    return !b.blank && (!b.pending || b.unpriced); }).length;
   var stopped = !!STOPPED_SET[st];
   var approved = !!APPROVED_SET[st];
   var awarded = !!((j.awardedTo || "").trim() || j.awardDate);
@@ -4253,7 +4280,7 @@ function jobStages(x) {
   var pct = doneJob ? 100 : (j.pct == null ? null : Math.max(0, Math.min(100, +j.pct || 0)));
   var steps = [
     { label: "Created",     sub: j.created || "", done: true },
-    { label: "Quotes in",   sub: x.j.bids.length ? quotesIn + " of " + x.j.bids.length : "", done: quotesIn > 0 },
+    { label: "Quotes in",   sub: x.c.invited ? quotesIn + " of " + x.c.invited : "", done: quotesIn > 0 },
     { label: stopped ? statusLabel(st) : "Approved", sub: j.statusDate || "", done: approved, stop: stopped },
     { label: "Awarded",     sub: j.awardDate || "", done: awarded },
     { label: "In progress", sub: (st === "inprogress" && pct != null) ? pct + "%" : "", done: doneJob },
@@ -4529,9 +4556,11 @@ function tEdit(path, text, ph) {
   return '<span class="editable-txt" contenteditable="true" spellcheck="false" data-edit="' +
     path + '" data-ph="' + esc(ph || "Click to edit") + '" title="Click to edit">' + esc(text) + '</span>';
 }
-function badge(x) { return x.j.bids.length > 1
+/* "N bids" counts the contractors on the job, not the rows in the editor — an
+   empty line is not a bid, and it used to be counted as one everywhere. */
+function badge(x) { return x.c.invited > 1
   ? ' <span class="bids expand" role="button" tabindex="0" title="Show the competing quotes">' +
-    x.j.bids.length + " bids</span>" : ""; }
+    x.c.invited + " bids</span>" : ""; }
 
 /* rows of one job's quote comparison — shared by Section B and the inline expansions.
    Contractor / scope note / amount are click-to-edit for signed-in editors. */
@@ -4563,7 +4592,7 @@ function cmpRows(x) {
   return r.join("");
 }
 function bidRowHTML(x, colspan) {
-  if (x.j.bids.length < 2) return "";
+  if (x.c.invited < 2) return "";
   return '<tr class="bidrow" hidden><td colspan="' + colspan + '"><div class="bidrow-inner">' +
     '<table class="cmp"><thead><tr><th>Contractor</th><th>Scope note</th>' +
     '<th class="money">Total (incl. HST)</th><th></th></tr></thead><tbody>' +
@@ -4710,7 +4739,7 @@ function renderClassicReport() {
          money(d.hpWTotal) + "</td></tr></tbody></table></div>" + decidedNote(d, "hp") + "</section>");
 
   /* Section B */
-  var multi = d.wait.filter(function (x) { return x.j.bids.length > 1; });
+  var multi = d.wait.filter(function (x) { return x.c.invited > 1; });
   h.push('<section id="secB"><div class="kicker">Section B</div><h2' + hA("headB") + ">" + esc(M.headB) + "</h2>");
   h.push('<p class="seclede">' + tE("meta:ledeB", M.ledeB, "Section description") + "</p>");
   if (!multi.length) h.push('<p class="seclede">No jobs currently have more than one bid.</p>');
@@ -5221,6 +5250,7 @@ function edJobCardHTML(j, ji) {
       ? '<span class="qst ' + (x.override ? "over" : "sel") + '">' +
         (x.override ? "Counted ⚑" : "Counted in totals") + "</span>"
       : (x.total != null ? '<span class="qst hi">Not counted</span>'
+        : x.unpriced ? '<span class="qst pen">\u{1F4CE} Enter the amount</span>'
         : ((b.contractor || "").trim() ? '<span class="qst pen">Pending</span>' : ""));
     var files = (b.files || []).map(function (f, fi) {
       return '<a class="attlink" href="' + esc(f.url) + '" data-att="' + esc(j.id) + ":" + bi + ":" + fi +
