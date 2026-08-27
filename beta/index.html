@@ -973,6 +973,8 @@ body:has(#report.tpl-packet) .wrap { max-width:1560px; }
 /* open items: two columns like the mockup */
 .tpl-packet #secE .notes { column-count:2; column-gap:26px; }
 .tpl-packet #secE .notes li { break-inside:avoid; }
+/* two columns of a job description on a phone is four words a line */
+@media screen and (max-width:600px){ .tpl-packet #secE .notes { column-count:1; } }
 .tpl-packet #secE h3 { column-span:all; }
 /* top savings list */
 .tpl-packet .pk-saves { display:flex; flex-direction:column; gap:8px; }
@@ -982,14 +984,6 @@ body:has(#report.tpl-packet) .wrap { max-width:1560px; }
 .tpl-packet .pk-saverow .sr-job b { color:var(--pkg); } .tpl-packet .pk-saverow b { font-weight:700; }
 .tpl-packet .pk-saverow .amt { flex:none; font-weight:700; color:var(--pkg); font-variant-numeric:tabular-nums; white-space:nowrap; }
 .tpl-packet .savecard.total { border-radius:9px; padding:14px; }
-/* schedule timeline */
-.tpl-packet .pk-timeline { display:flex; gap:6px; align-items:flex-start; overflow-x:auto; padding:8px 0 2px; }
-.tpl-packet .pk-tl { flex:1; min-width:78px; text-align:center; position:relative; padding-top:22px; }
-.tpl-packet .pk-tl::before { content:""; position:absolute; top:7px; left:0; right:0; height:2px; background:#cfe0d5; }
-.tpl-packet .pk-tl .dot { position:absolute; top:1px; left:50%; transform:translateX(-50%); width:13px; height:13px;
-  border-radius:50%; background:var(--pkg); border:2px solid #fff; box-shadow:0 0 0 1px #cfe0d5; }
-.tpl-packet .pk-tl .m { font-size:12px; font-weight:700; color:var(--ink); }
-.tpl-packet .pk-tl .n { font-size:11px; color:var(--ink2); }
 .tpl-packet .notes { margin:0; padding-left:18px; } .tpl-packet .notes li { margin:5px 0; font-size:13px; }
 /* the detail sections (comparisons / standard schedule) span full width below */
 .tpl-packet .pk-detail { display:flex; flex-direction:column; gap:16px; }
@@ -2074,7 +2068,7 @@ body[data-view="edit"] .wrap { max-width:none; }
   h1, h2, h3, .pk-sechead, .grouphead, .cardhead, section > .kicker, .seclede { break-after:avoid; }
   h1, h2, h3, .pk-sechead, .grouphead, .cardhead { break-inside:avoid; }
   p, li { orphans:2; widows:2; }
-  tr, .brow, .pk-saverow, .pk-updrow, .pk-tl { break-inside:avoid; }
+  tr, .brow, .pk-saverow, .pk-updrow { break-inside:avoid; }
   thead { display:table-header-group; }
   .card, .tile, .chart { break-inside:avoid; }
 
@@ -2785,7 +2779,7 @@ var BRAND_PATH = "nnsccQuoteTrackerBeta/brand";               /* the letterhead 
 var WEEKLY_DRAFT_PATH = "nnsccQuoteTrackerBeta/weeklyDraft";   /* the report she is working on */
 var WEEKLY_COLL = "nnsccWeeklyReportsBeta";                   /* every one she has finished */
 var VIEW_BETA = CURRENT_PATH.indexOf("Beta") >= 0;   /* which report the passcode gate reads/protects */
-var BUILD_STAMP = "2026-08-26 20:17";   /* filled in by build.js — which copy of the page this is */
+var BUILD_STAMP = "2026-08-26 20:26";   /* filled in by build.js — which copy of the page this is */
 /* path of the report currently on screen */
 function reportPath() {
   return cloud.active.kind === "current" ? CURRENT_PATH : (REPORTS_COLL + "/" + cloud.active.id);
@@ -3866,35 +3860,23 @@ function secBCards(d, ctx) {
   return h.join("");
 }
 /* Section E lists (open items, decisions, savings) — shared */
+/* What the board decided, newest first. This is the whole of the packet's
+   closing section now — see where it is pushed for what used to sit around it. */
 function secEBlocks(d, M, EDITOR) {
   var h = [];
-  var pend = d.spend.filter(function (x) { return x.c.pendingNames.length; });
-  var savers = d.spend.filter(function (x) { return x.c.saving > 0; });
-  var biggest = null;
-  d.spend.forEach(function (x) { if (!biggest || x.c.cost > biggest.c.cost) biggest = x; });
-  if (state.ai && state.ai.openNote)
-    h.push('<p class="seclede ainarr">' + tEdit("ai:openNote", state.ai.openNote, "AI note") + "</p>");
-  h.push('<ul class="notes">');
-  pend.forEach(function (x) {
-    h.push("<li class=\"jrow\"" + jdData(x.j) + ">Job " + esc(x.j.no) + " (" + esc(x.j.desc) + "): awaiting quotes from " +
-           esc(x.c.pendingNames.join(", ")) + ".</li>");
-  });
-  if (biggest && biggest.c.cost > 0)
-    h.push("<li class=\"jrow\"" + jdData(biggest.j) + ">Largest single item: Job " + esc(biggest.j.no) +
-           " (" + esc(biggest.j.desc) + ") at " + money(biggest.c.cost) + ".</li>");
-  if (!pend.length) h.push("<li>No bids outstanding — every invited contractor has quoted.</li>");
-  h.push("</ul>");
   var decided = d.jobs.filter(function (x) { return x.j.statusDate || (x.j.status && x.j.status !== "quoted"); })
     .sort(function (a, b) { return String(b.j.statusDate || "").localeCompare(String(a.j.statusDate || "")); });
-  if (decided.length) {
-    h.push('<h3 style="margin-top:16px">Status &amp; board decisions</h3><ul class="notes">');
-    decided.slice(0, 15).forEach(function (x) {
-      h.push("<li class=\"jrow\"" + jdData(x.j) + ">Job " + esc(x.j.no) + " (" + esc(x.j.desc) + "): <strong>" + esc(statusLabel(x.j.status)) + "</strong>" +
-        (x.j.statusDate ? " on " + esc(x.j.statusDate) : "") +
-        (x.j.statusNote ? " — " + esc(x.j.statusNote) : "") + "</li>");
-    });
-    h.push("</ul>");
-  }
+  if (!decided.length)
+    return '<p class="seclede" style="margin:0">No decisions recorded yet — once the board approves, ' +
+      'defers or declines a job, it is listed here with the date.</p>';
+  h.push('<ul class="notes">');
+  decided.slice(0, 15).forEach(function (x) {
+    h.push("<li class=\"jrow\"" + jdData(x.j) + ">Job " + esc(x.j.no) + " (" + esc(x.j.desc) + "): <strong>" +
+      esc(statusLabel(x.j.status)) + "</strong>" +
+      (x.j.statusDate ? " on " + esc(x.j.statusDate) : "") +
+      (x.j.statusNote ? " — " + esc(x.j.statusNote) : "") + "</li>");
+  });
+  h.push("</ul>");
   return h.join("");
 }
 /* contractor-spend bars (Section D body) — shared; reuses the .browlink popup */
@@ -4072,19 +4054,6 @@ function topSavings(d, ov) {
   return h.join("");
 }
 /* schedule-at-a-glance buckets from real statusDate months (packet) */
-function scheduleBuckets(d) {
-  var m = {};
-  d.spend.forEach(function (x) {
-    var dt = x.j.statusDate;
-    if (dt && /^\d{4}-\d{2}/.test(dt)) { var k = dt.slice(0, 7); m[k] = (m[k] || 0) + 1; }
-  });
-  return Object.keys(m).sort().map(function (k) {
-    var parts = k.split("-");
-    var label = new Date(+parts[0], +parts[1] - 1, 1).toLocaleDateString("en-CA", { month: "short", year: "numeric" });
-    return { label: label, n: m[k] };
-  });
-}
-
 /* gold line icons for the board-packet sidebar (monochrome, stroke #d9b878) */
 var PK_ICON = {
   sum:   'M4 20h16M7 20v-6M12 20V8M17 20v-9',
@@ -4341,7 +4310,6 @@ function renderPacketReport() {
   document.title = M.condoName + " — Quote Tracker · BETA PREVIEW";
   var bn = document.getElementById("brandName"); if (bn) bn.textContent = M.condoName;
   var cRows = secCRows(d, ctx);
-  var sched = scheduleBuckets(d);
   var nPast = d.progPast.length;    /* the rail only lists a section that exists */
   var role = ctx.ED ? "Property manager" : (isBoardMember() ? "Board member" : "Board viewer");
   var h = [];
@@ -4359,7 +4327,7 @@ function renderPacketReport() {
     '<a href="#secProg">' + pkIcon("prog") + ' Work in progress</a>' +
     (nPast ? '<a href="#secPast">' + pkIcon("done") + ' Completed earlier</a>' : "") +
     '<a href="#secD">' + pkIcon("spend") + ' Contractor spend</a>' +
-    '<a href="#secE">' + pkIcon("open") + ' Open items</a>' +
+    '<a href="#secE">' + pkIcon("open") + ' Status &amp; decisions</a>' +
     '<a href="#" data-arch="1">' + pkIcon("arch") + ' Reports archive</a>' +
     /* not a section of the report — the corporation's standing agreements,
        kept apart from the run of report sections */
@@ -4446,16 +4414,19 @@ function renderPacketReport() {
         ? '<a class="pk-viewall" data-pastmore="' + d.progPast.length + '">View all ' +
           d.progPast.length + ' completed jobs \u2193</a>' : '') +
       '</section>');
-  /* bottom 2-up: schedule | open items (kept last) */
-  h.push('<div class="pk-grid2">');
-  var tl = sched.length
-    ? sched.map(function (b) { return '<div class="pk-tl"><span class="dot"></span><div class="m">' + esc(b.label) + '</div><div class="n">' + b.n + ' job' + (b.n === 1 ? "" : "s") + '</div></div>'; }).join("")
-    : '';
-  h.push('<section class="panel"><h3>Schedule at a glance</h3>' +
-    (tl ? '<div class="pk-timeline">' + tl + '</div>' : '<p class="seclede" style="margin:0">No scheduled dates recorded yet — set a status date on jobs to build the timeline.</p>') +
-    '</section>');
-  h.push('<section id="secE" class="panel"><h3>Open items for the board</h3>' + secEBlocks(d, M, ctx.ED) + '</section>');
-  h.push('</div>');
+  /* The packet used to close on a two-up: a timeline beside the open items.
+     The timeline bucketed jobs by the month their status date fell in — the
+     month a decision was recorded, not when any work is scheduled — so it was
+     the decisions list beside it, drawn as dots, under a heading promising a
+     schedule. One month of decisions made it a single dot occupying half the
+     width of the page. The list says all of it and the reasons with it.
+
+     The open items that sat beside it — who has not quoted yet, and the
+     largest single job — are both said elsewhere: Bids pending is a card at the
+     top with the same jobs behind it, and the largest item is the first row of
+     Section C. */
+  h.push('<section id="secE" class="panel"><h3>Status &amp; board decisions</h3>' +
+    secEBlocks(d, M, ctx.ED) + '</section>');
   /* the corporation's standing agreements, read alongside the report */
   if (canSeeContracts())
     h.push('<section id="secF" class="panel"><h3>Contracts with contractors</h3>' +
