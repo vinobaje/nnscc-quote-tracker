@@ -2827,7 +2827,7 @@ var BRAND_PATH = "nnsccQuoteTrackerBeta/brand";               /* the letterhead 
 var WEEKLY_DRAFT_PATH = "nnsccQuoteTrackerBeta/weeklyDraft";   /* the report she is working on */
 var WEEKLY_COLL = "nnsccWeeklyReportsBeta";                   /* every one she has finished */
 var VIEW_BETA = CURRENT_PATH.indexOf("Beta") >= 0;   /* which report the passcode gate reads/protects */
-var BUILD_STAMP = "2026-08-28 23:55";   /* filled in by build.js — which copy of the page this is */
+var BUILD_STAMP = "2026-08-29 09:46";   /* filled in by build.js — which copy of the page this is */
 /* path of the report currently on screen */
 function reportPath() {
   return cloud.active.kind === "current" ? CURRENT_PATH : (REPORTS_COLL + "/" + cloud.active.id);
@@ -3428,7 +3428,14 @@ function jrowAttrs(j, cls) {
 /* Who made a change, in words. The log records the account that signed in, but
    an email address tells a board member nothing — show the person's name, and
    fall back to the address for anyone not on the list. */
-var PEOPLE = { "nnscc292connect@cpomanagement.ca": "Sarah" };
+/* The building's own list of names, which beats whatever a Google profile
+   happens to say. A profile name is set once, years ago, for email — "vino
+   reka", lower case and with a surname nobody here uses — and it should not
+   decide how a person is named on a board document. Anyone not listed falls
+   back to their profile name, and then to their address. */
+var PEOPLE = { "nnscc292connect@cpomanagement.ca": "Sarah",
+               "vino@stoneycreekpm.ca": "Vino",
+               "mvinobaje@gmail.com": "Vino" };
 /* Accounts whose edits are NOT written to the change log. The log exists so a
    board can see how the manager's report evolved; the condo super dipping in to
    maintain the system would only muddy that. Their writes still go through the
@@ -3467,9 +3474,10 @@ function updStamp(u) {
    building's own list of names, then the address itself */
 function updWho(u) {
   if (!u) return "";
-  if (u.byName) return String(u.byName).trim();
-  if (u.by) return String(PEOPLE[String(u.by).toLowerCase()] || u.by);
-  return "";
+  var em = String(u.by || "").trim().toLowerCase();
+  if (em && PEOPLE[em]) return PEOPLE[em];        /* the list first, always */
+  if (u.byName) return String(u.byName).trim();   /* then what they call themselves */
+  return u.by ? String(u.by) : "";                /* then the address, which is at least true */
 }
 function personLabel(email) {
   var e = String(email || "").trim();
