@@ -1163,6 +1163,9 @@ body:has(#report.tpl-packet) .wrap { max-width:1560px; }
 .tpl-packet .pk-updby { display:inline-block; font-size:10.5px; font-weight:600; color:var(--muted);
   border:1px solid var(--line); border-radius:99px; padding:1px 8px; margin-left:6px;
   vertical-align:middle; white-space:nowrap; }
+.tpl-packet .pk-updby.claim { cursor:pointer; color:var(--pkg); border-color:var(--pkg);
+  border-style:dashed; text-decoration:none; }
+.tpl-packet .pk-updby.claim:hover { background:var(--pkg); color:#fff; border-style:solid; }
 .tpl-packet .pk-health { display:inline-block; font-size:10.5px; font-weight:700; border-radius:99px; padding:2px 10px; vertical-align:middle; }
 .tpl-packet .pk-health.ok { background:#e3f2e9; color:#1e7a46; }
 .tpl-packet .pk-health.warn { background:#f6e3c0; color:#8a5a10; }
@@ -2824,7 +2827,7 @@ var BRAND_PATH = "nnsccQuoteTrackerBeta/brand";               /* the letterhead 
 var WEEKLY_DRAFT_PATH = "nnsccQuoteTrackerBeta/weeklyDraft";   /* the report she is working on */
 var WEEKLY_COLL = "nnsccWeeklyReportsBeta";                   /* every one she has finished */
 var VIEW_BETA = CURRENT_PATH.indexOf("Beta") >= 0;   /* which report the passcode gate reads/protects */
-var BUILD_STAMP = "2026-08-28 23:09";   /* filled in by build.js — which copy of the page this is */
+var BUILD_STAMP = "2026-08-28 23:12";   /* filled in by build.js — which copy of the page this is */
 /* path of the report currently on screen */
 function reportPath() {
   return cloud.active.kind === "current" ? CURRENT_PATH : (REPORTS_COLL + "/" + cloud.active.id);
@@ -4420,13 +4423,20 @@ function packetProgress(d, ctx) {
            what the note says, not metadata about it */
         var uwho = updWho(u);
         if (uwho) flags += '<span class="pk-updby">' + esc(uwho) + "</span>";
+        /* An update written before the app recorded an author has none, and
+           there is nowhere to look one up. The manager is standing in front of
+           it here — this is where she says it was hers, not in Edit data where
+           she is not. */
+        else if (ctx.ED) flags += '<a class="pk-updby claim" role="button" tabindex="0" ' +
+          'data-updmine="1" title="Put your name on this update">+ my name</a>';
         var mh = "";
         if (u.media && u.media.length) {
           /* site photos and clips open in the in-page viewer, same as quotes */
           mh = '<span class="pk-updmedia">' +
             mediaTilesHTML(u.media, (u.d || "") + " site update") + '</span>';
         }
-        return '<div class="pk-updrow' + (u.issue ? " issue" : "") + '"><span class="pk-updd">' + esc(u.d || "—") + '</span>' +
+        return '<div class="pk-updrow' + (u.issue ? " issue" : "") + '" data-ui="' + idx +
+          '"><span class="pk-updd">' + esc(u.d || "—") + '</span>' +
           '<span class="pk-updt">' + tEdit("upd:" + j.id + ":" + idx + ":t", u.t, "What happened…") + flags + mh + '</span></div>';
       });
       uh = '<div class="pk-upds"><div class="pk-updhead">Updates</div>' + rows.slice(0, 3).join("") +
@@ -11946,6 +11956,21 @@ document.getElementById("report").addEventListener("click", function (e) {
   /* property manager: click a pipeline stage dot to mark it reached */
   var stp = e.target.closest(".pk-step[data-stage]");
   if (stp && isEditor()) { pkStageClick(stp); return; }
+  /* property manager: claim an update written before authors were recorded */
+  var cm = e.target.closest("[data-updmine]");
+  if (cm && isEditor()) {
+    var cc = cm.closest(".pk-progcard"), crow = cm.closest(".pk-updrow");
+    var cj = cc && findJob(cc.dataset.jid);
+    var cu = cj && (cj.updates || [])[+(crow && crow.dataset.ui)];
+    if (!cu) return;
+    if (!updAuthor()) { alert("Sign in first."); return; }
+    updStamp(cu);
+    persist(null, [jobLabel(cj) + ": update of " + (cu.d || "no date") + " attributed to " +
+      updWho(cu)], cj.id);
+    renderReport();
+    if (document.body.dataset.view === "edit") renderEditor();
+    return;
+  }
   /* property manager: open the progress-update form for this card's job */
   var au = e.target.closest(".pk-addupd");
   if (au && isEditor()) {
