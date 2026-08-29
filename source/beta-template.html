@@ -1139,7 +1139,8 @@ body:has(#report.tpl-packet) .wrap { max-width:1560px; }
 .tpl-packet .pk-upds { border-top:1px solid var(--line-soft); margin-top:11px; padding-top:9px; }
 .tpl-packet .pk-updhead { font-size:11px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color:var(--muted); margin-bottom:4px; }
 .tpl-packet .pk-updrow { display:flex; gap:10px; margin:5px 0; font-size:14px; }
-.tpl-packet .pk-updd { flex:none; width:88px; color:var(--muted); font-size:12.5px; font-variant-numeric:tabular-nums; padding-top:1px; }
+.tpl-packet .pk-updd { flex:none; width:96px; color:var(--muted); font-size:12.5px;
+  font-variant-numeric:tabular-nums; padding-top:1px; }
 .tpl-packet .pk-updt { min-width:0; color:var(--ink2); line-height:1.45; }
 .tpl-packet .pk-updmore { display:inline-block; margin-top:6px; font-size:12.5px; font-weight:700; color:var(--pkg); cursor:pointer; }
 .tpl-packet .pk-updmore:hover { text-decoration:underline; }
@@ -1160,12 +1161,11 @@ body:has(#report.tpl-packet) .wrap { max-width:1560px; }
 .tpl-packet .pk-updflag.iss { background:#f6e3c0; color:#7a5210; }
 /* the name against a site update: quieter than a flag, because it is an
    attribution and not a warning */
-.tpl-packet .pk-updby { display:inline-block; font-size:10.5px; font-weight:600; color:var(--muted);
-  border:1px solid var(--line); border-radius:99px; padding:1px 8px; margin-left:6px;
-  vertical-align:middle; white-space:nowrap; }
-.tpl-packet .pk-updby.claim { cursor:pointer; color:var(--pkg); border-color:var(--pkg);
-  border-style:dashed; text-decoration:none; }
-.tpl-packet .pk-updby.claim:hover { background:var(--pkg); color:#fff; border-style:solid; }
+.tpl-packet .pk-updd .pk-updby { display:block; margin-top:2px; font-size:11px; font-weight:650;
+  color:var(--ink2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.tpl-packet .pk-updd .pk-updby.claim { cursor:pointer; color:var(--pkg); font-weight:600;
+  text-decoration:underline dotted; text-underline-offset:2px; }
+.tpl-packet .pk-updd .pk-updby.claim:hover { text-decoration:underline; }
 .tpl-packet .pk-health { display:inline-block; font-size:10.5px; font-weight:700; border-radius:99px; padding:2px 10px; vertical-align:middle; }
 .tpl-packet .pk-health.ok { background:#e3f2e9; color:#1e7a46; }
 .tpl-packet .pk-health.warn { background:#f6e3c0; color:#8a5a10; }
@@ -4421,14 +4421,19 @@ function packetProgress(d, ctx) {
           (ctx.ED && u.internal ? '<span class="pk-updflag int">Internal</span>' : "");
         /* who wrote it, in the row rather than in a tooltip — it is part of
            what the note says, not metadata about it */
+        /* Who wrote it goes under the date, not after the sentence. Trailing
+           the text it read as part of the note and moved about with the
+           wrapping; in the date column it lines up down the card, so the eye
+           can run down "when and who" without reading any of the what. */
         var uwho = updWho(u);
-        if (uwho) flags += '<span class="pk-updby">' + esc(uwho) + "</span>";
-        /* An update written before the app recorded an author has none, and
-           there is nowhere to look one up. The manager is standing in front of
-           it here — this is where she says it was hers, not in Edit data where
-           she is not. */
-        else if (ctx.ED) flags += '<a class="pk-updby claim" role="button" tabindex="0" ' +
-          'data-updmine="1" title="Put your name on this update">+ my name</a>';
+        var byLine = uwho
+          ? '<span class="pk-updby">' + esc(uwho) + "</span>"
+          /* An update written before the app recorded an author has none, and
+             there is nowhere to look one up. The manager is standing in front
+             of it here — this is where she says it was hers, not in Edit data
+             where she is not. */
+          : (ctx.ED ? '<a class="pk-updby claim" role="button" tabindex="0" ' +
+             'data-updmine="1" title="Put your name on this update">+ my name</a>' : "");
         var mh = "";
         if (u.media && u.media.length) {
           /* site photos and clips open in the in-page viewer, same as quotes */
@@ -4436,7 +4441,7 @@ function packetProgress(d, ctx) {
             mediaTilesHTML(u.media, (u.d || "") + " site update") + '</span>';
         }
         return '<div class="pk-updrow' + (u.issue ? " issue" : "") + '" data-ui="' + idx +
-          '"><span class="pk-updd">' + esc(u.d || "—") + '</span>' +
+          '"><span class="pk-updd">' + esc(u.d || "—") + byLine + "</span>" +
           '<span class="pk-updt">' + tEdit("upd:" + j.id + ":" + idx + ":t", u.t, "What happened…") + flags + mh + '</span></div>';
       });
       uh = '<div class="pk-upds"><div class="pk-updhead">Updates</div>' + rows.slice(0, 3).join("") +
