@@ -2827,7 +2827,7 @@ var BRAND_PATH = "nnsccQuoteTracker/brand";               /* the letterhead the 
 var WEEKLY_DRAFT_PATH = "nnsccQuoteTracker/weeklyDraft";   /* the report she is working on */
 var WEEKLY_COLL = "nnsccWeeklyReports";                   /* every one she has finished */
 var VIEW_BETA = CURRENT_PATH.indexOf("Beta") >= 0;   /* which report the passcode gate reads/protects */
-var BUILD_STAMP = "2026-08-28 23:18";   /* filled in by build.js — which copy of the page this is */
+var BUILD_STAMP = "2026-08-28 23:55";   /* filled in by build.js — which copy of the page this is */
 /* path of the report currently on screen */
 function reportPath() {
   return cloud.active.kind === "current" ? CURRENT_PATH : (REPORTS_COLL + "/" + cloud.active.id);
@@ -2849,7 +2849,8 @@ function cloudLine() {
    REAL enforcement on every write; this list gates the on-screen edit UI so that
    only these signed-in accounts ever see click-to-edit or the Edit tab.
    If you authorize a new editor in Firestore, add their address here too (lower-case). */
-var EDITOR_EMAILS = ["mvinobaje@gmail.com", "nnscc292connect@cpomanagement.ca"];
+var EDITOR_EMAILS = ["mvinobaje@gmail.com", "vino@stoneycreekpm.ca",
+                     "nnscc292connect@cpomanagement.ca"];
 /* An override forcing every reader EXCEPT the property manager onto one
    layout, whatever she picked — so she could work in one design and hand the
    board another. It is off, and the Settings picker now means what it has
