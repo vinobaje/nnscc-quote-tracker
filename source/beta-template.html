@@ -9656,14 +9656,19 @@ function alertList() {
   });
   return out;
 }
-/* What the reader sees on the way in. Agreements are named one by one — there
-   are never many and each is a decision. Quotes are counted rather than listed:
-   a dozen lines about prices going stale is the property manager's work, not
-   the board's, and burying the renewals under them helps nobody. */
-/* what this reader is allowed to be told about */
+/* Who is told. This list is a work list, not a report: quotes to re-confirm,
+   an agreement to give notice on, a certificate to chase. Every line of it is
+   something the property manager does and nothing the board decides, and a red
+   panel reading "14 things need attention" above a report that is in good order
+   says the wrong thing to a director who cannot act on any of the fourteen.
+
+   So it is hers and the owner's, and that is the whole rule — the banner, the
+   bell and its list all read this, so none of them can drift from the others.
+   The audience tag on each item is kept: it is the thing to relax if some of
+   this should ever go back to the board, and it says which lines could. */
 function alertVisible() {
-  var ED = isEditor();
-  return alertList().filter(function (i) { return ED || i.audience === "all"; });
+  if (!isEditor()) return [];
+  return alertList();
 }
 function alertUrgent(items) {
   return items.filter(function (i) { return i.severity === "passed" || i.severity === "urgent"; }).length;
