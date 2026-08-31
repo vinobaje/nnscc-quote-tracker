@@ -1161,22 +1161,6 @@ body:has(#report.tpl-packet) .wrap { max-width:1560px; }
 .tpl-packet .pk-updflag.iss { background:#f6e3c0; color:#7a5210; }
 /* the name against a site update: quieter than a flag, because it is an
    attribution and not a warning */
-/* The archive is a two-pane application that scrolls inside itself, not an
-   article that grows, so the frame is given a real height. Below 1000px it
-   folds to one column of its own accord; the minimum keeps it usable on a short
-   window, where 80vh alone would not be. */
-.tpl-packet .hvacframe { width:100%; height:80vh; min-height:600px; border:1px solid var(--line);
-  border-radius:10px; display:block; background:var(--paper); }
-.tpl-packet .hvacrest { padding:18px 2px 4px; }
-.tpl-packet .hvacrest p { margin:0 0 12px; color:var(--ink2); font-size:13.5px; max-width:62ch; }
-.tpl-packet .pk-hvacout { flex:none; font-size:12.5px; font-weight:700; color:var(--pkg);
-  text-decoration:none; white-space:nowrap; }
-.tpl-packet .pk-hvacout:hover { text-decoration:underline; }
-@media screen and (max-width:600px){
-  .tpl-packet .hvacframe { height:72vh; min-height:520px; }
-}
-/* on paper a frame prints as a grey rectangle at best */
-@media print { .tpl-packet #secHVAC { display:none !important; } }
 .tpl-packet .pk-updd .pk-updby { display:block; margin-top:2px; font-size:11px; font-weight:650;
   color:var(--ink2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .tpl-packet .pk-updd .pk-updby.claim { cursor:pointer; color:var(--pkg); font-weight:600;
@@ -2843,7 +2827,7 @@ var BRAND_PATH = "nnsccQuoteTrackerBeta/brand";               /* the letterhead 
 var WEEKLY_DRAFT_PATH = "nnsccQuoteTrackerBeta/weeklyDraft";   /* the report she is working on */
 var WEEKLY_COLL = "nnsccWeeklyReportsBeta";                   /* every one she has finished */
 var VIEW_BETA = CURRENT_PATH.indexOf("Beta") >= 0;   /* which report the passcode gate reads/protects */
-var BUILD_STAMP = "2026-08-30 22:01";   /* filled in by build.js — which copy of the page this is */
+var BUILD_STAMP = "2026-08-30 22:10";   /* filled in by build.js — which copy of the page this is */
 /* path of the report currently on screen */
 function reportPath() {
   return cloud.active.kind === "current" ? CURRENT_PATH : (REPORTS_COLL + "/" + cloud.active.id);
@@ -4530,7 +4514,9 @@ function renderPacketReport() {
     (nPast ? '<a href="#secPast">' + pkIcon("done") + ' Completed earlier</a>' : "") +
     '<a href="#secD">' + pkIcon("spend") + ' Contractor spend</a>' +
     '<a href="#secE">' + pkIcon("open") + ' Status &amp; decisions</a>' +
-    (hvacAvailable() ? '<a href="#secHVAC">' + pkIcon("hvac") + ' HVAC records</a>' : "") +
+    (hvacAvailable() ? '<a href="' + HVAC_URL + '" target="_blank" rel="noopener" ' +
+      'data-act="hvac-tab" title="Opens in its own tab, already unlocked">' +
+      pkIcon("hvac") + ' HVAC records \u2197</a>' : "") +
     '<a href="#" data-arch="1">' + pkIcon("arch") + ' Reports archive</a>' +
     /* not a section of the report — the corporation's standing agreements,
        kept apart from the run of report sections */
@@ -4644,7 +4630,6 @@ function renderPacketReport() {
     /* nothing decided yet: a fold over one sentence is worse than the sentence */
     : '<section id="secE" class="panel"><h3>Status &amp; board decisions</h3>' +
       secEBlocks(d, M, ctx.ED) + '</section>');
-  h.push(hvacSectionHTML());
   /* the corporation's standing agreements, read alongside the report */
   if (canSeeContracts())
     h.push('<section id="secF" class="panel"><h3>Contracts with contractors</h3>' +
@@ -11046,34 +11031,6 @@ var HVAC_URL   = "https://mcm.web.app";
 var HVAC_FRAME = HVAC_URL + "/?embed=1";
 var HVAC_HOSTS = ["https://quote-report.web.app", "https://quote-report-beta.web.app"];
 function hvacAvailable() { return HVAC_HOSTS.indexOf(location.origin) >= 0; }
-/* Opened on request rather than with the page. Not for the loading: this report
-   redraws itself in full on every edit, and an iframe cannot survive that — it
-   would reload, lose the reader's place and ask for the passcode again, every
-   time the manager corrected a price. Opened deliberately, it is opened once. */
-var hvacOpen = false;
-var hvacNote = "";        /* what the archive last said about itself */
-function hvacSectionHTML() {
-  if (!hvacAvailable()) return "";
-  var head = '<section id="secHVAC" class="panel pk-detailcard"><div class="pk-sechead">' +
-    '<div class="pk-sechead-l"><span class="pk-badge">\u{1F527}</span><div>' +
-    '<div class="pk-sectitle">HVAC service records</div>' +
-    '<div class="pk-secsub">' +
-    (hvacNote ? esc(hvacNote)
-      : "Every work order the contractors filed for these buildings, searchable, " +
-        "with each figure opening the page it was taken from.") +
-    "</div></div></div>" +
-    '<a class="pk-hvacout" href="' + HVAC_URL + '" target="_blank" rel="noopener" ' +
-    'data-act="hvac-tab" title="Opens in its own tab, already unlocked">' +
-    "Open full screen \u2197</a></div>";
-  if (!hvacOpen)
-    return head + '<div class="hvacrest"><p>The archive is a separate, ' +
-      "password-protected system. It opens here in the page.</p>" +
-      '<button class="btn primary" type="button" data-act="hvac-open">Open the service records</button>' +
-      "</div></section>";
-  return head + '<iframe class="hvacframe" id="hvacFrame" src="' + HVAC_FRAME +
-    '" title="NNSC 292 \u2014 HVAC service records" allow="microphone" ' +
-    'referrerpolicy="strict-origin"></iframe></section>';
-}
 /* The archive's embed code — its own, not the one the board types at that site,
    so either can be rotated without disturbing the other.
 
@@ -11083,7 +11040,6 @@ function hvacSectionHTML() {
    the Firestore rules use. Anyone who cannot do either does not get it, and
    sees the archive's own passcode form instead — which is the honest outcome,
    not a failure. */
-var hvacCode = "";
 /* A grant rather than the code where the archive will take one: it is good for
    two minutes and for one use, so nothing durable is ever in circulation and a
    link that is forwarded is dead before it is read. Minted per press — never
@@ -11096,32 +11052,6 @@ function hvacGrantFetch() {
   return cloud.fns.httpsCallable("nnsccGate")(args)
     .then(function (r) { return String((r.data && r.data.grant) || ""); })
     .catch(function () { return ""; });
-}
-function hvacUnlock(frame) {
-  if (!frame) return;
-  function send(code) {
-    if (!code) {
-      /* Say which of the two reasons it is. "It is asking for a passcode" is
-         no use to the manager, who is the only person who can stop it asking. */
-      hvacNote = isEditor()
-        ? "No embed code is saved, so the archive is asking the reader for its own passcode. " +
-          "Put the code in Edit data \u2192 Settings \u2192 Who can open the report."
-        : "The archive is asking for its own passcode \u2014 the board has it.";
-      var sub0 = document.querySelector("#secHVAC .pk-secsub");
-      if (sub0) sub0.textContent = hvacNote;
-      return;
-    }
-    frame.postMessage({ type: "unlock", passcode: code }, HVAC_URL);
-  }
-  /* the grant first; the static code only where no signing secret is stored */
-  hvacGrantFetch().then(function (g) {
-    if (g) { frame.postMessage({ type: "unlock", token: g }, HVAC_URL); return; }
-    if (hvacCode) return send(hvacCode);
-    if (!cloud.fns || !cloud.user) return send("");
-    cloud.fns.httpsCallable("nnsccGate")({ hvacCode: true, beta: VIEW_BETA })
-      .then(function (r) { hvacCode = String((r.data && r.data.code) || ""); send(hvacCode); })
-      .catch(function () { send(""); });
-  });
 }
 /* Open the archive in its own tab, already unlocked. The tab is opened on the
    press itself — synchronously, or a popup blocker eats it — and pointed at the
@@ -11144,28 +11074,6 @@ function hvacOpenTab() {
     if (tab) tab.location = url; else window.location.href = url;
   });
 }
-/* The archive talks back. Only its own origin is listened to, and only messages
-   that name themselves — anything else on the page's message channel is noise
-   at best. */
-addEventListener("message", function (e) {
-  if (e.origin !== HVAC_URL) return;
-  var d = e.data;
-  if (!d || d.source !== "nnsc-hvac") return;
-  if (d.type === "ready" && d.entries) {
-    var r = d.range || [];
-    hvacNote = d.entries + " work entries" +
-      (r[0] && r[1] ? ", " + r[0] + " to " + r[1] : "") + ".";
-  } else if (d.type === "needs-unlock") {
-    /* the reader unlocked this report already; they are not asked twice */
-    hvacUnlock(e.source || (document.getElementById("hvacFrame") || {}).contentWindow);
-    return;
-  } else if (d.type === "error") {
-    hvacNote = "The archive reported a problem" + (d.message ? ": " + d.message : ".");
-  } else return;
-  var sub = document.querySelector("#secHVAC .pk-secsub");
-  if (sub) sub.textContent = hvacNote;      /* redrawn in place: the frame stays */
-});
-
 /* ---------- shared-passcode view gate (non-editors) ---------- */
 function viewGateMsg(t) { var el = document.getElementById("viewGateMsg"); if (el) el.textContent = t || ""; }
 var gateTimer = null;
@@ -11199,8 +11107,6 @@ function submitViewGate(pass) {
       lastSaved = deepCopy(state);
       /* the agreements come with the report, and the passcode opens their PDFs */
       conGate.pass = pass;
-      /* and the archive's own code, which came from the same server check */
-      hvacCode = String(res.data.hvac || "");
       conState = { list: Array.isArray(res.data.contracts) ? res.data.contracts : [],
                    alerts: res.data.alertSettings || {} };
       conState.list.forEach(function (c) { if (!c.id) c.id = genId(); });
@@ -11241,28 +11147,25 @@ function viewPassCardHTML() {
        which is how the API keys ended up in a screenshot. Saved through the same
        function that checks the report's own passcode, and never sent back to a
        browser except to a reader who has already proved they may read the
-       report — see hvacUnlock. */
+       report — see hvacGrantFetch. */
     h.push('<p class="edithint" style="margin:14px 0 6px;font-weight:600">HVAC service records</p>');
+    h.push('<p class="edithint" style="margin:0 0 8px" id="hvacState">Checking…</p>');
     h.push('<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">' +
-      '<input id="hvacSecretInput" type="password" autocomplete="off" placeholder="signing secret (preferred)" ' +
-      'style="flex:1;min-width:180px;box-sizing:border-box">' +
-      '<input id="hvacCodeInput" type="password" autocomplete="off" placeholder="embed code (fallback)" ' +
-      'style="flex:1;min-width:180px;box-sizing:border-box">' +
+      '<input id="hvacSecretInput" type="password" autocomplete="off" placeholder="signing secret" ' +
+      'style="flex:1;min-width:200px;box-sizing:border-box">' +
       '<button class="btn" data-act="hvaccode-set" type="button">Save</button>' +
       '<span class="savenote" id="hvacCodeMsg"></span></div>');
     h.push('<p class="edithint" style="margin:6px 0 0;font-size:12px">So that a director who has already ' +
-      'opened this report is not asked for a second passcode at mcm.web.app. Both come from the archive’s ' +
-      'maintainer. The <strong>signing secret</strong> is the one to use: the report signs a fresh permit ' +
-      'for each reader that dies in two minutes and cannot be used twice, so nothing lasting is ever handed ' +
-      'out — it is also what makes “Open full screen” open without a prompt. The <strong>embed code</strong> ' +
-      'is the older way and is used only if no secret is stored. Either may be left blank; then readers ' +
-      'type the archive’s own passcode, which is how it worked before.</p>');
+      'opened this report is not asked for a second passcode at mcm.web.app. With the secret stored, ' +
+      'pressing <strong>HVAC records</strong> signs a permit for that one reader — good for two minutes ' +
+      'and one use — and the archive opens without a prompt. Leave it blank and the archive asks for its ' +
+      'own passcode, which is how it worked before.</p>');
   }
   h.push("</div></div>");
   return h.join("");
 }
 function hvacCodeSet() {
-  var ci = document.getElementById("hvacCodeInput");
+  var ci = null;
   var si = document.getElementById("hvacSecretInput");
   var msg = document.getElementById("hvacCodeMsg");
   var args = { setHvac: true, beta: VIEW_BETA };
@@ -11270,17 +11173,17 @@ function hvacCodeSet() {
      not "clear it", or saving one would silently wipe the other */
   if (ci && ci.value.trim()) args.code = ci.value.trim();
   if (si && si.value.trim()) args.secret = si.value.trim();
-  if (!args.code && !args.secret) { if (msg) msg.textContent = "Paste one of them first."; return; }
+  if (!args.secret) { if (msg) msg.textContent = "Paste the signing secret first."; return; }
   if (!cloud.fns || !cloud.user) { if (msg) msg.textContent = "Sign in first."; return; }
   if (msg) msg.textContent = "Saving…";
   cloud.fns.httpsCallable("nnsccGate")(args)
     .then(function (r) {
-      if (ci) ci.value = ""; if (si) si.value = "";
-      if (args.code) hvacCode = args.code;
+      if (si) si.value = "";
       var d = (r && r.data) || {};
       if (msg) msg.textContent = d.signing
         ? "Saved — the report will sign a permit for each reader."
-        : (d.set ? "Saved — the embed code will be used." : "Saved.");
+        : "Saved.";
+      viewPassCheck();                 /* re-read it from the server, not from hope */
     })
     .catch(function (e) {
       if (msg) msg.textContent = "⚠ " + ((e && e.message) || "could not save it");
@@ -11293,6 +11196,10 @@ function viewPassCheck() {
     if (el) el.textContent = (res.data && res.data.set)
       ? "🔒 A passcode is set — everyone else must enter it to view."
       : "🔓 No passcode set — other viewers currently cannot view (set one below to let them in).";
+    var hv = document.getElementById("hvacState");
+    if (hv) hv.textContent = (res.data && res.data.hvacSigning)
+      ? "🔒 A signing secret is stored — HVAC records opens without a passcode."
+      : "🔓 No signing secret — the archive asks readers for its own passcode.";
   }).catch(function () {});
 }
 function viewPassSet() {
@@ -12176,18 +12083,12 @@ document.getElementById("report").addEventListener("click", function (e) {
   var stp = e.target.closest(".pk-step[data-stage]");
   if (stp && isEditor()) { pkStageClick(stp); return; }
   /* anyone: open the HVAC archive in place. Not loaded until asked for — see
-     hvacSectionHTML for why it is not simply there on arrival */
+     the archive opens in its own tab, carrying a signed permit */
   if (e.target.closest('[data-act="hvac-tab"]')) {
     /* \u2318-click and middle-click keep the plain href, which asks for the
        archive's own passcode — that is the right fallback, not a broken tab */
     if (e.metaKey || e.ctrlKey || e.shiftKey || e.button > 0) return;
     e.preventDefault(); hvacOpenTab(); return;
-  }
-  if (e.target.closest('[data-act="hvac-open"]')) {
-    hvacOpen = true; renderReport();
-    var sec = document.getElementById("secHVAC");
-    if (sec) sec.scrollIntoView({ block: "start", behavior: "smooth" });
-    return;
   }
   /* property manager: claim an update written before authors were recorded */
   var cm = e.target.closest("[data-updmine]");

@@ -1018,7 +1018,10 @@ exports.nnsccGate = onCall(
         throw new HttpsError("permission-denied", "Only the property manager can set the view passcode.");
       }
       const m = masterFields(beta);
-      if (data.check === true) return { set: !!cfg[f.hash], master: !!cfg[m.hash] };
+      /* the manager should not have to guess whether the archive's credentials
+         are stored; nothing is returned but whether each exists */
+      if (data.check === true) return { set: !!cfg[f.hash], master: !!cfg[m.hash],
+        hvac: !!cfg.hvacEmbedCode, hvacSigning: !!cfg.hvacSignSecret };
       // {master:true} sets the all-buildings passcode instead of this one's
       const t = data.master === true ? m : f;
       const pass = String(data.passcode || "");
