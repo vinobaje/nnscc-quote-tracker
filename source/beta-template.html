@@ -6483,6 +6483,7 @@ document.getElementById("editor").addEventListener("click", function (e) {
       updWho(mu)], muj.id);
     renderEditor(); renderReport(); return;
   }
+  if (act === "hvaccode-set") { hvacCodeSet(); return; }
   if (act === "delupd") {
     var duc = e.target.closest(".ecard"), dur = e.target.closest("[data-ui]");
     if (!duc || !dur) return;
@@ -11072,10 +11073,36 @@ function hvacSectionHTML() {
     '" title="NNSC 292 \u2014 HVAC service records" allow="microphone" ' +
     'referrerpolicy="strict-origin"></iframe></section>';
 }
+/* The archive's embed code — its own, not the one the board types at that site,
+   so either can be rotated without disturbing the other.
+
+   It is never in this file. A reader who came through the passcode gate was
+   handed it by the server that checked the passcode; a reader signed in as an
+   editor or a director asks for it and is checked against the same two lists
+   the Firestore rules use. Anyone who cannot do either does not get it, and
+   sees the archive's own passcode form instead — which is the honest outcome,
+   not a failure. */
+var hvacCode = "";
+function hvacUnlock(frame) {
+  if (!frame) return;
+  function send(code) {
+    if (!code) {
+      hvacNote = "Asking for its passcode \u2014 the board has it.";
+      var sub0 = document.querySelector("#secHVAC .pk-secsub");
+      if (sub0) sub0.textContent = hvacNote;
+      return;
+    }
+    frame.postMessage({ type: "unlock", passcode: code }, HVAC_URL);
+  }
+  if (hvacCode) return send(hvacCode);
+  if (!cloud.fns || !cloud.user) return send("");
+  cloud.fns.httpsCallable("nnsccGate")({ hvacCode: true, beta: VIEW_BETA })
+    .then(function (r) { hvacCode = String((r.data && r.data.code) || ""); send(hvacCode); })
+    .catch(function () { send(""); });
+}
 /* The archive talks back. Only its own origin is listened to, and only messages
    that name themselves — anything else on the page's message channel is noise
-   at best. Nothing is ever sent to it: unlocking it from here would mean the
-   passcode living in this file, which anyone who can open the report can read. */
+   at best. */
 addEventListener("message", function (e) {
   if (e.origin !== HVAC_URL) return;
   var d = e.data;
@@ -11085,7 +11112,9 @@ addEventListener("message", function (e) {
     hvacNote = d.entries + " work entries" +
       (r[0] && r[1] ? ", " + r[0] + " to " + r[1] : "") + ".";
   } else if (d.type === "needs-unlock") {
-    hvacNote = "Asking for its passcode \u2014 the board has it; it is not this report's.";
+    /* the reader unlocked this report already; they are not asked twice */
+    hvacUnlock(e.source || (document.getElementById("hvacFrame") || {}).contentWindow);
+    return;
   } else if (d.type === "error") {
     hvacNote = "The archive reported a problem" + (d.message ? ": " + d.message : ".");
   } else return;
@@ -11126,6 +11155,8 @@ function submitViewGate(pass) {
       lastSaved = deepCopy(state);
       /* the agreements come with the report, and the passcode opens their PDFs */
       conGate.pass = pass;
+      /* and the archive's own code, which came from the same server check */
+      hvacCode = String(res.data.hvac || "");
       conState = { list: Array.isArray(res.data.contracts) ? res.data.contracts : [],
                    alerts: res.data.alertSettings || {} };
       conState.list.forEach(function (c) { if (!c.id) c.id = genId(); });
@@ -11161,9 +11192,43 @@ function viewPassCardHTML() {
       '<button class="btn primary" data-act="viewpass-set" type="button">Save passcode</button>' +
       '<span class="savenote" id="viewPassMsg"></span></div>');
     h.push('<p class="edithint" style="margin:8px 0 0;font-size:12px">You (the property manager) and board members always view without a passcode. Everyone else must enter it. It’s stored encrypted (scrypt) and never shown again — share it with whoever should see the report.</p>');
+    /* The HVAC archive's embed code. Kept here rather than in the Firestore
+       console because the console can read a value back and put it on a screen,
+       which is how the API keys ended up in a screenshot. Saved through the same
+       function that checks the report's own passcode, and never sent back to a
+       browser except to a reader who has already proved they may read the
+       report — see hvacUnlock. */
+    h.push('<p class="edithint" style="margin:14px 0 6px;font-weight:600">HVAC service records</p>');
+    h.push('<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">' +
+      '<input id="hvacCodeInput" type="password" autocomplete="off" placeholder="the archive’s embed code" ' +
+      'style="flex:1;min-width:200px;box-sizing:border-box">' +
+      '<button class="btn" data-act="hvaccode-set" type="button">Save code</button>' +
+      '<span class="savenote" id="hvacCodeMsg"></span></div>');
+    h.push('<p class="edithint" style="margin:6px 0 0;font-size:12px">The archive on mcm.web.app asks the ' +
+      'report for this when a director opens it, so nobody meets a second passcode. Ask its maintainer for ' +
+      'the embed code — it is separate from the one the board types at that site, so either can be changed ' +
+      'without the other. Leave it blank and readers simply type the archive’s own passcode instead.</p>');
   }
   h.push("</div></div>");
   return h.join("");
+}
+function hvacCodeSet() {
+  var inp = document.getElementById("hvacCodeInput");
+  var v = (inp && inp.value || "").trim();
+  var msg = document.getElementById("hvacCodeMsg");
+  if (!cloud.fns || !cloud.user) { if (msg) msg.textContent = "Sign in first."; return; }
+  if (msg) msg.textContent = "Saving…";
+  cloud.fns.httpsCallable("nnsccGate")({ setHvac: true, code: v, beta: VIEW_BETA })
+    .then(function (r) {
+      if (inp) inp.value = "";
+      hvacCode = v;
+      if (msg) msg.textContent = (r.data && r.data.set)
+        ? "Saved — directors will not be asked for it."
+        : "Cleared — readers will type the archive’s own passcode.";
+    })
+    .catch(function (e) {
+      if (msg) msg.textContent = "⚠ " + ((e && e.message) || "could not save it");
+    });
 }
 function viewPassCheck() {
   if (!cloud.fns || !cloud.user) return;

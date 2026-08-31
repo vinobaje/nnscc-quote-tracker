@@ -1030,12 +1030,62 @@ exports.nnsccGate = onCall(
       ]);
       const d = rep.exists ? rep.data() : {};
       const cl = con.exists && Array.isArray(con.data().list) ? con.data().list : [];
+      // The HVAC archive's own embed code, handed over with the report because
+      // the caller has just proved the same right to read it. It never sits in
+      // the tracker's JavaScript: a reader who cannot answer this gate cannot
+      // get it, and it is not the code the board types at that site directly.
+      const gcfg = (await cfgRef.get()).data() || {};
       return {
         ok: true,
         report: { jobs: d.jobs || [], meta: d.meta || null, ai: d.ai || null, reportName: d.reportName || null },
         contracts: cl,
         alertSettings: (con.exists && con.data().alerts) || {},
+        hvac: String(gcfg.hvacEmbedCode || ""),
       };
+    }
+
+    // ----- signed in: the same code, for a reader who never met the gate -----
+    // Editors and board members read the report straight out of Firestore and
+    // so never call `view`. They still need the archive's code, and it still
+    // must not be in the bundle, so it is asked for here and the caller's right
+    // to it is checked against the same two lists the rules use.
+    if (data.hvacCode === true) {
+      const auth = request.auth;
+      if (!auth || !auth.token || auth.token.email_verified !== true || !auth.token.email) {
+        throw new HttpsError("unauthenticated", "Sign in to open the service records.");
+      }
+      const email = auth.token.email.toLowerCase();
+      const cfgSnap2 = await cfgRef.get();
+      const cfg2 = cfgSnap2.exists ? cfgSnap2.data() : {};
+      const eds = (cfg2.editors || []).map((e) => String(e).toLowerCase());
+      let allowed = email === OWNER || eds.includes(email);
+      if (!allowed) {
+        const bd = await db.doc(beta ? "nnsccQuoteTrackerBeta/board" : "nnsccQuoteTracker/board").get();
+        const members = (bd.exists && bd.data().members) || [];
+        allowed = members.map((m) => String(m).toLowerCase()).includes(email);
+      }
+      if (!allowed) throw new HttpsError("permission-denied", "This account cannot read the service records.");
+      return { code: String(cfg2.hvacEmbedCode || "") };
+    }
+
+    // ----- editor: store the archive's embed code -----
+    // Pasted in the app rather than typed into the Firestore console, for the
+    // same reason the API keys are: the console can read a value back and put
+    // it on a screen, and this one is meant to be write-only from here on.
+    if (data.setHvac === true) {
+      const auth3 = request.auth;
+      if (!auth3 || !auth3.token || auth3.token.email_verified !== true || !auth3.token.email) {
+        throw new HttpsError("unauthenticated", "Sign in as the property manager.");
+      }
+      const em3 = auth3.token.email.toLowerCase();
+      const c3 = (await cfgRef.get()).data() || {};
+      const ed3 = (c3.editors || []).map((e) => String(e).toLowerCase());
+      if (em3 !== OWNER && !ed3.includes(em3)) {
+        throw new HttpsError("permission-denied", "Only the property manager can set this.");
+      }
+      const code = String(data.code || "");
+      await cfgRef.set({ hvacEmbedCode: code }, { merge: true });
+      return { set: !!code };
     }
 
     // ----- public: hand over one signed contract, passcode first -----
