@@ -1,190 +1,139 @@
-# Reply from the quotation tracker
+# Reply from the quotation tracker — where this ended up
 
-Your §5b is built and deployed on `https://quote-report.web.app`. The board is
-meant to unlock the tracker once and never see a second prompt, and every part
-of that is in place except one value, which only you can issue.
+Supersedes our earlier reply, which asked for two things and described a frame.
+Both asks were answered, everything is built, and the board has been using it.
+One thing changed shape on our side after we saw it working, and this is written
+so you are not maintaining an integration we no longer have.
 
-**The ask, in one line: send an embed-only passcode for the tracker to hold.**
-
----
-
-## 1. What is already done on this side
-
-- `#secHVAC` section and a **🔧 HVAC records** entry in the report's left rail.
-- The frame: `https://mcm.web.app/?embed=1`, `allow="microphone"`, no sandbox,
-  `height:80vh; min-height:600px` (`72vh`/`520px` under 600px wide).
-- **The section is drawn only on `https://quote-report.web.app`.** Everywhere
-  else — our beta site, our other four buildings — there is no section and no
-  menu entry, because your `frame-ancestors` would refuse the frame there and
-  the board would be looking at an empty box with nothing to explain it. We
-  check `location.origin` against a one-item list.
-- We listen for `ready`, `needs-unlock` and `error`. `ready` replaces the
-  section's description with your entry count and date range.
-- On `needs-unlock` we post `{type:'unlock', passcode}` to `https://mcm.web.app`
-  — targeted, never `'*'`.
-- Frame loads on a press, not with the page. Ours redraws its whole DOM on every
-  inline edit, which would reload your frame and lose the reader's place each
-  time the manager corrected a price.
-- The section is hidden from print, since you have no print stylesheet. The
-  "Open full screen ↗" link is beside the heading.
-
-Verified with 30 unit tests: the origin gate, the frame markup, and the unlock
-exchange including the refusal and no-code paths.
+**In one line: we do not frame the report any more. We open it in its own tab
+with `#t=<grant>`, and that is the whole of it.**
 
 ---
 
-## 2. What we need from you
+## 1. What the board does
 
-### (a) An embed-only passcode — the one blocker
-
-You offered this and we would like to take it: a code that is **not** the one the
-board types at `mcm.web.app` directly, so either can be rotated without
-disturbing the other. Send it however you would send a credential; it goes
-straight into our config and is never quoted back.
-
-Until it arrives, the frame shows its own form after the five-second grace — so
-the integration degrades exactly as you designed it, and nobody is stranded.
-
-### (b) A way to open the archive in its own tab, already unlocked
-
-The board has asked for this as well as the frame, and it is the request we
-cannot meet with anything you publish today: a menu item that opens
-`https://mcm.web.app` in a new tab, for a reader who has already unlocked the
-tracker, **without a second passcode**. In its own tab it gets the whole screen,
-it prints, and it survives the storage partitioning that makes framed sessions
-unreliable in Safari.
-
-`postMessage` cannot do it — there is no frame. So the credential has to travel
-in the link, and a passcode in a link is the thing we would most like to avoid:
-URLs are pasted into email, kept in history, and read out of the address bar over
-someone's shoulder.
-
-What we would like instead, if you are willing to accept it:
+Left rail of the report, under **Under contract**, beside Contracts:
 
 ```
-https://mcm.web.app/#t=<base64url payload>.<sig>
+🔧 HVAC records ↗
 ```
 
-- **In the fragment, not the query.** A fragment is never sent to a server, never
-  appears in a `Referer`, and never reaches your logs or ours.
-- Minted by our Cloud Function at the moment the reader clicks, one per click.
-- Payload as in §4 below — `exp` two minutes out, and a `nonce` so a link that is
-  forwarded is dead on arrival if it has already been used.
-- **Consumed and erased on arrival**: verify, establish your own session as if
-  the passcode had been typed, then `history.replaceState` the fragment away so
-  the address bar holds a clean URL and the token is not in the back button.
-
-If a token is missing, expired or already spent, your existing passcode form is
-the right fallback — the reader is never worse off than today.
-
-We will build the minting side to whatever shape you specify. If you would rather
-not accept a URL credential at all, say so plainly and we will keep the new-tab
-link as a plain link that asks for the passcode, and tell the board why.
-
-### (c) Optionally, our beta origin
-
-`https://quote-report-beta.web.app`. We stage everything there before it reaches
-directors, and today we cannot see this working until it is already live.
-
-```
-make embed-allow ORIGIN="https://quote-report.web.app https://quote-report-beta.web.app"
-```
+They press it. A tab opens, the archive is there, no passcode. That is the
+entire interaction, and it is what they asked for.
 
 ---
 
-## 3. Where the code lives, and why not where you suggested
+## 2. What we build to make that happen
 
-Your §5b recommends a Firestore document readable by a signed-in tracker user.
-**That would have locked out most of our board.**
+On the press, before anything else, we open the tab — synchronously, or a popup
+blocker eats a tab opened after an `await`. It holds "Opening the service
+records…" for the moment the round trip takes. Then our Cloud Function mints one
+grant and we point the tab at:
 
-Our readers are three populations, and only two of them are signed in:
+```
+https://mcm.web.app/#t=<grant>
+```
 
-| Reader | Firebase identity | How they read the report |
+The grant is exactly your §6, and is minted fresh per press — never cached,
+which would defeat single use.
+
+We verified the format against a second implementation written from your prose
+rather than from our minting code, since that is the only way such a check means
+anything. Both readings accept a valid grant and both reject: the wrong secret,
+a **hex-decoded** secret, a signature taken over the **raw JSON** instead of the
+transmitted base64url string, and a payload with one byte changed. Those are the
+two details you asked to pin down, and they are pinned.
+
+Nothing is cached and no credential is durable on our side. The signing secret
+lives in a config document no client may read, is written only through the same
+function, and is set from our own settings screen — never the Firestore console,
+which reads values back onto a screen.
+
+---
+
+## 3. Who is allowed to ask for a grant
+
+The same right to read the report, proved whichever way the reader has it:
+
+| Reader | Firebase identity | How the grant is authorised |
 |---|---|---|
-| Property manager | Google, on an allowlist | Firestore directly |
-| Director on the board list | Google | Firestore directly |
-| **Everyone else on the board** | **none** | shared passcode → Cloud Function |
+| Property manager | Google, on an allowlist | checked against the editor list |
+| Director on the board list | Google | checked against the board list |
+| Everyone else on the board | none | their tracker passcode, re-verified |
 
-The third group is the majority and the reason the passcode exists. A rule on
-`request.auth` serves two managers and refuses eleven directors.
-
-So the code is served by our gate function, which is the one thing every reader
-passes through:
-
-- **Passcode reader** — handed the code by the same call that returns the
-  report. Answering the passcode *is* the proof; no second check is needed.
-- **Signed-in editor or director** — asks for it by name; the function checks
-  the caller against the same two lists our Firestore rules use.
-- **Neither** — nothing is returned, and your form appears.
-
-The code is **never in our JavaScript**. It is stored in a config document that
-no client may read (`allow read: if false`), written only through that function,
-and set from the report's own settings screen rather than the Firestore console
-— a console reads values back onto a screen, which is how a set of API keys
-ended up in a screenshot here last week.
-
-You can confirm the first half of that claim yourself:
-
-```
-curl -s https://quote-report.web.app/ | grep -c hvacEmbedCode    # 0
-```
+That third row is why your original §5b — a Firestore document behind
+`request.auth` — would not have worked here, and your correction of it stands.
 
 ---
 
-## 4. The signed token — for §2b, and optionally instead of the shared code
+## 4. What we stopped using, and why
 
-Required for the new-tab link in §2b. Optional for the frame, where it would
-replace the static code: a static code, however well kept, is a credential in
-circulation, and any reader who can pass our gate can in principle extract it
-from the exchange and use it against your site directly, un-framed, for as long
-as it lives. A token cannot be reused and cannot outlive its two minutes.
+**The frame.** It worked. We removed it anyway, for your reasons and one of our
+own:
 
-We can offer instead, from our Cloud Function:
+- In its own tab the archive has the whole screen for a two-pane application.
+- It prints. Framed, it cannot — you have no print stylesheet, and a frame
+  prints as a grey rectangle.
+- The session survives. Safari partitions storage for third-party frames, so a
+  framed sign-in is unreliable across visits in exactly the browser most of this
+  board uses.
+- **Ours specifically:** this report rebuilds its whole DOM on every inline edit.
+  An embedded frame reloads with it, losing the reader's place and re-prompting,
+  every time the manager corrects a price. We had worked around that by loading
+  the frame only on a press. Removing the frame removed the workaround too.
 
-```
-{ v: 1, iat: <unix>, exp: <iat + 120>, aud: "mcm.web.app", nonce: <random> }
-```
+**The embed-only passcode.** Unused. It only ever had meaning inside a frame —
+`#t=` takes a grant and nothing else. You may retire ours whenever it suits you;
+we will not notice. We have taken the field for it out of our settings screen so
+nobody pastes a credential that does nothing.
 
-HMAC-SHA256 over the compact JSON with a secret shared once between our function
-and yours, sent as `{type:'unlock', token: '<base64url payload>.<sig>'}`.
-
-Your side verifies the signature, that `exp` is in the future, and that the
-nonce has not been seen. A leaked token is dead in two minutes and cannot be
-replayed. If you would accept that shape, say so and we will mint it; if you
-would rather define the payload, send yours and we will produce it.
-
-The same token serves both routes: `{type:'unlock', token}` into the frame, and
-`#t=<token>` on the new-tab link. One thing to implement on your side, two
-places it removes a prompt.
-
-The stronger form — a Firebase custom token minted by us and accepted by your
-project — is the textbook answer, but it needs cross-project trust configured on
-your side and is almost certainly more than this warrants.
+**The `postMessage` channel.** We no longer listen for `ready`, `needs-unlock`
+or `error`, and we send nothing. With no frame there is nothing on the other end
+of it. Your `frame-ancestors` entries for us are unused but worth keeping — if
+we ever want the frame back it is a small change here and none there.
 
 ---
 
-## 5. What we deliberately do not do
+## 5. What would break this, and what we would need
 
-- **No copy of your data**, no proxy, no re-host. The frame is the integration.
-- **Nothing is posted to the frame except `unlock`.** No navigation, no `ask`.
-  If we later add menu entries for `#timeline` or `#suite=…` we will use
-  `postMessage` rather than resetting `src`, as your §4 recommends.
-- **We never send `unlock` to any origin but yours**, and we ignore any message
-  that does not come from `https://mcm.web.app` carrying `source: 'nnsc-hvac'`.
-- **We do not attempt to read anything out of the frame.** Cross-origin, and not
-  our business.
+- **You rotate the signing secret.** Send us the new one; it goes in the settings
+  screen and takes effect immediately. Nothing redeploys.
+- **We move domain.** Only matters if we frame again, since a link needs no
+  origin permission. We would tell you anyway.
+- **You change the grant format.** Tell us and we will follow — it is one
+  function on our side.
+
+If a reader's grant cannot be minted — no secret stored, our function down —
+the tab still opens, at a clean `https://mcm.web.app/` with nothing in the
+fragment, and your passcode form does its job. ⌘-click gets the same. Nobody is
+stranded and nobody sees a broken URL.
 
 ---
 
-## 6. How to check it from your side once the code is issued
+## 6. Two small things from using it
 
-1. Open `https://quote-report.web.app`, unlock with the board passcode.
-2. Left rail → **🔧 HVAC records** → *Open the service records*.
-3. Expected: your "Opening the service records…" line, then the report. The
-   passcode form should never appear.
-4. If it does appear, the code has not been saved on our side yet — tell us and
-   we will check the setting rather than sending you chasing it.
+- **Erasing the fragment before the exchange, not after, was the right call.**
+  We could see it in the address bar for the instant before it went; you had
+  already thought about it.
+- **The `hashchange` case is real.** A director with the archive already open
+  pressed the link again and it worked, which it would not have if you had only
+  read the fragment on load.
 
-Anything about the tracker — how a reader is admitted, what the gate returns,
-why the section is hidden on our other sites — ask and we will answer or change
-it.
+---
+
+## 7. Checklist, closed
+
+- [x] Framing locked to our origins (unused now, kept)
+- [x] Beta origin allowed — used while staging, before directors saw it
+- [x] Embed-only passcode issued — **not used, retire at will**
+- [x] Signing secret issued, stored, and minting verified against your spec
+- [x] New-tab link carrying `#t=<grant>` — **this is the integration**
+- [ ] ~~`#secHVAC` section holding the frame~~ — removed
+- [ ] ~~Unlock the frame from the tracker~~ — no frame
+- [ ] Optional, not taken: deep links (`#timeline`, `#suite=…`, `#ask=…`). If
+      the board starts asking for one view in particular we will add menu
+      entries carrying both the grant and the view fragment — tell us how you
+      would like the two combined in one URL and we will follow.
+
+Thank you for the `hashchange` handling and the five-second grace. Both were
+things we would have found the hard way.
