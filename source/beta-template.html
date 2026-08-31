@@ -1161,6 +1161,22 @@ body:has(#report.tpl-packet) .wrap { max-width:1560px; }
 .tpl-packet .pk-updflag.iss { background:#f6e3c0; color:#7a5210; }
 /* the name against a site update: quieter than a flag, because it is an
    attribution and not a warning */
+/* The archive is a two-pane application that scrolls inside itself, not an
+   article that grows, so the frame is given a real height. Below 1000px it
+   folds to one column of its own accord; the minimum keeps it usable on a short
+   window, where 80vh alone would not be. */
+.tpl-packet .hvacframe { width:100%; height:80vh; min-height:600px; border:1px solid var(--line);
+  border-radius:10px; display:block; background:var(--paper); }
+.tpl-packet .hvacrest { padding:18px 2px 4px; }
+.tpl-packet .hvacrest p { margin:0 0 12px; color:var(--ink2); font-size:13.5px; max-width:62ch; }
+.tpl-packet .pk-hvacout { flex:none; font-size:12.5px; font-weight:700; color:var(--pkg);
+  text-decoration:none; white-space:nowrap; }
+.tpl-packet .pk-hvacout:hover { text-decoration:underline; }
+@media screen and (max-width:600px){
+  .tpl-packet .hvacframe { height:72vh; min-height:520px; }
+}
+/* on paper a frame prints as a grey rectangle at best */
+@media print { .tpl-packet #secHVAC { display:none !important; } }
 .tpl-packet .pk-updd .pk-updby { display:block; margin-top:2px; font-size:11px; font-weight:650;
   color:var(--ink2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .tpl-packet .pk-updd .pk-updby.claim { cursor:pointer; color:var(--pkg); font-weight:600;
@@ -4224,7 +4240,8 @@ var PK_ICON = {
   open:  'M4 13l2-8h12l2 8M4 13v6h16v-6M4 13h5l1.2 2h3.6l1.2-2h5',
   prog:  'M12 3a9 9 0 100 18 9 9 0 000-18M12 7v5l3.5 2',
   arch:  'M3 5a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1zM5 8v11h14V8M10 12h4',
-  done:  'M12 3a9 9 0 100 18 9 9 0 000-18M8.2 12.2l2.6 2.6 5-5'
+  done:  'M12 3a9 9 0 100 18 9 9 0 000-18M8.2 12.2l2.6 2.6 5-5',
+  hvac:  'M4 6h16v9H4zM8 15v3M16 15v3M7 19h10M8 9.5h8M8 12h5'
 };
 function pkIcon(k) {
   return '<span class="ni"><svg viewBox="0 0 24 24" fill="none" stroke="#eac986" stroke-width="1.7" ' +
@@ -4513,6 +4530,7 @@ function renderPacketReport() {
     (nPast ? '<a href="#secPast">' + pkIcon("done") + ' Completed earlier</a>' : "") +
     '<a href="#secD">' + pkIcon("spend") + ' Contractor spend</a>' +
     '<a href="#secE">' + pkIcon("open") + ' Status &amp; decisions</a>' +
+    (hvacAvailable() ? '<a href="#secHVAC">' + pkIcon("hvac") + ' HVAC records</a>' : "") +
     '<a href="#" data-arch="1">' + pkIcon("arch") + ' Reports archive</a>' +
     /* not a section of the report — the corporation's standing agreements,
        kept apart from the run of report sections */
@@ -4626,6 +4644,7 @@ function renderPacketReport() {
     /* nothing decided yet: a fold over one sentence is worse than the sentence */
     : '<section id="secE" class="panel"><h3>Status &amp; board decisions</h3>' +
       secEBlocks(d, M, ctx.ED) + '</section>');
+  h.push(hvacSectionHTML());
   /* the corporation's standing agreements, read alongside the report */
   if (canSeeContracts())
     h.push('<section id="secF" class="panel"><h3>Contracts with contractors</h3>' +
@@ -11009,6 +11028,71 @@ document.addEventListener("click", function (e) {
   });
 })();
 
+/* ---------- the HVAC service archive, shown inside this report ----------
+
+   A separate application on its own origin, holding sixty contractors' work
+   orders for NNSC 292 and naming residents in them. It is not copied here and
+   must not be: what protects those records is a Firebase rule tied to that
+   origin, and a frame keeps it that way — the data never touches this page and
+   this page never touches the data.
+
+   Its Content-Security-Policy names exactly one site that may frame it. So the
+   section is drawn only where framing will actually work: on any other origin
+   the browser would refuse the frame and the board would be looking at an empty
+   box with no way to tell why. The four building sites are excluded by the same
+   line, which is right for a second reason — these are NNSC 292's residents. */
+var HVAC_URL   = "https://mcm.web.app";
+var HVAC_FRAME = HVAC_URL + "/?embed=1";
+var HVAC_HOSTS = ["https://quote-report.web.app"];
+function hvacAvailable() { return HVAC_HOSTS.indexOf(location.origin) >= 0; }
+/* Opened on request rather than with the page. Not for the loading: this report
+   redraws itself in full on every edit, and an iframe cannot survive that — it
+   would reload, lose the reader's place and ask for the passcode again, every
+   time the manager corrected a price. Opened deliberately, it is opened once. */
+var hvacOpen = false;
+var hvacNote = "";        /* what the archive last said about itself */
+function hvacSectionHTML() {
+  if (!hvacAvailable()) return "";
+  var head = '<section id="secHVAC" class="panel pk-detailcard"><div class="pk-sechead">' +
+    '<div class="pk-sechead-l"><span class="pk-badge">\u{1F527}</span><div>' +
+    '<div class="pk-sectitle">HVAC service records</div>' +
+    '<div class="pk-secsub">' +
+    (hvacNote ? esc(hvacNote)
+      : "Every work order the contractors filed for these buildings, searchable, " +
+        "with each figure opening the page it was taken from.") +
+    "</div></div></div>" +
+    '<a class="pk-hvacout" href="' + HVAC_URL + '" target="_blank" rel="noopener">' +
+    "Open full screen \u2197</a></div>";
+  if (!hvacOpen)
+    return head + '<div class="hvacrest"><p>The archive is a separate, ' +
+      "password-protected system. It opens here in the page.</p>" +
+      '<button class="btn primary" type="button" data-act="hvac-open">Open the service records</button>' +
+      "</div></section>";
+  return head + '<iframe class="hvacframe" id="hvacFrame" src="' + HVAC_FRAME +
+    '" title="NNSC 292 \u2014 HVAC service records" allow="microphone" ' +
+    'referrerpolicy="strict-origin"></iframe></section>';
+}
+/* The archive talks back. Only its own origin is listened to, and only messages
+   that name themselves — anything else on the page's message channel is noise
+   at best. Nothing is ever sent to it: unlocking it from here would mean the
+   passcode living in this file, which anyone who can open the report can read. */
+addEventListener("message", function (e) {
+  if (e.origin !== HVAC_URL) return;
+  var d = e.data;
+  if (!d || d.source !== "nnsc-hvac") return;
+  if (d.type === "ready" && d.entries) {
+    var r = d.range || [];
+    hvacNote = d.entries + " work entries" +
+      (r[0] && r[1] ? ", " + r[0] + " to " + r[1] : "") + ".";
+  } else if (d.type === "needs-unlock") {
+    hvacNote = "Asking for its passcode \u2014 the board has it; it is not this report's.";
+  } else if (d.type === "error") {
+    hvacNote = "The archive reported a problem" + (d.message ? ": " + d.message : ".");
+  } else return;
+  var sub = document.querySelector("#secHVAC .pk-secsub");
+  if (sub) sub.textContent = hvacNote;      /* redrawn in place: the frame stays */
+});
+
 /* ---------- shared-passcode view gate (non-editors) ---------- */
 function viewGateMsg(t) { var el = document.getElementById("viewGateMsg"); if (el) el.textContent = t || ""; }
 var gateTimer = null;
@@ -11970,6 +12054,14 @@ document.getElementById("report").addEventListener("click", function (e) {
   /* property manager: click a pipeline stage dot to mark it reached */
   var stp = e.target.closest(".pk-step[data-stage]");
   if (stp && isEditor()) { pkStageClick(stp); return; }
+  /* anyone: open the HVAC archive in place. Not loaded until asked for — see
+     hvacSectionHTML for why it is not simply there on arrival */
+  if (e.target.closest('[data-act="hvac-open"]')) {
+    hvacOpen = true; renderReport();
+    var sec = document.getElementById("secHVAC");
+    if (sec) sec.scrollIntoView({ block: "start", behavior: "smooth" });
+    return;
+  }
   /* property manager: claim an update written before authors were recorded */
   var cm = e.target.closest("[data-updmine]");
   if (cm && isEditor()) {
