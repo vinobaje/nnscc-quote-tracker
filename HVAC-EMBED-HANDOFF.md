@@ -45,7 +45,43 @@ straight into our config and is never quoted back.
 Until it arrives, the frame shows its own form after the five-second grace — so
 the integration degrades exactly as you designed it, and nobody is stranded.
 
-### (b) Optionally, our beta origin
+### (b) A way to open the archive in its own tab, already unlocked
+
+The board has asked for this as well as the frame, and it is the request we
+cannot meet with anything you publish today: a menu item that opens
+`https://mcm.web.app` in a new tab, for a reader who has already unlocked the
+tracker, **without a second passcode**. In its own tab it gets the whole screen,
+it prints, and it survives the storage partitioning that makes framed sessions
+unreliable in Safari.
+
+`postMessage` cannot do it — there is no frame. So the credential has to travel
+in the link, and a passcode in a link is the thing we would most like to avoid:
+URLs are pasted into email, kept in history, and read out of the address bar over
+someone's shoulder.
+
+What we would like instead, if you are willing to accept it:
+
+```
+https://mcm.web.app/#t=<base64url payload>.<sig>
+```
+
+- **In the fragment, not the query.** A fragment is never sent to a server, never
+  appears in a `Referer`, and never reaches your logs or ours.
+- Minted by our Cloud Function at the moment the reader clicks, one per click.
+- Payload as in §4 below — `exp` two minutes out, and a `nonce` so a link that is
+  forwarded is dead on arrival if it has already been used.
+- **Consumed and erased on arrival**: verify, establish your own session as if
+  the passcode had been typed, then `history.replaceState` the fragment away so
+  the address bar holds a clean URL and the token is not in the back button.
+
+If a token is missing, expired or already spent, your existing passcode form is
+the right fallback — the reader is never worse off than today.
+
+We will build the minting side to whatever shape you specify. If you would rather
+not accept a URL credential at all, say so plainly and we will keep the new-tab
+link as a plain link that asks for the passcode, and tell the board why.
+
+### (c) Optionally, our beta origin
 
 `https://quote-report-beta.web.app`. We stage everything there before it reaches
 directors, and today we cannot see this working until it is already live.
@@ -95,26 +131,31 @@ curl -s https://quote-report.web.app/ | grep -c hvacEmbedCode    # 0
 
 ---
 
-## 4. Optional: a signed token instead of a shared code
+## 4. The signed token — for §2b, and optionally instead of the shared code
 
-Not needed for launch — take this only if you would rather no reusable secret
-existed. A static code, however well kept, is a credential in circulation: any
-reader who can pass our gate can in principle extract it from the exchange and
-use it against your site directly, un-framed, for as long as it lives.
+Required for the new-tab link in §2b. Optional for the frame, where it would
+replace the static code: a static code, however well kept, is a credential in
+circulation, and any reader who can pass our gate can in principle extract it
+from the exchange and use it against your site directly, un-framed, for as long
+as it lives. A token cannot be reused and cannot outlive its two minutes.
 
 We can offer instead, from our Cloud Function:
 
 ```
-{ v: 1, iat: <unix>, exp: <iat + 300>, aud: "mcm.web.app", nonce: <random> }
+{ v: 1, iat: <unix>, exp: <iat + 120>, aud: "mcm.web.app", nonce: <random> }
 ```
 
 HMAC-SHA256 over the compact JSON with a secret shared once between our function
 and yours, sent as `{type:'unlock', token: '<base64url payload>.<sig>'}`.
 
 Your side verifies the signature, that `exp` is in the future, and that the
-nonce has not been seen. A leaked token is dead in five minutes and cannot be
+nonce has not been seen. A leaked token is dead in two minutes and cannot be
 replayed. If you would accept that shape, say so and we will mint it; if you
 would rather define the payload, send yours and we will produce it.
+
+The same token serves both routes: `{type:'unlock', token}` into the frame, and
+`#t=<token>` on the new-tab link. One thing to implement on your side, two
+places it removes a prompt.
 
 The stronger form — a Firebase custom token minted by us and accepted by your
 project — is the textbook answer, but it needs cross-project trust configured on

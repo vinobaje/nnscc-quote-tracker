@@ -11087,7 +11087,12 @@ function hvacUnlock(frame) {
   if (!frame) return;
   function send(code) {
     if (!code) {
-      hvacNote = "Asking for its passcode \u2014 the board has it.";
+      /* Say which of the two reasons it is. "It is asking for a passcode" is
+         no use to the manager, who is the only person who can stop it asking. */
+      hvacNote = isEditor()
+        ? "No embed code is saved, so the archive is asking the reader for its own passcode. " +
+          "Put the code in Edit data \u2192 Settings \u2192 Who can open the report."
+        : "The archive is asking for its own passcode \u2014 the board has it.";
       var sub0 = document.querySelector("#secHVAC .pk-secsub");
       if (sub0) sub0.textContent = hvacNote;
       return;
