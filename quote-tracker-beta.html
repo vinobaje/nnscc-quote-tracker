@@ -2827,7 +2827,7 @@ var BRAND_PATH = "nnsccQuoteTrackerBeta/brand";               /* the letterhead 
 var WEEKLY_DRAFT_PATH = "nnsccQuoteTrackerBeta/weeklyDraft";   /* the report she is working on */
 var WEEKLY_COLL = "nnsccWeeklyReportsBeta";                   /* every one she has finished */
 var VIEW_BETA = CURRENT_PATH.indexOf("Beta") >= 0;   /* which report the passcode gate reads/protects */
-var BUILD_STAMP = "2026-08-30 22:10";   /* filled in by build.js — which copy of the page this is */
+var BUILD_STAMP = "2026-08-30 22:13";   /* filled in by build.js — which copy of the page this is */
 /* path of the report currently on screen */
 function reportPath() {
   return cloud.active.kind === "current" ? CURRENT_PATH : (REPORTS_COLL + "/" + cloud.active.id);
@@ -4514,15 +4514,19 @@ function renderPacketReport() {
     (nPast ? '<a href="#secPast">' + pkIcon("done") + ' Completed earlier</a>' : "") +
     '<a href="#secD">' + pkIcon("spend") + ' Contractor spend</a>' +
     '<a href="#secE">' + pkIcon("open") + ' Status &amp; decisions</a>' +
-    (hvacAvailable() ? '<a href="' + HVAC_URL + '" target="_blank" rel="noopener" ' +
-      'data-act="hvac-tab" title="Opens in its own tab, already unlocked">' +
-      pkIcon("hvac") + ' HVAC records \u2197</a>' : "") +
     '<a href="#" data-arch="1">' + pkIcon("arch") + ' Reports archive</a>' +
-    /* not a section of the report — the corporation's standing agreements,
-       kept apart from the run of report sections */
-    (canSeeContracts()
+    /* Not sections of the report: the corporation's standing agreements, and
+       the HVAC archive, which is a separate site entirely. Both are things the
+       report points at rather than things it contains, so they sit below the
+       run of sections rather than among them. */
+    (canSeeContracts() || hvacAvailable()
       ? '<div class="pk-navsep">Under contract</div>' +
-        '<a class="pk-navcon" href="#secF">' + pkIcon("open") + ' Contracts</a>'
+        (canSeeContracts()
+          ? '<a class="pk-navcon" href="#secF">' + pkIcon("open") + ' Contracts</a>' : "") +
+        (hvacAvailable()
+          ? '<a class="pk-navcon" href="' + HVAC_URL + '" target="_blank" rel="noopener" ' +
+            'data-act="hvac-tab" title="Opens in its own tab, already unlocked">' +
+            pkIcon("hvac") + ' HVAC records \u2197</a>' : "")
       : "") + "</nav>");
   h.push('<div class="pk-side-foot"><span class="av">' + (ctx.ED ? "🛠" : (isBoardMember() ? "🗳" : "👤")) +
     '</span><span><b>' + role + '</b>' +
@@ -5053,6 +5057,21 @@ var ED_GROUPS = [
                      ["minutes", "⚖️", "Minutes"]]]
 ];
 if (VOTING_ON) ED_GROUPS.push(["Decisions", [["board", "🗳", "Board &amp; Voting"]]]);
+/* The Settings page is the owner's, not the property manager's.
+
+   It holds who may open the report at all, the shared passcode, the archive's
+   signing secret, and the restore tools — none of which a manager needs to run
+   a month, and all of which invite a wrong guess from somebody who opened the
+   page wondering what it was. Both of the owner's accounts, because he signs in
+   with either.
+
+   This hides the page; it does not harden it. The writes behind it are checked
+   on the server against the editor list, exactly as before, and that is what
+   actually stops one being made. */
+var OWNER_EMAILS = ["mvinobaje@gmail.com", "vino@stoneycreekpm.ca"];
+function isOwner() {
+  return !!(cloud.user && OWNER_EMAILS.indexOf(String(cloud.user.email || "").toLowerCase()) >= 0);
+}
 var ED_FOOT = [["settings", "⚙️", "Settings"]];
 
 function renderEditor() {
@@ -5078,7 +5097,11 @@ function renderEditor() {
     "Who can open the report, vote on a job and sign the resolution.") + boardCardHTML() + edVotingHTML());
   /* with voting put away the board-member list lives in Settings, so an old
      link or a stale click on "board" lands there rather than on nothing */
-  else if (edNav === "settings" || edNav === "board") h.push(edSettingsHTML(M));
+  else if (edNav === "settings" || edNav === "board") {
+    /* a link kept in a bookmark, or the state left behind by a sign-out */
+    if (isOwner()) h.push(edSettingsHTML(M));
+    else { edNav = "jobs"; h.push(edJobsHTML()); }
+  }
   else h.push(edJobsHTML());
   h.push("</div></div></div>");
   document.getElementById("editor").innerHTML = h.join("");
@@ -5243,9 +5266,12 @@ function edSideHTML(M) {
     g[1].forEach(function (s) { h.push(navBtn(s)); });
     h.push("</div>");
   });
-  h.push('<div class="ed-navgroup foot">');
-  ED_FOOT.forEach(function (s) { h.push(navBtn(s)); });
-  h.push("</div></nav>");
+  if (isOwner()) {
+    h.push('<div class="ed-navgroup foot">');
+    ED_FOOT.forEach(function (s) { h.push(navBtn(s)); });
+    h.push("</div>");
+  }
+  h.push("</nav>");
   var who = (cloud.user && cloud.user.email) || "";
   h.push('<div class="ed-sidefoot"><div class="ed-help"><b>Everything saves itself</b>' +
     "Each change is written as you make it — to this browser, and to the cloud when you’re signed in. " +
