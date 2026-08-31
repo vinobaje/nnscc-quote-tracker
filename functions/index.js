@@ -933,6 +933,18 @@ exports.nnsccStamp = onCall(
 // shared passcode. The passcode is stored as a salted scrypt hash (never in
 // plaintext, never client-readable — the config doc is `allow read: if false`)
 // and verified server-side, with throttling to blunt brute-force attempts.
+// One grant for the HVAC archive: good for two minutes, good once. The archive
+// records the nonce it has spent and refuses a replay, so a link that is
+// forwarded is dead on arrival rather than an open door.
+function hvacMintGrant(secret) {
+  const now = Math.floor(Date.now() / 1000);
+  const payload = { v: 1, iat: now, exp: now + 120, aud: "mcm.web.app",
+                    nonce: crypto.randomBytes(16).toString("hex") };
+  const body = Buffer.from(JSON.stringify(payload), "utf8").toString("base64url");
+  // ASCII over the transmitted string, and the secret as its own characters
+  const sig = crypto.createHmac("sha256", secret).update(body, "ascii").digest("base64url");
+  return body + "." + sig;
+}
 const GATE_REPORT = { live: "nnsccQuoteTracker/main", beta: "nnsccQuoteTrackerBeta/main" };
 // The contract register travels with the report: a board member reading with the
 // passcode sees the agreements alongside the quotes, the same as every other
@@ -1044,6 +1056,35 @@ exports.nnsccGate = onCall(
       };
     }
 
+    // ----- a signed grant for the HVAC archive -----
+    // Preferred over handing out the static embed code: a grant is dead in two
+    // minutes and cannot be spent twice, so nothing durable is ever in
+    // circulation. Their spec, exactly: the signature covers the base64url
+    // payload STRING as transmitted, not the raw JSON, so the two projects
+    // cannot fall out over key order or whitespace; and the secret is signed as
+    // its own characters, not hex-decoded.
+    if (data.hvacGrant === true) {
+      const cfgG = (await cfgRef.get()).data() || {};
+      const secret = String(cfgG.hvacSignSecret || "");
+      if (!secret) throw new HttpsError("failed-precondition", "No signing secret has been saved.");
+      // the same right to read the report, proved either way
+      if (request.auth && request.auth.token && request.auth.token.email_verified === true &&
+          request.auth.token.email) {
+        const emG = request.auth.token.email.toLowerCase();
+        const edG = (cfgG.editors || []).map((e) => String(e).toLowerCase());
+        let okG = emG === OWNER || edG.includes(emG);
+        if (!okG) {
+          const bdG = await db.doc(beta ? "nnsccQuoteTrackerBeta/board" : "nnsccQuoteTracker/board").get();
+          const mem = (bdG.exists && bdG.data().members) || [];
+          okG = mem.map((m) => String(m).toLowerCase()).includes(emG);
+        }
+        if (!okG) throw new HttpsError("permission-denied", "This account cannot read the service records.");
+      } else {
+        await gateVerify(cfgRef, beta, String(data.passcode || ""));
+      }
+      return { grant: hvacMintGrant(secret) };
+    }
+
     // ----- signed in: the same code, for a reader who never met the gate -----
     // Editors and board members read the report straight out of Firestore and
     // so never call `view`. They still need the archive's code, and it still
@@ -1083,9 +1124,13 @@ exports.nnsccGate = onCall(
       if (em3 !== OWNER && !ed3.includes(em3)) {
         throw new HttpsError("permission-denied", "Only the property manager can set this.");
       }
-      const code = String(data.code || "");
-      await cfgRef.set({ hvacEmbedCode: code }, { merge: true });
-      return { set: !!code };
+      const patch = {};
+      if (typeof data.code === "string") patch.hvacEmbedCode = String(data.code);
+      if (typeof data.secret === "string") patch.hvacSignSecret = String(data.secret);
+      if (!Object.keys(patch).length) throw new HttpsError("invalid-argument", "Nothing to save.");
+      await cfgRef.set(patch, { merge: true });
+      const after = (await cfgRef.get()).data() || {};
+      return { set: !!after.hvacEmbedCode, signing: !!after.hvacSignSecret };
     }
 
     // ----- public: hand over one signed contract, passcode first -----

@@ -2843,7 +2843,7 @@ var BRAND_PATH = "nnsccQuoteTrackerBeta/brand";               /* the letterhead 
 var WEEKLY_DRAFT_PATH = "nnsccQuoteTrackerBeta/weeklyDraft";   /* the report she is working on */
 var WEEKLY_COLL = "nnsccWeeklyReportsBeta";                   /* every one she has finished */
 var VIEW_BETA = CURRENT_PATH.indexOf("Beta") >= 0;   /* which report the passcode gate reads/protects */
-var BUILD_STAMP = "2026-08-30 21:50";   /* filled in by build.js — which copy of the page this is */
+var BUILD_STAMP = "2026-08-30 22:01";   /* filled in by build.js — which copy of the page this is */
 /* path of the report currently on screen */
 function reportPath() {
   return cloud.active.kind === "current" ? CURRENT_PATH : (REPORTS_COLL + "/" + cloud.active.id);
@@ -11044,7 +11044,7 @@ document.addEventListener("click", function (e) {
    line, which is right for a second reason — these are NNSC 292's residents. */
 var HVAC_URL   = "https://mcm.web.app";
 var HVAC_FRAME = HVAC_URL + "/?embed=1";
-var HVAC_HOSTS = ["https://quote-report.web.app"];
+var HVAC_HOSTS = ["https://quote-report.web.app", "https://quote-report-beta.web.app"];
 function hvacAvailable() { return HVAC_HOSTS.indexOf(location.origin) >= 0; }
 /* Opened on request rather than with the page. Not for the loading: this report
    redraws itself in full on every edit, and an iframe cannot survive that — it
@@ -11062,7 +11062,8 @@ function hvacSectionHTML() {
       : "Every work order the contractors filed for these buildings, searchable, " +
         "with each figure opening the page it was taken from.") +
     "</div></div></div>" +
-    '<a class="pk-hvacout" href="' + HVAC_URL + '" target="_blank" rel="noopener">' +
+    '<a class="pk-hvacout" href="' + HVAC_URL + '" target="_blank" rel="noopener" ' +
+    'data-act="hvac-tab" title="Opens in its own tab, already unlocked">' +
     "Open full screen \u2197</a></div>";
   if (!hvacOpen)
     return head + '<div class="hvacrest"><p>The archive is a separate, ' +
@@ -11083,6 +11084,19 @@ function hvacSectionHTML() {
    sees the archive's own passcode form instead — which is the honest outcome,
    not a failure. */
 var hvacCode = "";
+/* A grant rather than the code where the archive will take one: it is good for
+   two minutes and for one use, so nothing durable is ever in circulation and a
+   link that is forwarded is dead before it is read. Minted per press — never
+   cached, which would defeat the point of it being single-use. */
+function hvacGrantFetch() {
+  if (!cloud.fns) return Promise.resolve("");
+  var args = { hvacGrant: true, beta: VIEW_BETA };
+  /* a passcode reader proves the same right the same way they proved it before */
+  if (!cloud.user && conGate.pass) args.passcode = conGate.pass;
+  return cloud.fns.httpsCallable("nnsccGate")(args)
+    .then(function (r) { return String((r.data && r.data.grant) || ""); })
+    .catch(function () { return ""; });
+}
 function hvacUnlock(frame) {
   if (!frame) return;
   function send(code) {
@@ -11099,11 +11113,36 @@ function hvacUnlock(frame) {
     }
     frame.postMessage({ type: "unlock", passcode: code }, HVAC_URL);
   }
-  if (hvacCode) return send(hvacCode);
-  if (!cloud.fns || !cloud.user) return send("");
-  cloud.fns.httpsCallable("nnsccGate")({ hvacCode: true, beta: VIEW_BETA })
-    .then(function (r) { hvacCode = String((r.data && r.data.code) || ""); send(hvacCode); })
-    .catch(function () { send(""); });
+  /* the grant first; the static code only where no signing secret is stored */
+  hvacGrantFetch().then(function (g) {
+    if (g) { frame.postMessage({ type: "unlock", token: g }, HVAC_URL); return; }
+    if (hvacCode) return send(hvacCode);
+    if (!cloud.fns || !cloud.user) return send("");
+    cloud.fns.httpsCallable("nnsccGate")({ hvacCode: true, beta: VIEW_BETA })
+      .then(function (r) { hvacCode = String((r.data && r.data.code) || ""); send(hvacCode); })
+      .catch(function () { send(""); });
+  });
+}
+/* Open the archive in its own tab, already unlocked. The tab is opened on the
+   press itself — synchronously, or a popup blocker eats it — and pointed at the
+   grant when it arrives a moment later. The grant rides in the fragment, which
+   no browser sends to any server, and the archive erases it on arrival. */
+function hvacOpenTab() {
+  var tab = null;
+  try { tab = window.open("about:blank", "_blank"); } catch (e) {}
+  if (tab) {
+    try {
+      tab.opener = null;                        /* the same protection as noopener */
+      tab.document.write("<title>Opening the service records\u2026</title>" +
+        '<body style="font:15px -apple-system,Segoe UI,Roboto,sans-serif;color:#4A5866;' +
+        'padding:40px">Opening the service records\u2026</body>');
+      tab.document.close();
+    } catch (e) {}
+  }
+  hvacGrantFetch().then(function (g) {
+    var url = HVAC_URL + "/" + (g ? "#t=" + g : "");
+    if (tab) tab.location = url; else window.location.href = url;
+  });
 }
 /* The archive talks back. Only its own origin is listened to, and only messages
    that name themselves — anything else on the page's message channel is noise
@@ -11205,31 +11244,43 @@ function viewPassCardHTML() {
        report — see hvacUnlock. */
     h.push('<p class="edithint" style="margin:14px 0 6px;font-weight:600">HVAC service records</p>');
     h.push('<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">' +
-      '<input id="hvacCodeInput" type="password" autocomplete="off" placeholder="the archive’s embed code" ' +
-      'style="flex:1;min-width:200px;box-sizing:border-box">' +
-      '<button class="btn" data-act="hvaccode-set" type="button">Save code</button>' +
+      '<input id="hvacSecretInput" type="password" autocomplete="off" placeholder="signing secret (preferred)" ' +
+      'style="flex:1;min-width:180px;box-sizing:border-box">' +
+      '<input id="hvacCodeInput" type="password" autocomplete="off" placeholder="embed code (fallback)" ' +
+      'style="flex:1;min-width:180px;box-sizing:border-box">' +
+      '<button class="btn" data-act="hvaccode-set" type="button">Save</button>' +
       '<span class="savenote" id="hvacCodeMsg"></span></div>');
-    h.push('<p class="edithint" style="margin:6px 0 0;font-size:12px">The archive on mcm.web.app asks the ' +
-      'report for this when a director opens it, so nobody meets a second passcode. Ask its maintainer for ' +
-      'the embed code — it is separate from the one the board types at that site, so either can be changed ' +
-      'without the other. Leave it blank and readers simply type the archive’s own passcode instead.</p>');
+    h.push('<p class="edithint" style="margin:6px 0 0;font-size:12px">So that a director who has already ' +
+      'opened this report is not asked for a second passcode at mcm.web.app. Both come from the archive’s ' +
+      'maintainer. The <strong>signing secret</strong> is the one to use: the report signs a fresh permit ' +
+      'for each reader that dies in two minutes and cannot be used twice, so nothing lasting is ever handed ' +
+      'out — it is also what makes “Open full screen” open without a prompt. The <strong>embed code</strong> ' +
+      'is the older way and is used only if no secret is stored. Either may be left blank; then readers ' +
+      'type the archive’s own passcode, which is how it worked before.</p>');
   }
   h.push("</div></div>");
   return h.join("");
 }
 function hvacCodeSet() {
-  var inp = document.getElementById("hvacCodeInput");
-  var v = (inp && inp.value || "").trim();
+  var ci = document.getElementById("hvacCodeInput");
+  var si = document.getElementById("hvacSecretInput");
   var msg = document.getElementById("hvacCodeMsg");
+  var args = { setHvac: true, beta: VIEW_BETA };
+  /* only what was actually typed is written: an empty box is "leave it alone",
+     not "clear it", or saving one would silently wipe the other */
+  if (ci && ci.value.trim()) args.code = ci.value.trim();
+  if (si && si.value.trim()) args.secret = si.value.trim();
+  if (!args.code && !args.secret) { if (msg) msg.textContent = "Paste one of them first."; return; }
   if (!cloud.fns || !cloud.user) { if (msg) msg.textContent = "Sign in first."; return; }
   if (msg) msg.textContent = "Saving…";
-  cloud.fns.httpsCallable("nnsccGate")({ setHvac: true, code: v, beta: VIEW_BETA })
+  cloud.fns.httpsCallable("nnsccGate")(args)
     .then(function (r) {
-      if (inp) inp.value = "";
-      hvacCode = v;
-      if (msg) msg.textContent = (r.data && r.data.set)
-        ? "Saved — directors will not be asked for it."
-        : "Cleared — readers will type the archive’s own passcode.";
+      if (ci) ci.value = ""; if (si) si.value = "";
+      if (args.code) hvacCode = args.code;
+      var d = (r && r.data) || {};
+      if (msg) msg.textContent = d.signing
+        ? "Saved — the report will sign a permit for each reader."
+        : (d.set ? "Saved — the embed code will be used." : "Saved.");
     })
     .catch(function (e) {
       if (msg) msg.textContent = "⚠ " + ((e && e.message) || "could not save it");
@@ -12126,6 +12177,12 @@ document.getElementById("report").addEventListener("click", function (e) {
   if (stp && isEditor()) { pkStageClick(stp); return; }
   /* anyone: open the HVAC archive in place. Not loaded until asked for — see
      hvacSectionHTML for why it is not simply there on arrival */
+  if (e.target.closest('[data-act="hvac-tab"]')) {
+    /* \u2318-click and middle-click keep the plain href, which asks for the
+       archive's own passcode — that is the right fallback, not a broken tab */
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.button > 0) return;
+    e.preventDefault(); hvacOpenTab(); return;
+  }
   if (e.target.closest('[data-act="hvac-open"]')) {
     hvacOpen = true; renderReport();
     var sec = document.getElementById("secHVAC");
