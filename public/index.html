@@ -374,25 +374,44 @@ input:focus, select:focus { outline:2px solid var(--accent); outline-offset:-1px
 .edithint { color:var(--ink2); font-size:14px; max-width:70ch; margin:14px 0; }
 .esettings .ebids { padding:10px 14px 14px; }
 /* ---- the agenda ---- */
+.agmeta { display:flex; gap:12px 16px; flex-wrap:wrap; align-items:flex-end; }
+.agmeta label { display:flex; flex-direction:column; gap:3px; font-size:11.5px; font-weight:600;
+  color:var(--ink2); flex:0 0 auto; }
+.agmeta label.wide { flex:1 1 320px; }
+.agmeta label.chk { flex-direction:row; align-items:center; gap:6px; font-weight:500; }
+.agmeta input, .agmeta select { font-size:13px; }
+.agmeta label.wide input { width:100%; box-sizing:border-box; }
+.agsum { margin:12px 0 0; font-size:13px; color:var(--ink2); background:var(--paper);
+  border-left:3px solid var(--accent); padding:8px 12px; border-radius:0 6px 6px 0; }
 .agadd { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
-.agadd select { flex:0 0 240px; }
+.agadd select { flex:0 0 260px; }
 .agadd input { flex:1 1 260px; min-width:200px; box-sizing:border-box; }
-.agrow { display:flex; gap:10px; align-items:flex-start; padding:8px 2px;
+.agtag { font-size:10px; font-weight:700; letter-spacing:.07em; text-transform:uppercase;
+  border-radius:99px; padding:2px 8px; background:var(--line-soft); color:var(--ink2); }
+.agtag.decision { background:var(--accent-soft); color:var(--accent-ink); }
+.agtag.information { background:var(--good-soft); color:var(--good); }
+.agclock { font-size:11.5px; color:var(--muted); font-variant-numeric:tabular-nums; }
+.agmins { display:inline-flex; align-items:center; gap:4px; font-size:11.5px; color:var(--muted); }
+.agmins input { width:50px; font-size:12px; text-align:right; }
+.agrow { display:flex; gap:10px; align-items:flex-start; padding:9px 2px;
   border-bottom:1px solid var(--line-soft); }
 .agrow:last-child { border-bottom:none; }
-.aggrip { flex:none; width:14px; color:var(--muted); font-size:12px; padding-top:3px; }
+.agno { flex:none; width:30px; font-size:12px; font-weight:700; color:var(--muted);
+  font-variant-numeric:tabular-nums; padding-top:2px; }
 .agmain { flex:1 1 auto; min-width:0; display:flex; flex-direction:column; gap:3px; }
 .agtitle { font-size:13.5px; font-weight:650; color:var(--ink); }
 .agtitle.ro { cursor:pointer; }
 .agtitle.ro:hover { color:var(--accent); text-decoration:underline; }
 .agwhy { font-size:12px; color:var(--ink2); line-height:1.45; }
+.agcite { font-size:11.5px; color:var(--muted); font-style:italic; }
+.agmot { display:flex; align-items:center; gap:7px; margin-top:3px; }
+.agmot b { flex:none; font-size:9.5px; letter-spacing:.08em; color:var(--muted); }
+.agmot input { flex:1 1 auto; min-width:0; font-size:12px; box-sizing:border-box; }
 .agamt { flex:none; font-size:13.5px; font-weight:700; font-variant-numeric:tabular-nums;
   color:var(--ink); padding-top:1px; }
 .agrow.man input.agtitle { font-weight:650; width:100%; box-sizing:border-box; }
 .agrow.man input.agnote { font-size:12px; width:100%; box-sizing:border-box; }
-.agwho { flex:0 0 130px; font-size:12px; box-sizing:border-box; }
-.agcam { flex:none; display:inline-flex; align-items:center; gap:5px; font-size:11.5px;
-  color:var(--ink2); white-space:nowrap; padding-top:4px; }
+.agwho { flex:0 0 120px; font-size:12px; box-sizing:border-box; }
 /* left out of this meeting: still on the page, plainly not going on the sheet */
 .agrow.off .agmain, .agrow.off .agamt { opacity:.4; text-decoration:line-through; }
 .agsec.off { opacity:.55; }
@@ -400,6 +419,7 @@ input:focus, select:focus { outline:2px solid var(--accent); outline-offset:-1px
 @media screen and (max-width:700px){
   .agrow { flex-wrap:wrap; }
   .agwho { flex:1 1 100%; }
+}
 }
 .esrow { display:grid; grid-template-columns:180px 1fr; gap:10px; align-items:center; padding:4px 0; }
 .esrow label { font-size:12.5px; color:var(--ink2); font-weight:600; text-align:right; }
@@ -2856,7 +2876,7 @@ var WEEKLY_DRAFT_PATH = "nnsccQuoteTracker/weeklyDraft";   /* the report she is 
 var WEEKLY_COLL = "nnsccWeeklyReports";                   /* every one she has finished */
 var AGENDA_PATH = "nnsccQuoteTracker/agendaDraft";        /* the agenda for the next meeting */
 var VIEW_BETA = CURRENT_PATH.indexOf("Beta") >= 0;   /* which report the passcode gate reads/protects */
-var BUILD_STAMP = "2026-09-08 17:10";   /* filled in by build.js — which copy of the page this is */
+var BUILD_STAMP = "2026-09-08 18:45";   /* filled in by build.js — which copy of the page this is */
 /* path of the report currently on screen */
 function reportPath() {
   return cloud.active.kind === "current" ? CURRENT_PATH : (REPORTS_COLL + "/" + cloud.active.id);
@@ -6253,11 +6273,23 @@ document.getElementById("editor").addEventListener("change", function (e) {
   /* the meeting's own details, and the fields of a hand-added item */
   var agf = e.target.dataset.agf;
   if (agf) {
-    agState[agf] = e.target.value;
+    agState[agf] = (e.target.type === "checkbox") ? !!e.target.checked : e.target.value;
     agSave();
-    if (agf === "kind") renderEditor();
+    /* these three change the shape of the page, not just a word on it */
+    if (agf === "kind" || agf === "clock" || agf === "time") renderEditor();
     return;
   }
+  /* how long the chair is giving this part of the meeting */
+  var agmin = e.target.dataset.agmin;
+  if (agmin) {
+    agState.mins[agmin] = e.target.value;
+    agSave(); renderEditor(); return;
+  }
+  /* the motion, reworded. An empty box is not "no motion" — it is her saying
+     this item does not need one, which is different from never having drafted
+     it, so the override is stored either way. */
+  var agmot = e.target.dataset.agmot;
+  if (agmot) { agState.motions[agmot] = e.target.value; agSave(); return; }
   var agif = e.target.dataset.agif;
   if (agif) {
     var arow = e.target.closest("[data-agi]");
@@ -9031,24 +9063,58 @@ var wkState = {
    disagreed with the report it was printed beside would be worse than none. */
 function agendaAvailable() { return isOwner() && VIEW_BETA; }
 
-/* the order a condo meeting actually runs in */
+/* The order a condo meeting actually runs in, what each part is FOR, and how
+   long a chair should give it. The third column matters more than it looks: a
+   director scanning the page needs to know in one glance which items require a
+   vote and which are being read to them, and a chair needs to know whether the
+   meeting is running late before it has. */
 var AG_SECTIONS = [
-  ["open",      "Call to order",                       "manual"],
-  ["minutes",   "Approval of the previous minutes",    "auto"],
-  ["arising",   "Business arising",                    "auto"],
-  ["manager",   "Property manager’s report",      "auto"],
-  ["decide",    "New business — decisions required", "auto"],
-  ["contracts", "Contracts and renewals",              "auto"],
-  ["other",     "Other business",                      "manual"],
-  ["close",     "Next meeting and adjournment",        "manual"]
+  ["open",      "Call to order",                     "manual", "procedural",  5],
+  ["minutes",   "Approval of the previous minutes",  "auto",   "decision",    5],
+  ["arising",   "Business arising",                  "auto",   "decision",   15],
+  ["manager",   "Property manager’s report",    "auto",   "information",10],
+  ["decide",    "New business — decisions required","auto",  "decision",   25],
+  ["contracts", "Contracts and renewals",            "auto",   "decision",   10],
+  ["other",     "Other business",                    "manual", "discussion", 10],
+  ["camera",    "In camera",                         "manual", "decision",   10],
+  ["close",     "Next meeting and adjournment",      "manual", "procedural",  5]
 ];
+var AG_TAGS = { decision: "Decision", information: "Information",
+                discussion: "Discussion", procedural: "Procedural" };
+function agSec(k) {
+  var out = null;
+  AG_SECTIONS.forEach(function (s) { if (s[0] === k) out = s; });
+  return out;
+}
+function agMinutesFor(k) {
+  var v = agState.mins[k];
+  if (v === "" || v == null) { var s = agSec(k); return s ? s[4] : 10; }
+  return Math.max(0, parseInt(v, 10) || 0);
+}
+/* "7:00 pm" or "19:00" into minutes past midnight, so the chair gets a clock
+   down the margin rather than a duration to add up in his head */
+function agClockParse(t) {
+  var m = String(t || "").trim().toLowerCase().match(/^(\d{1,2})[:.]?(\d{2})?\s*(a\.?m\.?|p\.?m\.?)?$/);
+  if (!m) return null;
+  var h = +m[1], mi = +(m[2] || 0), ap = (m[3] || "").replace(/\./g, "");
+  if (ap === "pm" && h < 12) h += 12;
+  if (ap === "am" && h === 12) h = 0;
+  if (h > 23 || mi > 59) return null;
+  return h * 60 + mi;
+}
+function agClockShow(mins) {
+  if (mins == null) return "";
+  var h = Math.floor(mins / 60) % 24, mi = mins % 60;
+  var ap = h >= 12 ? "p.m." : "a.m.", h12 = h % 12 === 0 ? 12 : h % 12;
+  return h12 + ":" + String(mi).padStart(2, "0") + " " + ap;
+}
 function agSecLabel(k) {
   var out = k;
   AG_SECTIONS.forEach(function (s) { if (s[0] === k) out = s[1]; });
   return out;
 }
-var agState = { meeting: "", time: "", place: "", kind: "board",
-                items: [], skip: {}, secOff: {}, loaded: false };
+var agState = { meeting: "", time: "", place: "", kind: "board", chair: "", clock: true,
+                items: [], skip: {}, secOff: {}, mins: {}, motions: {}, loaded: false };
 var agSaveT = null;
 function agSave() {
   if (!cloud.on || !agendaAvailable()) return;
@@ -9057,7 +9123,9 @@ function agSave() {
     cloud.db.doc(AGENDA_PATH).set({
       meeting: agState.meeting || "", time: agState.time || "",
       place: agState.place || "", kind: agState.kind || "board",
+      chair: agState.chair || "", clock: agState.clock !== false,
       items: agState.items, skip: agState.skip, secOff: agState.secOff,
+      mins: agState.mins, motions: agState.motions,
       at: firebase.firestore.FieldValue.serverTimestamp(),
       by: (cloud.user && cloud.user.email) || ""
     }, { merge: true }).catch(function () {});
@@ -9076,6 +9144,10 @@ function agLoad() {
     agState.items = Array.isArray(d.items) ? d.items : [];
     agState.skip = d.skip || {};
     agState.secOff = d.secOff || {};
+    agState.mins = d.mins || {};
+    agState.motions = d.motions || {};
+    agState.chair = d.chair || "";
+    agState.clock = d.clock !== false;
     if (document.body.dataset.view === "edit" && edNav === "agenda") renderEditor();
   }).catch(function () {});
 }
@@ -9094,7 +9166,10 @@ function agGather() {
     return String(b.date || "").localeCompare(String(a.date || "")); });
   if (meets[0])
     out.minutes.push({ id: meets[0].id, title: minLabel(meets[0]),
-      why: meets[0].draft ? "Filed as a draft — for approval" : "On file", amt: null });
+      why: meets[0].draft ? "Circulated in draft" : "On file",
+      amt: null,
+      motion: "That the minutes of the meeting held " + jdDate(meets[0].date) +
+              " be approved as circulated." });
 
   /* business arising: what the board put off, and how long ago */
   d.jobs.filter(function (x) { return (x.j.status || "") === "deferred"; })
@@ -9103,8 +9178,12 @@ function agGather() {
       var n = x.j.statusDate ? conDaysUntil(x.j.statusDate) : null;
       out.arising.push({ id: x.j.id, jid: x.j.id, title: jobLabel(x.j), amt: x.c.cost || 0,
         why: "Deferred" + (x.j.statusDate ? " on " + jdDate(x.j.statusDate) : "") +
-             (n != null && n < -1 ? " — " + Math.abs(n) + " days ago" : "") +
-             (x.j.statusNote ? " — " + x.j.statusNote : "") });
+             (n != null && n < -1 ? ", " + Math.abs(n) + " days ago" : "") +
+             (x.j.statusNote ? " — “" + x.j.statusNote + "”" : ""),
+        /* the passage in the minutes that recorded it, where one was linked —
+           a board reading "deferred" is entitled to the page it was deferred on */
+        cite: agCite(x.j),
+        motion: agJobMotion(x) });
     });
 
   /* the manager's report: what is on site right now */
@@ -9138,7 +9217,7 @@ function agGather() {
         else if (left != null && left <= 30) bits.push("⚠ the quote lapses in " + left + " days");
       }
       out.decide.push({ id: x.j.id, jid: x.j.id, title: jobLabel(x.j),
-        amt: x.c.cost, why: bits.join(" · ") });
+        amt: x.c.cost, why: bits.join(" · "), cite: agCite(x.j), motion: agJobMotion(x) });
     });
 
   /* agreements where not deciding is itself a decision */
@@ -9150,161 +9229,305 @@ function agGather() {
           ? "⚠ notice was due " + jdDate(notice) + " — it has renewed for another term"
           : "Notice must be given by " + jdDate(notice) + " (" + nd + " days) or it renews")
       : (ed != null ? "Ends " + jdDate(c.end) + " (" + ed + " days)" : "Ending soon");
+    var cw = (c.contractor || "").trim() || "the contractor";
     out.contracts.push({ id: c.id, cid: c.id, amt: null,
       title: ((c.contractor || "").trim() || "Contractor not named") + (c.title ? " — " + c.title : ""),
-      why: why });
+      why: why,
+      motion: (nd != null && nd >= 0)
+        ? "That the Board give notice, on or before " + jdDate(notice) + ", to end the agreement with " +
+          cw + (c.title ? " for " + c.title : "") + (c.end ? " on " + jdDate(c.end) : "") + "."
+        : (nd != null
+            ? "That the Board note that the agreement with " + cw +
+              " has renewed for a further term, the date for notice having passed."
+            : "That the Board determine whether to renew the agreement with " + cw +
+              (c.end ? ", which ends " + jdDate(c.end) : "") + ".") });
   });
   return out;
+}
+/* Where the board last decided this job, if the passage was ever linked. This
+   is the whole point of the minute book: "deferred" with a page number behind
+   it is a fact, and without one it is a memory. */
+function agCite(j) {
+  var l = (j.minutes || [])[0];
+  if (!l) return "";
+  var m = minById(l.id);
+  return "Minutes of " + minLabel(m) + (l.page ? ", page " + l.page : "");
+}
+/* The motion, drafted from what the quotes actually say. The secretary should
+   be editing a sentence, not composing one at nine o'clock; and the wording
+   changes with the facts — the only quote received is not "the lowest", and a
+   quote carried over a cheaper one is a recommendation, not a low bid. */
+function agJobMotion(x) {
+  var cb = x.c.carriedBids[0];
+  if (!cb || !(x.c.cost > 0)) return "";
+  var who = (cb.b.contractor || "").trim() || "the contractor";
+  var qual = cb.override ? ", being the quotation recommended by the property manager"
+           : x.c.priced > 1 ? ", being the lowest of " + x.c.priced + " quotations received"
+           : ", being the only quotation received";
+  return "That the Board approve the quotation from " + who + " in the amount of " +
+    money(x.c.cost) + " (HST included) for " + (x.j.desc || "the work described") + qual + ".";
+}
+function agMotionText(it) {
+  if (it && it.id && agState.motions[it.id] != null) return agState.motions[it.id];
+  return (it && it.motion) || "";
 }
 function agManual(sec) {
   return agState.items.filter(function (i) { return i.sec === sec; });
 }
 
 /* ---------- the agenda on screen ---------- */
-function agRowHTML(sec, it, manual, idx) {
-  var amt = (it.amt != null && it.amt > 0) ? '<span class="agamt">' + money(it.amt) + "</span>" : "";
-  if (manual) {
-    return '<div class="agrow man" data-agi="' + idx + '">' +
-      '<span class="aggrip">✎</span>' +
-      '<span class="agmain">' +
-      '<input type="text" class="agtitle" data-agif="title" value="' + esc(it.title || "") +
-      '" placeholder="What is this item?">' +
-      '<input type="text" class="agnote" data-agif="note" value="' + esc(it.note || "") +
-      '" placeholder="a line of context, or what you want from the board (optional)"></span>' +
-      '<input type="text" class="agwho" data-agif="who" value="' + esc(it.who || "") +
-      '" placeholder="raised by">' +
-      '<label class="agcam" title="Kept off the board-facing copy"><input type="checkbox" data-agif="camera"' +
-      (it.camera ? " checked" : "") + "> in camera</label>" +
-      '<button class="xbtn" type="button" data-act="ag-del" title="Remove this item">✕</button></div>';
+/* auto items first, then whatever she filed under the same heading */
+function agItems(key, g) {
+  var out = [];
+  (g[key] || []).forEach(function (it) { out.push({ it: it, manual: false }); });
+  agState.items.forEach(function (it, i) {
+    if (it.sec === key) out.push({ it: it, manual: true, i: i });
+  });
+  return out;
+}
+/* what tonight is about, in one line: the two numbers a director wants before
+   reading anything, and the one a treasurer wants */
+function agSummary(g) {
+  var nDec = 0, sum = 0, nCon = 0;
+  AG_SECTIONS.forEach(function (sec) {
+    if (!agOn(sec[0]) || sec[3] !== "decision") return;
+    agItems(sec[0], g).forEach(function (r) {
+      if (!r.manual && agSkipped(sec[0], r.it.id)) return;
+      nDec++;
+      if (!r.manual && r.it.amt > 0) sum += r.it.amt;
+      if (sec[0] === "contracts") nCon++;
+    });
+  });
+  return { decisions: nDec, money: sum, contracts: nCon };
+}
+function agRowHTML(sec, r, num) {
+  var it = r.it, motion = agMotionText(it);
+  var skipped = !r.manual && agSkipped(sec, it.id);
+  var h = ['<div class="agrow' + (skipped ? " off" : "") + (r.manual ? " man" : "") + '"' +
+    (r.manual ? ' data-agi="' + r.i + '"' : "") + ">"];
+  h.push('<span class="agno">' + num + "</span>");
+  h.push('<span class="agmain">');
+  if (r.manual) {
+    h.push('<input type="text" class="agtitle" data-agif="title" value="' + esc(it.title || "") +
+      '" placeholder="What is this item?">');
+    h.push('<input type="text" class="agnote" data-agif="note" value="' + esc(it.note || "") +
+      '" placeholder="a line of context for the board (optional)">');
+  } else {
+    h.push('<span class="agtitle ro"' + (it.jid ? ' data-agjob="' + esc(it.jid) + '" title="Open this job"' : "") +
+      ">" + esc(it.title) + "</span>");
+    if (it.why) h.push('<span class="agwhy">' + esc(it.why) + "</span>");
+    if (it.cite) h.push('<span class="agcite">' + esc(it.cite) + "</span>");
   }
-  var skipped = agSkipped(sec, it.id);
-  return '<div class="agrow' + (skipped ? " off" : "") + '">' +
-    '<span class="aggrip">•</span>' +
-    '<span class="agmain">' +
-    '<span class="agtitle ro"' + (it.jid ? ' data-agjob="' + esc(it.jid) + '" title="Open this job"' : "") + ">" +
-    esc(it.title) + "</span>" +
-    (it.why ? '<span class="agwhy">' + esc(it.why) + "</span>" : "") + "</span>" +
-    amt +
-    '<button class="edbtn" type="button" data-act="ag-skip" data-ags="' + esc(sec + ":" + it.id) + '">' +
-    (skipped ? "Put back" : "Not this time") + "</button></div>";
+  /* the motion, drafted where it can be and hers to change either way */
+  h.push('<span class="agmot"><b>MOTION</b>' +
+    '<input type="text" data-agmot="' + esc(it.id) + '" value="' + esc(motion) +
+    '" placeholder="' + (r.manual ? "Draft a motion, if this item needs one" : "No motion drafted") + '"></span>');
+  h.push("</span>");
+  if (!r.manual && it.amt > 0) h.push('<span class="agamt">' + money(it.amt) + "</span>");
+  if (r.manual) h.push('<input type="text" class="agwho" data-agif="who" value="' + esc(it.who || "") +
+    '" placeholder="raised by">');
+  h.push(r.manual
+    ? '<button class="xbtn" type="button" data-act="ag-del" title="Remove this item">✕</button>'
+    : '<button class="edbtn" type="button" data-act="ag-skip" data-ags="' + esc(sec + ":" + it.id) + '">' +
+      (skipped ? "Put back" : "Not this time") + "</button>");
+  h.push("</div>");
+  return h.join("");
 }
 function agHTML() {
-  var M = state.meta || META_DEFAULTS, g = agGather();
+  var g = agGather(), sum = agSummary(g);
   var h = [edSecHead("Agenda",
-    "The next board meeting, assembled from the report itself. Jobs waiting on a decision, " +
-    "what the board deferred last time and the agreements running out are all here already — " +
-    "add what the tracker cannot know about, drop what can wait, and print it.")];
+    "The next meeting, assembled from the report itself: what the board deferred, what is waiting " +
+    "on a decision, and which agreements run out before you meet again. Motions are drafted from " +
+    "the quotations and are yours to reword. Add what the tracker cannot know about, and print it.")];
 
   h.push('<div class="ecard esettings"><div class="ehead"><strong>The meeting</strong>' +
-    '<span style="font-size:12.5px;color:var(--ink2)">— what goes at the top of the page</span>' +
     '<span class="spacer"></span>' +
     '<button class="btn primary" type="button" data-act="ag-print">\u{1F5A8} Print / PDF</button>' +
     '</div><div class="ebids">');
-  h.push('<div class="esrow"><label>Kind</label><select data-agf="kind">' +
-    ['board,Board meeting', 'agm,Annual general meeting', 'special,Special meeting'].map(function (o) {
-      var p = o.split(",");
-      return '<option value="' + p[0] + '"' + (agState.kind === p[0] ? " selected" : "") + ">" + p[1] + "</option>";
-    }).join("") + "</select></div>");
-  h.push('<div class="esrow"><label>Date</label><input type="date" data-agf="meeting" value="' +
-    esc(agState.meeting || "") + '"></div>');
-  h.push('<div class="esrow"><label>Time</label><input type="text" data-agf="time" value="' +
-    esc(agState.time || "") + '" placeholder="7:00 pm"></div>');
-  h.push('<div class="esrow"><label>Where</label><input type="text" data-agf="place" value="' +
-    esc(agState.place || "") + '" placeholder="Party room, 550 N Service Rd W — or a video link"></div>');
+  h.push('<div class="agmeta">' +
+    '<label>Kind<select data-agf="kind">' +
+    ["board,Meeting of the Board of Directors", "agm,Annual General Meeting",
+     "special,Special Meeting of the Board"].map(function (o) {
+      var p = o.split(","); return '<option value="' + p[0] + '"' +
+        (agState.kind === p[0] ? " selected" : "") + ">" + p[1] + "</option>";
+    }).join("") + "</select></label>" +
+    '<label>Date<input type="date" data-agf="meeting" value="' + esc(agState.meeting || "") + '"></label>' +
+    '<label>Start<input type="text" data-agf="time" value="' + esc(agState.time || "") +
+      '" placeholder="7:00 pm"></label>' +
+    '<label>Chair<input type="text" data-agf="chair" value="' + esc(agState.chair || "") +
+      '" placeholder="optional"></label>' +
+    '<label class="wide">Where<input type="text" data-agf="place" value="' + esc(agState.place || "") +
+      '" placeholder="Party room, 550 N Service Rd W — or a video link"></label>' +
+    '<label class="chk"><input type="checkbox" data-agf="clock"' + (agState.clock !== false ? " checked" : "") +
+      '> Print a running clock down the margin</label></div>');
+  h.push('<p class="agsum">Before the board: <b>' + sum.decisions + '</b> item' +
+    (sum.decisions === 1 ? "" : "s") + " for decision" +
+    (sum.money > 0 ? ", <b>" + money(sum.money) + "</b> of work" : "") +
+    (sum.contracts ? ", <b>" + sum.contracts + "</b> agreement" + (sum.contracts === 1 ? "" : "s") +
+      " needing notice" : "") + ".</p>");
   h.push("</div></div>");
 
-  /* one place to add an item, with the section chosen rather than eight buttons */
   h.push('<div class="ecard esettings"><div class="ehead"><strong>Add an item</strong>' +
     '<span style="font-size:12.5px;color:var(--ink2)">— anything the tracker has no way to know about</span>' +
     '</div><div class="ebids"><div class="agadd">' +
-    '<select id="agNewSec">' + AG_SECTIONS.map(function (s) {
-      return '<option value="' + s[0] + '"' + (s[0] === "other" ? " selected" : "") + ">" + s[1] + "</option>";
+    '<select id="agNewSec">' + AG_SECTIONS.map(function (s2) {
+      return '<option value="' + s2[0] + '"' + (s2[0] === "other" ? " selected" : "") + ">" + s2[1] + "</option>";
     }).join("") + "</select>" +
     '<input type="text" id="agNewTitle" placeholder="What is it? — e.g. “Pool re-opening, hours and staffing”">' +
     '<button class="btn primary" type="button" data-act="ag-add">+ Add</button></div></div></div>');
 
-  var n = 0;
+  var n = 0, at = agState.clock !== false ? agClockParse(agState.time) : null;
   AG_SECTIONS.forEach(function (sec) {
-    var key = sec[0], auto = g[key] || [], man = agManual(key), on = agOn(key);
-    if (!auto.length && !man.length && sec[2] === "auto") return;   /* nothing to say, no heading */
+    var key = sec[0], rows = agItems(key, g), on = agOn(key);
+    if (!rows.length && sec[2] === "auto") return;
     n++;
+    var mins = agMinutesFor(key);
     h.push('<div class="ecard esettings agsec' + (on ? "" : " off") + '"><div class="ehead">' +
       '<strong>' + n + ". " + esc(sec[1]) + "</strong>" +
-      '<span style="font-size:12.5px;color:var(--ink2)">— ' +
-      (auto.length + man.length) + (auto.length + man.length === 1 ? " item" : " items") + "</span>" +
+      '<span class="agtag ' + sec[3] + '">' + AG_TAGS[sec[3]] + "</span>" +
+      (at != null ? '<span class="agclock">' + agClockShow(at) + "</span>" : "") +
       '<span class="spacer"></span>' +
+      '<label class="agmins">' + '<input type="number" min="0" max="180" data-agmin="' + key +
+      '" value="' + mins + '"> min</label>' +
       '<button class="edbtn" type="button" data-act="ag-secoff" data-ags="' + key + '">' +
-      (on ? "Leave out" : "Put back") + '</button></div><div class="ebids">');
-    if (!auto.length && !man.length)
-      h.push('<p class="updempty" style="margin:2px 0">Nothing here yet — add an item above.</p>');
-    auto.forEach(function (it) { h.push(agRowHTML(key, it, false)); });
-    agState.items.forEach(function (it, i) {
-      if (it.sec === key) h.push(agRowHTML(key, it, true, i));
-    });
+      (on ? "Leave out" : "Put back") + "</button></div><div class=\"ebids\">");
+    if (!rows.length)
+      h.push('<p class="updempty" style="margin:2px 0">Nothing here — add an item above.</p>');
+    rows.forEach(function (r, i) { h.push(agRowHTML(key, r, n + "." + (i + 1))); });
     h.push("</div></div>");
+    if (at != null && on) at += mins;
   });
+  if (at != null)
+    h.push('<p class="agsum">On these timings the meeting rises at <b>' + agClockShow(at) + "</b>.</p>");
   return h.join("");
 }
 
-/* ---------- the printed page ----------
+/* ---------- the document that goes round the table ----------
    Written into its own window rather than printed from the workspace: the
-   editor is full of things that have no place on a sheet handed round a table,
+   editor is full of things that have no place on a sheet handed to a director,
    and fighting them with a print stylesheet is how the last one grew. */
 function agPrintHTML() {
-  var M = state.meta || META_DEFAULTS, g = agGather();
-  var when = agState.meeting ? jdDate(agState.meeting) : "date to be set";
+  var M = state.meta || META_DEFAULTS, g = agGather(), sum = agSummary(g);
   var kind = agState.kind === "agm" ? "Annual General Meeting"
-           : agState.kind === "special" ? "Special Meeting" : "Meeting of the Board of Directors";
-  var h = ['<h1>' + esc(M.condoName || "The corporation") + "</h1>",
-    '<p class="sub">' + esc(M.regNo || "") + "</p>",
-    '<h2>Agenda — ' + esc(kind) + "</h2>",
-    '<p class="when"><b>' + esc(when) + "</b>" +
-      (agState.time ? " · " + esc(agState.time) : "") +
-      (agState.place ? " · " + esc(agState.place) : "") + "</p>"];
-  var n = 0;
+           : agState.kind === "special" ? "Special Meeting of the Board"
+           : "Meeting of the Board of Directors";
+  var when = agState.meeting ? jdDate(agState.meeting) : "date to be confirmed";
+  var h = ['<div class="cover">',
+    '<div class="corp">' + esc(M.condoName || "The corporation") + "</div>",
+    '<div class="reg">' + esc(M.regNo || "") + "</div>",
+    '<div class="rule"></div>',
+    '<div class="doct">Agenda</div>',
+    '<div class="kind">' + esc(kind) + "</div>",
+    '<div class="when">' + esc(when) +
+      (agState.time ? " &nbsp;·&nbsp; " + esc(agState.time) : "") + "</div>",
+    (agState.place ? '<div class="where">' + esc(agState.place) + "</div>" : ""),
+    "</div>"];
+
+  h.push('<table class="attend"><tr><td>Present</td><td class="line"></td></tr>' +
+    "<tr><td>Regrets</td><td class=\"line\"></td></tr>" +
+    '<tr><td>Chair</td><td class="line">' + esc(agState.chair || "") + "</td></tr>" +
+    "<tr><td>Quorum</td><td class=\"line\">confirmed &nbsp;&#9744;</td></tr></table>");
+
+  if (sum.decisions)
+    h.push('<p class="brief"><b>' + sum.decisions + '</b> item' + (sum.decisions === 1 ? "" : "s") +
+      " require" + (sum.decisions === 1 ? "s" : "") + " a decision" +
+      (sum.money > 0 ? ", covering <b>" + money(sum.money) + "</b> of work" : "") +
+      (sum.contracts ? ", and <b>" + sum.contracts + "</b> agreement" +
+        (sum.contracts === 1 ? "" : "s") + " where notice is due" : "") + ".</p>");
+
+  var n = 0, at = agState.clock !== false ? agClockParse(agState.time) : null;
   AG_SECTIONS.forEach(function (sec) {
-    var key = sec[0], auto = (g[key] || []).filter(function (it) { return !agSkipped(key, it.id); });
-    var man = agManual(key);
+    var key = sec[0];
     if (!agOn(key)) return;
-    if (!auto.length && !man.length && sec[2] === "auto") return;
+    var rows = agItems(key, g).filter(function (r) {
+      return r.manual || !agSkipped(key, r.it.id); });
+    if (!rows.length && sec[2] === "auto") return;
     n++;
-    h.push("<h3>" + n + ". " + esc(sec[1]) + "</h3>");
-    if (!auto.length && !man.length) { h.push('<p class="none">—</p>'); return; }
-    h.push("<ol>");
-    auto.forEach(function (it) {
-      h.push("<li><b>" + esc(it.title) + "</b>" +
-        (it.amt != null && it.amt > 0 ? ' <span class="amt">' + money(it.amt) + "</span>" : "") +
-        (it.why ? '<br><span class="why">' + esc(it.why) + "</span>" : "") + "</li>");
+    var mins = agMinutesFor(key);
+    h.push('<section class="sec"><h3><span class="sn">' + n + ".</span>" + esc(sec[1]) +
+      '<span class="tag ' + sec[3] + '">' + AG_TAGS[sec[3]] + "</span>" +
+      (at != null ? '<span class="clk">' + agClockShow(at) + "</span>" : "") + "</h3>");
+    /* a heading with nothing under it is how "Call to order" has always looked
+       on paper; "No items." is a screen's way of talking */
+    rows.forEach(function (r, i) {
+      var it = r.it, motion = agMotionText(it);
+      h.push('<div class="item"><div class="ihead"><span class="ino">' + n + "." + (i + 1) + "</span>" +
+        '<span class="ittl">' + esc(r.manual ? (it.title || "(untitled)") : it.title) + "</span>" +
+        (!r.manual && it.amt > 0 ? '<span class="iamt">' + money(it.amt) + "</span>" : "") + "</div>");
+      var sub = [];
+      if (!r.manual && it.why) sub.push(esc(it.why));
+      if (!r.manual && it.cite) sub.push("<i>" + esc(it.cite) + "</i>");
+      if (r.manual && it.note) sub.push(esc(it.note));
+      if (r.manual && it.who) sub.push("Raised by " + esc(it.who));
+      if (sub.length) h.push('<div class="isub">' + sub.join(" &nbsp;·&nbsp; ") + "</div>");
+      if (motion)
+        h.push('<div class="motion"><div class="mtxt"><b>MOTION:</b> ' + esc(motion) + "</div>" +
+          '<div class="mline">Moved <span class="u"></span> Seconded <span class="u"></span>' +
+          '<span class="boxes">&#9744; Carried &nbsp; &#9744; Defeated &nbsp; &#9744; Deferred</span></div></div>');
+      h.push("</div>");
     });
-    man.forEach(function (it) {
-      h.push("<li><b>" + esc(it.title || "(untitled)") + "</b>" +
-        (it.camera ? ' <span class="cam">in camera</span>' : "") +
-        (it.who ? ' <span class="why">— ' + esc(it.who) + "</span>" : "") +
-        (it.note ? '<br><span class="why">' + esc(it.note) + "</span>" : "") + "</li>");
-    });
-    h.push("</ol>");
+    h.push("</section>");
+    if (at != null) at += mins;
   });
-  h.push('<p class="foot">Prepared ' + esc(todayStr()) +
-    " from the contractor quote report. Amounts include HST and are the lowest quote carried for each job.</p>");
+  if (at != null)
+    h.push('<p class="rises">Anticipated adjournment: <b>' + agClockShow(at) + "</b></p>");
+  h.push('<div class="foot"><span>' + esc(M.condoName || "") + " &nbsp;·&nbsp; Agenda, " + esc(when) +
+    "</span><span>Prepared " + esc(todayStr()) +
+    " from the contractor quote report. Amounts include HST and are the quotation carried in the report totals.</span></div>");
   return h.join("");
+}
+function agPrintCSS() {
+  return "@page{margin:18mm 16mm}" +
+    "*{box-sizing:border-box}" +
+    "body{font:12.5pt/1.45 'Iowan Old Style',Georgia,'Times New Roman',serif;color:#111;" +
+      "max-width:47em;margin:0 auto;padding:14mm 0;background:#fff}" +
+    ".cover{text-align:center;margin-bottom:16px}" +
+    ".corp{font-size:15pt;font-weight:700;letter-spacing:.13em;text-transform:uppercase}" +
+    ".reg{font-size:9pt;color:#555;letter-spacing:.08em;margin-top:2px}" +
+    ".rule{border-top:2px solid #111;border-bottom:1px solid #111;height:3px;margin:10px auto 12px;max-width:34em}" +
+    ".doct{font-size:20pt;font-weight:700;letter-spacing:.22em;text-transform:uppercase}" +
+    ".kind{font-size:11pt;margin-top:2px}" +
+    ".when{font-size:11.5pt;font-weight:700;margin-top:8px}" +
+    ".where{font-size:10.5pt;color:#444;margin-top:1px}" +
+    ".attend{width:100%;border-collapse:collapse;margin:14px 0 6px;font-size:9.5pt}" +
+    ".attend td{padding:5px 0;vertical-align:bottom}" +
+    ".attend td:first-child{width:5.6em;color:#555;text-transform:uppercase;letter-spacing:.07em;font-size:8pt}" +
+    ".attend td.line{border-bottom:1px solid #bbb}" +
+    ".brief{font-size:10.5pt;background:#f3f3f0;border-left:3px solid #111;padding:7px 11px;margin:12px 0 4px}" +
+    ".sec{margin-top:20px;break-inside:auto}" +
+    "h3{font-size:10pt;text-transform:uppercase;letter-spacing:.11em;margin:0 0 8px;padding-bottom:5px;" +
+      "border-bottom:1.5px solid #111;display:flex;align-items:baseline;gap:9px;break-after:avoid}" +
+    "h3 .sn{font-weight:700}" +
+    "h3 .tag{margin-left:auto;font-size:7.5pt;letter-spacing:.09em;border:1px solid #999;color:#444;" +
+      "padding:1px 6px;border-radius:2px;font-weight:400}" +
+    "h3 .tag.decision{border-color:#111;color:#111;font-weight:700}" +
+    "h3 .clk{font-size:9pt;letter-spacing:0;color:#555;font-weight:400;min-width:5.6em;text-align:right}" +
+    ".item{margin:0 0 11px;break-inside:avoid}" +
+    ".ihead{display:flex;align-items:baseline;gap:8px}" +
+    ".ino{font-weight:700;min-width:2.4em}" +
+    ".ittl{font-weight:700;flex:1}" +
+    ".iamt{font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}" +
+    ".isub{margin:1px 0 0 2.4em;font-size:9.5pt;color:#444}" +
+    ".motion{margin:6px 0 0 2.4em;border-left:2px solid #111;padding:6px 0 4px 10px}" +
+    ".mtxt{font-size:10.5pt}" +
+    ".mtxt b{letter-spacing:.08em;font-size:8.5pt}" +
+    ".mline{margin-top:7px;font-size:9pt;color:#444;display:flex;align-items:baseline;gap:6px;flex-wrap:wrap}" +
+    ".mline .u{display:inline-block;width:9em;border-bottom:1px solid #999}" +
+    ".mline .boxes{margin-left:auto;white-space:nowrap}" +
+    ".none{color:#777;font-size:10pt;margin:2px 0}" +
+    ".rises{margin-top:18px;font-size:10pt;text-align:right;color:#444}" +
+    ".foot{margin-top:26px;border-top:1px solid #bbb;padding-top:7px;display:flex;flex-direction:column;" +
+      "gap:2px;color:#666;font-size:8.5pt}" +
+    "@media print{body{padding:0;max-width:none}.brief{background:none;border-left-width:2px}}";
 }
 function agPrint() {
   var w = window.open("", "_blank");
   if (!w) { alert("Your browser blocked the print window — allow pop-ups for this site and try again."); return; }
-  var css = "body{font:14px/1.5 Georgia,'Times New Roman',serif;color:#1E2833;max-width:44em;margin:40px auto;padding:0 24px}" +
-    "h1{font-size:21px;margin:0}h2{font-size:17px;margin:18px 0 2px}h3{font-size:14px;margin:22px 0 6px;" +
-    "text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid #ccc;padding-bottom:4px}" +
-    ".sub{margin:2px 0 0;color:#666;font-size:12px}.when{margin:2px 0 0;font-size:14px}" +
-    "ol{margin:0;padding-left:22px}li{margin:8px 0}" +
-    ".why{color:#555;font-size:12.5px}.amt{float:right;font-weight:700}" +
-    ".cam{font-size:11px;background:#eee;padding:1px 6px;border-radius:9px}" +
-    ".none{color:#888;margin:4px 0}" +
-    ".foot{margin-top:30px;border-top:1px solid #ccc;padding-top:8px;color:#666;font-size:11.5px}" +
-    "@media print{body{margin:0;max-width:none}h3{break-after:avoid}li{break-inside:avoid}}";
-  w.document.write("<!doctype html><meta charset='utf-8'><title>Agenda</title><style>" + css +
-    "</style>" + agPrintHTML());
+  var M = state.meta || META_DEFAULTS;
+  w.document.write("<!doctype html><meta charset='utf-8'><title>Agenda — " +
+    esc(M.condoName || "") + "</title><style>" + agPrintCSS() + "</style>" + agPrintHTML());
   w.document.close();
-  setTimeout(function () { try { w.focus(); w.print(); } catch (e) {} }, 250);
+  setTimeout(function () { try { w.focus(); w.print(); } catch (e) {} }, 300);
 }
 
 /* Sections in the order they print, and the plain name each goes by. The board
