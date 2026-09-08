@@ -30,6 +30,21 @@ const TARGETS = {
 };
 
 /* beta -> live substitutions, applied in order. Each must match at least once. */
+const AGENDA_STUB = "/* The agenda is not in this copy.\n *\n * It is being tried out on the beta site, and until that is finished it should\n * not be here at all \u2014 switched off is not the same as absent. build.js cuts\n * everything between AGENDA-BEGIN and AGENDA-END and leaves these, which are\n * the only entry points the rest of the page has into it. */\nfunction agendaAvailable() { return false; }\nfunction agHTML() { return \"\"; }\nfunction agLoad() {}\nfunction agSave() {}\nfunction agPrint() {}\nfunction agSend() {}\nfunction agAiRun() {}\nfunction agAiClear() {}\nvar agState = { items: [], skip: {}, secOff: {}, mins: {}, motions: {}, ai: null };\n";
+
+/* Cut the agenda out of every build but beta. Switched off is not the same as
+   absent, and while it is being tried out it should be absent. */
+function stripAgenda(out) {
+  const js = /\/\* AGENDA-BEGIN[\s\S]*?\/\* AGENDA-END \*\//;
+  const css = /\/\* AGENDA-CSS-BEGIN[\s\S]*?\/\* AGENDA-CSS-END \*\//;
+  if (!js.test(out)) throw new Error("AGENDA-BEGIN/END markers not found");
+  if (!css.test(out)) throw new Error("AGENDA-CSS-BEGIN/END markers not found");
+  out = out.replace(js, AGENDA_STUB).replace(css, "");
+  if (/agGather|agPrintHTML|AGENDA_PATH|agAiPayload/.test(out))
+    throw new Error("agenda code survived the strip");
+  return out;
+}
+
 const LIVE_SWAPS = [
   ['"nnsccQuoteTrackerBeta/main"', '"nnsccQuoteTracker/main"'],
   ['"nnsccQuoteReportsBeta"', '"nnsccQuoteReports"'],
@@ -40,7 +55,6 @@ const LIVE_SWAPS = [
   ['"nnsccActivityBeta"', '"nnsccActivity"'],
   ['"nnsccQuoteTrackerBeta/brand"', '"nnsccQuoteTracker/brand"'],
   ['"nnsccQuoteTrackerBeta/weeklyDraft"', '"nnsccQuoteTracker/weeklyDraft"'],
-  ['"nnsccQuoteTrackerBeta/agendaDraft"', '"nnsccQuoteTracker/agendaDraft"'],
   ['"nnsccWeeklyReportsBeta"', '"nnsccWeeklyReports"'],
   ['"nnsccQuoteTrackerBeta/board"', '"nnsccQuoteTracker/board"'],
   ['"nnsccBoardVotesBeta"', '"nnsccBoardVotes"'],
@@ -88,6 +102,8 @@ function build(name) {
   if (/__(SEED_JSON|LOGO_SRC|PHOTO_SRC|BUILD)__/.test(out)) throw new Error("a placeholder was left unfilled");
 
   if (t.live) {
+    /* before the swaps, so the agenda's own beta paths go with it */
+    out = stripAgenda(out);
     LIVE_SWAPS.forEach(function (pair) {
       if (out.indexOf(pair[0]) < 0) throw new Error("live swap not found in the source: " + pair[0]);
       out = out.split(pair[0]).join(pair[1]);
