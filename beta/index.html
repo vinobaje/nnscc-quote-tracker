@@ -381,6 +381,18 @@ input:focus, select:focus { outline:2px solid var(--accent); outline-offset:-1px
 .agmeta label.chk { flex-direction:row; align-items:center; gap:6px; font-weight:500; }
 .agmeta input, .agmeta select { font-size:13px; }
 .agmeta label.wide input { width:100%; box-sizing:border-box; }
+.agrec { display:flex; align-items:center; gap:9px; flex-wrap:wrap; margin-top:14px;
+  padding-top:12px; border-top:1px dashed var(--line); }
+.agrec .chk { display:inline-flex; align-items:center; gap:7px; font-size:12.5px; color:var(--ink2); }
+.agres { display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-top:5px; }
+.agres input { flex:0 0 130px; font-size:12px; box-sizing:border-box; }
+.agout { font:inherit; font-size:11px; font-weight:700; letter-spacing:.03em; cursor:pointer;
+  border:1px solid var(--line); background:var(--card); color:var(--muted);
+  border-radius:99px; padding:3px 10px; }
+.agout:hover { border-color:var(--ink2); color:var(--ink2); }
+.agout.on.carried { background:var(--good); border-color:var(--good); color:#fff; }
+.agout.on.defeated { background:var(--prio); border-color:var(--prio); color:#fff; }
+.agout.on.deferred { background:var(--amber); border-color:var(--amber); color:#fff; }
 .agsum { margin:12px 0 0; font-size:13px; color:var(--ink2); background:var(--paper);
   border-left:3px solid var(--accent); padding:8px 12px; border-radius:0 6px 6px 0; }
 .agadd { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
@@ -2875,8 +2887,9 @@ var BRAND_PATH = "nnsccQuoteTrackerBeta/brand";               /* the letterhead 
 var WEEKLY_DRAFT_PATH = "nnsccQuoteTrackerBeta/weeklyDraft";   /* the report she is working on */
 var WEEKLY_COLL = "nnsccWeeklyReportsBeta";                   /* every one she has finished */
 var AGENDA_PATH = "nnsccQuoteTrackerBeta/agendaDraft";        /* the agenda for the next meeting */
+var MEETINGS_COLL = "nnsccMeetingsBeta";                      /* meetings held, and what was decided */
 var VIEW_BETA = CURRENT_PATH.indexOf("Beta") >= 0;   /* which report the passcode gate reads/protects */
-var BUILD_STAMP = "2026-09-08 18:45";   /* filled in by build.js — which copy of the page this is */
+var BUILD_STAMP = "2026-09-08 18:58";   /* filled in by build.js — which copy of the page this is */
 /* path of the report currently on screen */
 function reportPath() {
   return cloud.active.kind === "current" ? CURRENT_PATH : (REPORTS_COLL + "/" + cloud.active.id);
@@ -6290,6 +6303,13 @@ document.getElementById("editor").addEventListener("change", function (e) {
      it, so the override is stored either way. */
   var agmot = e.target.dataset.agmot;
   if (agmot) { agState.motions[agmot] = e.target.value; agSave(); return; }
+  /* who moved it and who seconded it, typed as the meeting runs */
+  var agres = e.target.dataset.agres;
+  if (agres) {
+    var rrow = e.target.closest("[data-agid]");
+    if (rrow) { agRes(rrow.dataset.agid)[agres] = e.target.value; agSave(); }
+    return;
+  }
   var agif = e.target.dataset.agif;
   if (agif) {
     var arow = e.target.closest("[data-agi]");
@@ -6584,6 +6604,16 @@ document.getElementById("editor").addEventListener("click", function (e) {
   }
   /* ---- the agenda ---- */
   if (act === "ag-print") { agPrint(); return; }
+  if (act === "ag-minutes") { agMinutesPrint(); return; }
+  if (act === "ag-apply") { agApply(); return; }
+  if (act === "ag-close") { agClose(); return; }
+  if (act === "ag-out") {
+    var orow = e.target.closest("[data-agid]");
+    if (!orow) return;
+    var rr = agRes(orow.dataset.agid), want = actEl.getAttribute("data-ago");
+    rr.out = (rr.out === want) ? "" : want;     /* pressing it again takes it back */
+    agSave(); renderEditor(); return;
+  }
   if (act === "ag-add") {
     var ns = document.getElementById("agNewSec"), nt = document.getElementById("agNewTitle");
     var t = (nt && nt.value || "").trim();
@@ -9114,7 +9144,8 @@ function agSecLabel(k) {
   return out;
 }
 var agState = { meeting: "", time: "", place: "", kind: "board", chair: "", clock: true,
-                items: [], skip: {}, secOff: {}, mins: {}, motions: {}, loaded: false };
+                present: "", regrets: "", rec: false,
+                items: [], skip: {}, secOff: {}, mins: {}, motions: {}, res: {}, loaded: false };
 var agSaveT = null;
 function agSave() {
   if (!cloud.on || !agendaAvailable()) return;
@@ -9125,7 +9156,8 @@ function agSave() {
       place: agState.place || "", kind: agState.kind || "board",
       chair: agState.chair || "", clock: agState.clock !== false,
       items: agState.items, skip: agState.skip, secOff: agState.secOff,
-      mins: agState.mins, motions: agState.motions,
+      mins: agState.mins, motions: agState.motions, res: agState.res,
+      present: agState.present || "", regrets: agState.regrets || "", rec: !!agState.rec,
       at: firebase.firestore.FieldValue.serverTimestamp(),
       by: (cloud.user && cloud.user.email) || ""
     }, { merge: true }).catch(function () {});
@@ -9148,6 +9180,10 @@ function agLoad() {
     agState.motions = d.motions || {};
     agState.chair = d.chair || "";
     agState.clock = d.clock !== false;
+    agState.res = d.res || {};
+    agState.present = d.present || "";
+    agState.regrets = d.regrets || "";
+    agState.rec = !!d.rec;
     if (document.body.dataset.view === "edit" && edNav === "agenda") renderEditor();
   }).catch(function () {});
 }
@@ -9275,6 +9311,212 @@ function agManual(sec) {
   return agState.items.filter(function (i) { return i.sec === sec; });
 }
 
+/* ---------- what the board actually did ----------
+
+   The agenda stops being a plan the moment the chair calls the first item, and
+   what happens next has always been written twice: once on somebody's printed
+   copy, and again into the tracker a day later, from memory. This is the same
+   sheet, filled in. A motion carried here sets the job's status; the draft
+   minutes are written from the same record rather than typed out again.
+
+   Nothing is applied by being typed. She records the meeting as it runs and
+   presses one button afterwards, which says how many jobs it is about to move
+   and asks. Recording is not deciding. */
+var AG_OUTCOMES = [["carried", "Carried"], ["defeated", "Defeated"], ["deferred", "Deferred"]];
+/* what each outcome means for the job the motion was about */
+var AG_OUT_STATUS = { carried: "approved", defeated: "rejected", deferred: "deferred" };
+function agRes(id) {
+  var r = agState.res[id];
+  if (!r) { r = agState.res[id] = { moved: "", sec: "", out: "" }; }
+  return r;
+}
+function agHasRes(id) {
+  var r = agState.res[id];
+  return !!(r && (r.out || r.moved || r.sec));
+}
+/* every recorded outcome that names a job, and what it would do to it */
+function agPending() {
+  var g = agGather(), out = [];
+  ["arising", "decide"].forEach(function (key) {
+    (g[key] || []).forEach(function (it) {
+      if (!agOn(key) || agSkipped(key, it.id) || !it.jid) return;
+      var r = agState.res[it.id];
+      if (!r || !r.out) return;
+      var want = AG_OUT_STATUS[r.out];
+      var j = findJob(it.jid);
+      if (!j || !want || (j.status || "quoted") === want) return;
+      out.push({ j: j, it: it, want: want, out: r.out });
+    });
+  });
+  return out;
+}
+function agApply() {
+  var list = agPending();
+  if (!list.length) { alert("Nothing to apply — no recorded outcome would change a job's status."); return; }
+  var when = agState.meeting || todayISO();
+  var msg = "Apply what the board decided to " + list.length + " job" + (list.length === 1 ? "" : "s") + "?\n\n" +
+    list.map(function (p) {
+      return "• " + jobLabel(p.j) + "  →  " + statusLabel(p.want);
+    }).join("\n") +
+    "\n\nEach will be dated " + jdDate(when) + " and recorded in the change history.";
+  if (!confirm(msg)) return;
+  var notes = [];
+  list.forEach(function (p) {
+    p.j.status = p.want;
+    p.j.statusDate = when;
+    if (p.want === "completed") p.j.pct = 100;
+    notes.push(jobLabel(p.j) + ": " + statusLabel(p.want) + " by the board on " + jdDate(when));
+  });
+  persist(null, notes, null);
+  renderEditor(); renderReport();
+  alert(list.length + (list.length === 1 ? " job has" : " jobs have") + " been updated.");
+}
+
+/* ---------- the draft minutes ----------
+   In the corporation's own voice, because that is what the secretary will
+   otherwise spend an evening re-typing: "On a motion by …, seconded by …, the
+   Board resolved to …". The motion already reads "That the Board approve …",
+   so the resolution is the same sentence with its hinge turned. */
+function agResolve(motion) {
+  var t = String(motion || "").trim();
+  var m = t.match(/^That the Board\s+(.*)$/i);
+  if (m) return "the Board resolved to " + m[1].replace(/\.$/, "");
+  return "it was resolved that " + t.replace(/^That\s+/i, "").replace(/\.$/, "");
+}
+function agMinuteSentence(it, r) {
+  var motion = agMotionText(it);
+  if (!motion) return "";
+  var by = (r.moved || "").trim(), sd = (r.sec || "").trim();
+  var lead = (by && sd) ? "On a motion by " + esc(by) + ", seconded by " + esc(sd) + ", "
+           : by ? "On a motion by " + esc(by) + ", "
+           : "On a motion duly moved and seconded, ";
+  if (r.out === "carried")
+    return lead + esc(agResolve(motion)) + ". <b>CARRIED.</b>";
+  if (r.out === "defeated")
+    return lead + "it was moved that " + esc(motion.replace(/^That\s+/i, "").replace(/\.$/, "")) +
+      ". <b>DEFEATED.</b>";
+  if (r.out === "deferred")
+    return lead + "it was moved that " + esc(motion.replace(/^That\s+/i, "").replace(/\.$/, "")) +
+      ". The matter was <b>DEFERRED</b> to the next meeting.";
+  return "";
+}
+function agMinutesHTML() {
+  var M = state.meta || META_DEFAULTS, g = agGather();
+  var kind = agState.kind === "agm" ? "Annual General Meeting"
+           : agState.kind === "special" ? "Special Meeting of the Board"
+           : "Meeting of the Board of Directors";
+  var when = agState.meeting ? jdDate(agState.meeting) : "date not recorded";
+  var h = ['<div class="cover">',
+    '<div class="corp">' + esc(M.condoName || "The corporation") + "</div>",
+    '<div class="reg">' + esc(M.regNo || "") + "</div>",
+    '<div class="rule"></div>',
+    '<div class="doct">Minutes</div>',
+    '<div class="kind">' + esc(kind) + " &nbsp;·&nbsp; <b>DRAFT</b></div>",
+    '<div class="when">' + esc(when) + (agState.time ? " &nbsp;·&nbsp; " + esc(agState.time) : "") + "</div>",
+    (agState.place ? '<div class="where">' + esc(agState.place) + "</div>" : ""),
+    "</div>"];
+  h.push('<table class="attend">' +
+    '<tr><td>Present</td><td class="line">' + esc(agState.present || "") + "</td></tr>" +
+    '<tr><td>Regrets</td><td class="line">' + esc(agState.regrets || "") + "</td></tr>" +
+    '<tr><td>Chair</td><td class="line">' + esc(agState.chair || "") + "</td></tr></table>");
+  h.push('<p class="para">The meeting was called to order' +
+    (agState.time ? " at " + esc(agState.time) : "") + ", a quorum being present.</p>");
+
+  var n = 0;
+  AG_SECTIONS.forEach(function (sec) {
+    var key = sec[0];
+    if (!agOn(key)) return;
+    var rows = agItems(key, g).filter(function (r) { return r.manual || !agSkipped(key, r.it.id); });
+    if (!rows.length && sec[2] === "auto") return;
+    n++;
+    h.push('<section class="sec"><h3><span class="sn">' + n + ".</span>" + esc(sec[1]) + "</h3>");
+    rows.forEach(function (r, i) {
+      var it = r.it, res = agState.res[it.id] || {};
+      h.push('<div class="item"><div class="ihead"><span class="ino">' + n + "." + (i + 1) + "</span>" +
+        '<span class="ittl">' + esc(r.manual ? (it.title || "(untitled)") : it.title) + "</span>" +
+        (!r.manual && it.amt > 0 ? '<span class="iamt">' + money(it.amt) + "</span>" : "") + "</div>");
+      var sentence = res.out ? agMinuteSentence(it, res) : "";
+      if (sentence) h.push('<div class="res">' + sentence + "</div>");
+      else if (sec[3] === "information") {
+        var told = String(r.manual ? (it.note || "") : (it.why || "")).trim() || "Reported to the Board";
+        if (!/[.!?]$/.test(told)) told += ".";     /* it is a sentence now, not a chip */
+        h.push('<div class="res noted">' + esc(told) + " The report was <b>NOTED</b>.</div>");
+      }
+      else
+        h.push('<div class="res open">No decision was recorded on this item.</div>');
+      h.push("</div>");
+    });
+    h.push("</section>");
+  });
+  h.push('<p class="para">There being no further business, the meeting adjourned at ' +
+    '<span class="fill"></span>.</p>');
+  h.push('<div class="sign"><div><span class="u"></span><small>Chair</small></div>' +
+    '<div><span class="u"></span><small>Recording secretary</small></div></div>');
+  h.push('<div class="foot"><span>' + esc(M.condoName || "") + " &nbsp;·&nbsp; Draft minutes, " + esc(when) +
+    "</span><span>Drafted " + esc(todayStr()) +
+    " from the agenda and the decisions recorded against it. Subject to approval at the next meeting.</span></div>");
+  return h.join("");
+}
+function agMinutesPrint() {
+  var w = window.open("", "_blank");
+  if (!w) { alert("Your browser blocked the window — allow pop-ups for this site and try again."); return; }
+  var M = state.meta || META_DEFAULTS;
+  w.document.write("<!doctype html><meta charset='utf-8'><title>Draft minutes — " +
+    esc(M.condoName || "") + "</title><style>" + agPrintCSS() +
+    ".para{font-size:11pt;margin:12px 0}.res{margin:3px 0 0 2.4em;font-size:11pt}" +
+    ".res.noted,.res.open{color:#444}.res.open{font-style:italic}" +
+    ".fill{display:inline-block;width:7em;border-bottom:1px solid #999}" +
+    ".sign{display:flex;gap:40px;margin-top:34px}.sign>div{flex:1}" +
+    ".sign .u{display:block;border-bottom:1px solid #666;height:26px}" +
+    ".sign small{font-size:8.5pt;color:#666;letter-spacing:.06em;text-transform:uppercase}" +
+    "</style>" + agMinutesHTML());
+  w.document.close();
+  setTimeout(function () { try { w.focus(); w.print(); } catch (e) {} }, 300);
+}
+
+/* ---------- closing the meeting ----------
+   The agenda and everything decided against it are written to the record, and
+   the desk is cleared for the next one. What carries over carries over on its
+   own: a job deferred tonight is business arising next time because its status
+   says so, not because anything was copied. */
+function agClose() {
+  var pend = agPending();
+  if (pend.length && !confirm(pend.length + " recorded outcome" + (pend.length === 1 ? "" : "s") +
+      " have not been applied to the jobs yet.\n\nClose the meeting anyway? " +
+      "The record will be kept, but the jobs will keep their present status.")) return;
+  if (!confirm("File this meeting and start a fresh agenda?\n\nThe agenda and everything recorded " +
+      "against it are kept under Meetings held. Your date, time and place are cleared for the next one."))
+    return;
+  var g = agGather(), snap = { sections: [] };
+  AG_SECTIONS.forEach(function (sec) {
+    var key = sec[0];
+    if (!agOn(key)) return;
+    var rows = agItems(key, g).filter(function (r) { return r.manual || !agSkipped(key, r.it.id); });
+    if (!rows.length) return;
+    snap.sections.push({ key: key, title: sec[1], items: rows.map(function (r) {
+      var it = r.it, res = agState.res[it.id] || {};
+      return { title: r.manual ? (it.title || "") : it.title, amt: (!r.manual && it.amt) || null,
+               why: (!r.manual && it.why) || (r.manual && it.note) || "", jid: it.jid || "",
+               motion: agMotionText(it), moved: res.moved || "", sec: res.sec || "", out: res.out || "" };
+    }) });
+  });
+  var doc = { meeting: agState.meeting || "", time: agState.time || "", place: agState.place || "",
+    kind: agState.kind || "board", chair: agState.chair || "",
+    present: agState.present || "", regrets: agState.regrets || "",
+    body: snap, closedBy: (cloud.user && cloud.user.email) || "",
+    closedAt: firebase.firestore.FieldValue.serverTimestamp() };
+  cloud.db.collection(MEETINGS_COLL).add(doc).then(function () {
+    agState.meeting = ""; agState.time = agState.time; agState.chair = "";
+    agState.present = ""; agState.regrets = "";
+    agState.items = []; agState.skip = {}; agState.res = {}; agState.motions = {};
+    agState.rec = false;
+    agSave(); renderEditor();
+    alert("Filed. The next agenda is empty and will fill itself from the report.");
+  }).catch(function (e) {
+    alert("Could not file the meeting (" + ((e && e.code) || "error") + "). Nothing was cleared.");
+  });
+}
+
 /* ---------- the agenda on screen ---------- */
 /* auto items first, then whatever she filed under the same heading */
 function agItems(key, g) {
@@ -9303,8 +9545,8 @@ function agSummary(g) {
 function agRowHTML(sec, r, num) {
   var it = r.it, motion = agMotionText(it);
   var skipped = !r.manual && agSkipped(sec, it.id);
-  var h = ['<div class="agrow' + (skipped ? " off" : "") + (r.manual ? " man" : "") + '"' +
-    (r.manual ? ' data-agi="' + r.i + '"' : "") + ">"];
+  var h = ['<div class="agrow' + (skipped ? " off" : "") + (r.manual ? " man" : "") +
+    '" data-agid="' + esc(it.id) + '"' + (r.manual ? ' data-agi="' + r.i + '"' : "") + ">"];
   h.push('<span class="agno">' + num + "</span>");
   h.push('<span class="agmain">');
   if (r.manual) {
@@ -9322,6 +9564,16 @@ function agRowHTML(sec, r, num) {
   h.push('<span class="agmot"><b>MOTION</b>' +
     '<input type="text" data-agmot="' + esc(it.id) + '" value="' + esc(motion) +
     '" placeholder="' + (r.manual ? "Draft a motion, if this item needs one" : "No motion drafted") + '"></span>');
+  if (agState.rec && motion) {
+    var res = agRes(it.id);
+    h.push('<span class="agres">' +
+      '<input type="text" data-agres="moved" value="' + esc(res.moved || "") + '" placeholder="Moved by">' +
+      '<input type="text" data-agres="sec" value="' + esc(res.sec || "") + '" placeholder="Seconded by">' +
+      AG_OUTCOMES.map(function (o) {
+        return '<button type="button" class="agout ' + o[0] + (res.out === o[0] ? " on" : "") +
+          '" data-act="ag-out" data-ago="' + o[0] + '">' + o[1] + "</button>";
+      }).join("") + "</span>");
+  }
   h.push("</span>");
   if (!r.manual && it.amt > 0) h.push('<span class="agamt">' + money(it.amt) + "</span>");
   if (r.manual) h.push('<input type="text" class="agwho" data-agif="who" value="' + esc(it.who || "") +
@@ -9360,6 +9612,21 @@ function agHTML() {
       '" placeholder="Party room, 550 N Service Rd W — or a video link"></label>' +
     '<label class="chk"><input type="checkbox" data-agf="clock"' + (agState.clock !== false ? " checked" : "") +
       '> Print a running clock down the margin</label></div>');
+  if (agState.rec)
+    h.push('<div class="agmeta" style="margin-top:12px">' +
+      '<label class="wide">Present<input type="text" data-agf="present" value="' +
+        esc(agState.present || "") + '" placeholder="who attended"></label>' +
+      '<label class="wide">Regrets<input type="text" data-agf="regrets" value="' +
+        esc(agState.regrets || "") + '" placeholder="who sent regrets"></label></div>');
+  h.push('<div class="agrec"><label class="chk"><input type="checkbox" data-agf="rec"' +
+    (agState.rec ? " checked" : "") + "> <b>Recording the meeting</b> — show who moved what, and what carried" +
+    "</label>" +
+    (agState.rec
+      ? '<span class="spacer"></span>' +
+        '<button class="edbtn" type="button" data-act="ag-minutes">\u{1F4C4} Draft minutes</button>' +
+        '<button class="btn primary" type="button" data-act="ag-apply">\u2713 Apply decisions to the jobs</button>' +
+        '<button class="edbtn danger" type="button" data-act="ag-close">File this meeting</button>'
+      : "") + "</div>");
   h.push('<p class="agsum">Before the board: <b>' + sum.decisions + '</b> item' +
     (sum.decisions === 1 ? "" : "s") + " for decision" +
     (sum.money > 0 ? ", <b>" + money(sum.money) + "</b> of work" : "") +

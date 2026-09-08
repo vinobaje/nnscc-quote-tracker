@@ -77,6 +77,16 @@ service cloud.firestore {
       allow read, write: if nnsccEditor();
     }
 
+    // Meetings held: the agenda as it stood, with what the board decided on
+    // each item. Written when a meeting is closed and kept as the record the
+    // draft minutes are written from. Editor-only, both live and beta.
+    match /nnsccMeetings/{meetingId} {
+      allow read, write: if nnsccEditor();
+    }
+    match /nnsccMeetingsBeta/{meetingId} {
+      allow read, write: if nnsccEditor();
+    }
+
     // Report library — past/period reports. EDITOR-ONLY (public sees only the current report).
     match /nnsccQuoteReports/{reportId} {
       allow read: if nnsccEditor();
