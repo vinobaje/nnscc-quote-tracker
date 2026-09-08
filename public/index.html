@@ -373,6 +373,34 @@ input:focus, select:focus { outline:2px solid var(--accent); outline-offset:-1px
 .addbid { font-size:13px; font-weight:600; color:var(--accent-ink); background:none; border:none; cursor:pointer; padding:8px 12px 10px; }
 .edithint { color:var(--ink2); font-size:14px; max-width:70ch; margin:14px 0; }
 .esettings .ebids { padding:10px 14px 14px; }
+/* ---- the agenda ---- */
+.agadd { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+.agadd select { flex:0 0 240px; }
+.agadd input { flex:1 1 260px; min-width:200px; box-sizing:border-box; }
+.agrow { display:flex; gap:10px; align-items:flex-start; padding:8px 2px;
+  border-bottom:1px solid var(--line-soft); }
+.agrow:last-child { border-bottom:none; }
+.aggrip { flex:none; width:14px; color:var(--muted); font-size:12px; padding-top:3px; }
+.agmain { flex:1 1 auto; min-width:0; display:flex; flex-direction:column; gap:3px; }
+.agtitle { font-size:13.5px; font-weight:650; color:var(--ink); }
+.agtitle.ro { cursor:pointer; }
+.agtitle.ro:hover { color:var(--accent); text-decoration:underline; }
+.agwhy { font-size:12px; color:var(--ink2); line-height:1.45; }
+.agamt { flex:none; font-size:13.5px; font-weight:700; font-variant-numeric:tabular-nums;
+  color:var(--ink); padding-top:1px; }
+.agrow.man input.agtitle { font-weight:650; width:100%; box-sizing:border-box; }
+.agrow.man input.agnote { font-size:12px; width:100%; box-sizing:border-box; }
+.agwho { flex:0 0 130px; font-size:12px; box-sizing:border-box; }
+.agcam { flex:none; display:inline-flex; align-items:center; gap:5px; font-size:11.5px;
+  color:var(--ink2); white-space:nowrap; padding-top:4px; }
+/* left out of this meeting: still on the page, plainly not going on the sheet */
+.agrow.off .agmain, .agrow.off .agamt { opacity:.4; text-decoration:line-through; }
+.agsec.off { opacity:.55; }
+.agsec.off .ebids { display:none; }
+@media screen and (max-width:700px){
+  .agrow { flex-wrap:wrap; }
+  .agwho { flex:1 1 100%; }
+}
 .esrow { display:grid; grid-template-columns:180px 1fr; gap:10px; align-items:center; padding:4px 0; }
 .esrow label { font-size:12.5px; color:var(--ink2); font-weight:600; text-align:right; }
 .esrow textarea { font:13.5px/1.5 -apple-system,"Segoe UI",Roboto,sans-serif; color:var(--ink);
@@ -2826,8 +2854,9 @@ var ACTIVITY_COLL = "nnsccActivity";                      /* the manager's own r
 var BRAND_PATH = "nnsccQuoteTracker/brand";               /* the letterhead the manager puts on her report */
 var WEEKLY_DRAFT_PATH = "nnsccQuoteTracker/weeklyDraft";   /* the report she is working on */
 var WEEKLY_COLL = "nnsccWeeklyReports";                   /* every one she has finished */
+var AGENDA_PATH = "nnsccQuoteTracker/agendaDraft";        /* the agenda for the next meeting */
 var VIEW_BETA = CURRENT_PATH.indexOf("Beta") >= 0;   /* which report the passcode gate reads/protects */
-var BUILD_STAMP = "2026-08-31 01:29";   /* filled in by build.js — which copy of the page this is */
+var BUILD_STAMP = "2026-09-08 17:10";   /* filled in by build.js — which copy of the page this is */
 /* path of the report currently on screen */
 function reportPath() {
   return cloud.active.kind === "current" ? CURRENT_PATH : (REPORTS_COLL + "/" + cloud.active.id);
@@ -5054,7 +5083,7 @@ var ED_GROUPS = [
   ["Work", [["jobs", "💼", "Jobs &amp; Bids"], ["overview", "📊", "Overview"]]],
   ["Who we use", [["contractors", "👷", "Contractors"], ["contracts", "📄", "Contracts"]]],
   ["For the board", [["activity", "📝", "Activity"], ["weekly", "📰", "Board report"],
-                     ["minutes", "⚖️", "Minutes"]]]
+                     ["agenda", "🗒", "Agenda"], ["minutes", "⚖️", "Minutes"]]]
 ];
 if (VOTING_ON) ED_GROUPS.push(["Decisions", [["board", "🗳", "Board &amp; Voting"]]]);
 /* The Settings page is the owner's, not the property manager's.
@@ -5085,6 +5114,10 @@ function renderEditor() {
   else if (edNav === "weekly") h.push(edSecHead("Report to the board",
     "The week (or the month) as one document: what was carried out, what is booked, what the board " +
     "needs to decide, and your own reports joined on the end.") + wkCardHTML());
+  else if (edNav === "agenda") {
+    if (agendaAvailable()) { agLoad(); h.push(agHTML()); }
+    else { edNav = "jobs"; h.push(edJobsHTML()); }
+  }
   else if (edNav === "minutes") h.push(edSecHead("Board meeting minutes",
     "The meetings on file, and the passage of each one that decided a job. Yours and the " +
     "property manager's only — board members cannot open these.") + minCardHTML());
@@ -5263,7 +5296,10 @@ function edSideHTML(M) {
   h.push('<nav class="ed-nav">');
   ED_GROUPS.forEach(function (g) {
     h.push('<div class="ed-navgroup"><span class="ed-navhead">' + g[0] + "</span>");
-    g[1].forEach(function (s) { h.push(navBtn(s)); });
+    g[1].forEach(function (s) {
+      if (s[0] === "agenda" && !agendaAvailable()) return;
+      h.push(navBtn(s));
+    });
     h.push("</div>");
   });
   if (isOwner()) {
@@ -6214,6 +6250,24 @@ document.getElementById("editor").addEventListener("change", function (e) {
     else conState.alerts[alf] = Math.max(1, Math.round(+e.target.value || 0));
     conSave(); renderEditor(); renderReport(); return;
   }
+  /* the meeting's own details, and the fields of a hand-added item */
+  var agf = e.target.dataset.agf;
+  if (agf) {
+    agState[agf] = e.target.value;
+    agSave();
+    if (agf === "kind") renderEditor();
+    return;
+  }
+  var agif = e.target.dataset.agif;
+  if (agif) {
+    var arow = e.target.closest("[data-agi]");
+    var ait = arow && agState.items[+arow.dataset.agi];
+    if (ait) {
+      ait[agif] = (agif === "camera") ? !!e.target.checked : e.target.value;
+      agSave();
+    }
+    return;
+  }
   var aif = e.target.dataset.aif;
   if (aif && state.ai) {
     state.ai[aif] = e.target.value;
@@ -6323,6 +6377,8 @@ document.getElementById("editor").addEventListener("click", function (e) {
     if (moved) moved.scrollIntoView({ block: "nearest" });
     return;
   }
+  var agj = e.target.closest ? e.target.closest("[data-agjob]") : null;
+  if (agj) { openJobDossier(agj.getAttribute("data-agjob")); return; }
   /* the workspace has actions on wrappers (a card header, a table row), so the
      action is read from the nearest element that declares one */
   var actEl = e.target.closest("[data-act]");
@@ -6493,6 +6549,32 @@ document.getElementById("editor").addEventListener("click", function (e) {
     persist(null, [jobLabel(muj) + ": update of " + (mu.d || "no date") + " attributed to " +
       updWho(mu)], muj.id);
     renderEditor(); renderReport(); return;
+  }
+  /* ---- the agenda ---- */
+  if (act === "ag-print") { agPrint(); return; }
+  if (act === "ag-add") {
+    var ns = document.getElementById("agNewSec"), nt = document.getElementById("agNewTitle");
+    var t = (nt && nt.value || "").trim();
+    if (!t) { if (nt) nt.focus(); return; }
+    agState.items.push({ id: genId(), sec: (ns && ns.value) || "other",
+      title: t, note: "", who: "", camera: false });
+    if (nt) nt.value = "";
+    agSave(); renderEditor(); return;
+  }
+  if (act === "ag-del") {
+    var dr = e.target.closest("[data-agi]");
+    if (dr) { agState.items.splice(+dr.dataset.agi, 1); agSave(); renderEditor(); }
+    return;
+  }
+  if (act === "ag-skip") {
+    var sk = actEl.getAttribute("data-ags");
+    if (agState.skip[sk]) delete agState.skip[sk]; else agState.skip[sk] = true;
+    agSave(); renderEditor(); return;
+  }
+  if (act === "ag-secoff") {
+    var so = actEl.getAttribute("data-ags");
+    if (agState.secOff[so]) delete agState.secOff[so]; else agState.secOff[so] = true;
+    agSave(); renderEditor(); return;
   }
   if (act === "hvaccode-set") { hvacCodeSet(); return; }
   if (act === "delupd") {
@@ -8935,6 +9017,296 @@ var wkState = {
   secOff: {},           /* whole sections she does not want this time */
   html: "", draftLoaded: false, saving: false
 };
+/* ---------- the agenda for the next board meeting ----------
+
+   Not a new list to keep. Almost every line of a condo agenda is already in
+   this report and has only ever been missing an assembly: a job still awaiting
+   the board is an item requiring a decision, a deferred job is business arising
+   from the last meeting, and an agreement inside its notice window is a
+   decision with a deadline attached. What the manager adds by hand is the rest
+   — the things the tracker has no way to know about.
+
+   Every figure is read from computeAll() and the contract register at the
+   moment the agenda is drawn, never copied into it. An agenda that quietly
+   disagreed with the report it was printed beside would be worse than none. */
+function agendaAvailable() { return isOwner() && VIEW_BETA; }
+
+/* the order a condo meeting actually runs in */
+var AG_SECTIONS = [
+  ["open",      "Call to order",                       "manual"],
+  ["minutes",   "Approval of the previous minutes",    "auto"],
+  ["arising",   "Business arising",                    "auto"],
+  ["manager",   "Property manager’s report",      "auto"],
+  ["decide",    "New business — decisions required", "auto"],
+  ["contracts", "Contracts and renewals",              "auto"],
+  ["other",     "Other business",                      "manual"],
+  ["close",     "Next meeting and adjournment",        "manual"]
+];
+function agSecLabel(k) {
+  var out = k;
+  AG_SECTIONS.forEach(function (s) { if (s[0] === k) out = s[1]; });
+  return out;
+}
+var agState = { meeting: "", time: "", place: "", kind: "board",
+                items: [], skip: {}, secOff: {}, loaded: false };
+var agSaveT = null;
+function agSave() {
+  if (!cloud.on || !agendaAvailable()) return;
+  clearTimeout(agSaveT);
+  agSaveT = setTimeout(function () {
+    cloud.db.doc(AGENDA_PATH).set({
+      meeting: agState.meeting || "", time: agState.time || "",
+      place: agState.place || "", kind: agState.kind || "board",
+      items: agState.items, skip: agState.skip, secOff: agState.secOff,
+      at: firebase.firestore.FieldValue.serverTimestamp(),
+      by: (cloud.user && cloud.user.email) || ""
+    }, { merge: true }).catch(function () {});
+  }, 700);
+}
+function agLoad() {
+  if (!cloud.on || !agendaAvailable() || agState.loaded) return;
+  agState.loaded = true;
+  cloud.db.doc(AGENDA_PATH).get().then(function (snap) {
+    if (!snap.exists) { renderEditor(); return; }
+    var d = snap.data() || {};
+    agState.meeting = d.meeting || "";
+    agState.time = d.time || "";
+    agState.place = d.place || "";
+    agState.kind = d.kind || "board";
+    agState.items = Array.isArray(d.items) ? d.items : [];
+    agState.skip = d.skip || {};
+    agState.secOff = d.secOff || {};
+    if (document.body.dataset.view === "edit" && edNav === "agenda") renderEditor();
+  }).catch(function () {});
+}
+function agOn(sec) { return !agState.secOff[sec]; }
+function agSkipped(sec, id) { return !!agState.skip[sec + ":" + id]; }
+
+/* ---------- what the tracker already knows ----------
+   Each item carries a line saying why it is on this agenda and not the next
+   one. That sentence is the whole difference between a board deciding and a
+   board deferring again, and every word of it is already in the data. */
+function agGather() {
+  var d = computeAll(), out = { minutes: [], arising: [], manager: [], decide: [], contracts: [] };
+
+  /* the meeting whose minutes come up for approval: the newest one on file */
+  var meets = (minState.list || []).slice().sort(function (a, b) {
+    return String(b.date || "").localeCompare(String(a.date || "")); });
+  if (meets[0])
+    out.minutes.push({ id: meets[0].id, title: minLabel(meets[0]),
+      why: meets[0].draft ? "Filed as a draft — for approval" : "On file", amt: null });
+
+  /* business arising: what the board put off, and how long ago */
+  d.jobs.filter(function (x) { return (x.j.status || "") === "deferred"; })
+    .sort(function (a, b) { return String(a.j.statusDate || "").localeCompare(String(b.j.statusDate || "")); })
+    .forEach(function (x) {
+      var n = x.j.statusDate ? conDaysUntil(x.j.statusDate) : null;
+      out.arising.push({ id: x.j.id, jid: x.j.id, title: jobLabel(x.j), amt: x.c.cost || 0,
+        why: "Deferred" + (x.j.statusDate ? " on " + jdDate(x.j.statusDate) : "") +
+             (n != null && n < -1 ? " — " + Math.abs(n) + " days ago" : "") +
+             (x.j.statusNote ? " — " + x.j.statusNote : "") });
+    });
+
+  /* the manager's report: what is on site right now */
+  d.progNow.filter(function (x) { return (x.j.status || "") !== "completed"; })
+    .forEach(function (x) {
+      var ups = (x.j.updates || []).slice().sort(function (a, b) {
+        return String(b.d || "").localeCompare(String(a.d || "")); });
+      out.manager.push({ id: x.j.id, jid: x.j.id, title: jobLabel(x.j), amt: x.c.cost || 0,
+        why: statusLabel(x.j.status || "quoted") +
+             (x.j.status === "inprogress" && x.j.pct != null ? " — " + x.j.pct + "% on site" : "") +
+             (ups[0] && ups[0].d ? " — last update " + jdDate(ups[0].d) : "") });
+    });
+
+  /* the decisions themselves: priced, still waiting, priority first */
+  d.wait.filter(function (x) { return x.c.cost > 0; })
+    .sort(function (a, b) {
+      if (!!b.j.priority !== !!a.j.priority) return b.j.priority ? 1 : -1;
+      return b.c.cost - a.c.cost;
+    })
+    .forEach(function (x) {
+      var cb = x.c.carriedBids[0], who = (cb && cb.b.contractor || "").trim();
+      var bits = [];
+      if (x.j.priority) bits.push("High priority");
+      bits.push(x.c.priced + (x.c.priced === 1 ? " quote" : " quotes") + " in");
+      if (who) bits.push("lowest is " + who);
+      if (x.c.saving > 0) bits.push(money(x.c.saving) + " below the next");
+      /* a price with a date on it is a decision with a date on it */
+      if (cb) {
+        var e = bidExpiryISO(cb.b), left = e ? conDaysUntil(e) : null;
+        if (left != null && left < 0) bits.push("⚠ the quote lapsed " + Math.abs(left) + " days ago");
+        else if (left != null && left <= 30) bits.push("⚠ the quote lapses in " + left + " days");
+      }
+      out.decide.push({ id: x.j.id, jid: x.j.id, title: jobLabel(x.j),
+        amt: x.c.cost, why: bits.join(" · ") });
+    });
+
+  /* agreements where not deciding is itself a decision */
+  if (canSeeContracts()) conRenewals(90).forEach(function (c) {
+    var notice = conNoticeBy(c), nd = notice ? conDaysUntil(notice) : null;
+    var ed = c.end ? conDaysUntil(c.end) : null;
+    var why = nd != null
+      ? (nd < 0
+          ? "⚠ notice was due " + jdDate(notice) + " — it has renewed for another term"
+          : "Notice must be given by " + jdDate(notice) + " (" + nd + " days) or it renews")
+      : (ed != null ? "Ends " + jdDate(c.end) + " (" + ed + " days)" : "Ending soon");
+    out.contracts.push({ id: c.id, cid: c.id, amt: null,
+      title: ((c.contractor || "").trim() || "Contractor not named") + (c.title ? " — " + c.title : ""),
+      why: why });
+  });
+  return out;
+}
+function agManual(sec) {
+  return agState.items.filter(function (i) { return i.sec === sec; });
+}
+
+/* ---------- the agenda on screen ---------- */
+function agRowHTML(sec, it, manual, idx) {
+  var amt = (it.amt != null && it.amt > 0) ? '<span class="agamt">' + money(it.amt) + "</span>" : "";
+  if (manual) {
+    return '<div class="agrow man" data-agi="' + idx + '">' +
+      '<span class="aggrip">✎</span>' +
+      '<span class="agmain">' +
+      '<input type="text" class="agtitle" data-agif="title" value="' + esc(it.title || "") +
+      '" placeholder="What is this item?">' +
+      '<input type="text" class="agnote" data-agif="note" value="' + esc(it.note || "") +
+      '" placeholder="a line of context, or what you want from the board (optional)"></span>' +
+      '<input type="text" class="agwho" data-agif="who" value="' + esc(it.who || "") +
+      '" placeholder="raised by">' +
+      '<label class="agcam" title="Kept off the board-facing copy"><input type="checkbox" data-agif="camera"' +
+      (it.camera ? " checked" : "") + "> in camera</label>" +
+      '<button class="xbtn" type="button" data-act="ag-del" title="Remove this item">✕</button></div>';
+  }
+  var skipped = agSkipped(sec, it.id);
+  return '<div class="agrow' + (skipped ? " off" : "") + '">' +
+    '<span class="aggrip">•</span>' +
+    '<span class="agmain">' +
+    '<span class="agtitle ro"' + (it.jid ? ' data-agjob="' + esc(it.jid) + '" title="Open this job"' : "") + ">" +
+    esc(it.title) + "</span>" +
+    (it.why ? '<span class="agwhy">' + esc(it.why) + "</span>" : "") + "</span>" +
+    amt +
+    '<button class="edbtn" type="button" data-act="ag-skip" data-ags="' + esc(sec + ":" + it.id) + '">' +
+    (skipped ? "Put back" : "Not this time") + "</button></div>";
+}
+function agHTML() {
+  var M = state.meta || META_DEFAULTS, g = agGather();
+  var h = [edSecHead("Agenda",
+    "The next board meeting, assembled from the report itself. Jobs waiting on a decision, " +
+    "what the board deferred last time and the agreements running out are all here already — " +
+    "add what the tracker cannot know about, drop what can wait, and print it.")];
+
+  h.push('<div class="ecard esettings"><div class="ehead"><strong>The meeting</strong>' +
+    '<span style="font-size:12.5px;color:var(--ink2)">— what goes at the top of the page</span>' +
+    '<span class="spacer"></span>' +
+    '<button class="btn primary" type="button" data-act="ag-print">\u{1F5A8} Print / PDF</button>' +
+    '</div><div class="ebids">');
+  h.push('<div class="esrow"><label>Kind</label><select data-agf="kind">' +
+    ['board,Board meeting', 'agm,Annual general meeting', 'special,Special meeting'].map(function (o) {
+      var p = o.split(",");
+      return '<option value="' + p[0] + '"' + (agState.kind === p[0] ? " selected" : "") + ">" + p[1] + "</option>";
+    }).join("") + "</select></div>");
+  h.push('<div class="esrow"><label>Date</label><input type="date" data-agf="meeting" value="' +
+    esc(agState.meeting || "") + '"></div>');
+  h.push('<div class="esrow"><label>Time</label><input type="text" data-agf="time" value="' +
+    esc(agState.time || "") + '" placeholder="7:00 pm"></div>');
+  h.push('<div class="esrow"><label>Where</label><input type="text" data-agf="place" value="' +
+    esc(agState.place || "") + '" placeholder="Party room, 550 N Service Rd W — or a video link"></div>');
+  h.push("</div></div>");
+
+  /* one place to add an item, with the section chosen rather than eight buttons */
+  h.push('<div class="ecard esettings"><div class="ehead"><strong>Add an item</strong>' +
+    '<span style="font-size:12.5px;color:var(--ink2)">— anything the tracker has no way to know about</span>' +
+    '</div><div class="ebids"><div class="agadd">' +
+    '<select id="agNewSec">' + AG_SECTIONS.map(function (s) {
+      return '<option value="' + s[0] + '"' + (s[0] === "other" ? " selected" : "") + ">" + s[1] + "</option>";
+    }).join("") + "</select>" +
+    '<input type="text" id="agNewTitle" placeholder="What is it? — e.g. “Pool re-opening, hours and staffing”">' +
+    '<button class="btn primary" type="button" data-act="ag-add">+ Add</button></div></div></div>');
+
+  var n = 0;
+  AG_SECTIONS.forEach(function (sec) {
+    var key = sec[0], auto = g[key] || [], man = agManual(key), on = agOn(key);
+    if (!auto.length && !man.length && sec[2] === "auto") return;   /* nothing to say, no heading */
+    n++;
+    h.push('<div class="ecard esettings agsec' + (on ? "" : " off") + '"><div class="ehead">' +
+      '<strong>' + n + ". " + esc(sec[1]) + "</strong>" +
+      '<span style="font-size:12.5px;color:var(--ink2)">— ' +
+      (auto.length + man.length) + (auto.length + man.length === 1 ? " item" : " items") + "</span>" +
+      '<span class="spacer"></span>' +
+      '<button class="edbtn" type="button" data-act="ag-secoff" data-ags="' + key + '">' +
+      (on ? "Leave out" : "Put back") + '</button></div><div class="ebids">');
+    if (!auto.length && !man.length)
+      h.push('<p class="updempty" style="margin:2px 0">Nothing here yet — add an item above.</p>');
+    auto.forEach(function (it) { h.push(agRowHTML(key, it, false)); });
+    agState.items.forEach(function (it, i) {
+      if (it.sec === key) h.push(agRowHTML(key, it, true, i));
+    });
+    h.push("</div></div>");
+  });
+  return h.join("");
+}
+
+/* ---------- the printed page ----------
+   Written into its own window rather than printed from the workspace: the
+   editor is full of things that have no place on a sheet handed round a table,
+   and fighting them with a print stylesheet is how the last one grew. */
+function agPrintHTML() {
+  var M = state.meta || META_DEFAULTS, g = agGather();
+  var when = agState.meeting ? jdDate(agState.meeting) : "date to be set";
+  var kind = agState.kind === "agm" ? "Annual General Meeting"
+           : agState.kind === "special" ? "Special Meeting" : "Meeting of the Board of Directors";
+  var h = ['<h1>' + esc(M.condoName || "The corporation") + "</h1>",
+    '<p class="sub">' + esc(M.regNo || "") + "</p>",
+    '<h2>Agenda — ' + esc(kind) + "</h2>",
+    '<p class="when"><b>' + esc(when) + "</b>" +
+      (agState.time ? " · " + esc(agState.time) : "") +
+      (agState.place ? " · " + esc(agState.place) : "") + "</p>"];
+  var n = 0;
+  AG_SECTIONS.forEach(function (sec) {
+    var key = sec[0], auto = (g[key] || []).filter(function (it) { return !agSkipped(key, it.id); });
+    var man = agManual(key);
+    if (!agOn(key)) return;
+    if (!auto.length && !man.length && sec[2] === "auto") return;
+    n++;
+    h.push("<h3>" + n + ". " + esc(sec[1]) + "</h3>");
+    if (!auto.length && !man.length) { h.push('<p class="none">—</p>'); return; }
+    h.push("<ol>");
+    auto.forEach(function (it) {
+      h.push("<li><b>" + esc(it.title) + "</b>" +
+        (it.amt != null && it.amt > 0 ? ' <span class="amt">' + money(it.amt) + "</span>" : "") +
+        (it.why ? '<br><span class="why">' + esc(it.why) + "</span>" : "") + "</li>");
+    });
+    man.forEach(function (it) {
+      h.push("<li><b>" + esc(it.title || "(untitled)") + "</b>" +
+        (it.camera ? ' <span class="cam">in camera</span>' : "") +
+        (it.who ? ' <span class="why">— ' + esc(it.who) + "</span>" : "") +
+        (it.note ? '<br><span class="why">' + esc(it.note) + "</span>" : "") + "</li>");
+    });
+    h.push("</ol>");
+  });
+  h.push('<p class="foot">Prepared ' + esc(todayStr()) +
+    " from the contractor quote report. Amounts include HST and are the lowest quote carried for each job.</p>");
+  return h.join("");
+}
+function agPrint() {
+  var w = window.open("", "_blank");
+  if (!w) { alert("Your browser blocked the print window — allow pop-ups for this site and try again."); return; }
+  var css = "body{font:14px/1.5 Georgia,'Times New Roman',serif;color:#1E2833;max-width:44em;margin:40px auto;padding:0 24px}" +
+    "h1{font-size:21px;margin:0}h2{font-size:17px;margin:18px 0 2px}h3{font-size:14px;margin:22px 0 6px;" +
+    "text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid #ccc;padding-bottom:4px}" +
+    ".sub{margin:2px 0 0;color:#666;font-size:12px}.when{margin:2px 0 0;font-size:14px}" +
+    "ol{margin:0;padding-left:22px}li{margin:8px 0}" +
+    ".why{color:#555;font-size:12.5px}.amt{float:right;font-weight:700}" +
+    ".cam{font-size:11px;background:#eee;padding:1px 6px;border-radius:9px}" +
+    ".none{color:#888;margin:4px 0}" +
+    ".foot{margin-top:30px;border-top:1px solid #ccc;padding-top:8px;color:#666;font-size:11.5px}" +
+    "@media print{body{margin:0;max-width:none}h3{break-after:avoid}li{break-inside:avoid}}";
+  w.document.write("<!doctype html><meta charset='utf-8'><title>Agenda</title><style>" + css +
+    "</style>" + agPrintHTML());
+  w.document.close();
+  setTimeout(function () { try { w.focus(); w.print(); } catch (e) {} }, 250);
+}
+
 /* Sections in the order they print, and the plain name each goes by. The board
    already gets the quote report, so the parts that repeat it are hers to drop. */
 var WK_SECTIONS = [
