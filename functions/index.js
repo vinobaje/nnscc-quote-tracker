@@ -210,6 +210,60 @@ const SCHEDULE_SCHEMA = {
 //     550-912" is not "Repairs unit 550-318", and a wrong citation shown to a
 //     board is worse than no citation;
 //   * nothing here changes a job. The reply is a list of proposals; the
+// Writing the agenda for a board meeting from what the tracker already holds.
+//
+// The rule this whole file lives by applies here more than anywhere: the model
+// chooses the WORDS and the data supplies the FACTS. So it is never told an
+// amount, a contractor's name or a number of quotations — it cannot leak or
+// mangle a figure it was never given. Where a motion needs one it writes a
+// placeholder, and the page puts the real value in afterwards. A wrong price in
+// a motion is not a typo; it is the board approving something else.
+const AGENDA_SYSTEM =
+  "You prepare agendas for the board of directors of an Ontario condominium corporation. " +
+  "You are given the items already assembled from the corporation's own records. Write each one up " +
+  "in the register of a board agenda: formal, plain, impersonal. No salesmanship, no adjectives of " +
+  "praise, no exhortation, nothing a minute-taker would have to rewrite.\n\n" +
+  "For every item you are given, return an object with these fields.\n\n" +
+  "1. `id` — copied character-for-character from the item supplied. Never invent one.\n" +
+  "2. `heading` — how the item should read on the agenda. Sentence case, under 80 characters, no " +
+  "trailing full stop. Turn a working note into a heading: “power sweep parking lot” becomes " +
+  "“Power sweeping of the parking lot”. Keep unit and building numbers, which identify the work. " +
+  "Never include a price or a contractor's name.\n" +
+  "3. `background` — ONE sentence of context a director needs in order to decide, drawn only from " +
+  "the circumstances supplied with the item. Under 200 characters. If the circumstances do not " +
+  "support a sentence, return an empty string; an invented reason is worse than none.\n" +
+  "4. `motion` — the motion the board would put, beginning “That the Board”. Under 300 characters. " +
+  "Where the motion needs the price write {amount}, where it needs the contractor write " +
+  "{contractor}, and where it needs how many quotations were received write {quotes}. Write those " +
+  "placeholders exactly, in braces. NEVER write a dollar figure, a contractor's name or a count of " +
+  "quotations yourself — you have not been told them, and a guess would be read out at a meeting " +
+  "as though it were true.\n\n" +
+  "Also return `note`: two or three sentences the chair might read to open the meeting, saying what " +
+  "this agenda is mostly about and what is most pressing on it. Same register. No figures.\n\n" +
+  "Return one object per item supplied, in the same order, and nothing else.";
+const AGENDA_SCHEMA = {
+  type: "object",
+  properties: {
+    note: { type: "string" },
+    items: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          id: { type: "string" },
+          heading: { type: "string" },
+          background: { type: "string" },
+          motion: { type: "string" },
+        },
+        required: ["id", "heading", "background", "motion"],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ["note", "items"],
+  additionalProperties: false,
+};
+
 //     property manager accepts them one at a time.
 const MINUTES_SYSTEM =
   "You read the minutes of a condominium board meeting and list the decisions the board recorded " +
@@ -654,6 +708,30 @@ exports.nnsccTrackerAi = onCall(
     // rather than the PDF means the model is quoting from the same copy the
     // highlight is found in, so a quote that comes back either matches or is
     // discarded before anyone sees it.
+    // ----- mode: write up an assembled agenda -----
+    if (request.data && request.data.agenda === true) {
+      const items = Array.isArray(request.data.items) ? request.data.items : [];
+      if (!items.length) throw new HttpsError("invalid-argument", "There is nothing on the agenda to write up.");
+      if (items.length > 60) throw new HttpsError("invalid-argument", "That is more items than one agenda holds.");
+      // Deliberately narrow: an id, what kind of item it is, the manager's own
+      // words for it, and circumstances already reduced to phrases with no
+      // numbers in them. No amounts. No contractor names. No counts.
+      const safe = items.map((it) => ({
+        id: String((it && it.id) || "").slice(0, 60),
+        section: String((it && it.section) || "").slice(0, 40),
+        description: String((it && it.description) || "").slice(0, 300),
+        priority: (it && it.priority) === true,
+        circumstances: (Array.isArray(it && it.circumstances) ? it.circumstances : [])
+          .map((c) => String(c).replace(/[0-9$]/g, "").slice(0, 120)).filter(Boolean).slice(0, 6),
+      })).filter((it) => it.id);
+      if (!safe.length) throw new HttpsError("invalid-argument", "No usable items were sent.");
+      const meeting = String(request.data.meetingKind || "meeting of the board of directors").slice(0, 80);
+      return await callClaude(key, AGENDA_SYSTEM,
+        "This is the agenda for a " + meeting + ". Write up each item.\n\n" +
+        JSON.stringify(safe, null, 1).slice(0, 60000),
+        AGENDA_SCHEMA, 6000, CONTRACT_MODEL);
+    }
+
     if (request.data && request.data.minutes === true) {
       const pages = Array.isArray(request.data.pages) ? request.data.pages : [];
       if (!pages.length) throw new HttpsError("invalid-argument", "No pages were provided.");

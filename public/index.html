@@ -381,6 +381,14 @@ input:focus, select:focus { outline:2px solid var(--accent); outline-offset:-1px
 .agmeta label.chk { flex-direction:row; align-items:center; gap:6px; font-weight:500; }
 .agmeta input, .agmeta select { font-size:13px; }
 .agmeta label.wide input { width:100%; box-sizing:border-box; }
+.agnote { margin:12px 0 0; }
+.agnote b { display:block; font-size:11px; letter-spacing:.07em; text-transform:uppercase;
+  color:var(--muted); margin-bottom:4px; }
+.agnote textarea { width:100%; box-sizing:border-box; font:inherit; font-size:13px; line-height:1.5;
+  border:1px solid var(--line); border-radius:7px; padding:9px 11px; resize:vertical; }
+.agback { font-size:12.5px; color:var(--ink); line-height:1.45; }
+.agref { font-size:10.5px; font-weight:600; color:var(--muted); margin-left:7px;
+  border:1px solid var(--line); border-radius:99px; padding:1px 7px; }
 .agsent { margin:12px 0 0; font-size:12.5px; color:var(--good); background:var(--good-soft);
   border-radius:6px; padding:7px 11px; }
 .agrec { display:flex; align-items:center; gap:9px; flex-wrap:wrap; margin-top:14px;
@@ -2889,9 +2897,8 @@ var BRAND_PATH = "nnsccQuoteTracker/brand";               /* the letterhead the 
 var WEEKLY_DRAFT_PATH = "nnsccQuoteTracker/weeklyDraft";   /* the report she is working on */
 var WEEKLY_COLL = "nnsccWeeklyReports";                   /* every one she has finished */
 var AGENDA_PATH = "nnsccQuoteTracker/agendaDraft";        /* the agenda for the next meeting */
-var MEETINGS_COLL = "nnsccMeetings";                      /* meetings held, and what was decided */
 var VIEW_BETA = CURRENT_PATH.indexOf("Beta") >= 0;   /* which report the passcode gate reads/protects */
-var BUILD_STAMP = "2026-09-08 19:19";   /* filled in by build.js — which copy of the page this is */
+var BUILD_STAMP = "2026-09-08 19:42";   /* filled in by build.js — which copy of the page this is */
 /* path of the report currently on screen */
 function reportPath() {
   return cloud.active.kind === "current" ? CURRENT_PATH : (REPORTS_COLL + "/" + cloud.active.id);
@@ -6288,6 +6295,10 @@ document.getElementById("editor").addEventListener("change", function (e) {
   /* the meeting's own details, and the fields of a hand-added item */
   var agf = e.target.dataset.agf;
   if (agf) {
+    if (agf === "note") {
+      if (agState.ai) { agState.ai.note = e.target.value; agSave(); }
+      return;
+    }
     agState[agf] = (e.target.type === "checkbox") ? !!e.target.checked : e.target.value;
     agSave();
     /* these three change the shape of the page, not just a word on it */
@@ -6305,13 +6316,6 @@ document.getElementById("editor").addEventListener("change", function (e) {
      it, so the override is stored either way. */
   var agmot = e.target.dataset.agmot;
   if (agmot) { agState.motions[agmot] = e.target.value; agSave(); return; }
-  /* who moved it and who seconded it, typed as the meeting runs */
-  var agres = e.target.dataset.agres;
-  if (agres) {
-    var rrow = e.target.closest("[data-agid]");
-    if (rrow) { agRes(rrow.dataset.agid)[agres] = e.target.value; agSave(); }
-    return;
-  }
   var agif = e.target.dataset.agif;
   if (agif) {
     var arow = e.target.closest("[data-agi]");
@@ -6605,18 +6609,10 @@ document.getElementById("editor").addEventListener("click", function (e) {
     renderEditor(); renderReport(); return;
   }
   /* ---- the agenda ---- */
+  if (act === "ag-ai") { agAiRun(); return; }
+  if (act === "ag-aiclear") { agAiClear(); return; }
   if (act === "ag-print") { agPrint(); return; }
   if (act === "ag-send") { agSend(); return; }
-  if (act === "ag-minutes") { agMinutesPrint(); return; }
-  if (act === "ag-apply") { agApply(); return; }
-  if (act === "ag-close") { agClose(); return; }
-  if (act === "ag-out") {
-    var orow = e.target.closest("[data-agid]");
-    if (!orow) return;
-    var rr = agRes(orow.dataset.agid), want = actEl.getAttribute("data-ago");
-    rr.out = (rr.out === want) ? "" : want;     /* pressing it again takes it back */
-    agSave(); renderEditor(); return;
-  }
   if (act === "ag-add") {
     var ns = document.getElementById("agNewSec"), nt = document.getElementById("agNewTitle");
     var t = (nt && nt.value || "").trim();
@@ -9147,8 +9143,7 @@ function agSecLabel(k) {
   return out;
 }
 var agState = { meeting: "", time: "", place: "", kind: "board", chair: "", clock: true,
-                present: "", regrets: "", rec: false,
-                items: [], skip: {}, secOff: {}, mins: {}, motions: {}, res: {}, loaded: false };
+                items: [], skip: {}, secOff: {}, mins: {}, motions: {}, ai: null, loaded: false };
 var agSaveT = null;
 function agSave() {
   if (!cloud.on || !agendaAvailable()) return;
@@ -9159,8 +9154,7 @@ function agSave() {
       place: agState.place || "", kind: agState.kind || "board",
       chair: agState.chair || "", clock: agState.clock !== false,
       items: agState.items, skip: agState.skip, secOff: agState.secOff,
-      mins: agState.mins, motions: agState.motions, res: agState.res,
-      present: agState.present || "", regrets: agState.regrets || "", rec: !!agState.rec,
+      mins: agState.mins, motions: agState.motions, ai: agState.ai || null,
       sentAt: agState.sentAt || "", sentTo: agState.sentTo || 0,
       at: firebase.firestore.FieldValue.serverTimestamp(),
       by: (cloud.user && cloud.user.email) || ""
@@ -9181,13 +9175,10 @@ function agLoad() {
     agState.skip = d.skip || {};
     agState.secOff = d.secOff || {};
     agState.mins = d.mins || {};
+    agState.ai = (d.ai && d.ai.items) ? d.ai : null;
     agState.motions = d.motions || {};
     agState.chair = d.chair || "";
     agState.clock = d.clock !== false;
-    agState.res = d.res || {};
-    agState.present = d.present || "";
-    agState.regrets = d.regrets || "";
-    agState.rec = !!d.rec;
     agState.sentAt = d.sentAt || "";
     agState.sentTo = d.sentTo || 0;
     if (document.body.dataset.view === "edit" && edNav === "agenda") renderEditor();
@@ -9224,7 +9215,9 @@ function agGather() {
              (x.j.statusNote ? " — “" + x.j.statusNote + "”" : ""),
         /* the passage in the minutes that recorded it, where one was linked —
            a board reading "deferred" is entitled to the page it was deferred on */
-        cite: agCite(x.j),
+        cite: agCite(x.j), no: x.j.no,
+        who: ((x.c.carriedBids[0] && x.c.carriedBids[0].b.contractor) || "").trim(),
+        nq: x.c.priced,
         motion: agJobMotion(x) });
     });
 
@@ -9259,7 +9252,8 @@ function agGather() {
         else if (left != null && left <= 30) bits.push("⚠ the quote lapses in " + left + " days");
       }
       out.decide.push({ id: x.j.id, jid: x.j.id, title: jobLabel(x.j),
-        amt: x.c.cost, why: bits.join(" · "), cite: agCite(x.j), motion: agJobMotion(x) });
+        amt: x.c.cost, why: bits.join(" · "), cite: agCite(x.j), no: x.j.no,
+        who: who, nq: x.c.priced, motion: agJobMotion(x) });
     });
 
   /* agreements where not deciding is itself a decision */
@@ -9272,7 +9266,7 @@ function agGather() {
           : "Notice must be given by " + jdDate(notice) + " (" + nd + " days) or it renews")
       : (ed != null ? "Ends " + jdDate(c.end) + " (" + ed + " days)" : "Ending soon");
     var cw = (c.contractor || "").trim() || "the contractor";
-    out.contracts.push({ id: c.id, cid: c.id, amt: null,
+    out.contracts.push({ id: c.id, cid: c.id, amt: null, who: cw,
       title: ((c.contractor || "").trim() || "Contractor not named") + (c.title ? " — " + c.title : ""),
       why: why,
       motion: (nd != null && nd >= 0)
@@ -9309,8 +9303,11 @@ function agJobMotion(x) {
   return "That the Board approve the quotation from " + who + " in the amount of " +
     money(x.c.cost) + " (HST included) for " + (x.j.desc || "the work described") + qual + ".";
 }
+/* what she typed, then what Claude wrote, then what the quotes themselves say */
 function agMotionText(it) {
   if (it && it.id && agState.motions[it.id] != null) return agState.motions[it.id];
+  var a = agAiMotion(it);
+  if (a) return a;
   return (it && it.motion) || "";
 }
 function agManual(sec) {
@@ -9449,210 +9446,122 @@ function agSend() {
   }).catch(function () { alert("Could not read the board list."); });
 }
 
-/* ---------- what the board actually did ----------
+/* ---------- Claude writes it up ----------
 
-   The agenda stops being a plan the moment the chair calls the first item, and
-   what happens next has always been written twice: once on somebody's printed
-   copy, and again into the tracker a day later, from memory. This is the same
-   sheet, filled in. A motion carried here sets the job's status; the draft
-   minutes are written from the same record rather than typed out again.
+   The tracker knows what is on the agenda. What it has never had is the
+   register — "power sweep parking lot" is a working note, not a heading a
+   director reads, and a motion assembled from a template reads like one.
 
-   Nothing is applied by being typed. She records the meeting as it runs and
-   presses one button afterwards, which says how many jobs it is about to move
-   and asks. Recording is not deciding. */
-var AG_OUTCOMES = [["carried", "Carried"], ["defeated", "Defeated"], ["deferred", "Deferred"]];
-/* what each outcome means for the job the motion was about */
-var AG_OUT_STATUS = { carried: "approved", defeated: "rejected", deferred: "deferred" };
-function agRes(id) {
-  var r = agState.res[id];
-  if (!r) { r = agState.res[id] = { moved: "", sec: "", out: "" }; }
-  return r;
+   What is sent is deliberately thin: the item's own words, whether it is
+   high priority, and its circumstances already reduced to phrases with no
+   numbers in them. No amount, no contractor, no count of quotations — Claude
+   cannot mangle a figure it was never given. Where the motion needs one it
+   writes {amount}, {contractor} or {quotes}, and the page fills those in from
+   the record afterwards. Anything that comes back carrying a dollar figure is
+   dropped rather than shown: it can only have been invented.
+
+   Nothing is applied on arrival. She reads it, keeps what reads better than
+   what she had, and one button puts it all back. */
+function agAiCirc(sec, it) {
+  var c = [];
+  if (sec === "minutes") c.push("the minutes of the previous meeting are before the board for approval");
+  if (sec === "arising") c.push("the board deferred this at an earlier meeting and it returns undecided");
+  if (sec === "manager") c.push("the work is under way on site and is reported for information only");
+  if (sec === "contracts")
+    c.push(/renewed for another term/.test(it.why || "")
+      ? "the date for giving notice has passed and the agreement has renewed"
+      : "the agreement is approaching the date by which notice must be given, or it renews");
+  if (sec === "decide" || sec === "arising") {
+    if (it.nq > 1) c.push("more than one quotation was received");
+    else if (it.nq === 1) c.push("only one quotation was received");
+    if (/lapsed/.test(it.why || "")) c.push("the quotation has already lapsed");
+    else if (/lapses in/.test(it.why || "")) c.push("the quotation lapses shortly");
+    if (/recommended by the property manager/.test(it.motion || ""))
+      c.push("the quotation carried is not the lowest; the property manager has recommended it");
+  }
+  return c;
 }
-function agHasRes(id) {
-  var r = agState.res[id];
-  return !!(r && (r.out || r.moved || r.sec));
-}
-/* every recorded outcome that names a job, and what it would do to it */
-function agPending() {
+function agAiPayload() {
   var g = agGather(), out = [];
-  ["arising", "decide"].forEach(function (key) {
+  AG_SECTIONS.forEach(function (sec) {
+    var key = sec[0];
+    if (!agOn(key)) return;
     (g[key] || []).forEach(function (it) {
-      if (!agOn(key) || agSkipped(key, it.id) || !it.jid) return;
-      var r = agState.res[it.id];
-      if (!r || !r.out) return;
-      var want = AG_OUT_STATUS[r.out];
-      var j = findJob(it.jid);
-      if (!j || !want || (j.status || "quoted") === want) return;
-      out.push({ j: j, it: it, want: want, out: r.out });
+      if (agSkipped(key, it.id)) return;
+      out.push({ id: it.id, section: sec[1], priority: /High priority/.test(it.why || ""),
+        description: it.title + (it.why && sec[0] === "arising" ? " — " + it.why : ""),
+        circumstances: agAiCirc(key, it) });
+    });
+    agManual(key).forEach(function (it) {
+      if (!(it.title || "").trim()) return;
+      out.push({ id: it.id, section: sec[1], priority: false,
+        description: (it.title || "") + (it.note ? " — " + it.note : ""),
+        circumstances: [] });
     });
   });
   return out;
 }
-function agApply() {
-  var list = agPending();
-  if (!list.length) { alert("Nothing to apply — no recorded outcome would change a job's status."); return; }
-  var when = agState.meeting || todayISO();
-  var msg = "Apply what the board decided to " + list.length + " job" + (list.length === 1 ? "" : "s") + "?\n\n" +
-    list.map(function (p) {
-      return "• " + jobLabel(p.j) + "  →  " + statusLabel(p.want);
-    }).join("\n") +
-    "\n\nEach will be dated " + jdDate(when) + " and recorded in the change history.";
-  if (!confirm(msg)) return;
-  var notes = [];
-  list.forEach(function (p) {
-    p.j.status = p.want;
-    p.j.statusDate = when;
-    if (p.want === "completed") p.j.pct = 100;
-    notes.push(jobLabel(p.j) + ": " + statusLabel(p.want) + " by the board on " + jdDate(when));
+/* a figure it was never given can only have been invented */
+function agAiSafe(t) {
+  var v = String(t == null ? "" : t).trim();
+  return /\$|\d[\d,]*\.\d\d/.test(v) ? "" : v;
+}
+function agAiKeep(raw, sent) {
+  var known = {};
+  sent.forEach(function (x) { known[x.id] = true; });
+  var out = { note: agAiSafe((raw && raw.note) || "").slice(0, 600), items: {}, at: todayISO() };
+  ((raw && raw.items) || []).forEach(function (r) {
+    var id = String((r && r.id) || "");
+    if (!known[id]) return;                       /* an item we never sent */
+    var heading = agAiSafe(r.heading).slice(0, 120);
+    var motion = agAiSafe(r.motion).slice(0, 400);
+    /* a motion that kept a brace it could not fill is not a motion */
+    if (motion && /\{(?!amount\}|contractor\}|quotes\})/.test(motion)) motion = "";
+    out.items[id] = { heading: heading, background: agAiSafe(r.background).slice(0, 300), motion: motion };
   });
-  persist(null, notes, null);
-  renderEditor(); renderReport();
-  alert(list.length + (list.length === 1 ? " job has" : " jobs have") + " been updated.");
+  return out;
 }
-
-/* ---------- the draft minutes ----------
-   In the corporation's own voice, because that is what the secretary will
-   otherwise spend an evening re-typing: "On a motion by …, seconded by …, the
-   Board resolved to …". The motion already reads "That the Board approve …",
-   so the resolution is the same sentence with its hinge turned. */
-function agResolve(motion) {
-  var t = String(motion || "").trim();
-  var m = t.match(/^That the Board\s+(.*)$/i);
-  if (m) return "the Board resolved to " + m[1].replace(/\.$/, "");
-  return "it was resolved that " + t.replace(/^That\s+/i, "").replace(/\.$/, "");
+/* the placeholders, filled from the record rather than from the model */
+function agAiMotion(it) {
+  if (!it || !it.id) return "";
+  var a = agState.ai && agState.ai.items[it.id];
+  if (!a || !a.motion) return "";
+  var m = a.motion
+    .replace(/\{amount\}/g, it.amt > 0 ? money(it.amt) : "the amount quoted")
+    .replace(/\{contractor\}/g, (it.who || "").trim() || "the contractor")
+    .replace(/\{quotes\}/g, it.nq != null ? String(it.nq) : "the");
+  return /[{}]/.test(m) ? "" : m;
 }
-function agMinuteSentence(it, r) {
-  var motion = agMotionText(it);
-  if (!motion) return "";
-  var by = (r.moved || "").trim(), sd = (r.sec || "").trim();
-  var lead = (by && sd) ? "On a motion by " + esc(by) + ", seconded by " + esc(sd) + ", "
-           : by ? "On a motion by " + esc(by) + ", "
-           : "On a motion duly moved and seconded, ";
-  if (r.out === "carried")
-    return lead + esc(agResolve(motion)) + ". <b>CARRIED.</b>";
-  if (r.out === "defeated")
-    return lead + "it was moved that " + esc(motion.replace(/^That\s+/i, "").replace(/\.$/, "")) +
-      ". <b>DEFEATED.</b>";
-  if (r.out === "deferred")
-    return lead + "it was moved that " + esc(motion.replace(/^That\s+/i, "").replace(/\.$/, "")) +
-      ". The matter was <b>DEFERRED</b> to the next meeting.";
-  return "";
+function agAiOf(it) { return (it && it.id && agState.ai && agState.ai.items[it.id]) || null; }
+function agHeadingOf(it, fallback) {
+  var a = agAiOf(it);
+  return (a && a.heading) || fallback;
 }
-function agMinutesHTML() {
-  var M = state.meta || META_DEFAULTS, g = agGather();
-  var kind = agState.kind === "agm" ? "Annual General Meeting"
-           : agState.kind === "special" ? "Special Meeting of the Board"
-           : "Meeting of the Board of Directors";
-  var when = agState.meeting ? jdDate(agState.meeting) : "date not recorded";
-  var h = ['<div class="cover">',
-    '<div class="corp">' + esc(M.condoName || "The corporation") + "</div>",
-    '<div class="reg">' + esc(M.regNo || "") + "</div>",
-    '<div class="rule"></div>',
-    '<div class="doct">Minutes</div>',
-    '<div class="kind">' + esc(kind) + " &nbsp;·&nbsp; <b>DRAFT</b></div>",
-    '<div class="when">' + esc(when) + (agState.time ? " &nbsp;·&nbsp; " + esc(agState.time) : "") + "</div>",
-    (agState.place ? '<div class="where">' + esc(agState.place) + "</div>" : ""),
-    "</div>"];
-  h.push('<table class="attend">' +
-    '<tr><td>Present</td><td class="line">' + esc(agState.present || "") + "</td></tr>" +
-    '<tr><td>Regrets</td><td class="line">' + esc(agState.regrets || "") + "</td></tr>" +
-    '<tr><td>Chair</td><td class="line">' + esc(agState.chair || "") + "</td></tr></table>");
-  h.push('<p class="para">The meeting was called to order' +
-    (agState.time ? " at " + esc(agState.time) : "") + ", a quorum being present.</p>");
-
-  var n = 0;
-  AG_SECTIONS.forEach(function (sec) {
-    var key = sec[0];
-    if (!agOn(key)) return;
-    var rows = agItems(key, g).filter(function (r) { return r.manual || !agSkipped(key, r.it.id); });
-    if (!rows.length && sec[2] === "auto") return;
-    n++;
-    h.push('<section class="sec"><h3><span class="sn">' + n + ".</span>" + esc(sec[1]) + "</h3>");
-    rows.forEach(function (r, i) {
-      var it = r.it, res = agState.res[it.id] || {};
-      h.push('<div class="item"><div class="ihead"><span class="ino">' + n + "." + (i + 1) + "</span>" +
-        '<span class="ittl">' + esc(r.manual ? (it.title || "(untitled)") : it.title) + "</span>" +
-        (!r.manual && it.amt > 0 ? '<span class="iamt">' + money(it.amt) + "</span>" : "") + "</div>");
-      var sentence = res.out ? agMinuteSentence(it, res) : "";
-      if (sentence) h.push('<div class="res">' + sentence + "</div>");
-      else if (sec[3] === "information") {
-        var told = String(r.manual ? (it.note || "") : (it.why || "")).trim() || "Reported to the Board";
-        if (!/[.!?]$/.test(told)) told += ".";     /* it is a sentence now, not a chip */
-        h.push('<div class="res noted">' + esc(told) + " The report was <b>NOTED</b>.</div>");
-      }
-      else
-        h.push('<div class="res open">No decision was recorded on this item.</div>');
-      h.push("</div>");
+function agAiRun() {
+  if (!cloud.fns || !cloud.user) { alert("Sign in first."); return; }
+  var sent = agAiPayload();
+  if (!sent.length) { alert("There is nothing on the agenda to write up yet."); return; }
+  var kind = agState.kind === "agm" ? "annual general meeting"
+           : agState.kind === "special" ? "special meeting of the board"
+           : "meeting of the board of directors";
+  edBusy("Claude is writing up " + sent.length + " item" + (sent.length === 1 ? "" : "s") + "…");
+  cloud.fns.httpsCallable("nnsccTrackerAi")({ agenda: true, items: sent, meetingKind: kind })
+    .then(function (res) {
+      agState.ai = agAiKeep(res.data || {}, sent);
+      var n = Object.keys(agState.ai.items).length;
+      edBusy("");
+      agSave(); renderEditor();
+      if (!n) alert("Nothing usable came back. The wording you had is unchanged.");
+    })
+    .catch(function (e) {
+      edBusy("");
+      alert("It could not be written up (" + ((e && e.message) || "error") + "). Nothing has changed.");
     });
-    h.push("</section>");
-  });
-  h.push('<p class="para">There being no further business, the meeting adjourned at ' +
-    '<span class="fill"></span>.</p>');
-  h.push('<div class="sign"><div><span class="u"></span><small>Chair</small></div>' +
-    '<div><span class="u"></span><small>Recording secretary</small></div></div>');
-  h.push('<div class="foot"><span>' + esc(M.condoName || "") + " &nbsp;·&nbsp; Draft minutes, " + esc(when) +
-    "</span><span>Drafted " + esc(todayStr()) +
-    " from the agenda and the decisions recorded against it. Subject to approval at the next meeting.</span></div>");
-  return h.join("");
 }
-function agMinutesPrint() {
-  var w = window.open("", "_blank");
-  if (!w) { alert("Your browser blocked the window — allow pop-ups for this site and try again."); return; }
-  var M = state.meta || META_DEFAULTS;
-  w.document.write("<!doctype html><meta charset='utf-8'><title>Draft minutes — " +
-    esc(M.condoName || "") + "</title><style>" + agPrintCSS() +
-    ".para{font-size:11pt;margin:12px 0}.res{margin:3px 0 0 2.4em;font-size:11pt}" +
-    ".res.noted,.res.open{color:#444}.res.open{font-style:italic}" +
-    ".fill{display:inline-block;width:7em;border-bottom:1px solid #999}" +
-    ".sign{display:flex;gap:40px;margin-top:34px}.sign>div{flex:1}" +
-    ".sign .u{display:block;border-bottom:1px solid #666;height:26px}" +
-    ".sign small{font-size:8.5pt;color:#666;letter-spacing:.06em;text-transform:uppercase}" +
-    "</style>" + agMinutesHTML());
-  w.document.close();
-  setTimeout(function () { try { w.focus(); w.print(); } catch (e) {} }, 300);
-}
-
-/* ---------- closing the meeting ----------
-   The agenda and everything decided against it are written to the record, and
-   the desk is cleared for the next one. What carries over carries over on its
-   own: a job deferred tonight is business arising next time because its status
-   says so, not because anything was copied. */
-function agClose() {
-  var pend = agPending();
-  if (pend.length && !confirm(pend.length + " recorded outcome" + (pend.length === 1 ? "" : "s") +
-      " have not been applied to the jobs yet.\n\nClose the meeting anyway? " +
-      "The record will be kept, but the jobs will keep their present status.")) return;
-  if (!confirm("File this meeting and start a fresh agenda?\n\nThe agenda and everything recorded " +
-      "against it are kept under Meetings held. Your date, time and place are cleared for the next one."))
-    return;
-  var g = agGather(), snap = { sections: [] };
-  AG_SECTIONS.forEach(function (sec) {
-    var key = sec[0];
-    if (!agOn(key)) return;
-    var rows = agItems(key, g).filter(function (r) { return r.manual || !agSkipped(key, r.it.id); });
-    if (!rows.length) return;
-    snap.sections.push({ key: key, title: sec[1], items: rows.map(function (r) {
-      var it = r.it, res = agState.res[it.id] || {};
-      return { title: r.manual ? (it.title || "") : it.title, amt: (!r.manual && it.amt) || null,
-               why: (!r.manual && it.why) || (r.manual && it.note) || "", jid: it.jid || "",
-               motion: agMotionText(it), moved: res.moved || "", sec: res.sec || "", out: res.out || "" };
-    }) });
-  });
-  var doc = { meeting: agState.meeting || "", time: agState.time || "", place: agState.place || "",
-    kind: agState.kind || "board", chair: agState.chair || "",
-    present: agState.present || "", regrets: agState.regrets || "",
-    body: snap, closedBy: (cloud.user && cloud.user.email) || "",
-    closedAt: firebase.firestore.FieldValue.serverTimestamp() };
-  cloud.db.collection(MEETINGS_COLL).add(doc).then(function () {
-    agState.meeting = ""; agState.time = agState.time; agState.chair = "";
-    agState.present = ""; agState.regrets = "";
-    agState.items = []; agState.skip = {}; agState.res = {}; agState.motions = {};
-    agState.rec = false; agState.sentAt = ""; agState.sentTo = 0;
-    agSave(); renderEditor();
-    alert("Filed. The next agenda is empty and will fill itself from the report.");
-  }).catch(function (e) {
-    alert("Could not file the meeting (" + ((e && e.code) || "error") + "). Nothing was cleared.");
-  });
+function agAiClear() {
+  if (!confirm("Put back your own wording throughout?\n\nThe headings, background lines and motions " +
+      "Claude wrote are discarded. Anything you typed yourself is untouched.")) return;
+  agState.ai = null; agSave(); renderEditor();
 }
 
 /* ---------- the agenda on screen ---------- */
@@ -9693,8 +9602,11 @@ function agRowHTML(sec, r, num) {
     h.push('<input type="text" class="agnote" data-agif="note" value="' + esc(it.note || "") +
       '" placeholder="a line of context for the board (optional)">');
   } else {
+    var ai = agAiOf(it);
     h.push('<span class="agtitle ro"' + (it.jid ? ' data-agjob="' + esc(it.jid) + '" title="Open this job"' : "") +
-      ">" + esc(it.title) + "</span>");
+      ">" + esc(agHeadingOf(it, it.title)) +
+      (ai && ai.heading && it.no ? '<span class="agref">Job ' + esc(it.no) + "</span>" : "") + "</span>");
+    if (ai && ai.background) h.push('<span class="agback">' + esc(ai.background) + "</span>");
     if (it.why) h.push('<span class="agwhy">' + esc(it.why) + "</span>");
     if (it.cite) h.push('<span class="agcite">' + esc(it.cite) + "</span>");
   }
@@ -9702,16 +9614,6 @@ function agRowHTML(sec, r, num) {
   h.push('<span class="agmot"><b>MOTION</b>' +
     '<input type="text" data-agmot="' + esc(it.id) + '" value="' + esc(motion) +
     '" placeholder="' + (r.manual ? "Draft a motion, if this item needs one" : "No motion drafted") + '"></span>');
-  if (agState.rec && motion) {
-    var res = agRes(it.id);
-    h.push('<span class="agres">' +
-      '<input type="text" data-agres="moved" value="' + esc(res.moved || "") + '" placeholder="Moved by">' +
-      '<input type="text" data-agres="sec" value="' + esc(res.sec || "") + '" placeholder="Seconded by">' +
-      AG_OUTCOMES.map(function (o) {
-        return '<button type="button" class="agout ' + o[0] + (res.out === o[0] ? " on" : "") +
-          '" data-act="ag-out" data-ago="' + o[0] + '">' + o[1] + "</button>";
-      }).join("") + "</span>");
-  }
   h.push("</span>");
   if (!r.manual && it.amt > 0) h.push('<span class="agamt">' + money(it.amt) + "</span>");
   if (r.manual) h.push('<input type="text" class="agwho" data-agif="who" value="' + esc(it.who || "") +
@@ -9732,8 +9634,11 @@ function agHTML() {
 
   h.push('<div class="ecard esettings"><div class="ehead"><strong>The meeting</strong>' +
     '<span class="spacer"></span>' +
+    '<button class="btn primary" type="button" data-act="ag-ai">\u2728 ' +
+    (agState.ai ? "Write it up again" : "Write up the agenda") + "</button>" +
+    (agState.ai ? '<button class="edbtn" type="button" data-act="ag-aiclear">Use my wording</button>' : "") +
     '<button class="edbtn" type="button" data-act="ag-print">\u{1F5A8} Print / PDF</button>' +
-    '<button class="btn primary" type="button" data-act="ag-send">\u2709 Send to the board</button>' +
+    '<button class="edbtn" type="button" data-act="ag-send">\u2709 Send to the board</button>' +
     '</div><div class="ebids">');
   h.push('<div class="agmeta">' +
     '<label>Kind<select data-agf="kind">' +
@@ -9751,25 +9656,13 @@ function agHTML() {
       '" placeholder="Party room, 550 N Service Rd W — or a video link"></label>' +
     '<label class="chk"><input type="checkbox" data-agf="clock"' + (agState.clock !== false ? " checked" : "") +
       '> Print a running clock down the margin</label></div>');
-  if (agState.rec)
-    h.push('<div class="agmeta" style="margin-top:12px">' +
-      '<label class="wide">Present<input type="text" data-agf="present" value="' +
-        esc(agState.present || "") + '" placeholder="who attended"></label>' +
-      '<label class="wide">Regrets<input type="text" data-agf="regrets" value="' +
-        esc(agState.regrets || "") + '" placeholder="who sent regrets"></label></div>');
-  h.push('<div class="agrec"><label class="chk"><input type="checkbox" data-agf="rec"' +
-    (agState.rec ? " checked" : "") + "> <b>Recording the meeting</b> — show who moved what, and what carried" +
-    "</label>" +
-    (agState.rec
-      ? '<span class="spacer"></span>' +
-        '<button class="edbtn" type="button" data-act="ag-minutes">\u{1F4C4} Draft minutes</button>' +
-        '<button class="btn primary" type="button" data-act="ag-apply">\u2713 Apply decisions to the jobs</button>' +
-        '<button class="edbtn danger" type="button" data-act="ag-close">File this meeting</button>'
-      : "") + "</div>");
   if (agState.sentAt)
     h.push('<p class="agsent">\u2709 Sent to ' + (agState.sentTo || 0) + " board member" +
       ((agState.sentTo || 0) === 1 ? "" : "s") + " on " + esc(jdDate(agState.sentAt)) +
       ". Sending again replaces nothing — they simply receive it twice.</p>");
+  if (agState.ai && agState.ai.note)
+    h.push('<div class="agnote"><b>Chair\u2019s note</b>' +
+      '<textarea data-agf="note" rows="3">' + esc(agState.ai.note) + "</textarea></div>");
   h.push('<p class="agsum">Before the board: <b>' + sum.decisions + '</b> item' +
     (sum.decisions === 1 ? "" : "s") + " for decision" +
     (sum.money > 0 ? ", <b>" + money(sum.money) + "</b> of work" : "") +
@@ -9838,6 +9731,8 @@ function agPrintHTML() {
     '<tr><td>Chair</td><td class="line">' + esc(agState.chair || "") + "</td></tr>" +
     "<tr><td>Quorum</td><td class=\"line\">confirmed &nbsp;&#9744;</td></tr></table>");
 
+  if (agState.ai && agState.ai.note)
+    h.push('<p class="chairnote">' + esc(agState.ai.note) + "</p>");
   if (sum.decisions)
     h.push('<p class="brief"><b>' + sum.decisions + '</b> item' + (sum.decisions === 1 ? "" : "s") +
       " require" + (sum.decisions === 1 ? "s" : "") + " a decision" +
@@ -9861,9 +9756,13 @@ function agPrintHTML() {
        on paper; "No items." is a screen's way of talking */
     rows.forEach(function (r, i) {
       var it = r.it, motion = agMotionText(it);
+      var pai = agAiOf(it);
       h.push('<div class="item"><div class="ihead"><span class="ino">' + n + "." + (i + 1) + "</span>" +
-        '<span class="ittl">' + esc(r.manual ? (it.title || "(untitled)") : it.title) + "</span>" +
+        '<span class="ittl">' + esc(r.manual ? (it.title || "(untitled)") : agHeadingOf(it, it.title)) +
+        (!r.manual && pai && pai.heading && it.no ? ' <span class="iref">(Job ' + esc(it.no) + ")</span>" : "") +
+        "</span>" +
         (!r.manual && it.amt > 0 ? '<span class="iamt">' + money(it.amt) + "</span>" : "") + "</div>");
+      if (pai && pai.background) h.push('<div class="iback">' + esc(pai.background) + "</div>");
       var sub = [];
       if (!r.manual && it.why) sub.push(esc(it.why));
       if (!r.manual && it.cite) sub.push("<i>" + esc(it.cite) + "</i>");
@@ -9903,6 +9802,9 @@ function agPrintCSS() {
     ".attend td{padding:5px 0;vertical-align:bottom}" +
     ".attend td:first-child{width:5.6em;color:#555;text-transform:uppercase;letter-spacing:.07em;font-size:8pt}" +
     ".attend td.line{border-bottom:1px solid #bbb}" +
+    ".chairnote{font-size:11pt;line-height:1.55;margin:16px 0 4px;text-align:justify}" +
+    ".iback{margin:2px 0 0 2.4em;font-size:10.5pt;line-height:1.45}" +
+    ".iref{font-weight:400;color:#666;font-size:9pt}" +
     ".brief{font-size:10.5pt;background:#f3f3f0;border-left:3px solid #111;padding:7px 11px;margin:12px 0 4px}" +
     ".sec{margin-top:20px;break-inside:auto}" +
     "h3{font-size:10pt;text-transform:uppercase;letter-spacing:.11em;margin:0 0 8px;padding-bottom:5px;" +
