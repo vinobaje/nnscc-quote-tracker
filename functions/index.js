@@ -726,10 +726,22 @@ exports.nnsccTrackerAi = onCall(
       })).filter((it) => it.id);
       if (!safe.length) throw new HttpsError("invalid-argument", "No usable items were sent.");
       const meeting = String(request.data.meetingKind || "meeting of the board of directors").slice(0, 80);
+      // The agenda is written up a batch at a time, so no single reply can run
+      // past its own ceiling however long the month has been. Only the first
+      // batch is asked for the chair's note, and it is given a description of
+      // the whole meeting to write it from rather than the dozen items it can
+      // see — a note about the first twelve items is not a note about the
+      // meeting.
+      const wantNote = request.data.wantNote === true;
+      const overview = String(request.data.overview || "").slice(0, 600);
       return await callClaude(key, AGENDA_SYSTEM,
-        "This is the agenda for a " + meeting + ". Write up each item.\n\n" +
+        "This is the agenda for a " + meeting + ".\n\n" +
+        (wantNote
+          ? "The meeting as a whole: " + (overview || "as set out below") +
+            "\n\nWrite the chair's note for that whole meeting, and write up each item below.\n\n"
+          : "Write up each item below. Return an empty string for `note` — it has already been written.\n\n") +
         JSON.stringify(safe, null, 1).slice(0, 60000),
-        AGENDA_SCHEMA, 6000, CONTRACT_MODEL);
+        AGENDA_SCHEMA, 8000, CONTRACT_MODEL);
     }
 
     if (request.data && request.data.minutes === true) {

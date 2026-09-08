@@ -9537,6 +9537,27 @@ function agHeadingOf(it, fallback) {
   var a = agAiOf(it);
   return (a && a.heading) || fallback;
 }
+/* What the meeting is, in a sentence with no numbers in it, so the chair's note
+   can be about the evening rather than about the first twelve items of it. */
+function agAiOverview() {
+  var g = agGather(), bits = [];
+  AG_SECTIONS.forEach(function (sec) {
+    var key = sec[0];
+    if (!agOn(key)) return;
+    var n = (g[key] || []).filter(function (it) { return !agSkipped(key, it.id); }).length +
+            agManual(key).length;
+    if (!n) return;
+    bits.push(agAiWords(n) + " under " + sec[1].toLowerCase());
+  });
+  return bits.join("; ") + ".";
+}
+/* spelled out, because a digit is the one thing that must not travel */
+function agAiWords(n) {
+  var w = ["no items", "one item", "two items", "three items", "four items", "five items",
+           "six items", "seven items", "eight items", "nine items", "ten items"];
+  return w[n] || "several items";
+}
+var AG_AI_BATCH = 12;
 function agAiRun() {
   if (!cloud.fns || !cloud.user) { alert("Sign in first."); return; }
   var sent = agAiPayload();
@@ -9544,19 +9565,51 @@ function agAiRun() {
   var kind = agState.kind === "agm" ? "annual general meeting"
            : agState.kind === "special" ? "special meeting of the board"
            : "meeting of the board of directors";
-  edBusy("Claude is writing up " + sent.length + " item" + (sent.length === 1 ? "" : "s") + "…");
-  cloud.fns.httpsCallable("nnsccTrackerAi")({ agenda: true, items: sent, meetingKind: kind })
-    .then(function (res) {
-      agState.ai = agAiKeep(res.data || {}, sent);
-      var n = Object.keys(agState.ai.items).length;
-      edBusy("");
-      agSave(); renderEditor();
-      if (!n) alert("Nothing usable came back. The wording you had is unchanged.");
-    })
-    .catch(function (e) {
-      edBusy("");
-      alert("It could not be written up (" + ((e && e.message) || "error") + "). Nothing has changed.");
-    });
+  /* A dozen at a time. A long month is a long agenda, and one reply covering
+     fifty items runs past its own ceiling and comes back cut in half — which is
+     not an error to show her, it is an error not to have avoided. */
+  var batches = [];
+  for (var i = 0; i < sent.length; i += AG_AI_BATCH) batches.push(sent.slice(i, i + AG_AI_BATCH));
+  /* Seeded from whatever is already written up, so a batch that fails and is
+     retried tops the agenda up rather than starting it again — and a second
+     failure cannot undo the first attempt's successes. */
+  var got = { note: (agState.ai && agState.ai.note) || "", items: {}, at: todayISO() };
+  if (agState.ai) Object.keys(agState.ai.items).forEach(function (k) {
+    got.items[k] = agState.ai.items[k];
+  });
+  var done = 0, failed = 0;
+  function step() {
+    if (done >= batches.length) return finish();
+    var b = batches[done];
+    edBusy(batches.length > 1
+      ? "Claude is writing up the agenda — " + Math.min((done + 1) * AG_AI_BATCH, sent.length) +
+        " of " + sent.length + "…"
+      : "Claude is writing up " + sent.length + " item" + (sent.length === 1 ? "" : "s") + "…");
+    return cloud.fns.httpsCallable("nnsccTrackerAi")({
+      agenda: true, items: b, meetingKind: kind,
+      wantNote: done === 0, overview: done === 0 ? agAiOverview() : ""
+    }).then(function (res) {
+      var part = agAiKeep(res.data || {}, b);
+      if (part.note) got.note = part.note;      /* a fresh run rewrites the note */
+      Object.keys(part.items).forEach(function (k) { got.items[k] = part.items[k]; });
+    }, function () {
+      failed++;                       /* one batch short is not the whole agenda lost */
+    }).then(function () { done++; return step(); });
+  }
+  function finish() {
+    edBusy("");
+    var n = Object.keys(got.items).length;
+    if (!n) {
+      alert("Nothing usable came back. The wording you had is unchanged.");
+      return;
+    }
+    agState.ai = got; agSave(); renderEditor();
+    if (failed)
+      alert("Written up, but " + failed + " batch" + (failed === 1 ? "" : "es") +
+        " did not come back. Those items kept the wording they had — press " +
+        "“Write it up again” and what already came back is kept.");
+  }
+  step();
 }
 function agAiClear() {
   if (!confirm("Put back your own wording throughout?\n\nThe headings, background lines and motions " +
