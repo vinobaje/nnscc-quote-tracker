@@ -381,6 +381,8 @@ input:focus, select:focus { outline:2px solid var(--accent); outline-offset:-1px
 .agmeta label.chk { flex-direction:row; align-items:center; gap:6px; font-weight:500; }
 .agmeta input, .agmeta select { font-size:13px; }
 .agmeta label.wide input { width:100%; box-sizing:border-box; }
+.agsent { margin:12px 0 0; font-size:12.5px; color:var(--good); background:var(--good-soft);
+  border-radius:6px; padding:7px 11px; }
 .agrec { display:flex; align-items:center; gap:9px; flex-wrap:wrap; margin-top:14px;
   padding-top:12px; border-top:1px dashed var(--line); }
 .agrec .chk { display:inline-flex; align-items:center; gap:7px; font-size:12.5px; color:var(--ink2); }
@@ -6604,6 +6606,7 @@ document.getElementById("editor").addEventListener("click", function (e) {
   }
   /* ---- the agenda ---- */
   if (act === "ag-print") { agPrint(); return; }
+  if (act === "ag-send") { agSend(); return; }
   if (act === "ag-minutes") { agMinutesPrint(); return; }
   if (act === "ag-apply") { agApply(); return; }
   if (act === "ag-close") { agClose(); return; }
@@ -9158,6 +9161,7 @@ function agSave() {
       items: agState.items, skip: agState.skip, secOff: agState.secOff,
       mins: agState.mins, motions: agState.motions, res: agState.res,
       present: agState.present || "", regrets: agState.regrets || "", rec: !!agState.rec,
+      sentAt: agState.sentAt || "", sentTo: agState.sentTo || 0,
       at: firebase.firestore.FieldValue.serverTimestamp(),
       by: (cloud.user && cloud.user.email) || ""
     }, { merge: true }).catch(function () {});
@@ -9184,6 +9188,8 @@ function agLoad() {
     agState.present = d.present || "";
     agState.regrets = d.regrets || "";
     agState.rec = !!d.rec;
+    agState.sentAt = d.sentAt || "";
+    agState.sentTo = d.sentTo || 0;
     if (document.body.dataset.view === "edit" && edNav === "agenda") renderEditor();
   }).catch(function () {});
 }
@@ -9309,6 +9315,138 @@ function agMotionText(it) {
 }
 function agManual(sec) {
   return agState.items.filter(function (i) { return i.sec === sec; });
+}
+
+/* ---------- sending it to the directors ----------
+
+   A director reads this on a phone, standing up, two days before the meeting.
+   So the agenda goes in the body of the mail as well as attached to it: the
+   attachment is for the person who prints it and brings it to the table, and
+   the body is for everyone else, who will never open a PDF on a telephone.
+
+   The body is written in plain inline styles rather than the printed
+   stylesheet. Mail clients are twenty years behind browsers — flexbox, class
+   selectors and a stylesheet in the head are all a gamble — and an agenda that
+   arrives as a stack of unstyled fragments is worse than a plain one. */
+function agEmailHTML() {
+  var M = state.meta || META_DEFAULTS, g = agGather(), sum = agSummary(g);
+  var kind = agState.kind === "agm" ? "Annual General Meeting"
+           : agState.kind === "special" ? "Special Meeting of the Board"
+           : "Meeting of the Board of Directors";
+  var when = agState.meeting ? jdDate(agState.meeting) : "date to be confirmed";
+  var wrap = "font:15px/1.5 -apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#1E2833;" +
+             "max-width:620px;margin:0 auto;padding:8px 4px";
+  var h = ['<div style="' + wrap + '">'];
+  h.push('<div style="text-align:center;border-bottom:2px solid #1E2833;padding-bottom:12px;margin-bottom:16px">' +
+    '<div style="font-size:15px;font-weight:700;letter-spacing:.10em;text-transform:uppercase">' +
+      esc(M.condoName || "") + "</div>" +
+    '<div style="font-size:11px;color:#7A8794;margin-top:2px">' + esc(M.regNo || "") + "</div>" +
+    '<div style="font-size:22px;font-weight:700;letter-spacing:.16em;margin-top:10px">AGENDA</div>' +
+    '<div style="font-size:13px;color:#4A5866;margin-top:2px">' + esc(kind) + "</div>" +
+    '<div style="font-size:15px;font-weight:700;margin-top:8px">' + esc(when) +
+      (agState.time ? " &nbsp;·&nbsp; " + esc(agState.time) : "") + "</div>" +
+    (agState.place ? '<div style="font-size:13px;color:#4A5866">' + esc(agState.place) + "</div>" : "") +
+    "</div>");
+  if (sum.decisions)
+    h.push('<div style="background:#F0F3F6;border-left:3px solid #1E2833;padding:9px 13px;' +
+      'font-size:14px;margin-bottom:18px"><b>' + sum.decisions + "</b> item" +
+      (sum.decisions === 1 ? "" : "s") + " require" + (sum.decisions === 1 ? "s" : "") + " a decision" +
+      (sum.money > 0 ? ", covering <b>" + money(sum.money) + "</b> of work" : "") +
+      (sum.contracts ? ", and <b>" + sum.contracts + "</b> agreement" +
+        (sum.contracts === 1 ? "" : "s") + " where notice is due" : "") + ".</div>");
+
+  var n = 0;
+  AG_SECTIONS.forEach(function (sec) {
+    var key = sec[0];
+    if (!agOn(key)) return;
+    var rows = agItems(key, g).filter(function (r) { return r.manual || !agSkipped(key, r.it.id); });
+    if (!rows.length && sec[2] === "auto") return;
+    n++;
+    h.push('<div style="font-size:12px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;' +
+      'border-bottom:1px solid #1E2833;padding-bottom:5px;margin:22px 0 10px">' + n + ". " +
+      esc(sec[1]) + '<span style="float:right;font-weight:400;color:#7A8794;letter-spacing:.04em">' +
+      AG_TAGS[sec[3]] + "</span></div>");
+    rows.forEach(function (r, i) {
+      var it = r.it, motion = agMotionText(it);
+      h.push('<div style="margin:0 0 14px">');
+      h.push('<div style="font-weight:700;font-size:14.5px">' + n + "." + (i + 1) + "&nbsp; " +
+        esc(r.manual ? (it.title || "(untitled)") : it.title) +
+        (!r.manual && it.amt > 0 ? '<span style="float:right">' + money(it.amt) + "</span>" : "") + "</div>");
+      var sub = [];
+      if (!r.manual && it.why) sub.push(esc(it.why));
+      if (!r.manual && it.cite) sub.push("<i>" + esc(it.cite) + "</i>");
+      if (r.manual && it.note) sub.push(esc(it.note));
+      if (r.manual && it.who) sub.push("Raised by " + esc(it.who));
+      if (sub.length)
+        h.push('<div style="font-size:13px;color:#4A5866;margin-top:2px">' + sub.join(" &nbsp;·&nbsp; ") + "</div>");
+      if (motion)
+        h.push('<div style="border-left:2px solid #1E2833;padding:5px 0 3px 10px;margin-top:6px;font-size:13.5px">' +
+          '<b style="font-size:11px;letter-spacing:.07em">MOTION:</b> ' + esc(motion) + "</div>");
+      h.push("</div>");
+    });
+  });
+  h.push('<div style="border-top:1px solid #D9DEE3;margin-top:26px;padding-top:10px;' +
+    'font-size:12px;color:#7A8794">The same agenda is attached as a PDF for printing. ' +
+    "Amounts include HST and are the quotation carried in the report totals.</div>");
+  h.push("</div>");
+  return h.join("");
+}
+function agSendSubject() {
+  var M = state.meta || META_DEFAULTS;
+  var kind = agState.kind === "agm" ? "AGM" : agState.kind === "special" ? "Special meeting" : "Board meeting";
+  return (M.condoName || "Agenda") + " — " + kind + " agenda" +
+    (agState.meeting ? ", " + jdDate(agState.meeting) : "");
+}
+function agSend() {
+  if (!cloud.fns || !cloud.user) { alert("Sign in first."); return; }
+  cloud.db.doc(BOARD_PATH).get().then(function (snap) {
+    var to = ((snap.exists && snap.data().members) || [])
+      .map(function (e) { return String(e).trim(); }).filter(Boolean);
+    if (!to.length) {
+      alert("No board members are listed yet.\n\nAdd their addresses under Settings → " +
+            "Who can open the report, and they will be the recipients here.");
+      return;
+    }
+    if (!agState.meeting &&
+        !confirm("This agenda has no meeting date on it.\n\nSend it to the board anyway?")) return;
+    /* named, one per line, before anything leaves the building */
+    if (!confirm("Send this agenda to " + to.length + " board member" + (to.length === 1 ? "" : "s") + "?\n\n" +
+        to.join("\n") + "\n\nSubject: " + agSendSubject() +
+        "\n\nThey receive the agenda in the body of the email and attached as a PDF.")) return;
+
+    var M = state.meta || META_DEFAULTS;
+    var doc = "<!doctype html><meta charset='utf-8'><style>" + agPrintCSS() + "</style>" + agPrintHTML();
+    edBusy("Rendering the agenda…");
+    cloud.fns.httpsCallable("nnsccWeeklyPdf")({
+      html: doc,
+      footer: (M.condoName || "") + " · agenda · " +
+        (agState.meeting ? jdDate(agState.meeting) : "")
+    }).then(function (res) {
+      var pdf = (res.data && res.data.pdf) || "";
+      edBusy("Sending to " + to.length + " board member" + (to.length === 1 ? "" : "s") + "…");
+      return cloud.fns.httpsCallable("nnsccWeeklySend")({
+        beta: VIEW_BETA,                      /* the board list that belongs to this copy */
+        pdfB64: pdf,
+        noAttachment: !pdf,                   /* the body alone still beats nothing */
+        filename: "agenda-" + (agState.meeting || todayISO()) + ".pdf",
+        subject: agSendSubject(),
+        html: agEmailHTML()
+      });
+    }).then(function (r) {
+      var sent = (r.data && r.data.to) || to;
+      edBusy("");
+      agState.sentAt = todayISO(); agState.sentTo = sent.length; agSave();
+      persist(null, ["Agenda for " + (agState.meeting ? jdDate(agState.meeting) : "the next meeting") +
+        " sent to " + sent.length + " board member" + (sent.length === 1 ? "" : "s")], null);
+      renderEditor();
+      alert("Sent to " + sent.length + " board member" + (sent.length === 1 ? "" : "s") + ".");
+    }).catch(function (e) {
+      edBusy("");
+      alert("It was not sent (" + ((e && e.message) || "error") + ").\n\n" +
+            "Nothing has gone to the board. If the Resend key or the sending address is the problem, " +
+            "both are under Settings.");
+    });
+  }).catch(function () { alert("Could not read the board list."); });
 }
 
 /* ---------- what the board actually did ----------
@@ -9509,7 +9647,7 @@ function agClose() {
     agState.meeting = ""; agState.time = agState.time; agState.chair = "";
     agState.present = ""; agState.regrets = "";
     agState.items = []; agState.skip = {}; agState.res = {}; agState.motions = {};
-    agState.rec = false;
+    agState.rec = false; agState.sentAt = ""; agState.sentTo = 0;
     agSave(); renderEditor();
     alert("Filed. The next agenda is empty and will fill itself from the report.");
   }).catch(function (e) {
@@ -9594,7 +9732,8 @@ function agHTML() {
 
   h.push('<div class="ecard esettings"><div class="ehead"><strong>The meeting</strong>' +
     '<span class="spacer"></span>' +
-    '<button class="btn primary" type="button" data-act="ag-print">\u{1F5A8} Print / PDF</button>' +
+    '<button class="edbtn" type="button" data-act="ag-print">\u{1F5A8} Print / PDF</button>' +
+    '<button class="btn primary" type="button" data-act="ag-send">\u2709 Send to the board</button>' +
     '</div><div class="ebids">');
   h.push('<div class="agmeta">' +
     '<label>Kind<select data-agf="kind">' +
@@ -9627,6 +9766,10 @@ function agHTML() {
         '<button class="btn primary" type="button" data-act="ag-apply">\u2713 Apply decisions to the jobs</button>' +
         '<button class="edbtn danger" type="button" data-act="ag-close">File this meeting</button>'
       : "") + "</div>");
+  if (agState.sentAt)
+    h.push('<p class="agsent">\u2709 Sent to ' + (agState.sentTo || 0) + " board member" +
+      ((agState.sentTo || 0) === 1 ? "" : "s") + " on " + esc(jdDate(agState.sentAt)) +
+      ". Sending again replaces nothing — they simply receive it twice.</p>");
   h.push('<p class="agsum">Before the board: <b>' + sum.decisions + '</b> item' +
     (sum.decisions === 1 ? "" : "s") + " for decision" +
     (sum.money > 0 ? ", <b>" + money(sum.money) + "</b> of work" : "") +

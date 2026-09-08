@@ -1707,9 +1707,15 @@ exports.nnsccWeeklySend = onCall(
   async (request) => {
     await requireArrearsEditor(request);
     const db = admin.firestore();
+    /* The board list is per copy of the report. It has only ever been asked for
+       the live one because only the live weekly report was ever sent; the
+       agenda is trialled on beta first, and sending a beta document to the
+       directors named in the live list would be a quiet cross-wiring. */
+    const boardPath = (request.data && request.data.beta === true)
+      ? "nnsccQuoteTrackerBeta/board" : "nnsccQuoteTracker/board";
     const [cfgSnap, boardSnap, conSnap] = await Promise.all([
       db.doc("nnsccQuoteTrackerConfig/main").get(),
-      db.doc("nnsccQuoteTracker/board").get(),
+      db.doc(boardPath).get(),
       db.doc(ALERT_PATHS.contracts).get(),
     ]);
     const key = cfgSnap.exists && cfgSnap.data().resendKey;
@@ -1722,7 +1728,8 @@ exports.nnsccWeeklySend = onCall(
     const to = members.concat(extra).filter((e, i, a) => e && a.indexOf(e) === i);
     if (!to.length) throw new HttpsError("failed-precondition", "No board members are listed to send to.");
     const pdf = String((request.data && request.data.pdfB64) || "");
-    if (!pdf) throw new HttpsError("invalid-argument", "No report was attached.");
+    const noPdf = request.data && request.data.noAttachment === true;
+    if (!pdf && !noPdf) throw new HttpsError("invalid-argument", "No report was attached.");
     const subject = String((request.data && request.data.subject) || "Weekly report");
     const body = String((request.data && request.data.html) || "<p>The weekly report is attached.</p>");
     const name = String((request.data && request.data.filename) || "weekly-report.pdf")
@@ -1730,8 +1737,8 @@ exports.nnsccWeeklySend = onCall(
     const resp = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: { "content-type": "application/json", authorization: "Bearer " + key },
-      body: JSON.stringify({ from: from, to: to, subject: subject, html: body,
-        attachments: [{ filename: name, content: pdf }] }),
+      body: JSON.stringify(Object.assign({ from: from, to: to, subject: subject, html: body },
+        pdf ? { attachments: [{ filename: name, content: pdf }] } : {})),
     });
     const text = await resp.text();
     if (!resp.ok) throw new HttpsError("internal", "Resend returned HTTP " + resp.status + ": " + text.slice(0, 300));
