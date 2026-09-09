@@ -231,13 +231,12 @@ const AGENDA_SYSTEM =
   "Never include a price or a contractor's name.\n" +
   "3. `background` — ONE sentence of context a director needs in order to decide, drawn only from " +
   "the circumstances supplied with the item. Under 200 characters. If the circumstances do not " +
-  "support a sentence, return an empty string; an invented reason is worse than none.\n" +
-  "4. `motion` — the motion the board would put, beginning “That the Board”. Under 300 characters. " +
-  "Where the motion needs the price write {amount}, where it needs the contractor write " +
-  "{contractor}, and where it needs how many quotations were received write {quotes}. Write those " +
-  "placeholders exactly, in braces. NEVER write a dollar figure, a contractor's name or a count of " +
-  "quotations yourself — you have not been told them, and a guess would be read out at a meeting " +
-  "as though it were true.\n\n" +
+  "support a sentence, return an empty string; an invented reason is worse than none.\n\n" +
+  "Never write a dollar figure, a contractor's name or a count of quotations anywhere. You have " +
+  "not been told them, and a guess would be read out at a meeting as though it were true. The " +
+  "corporation's own records supply those, and they are printed beside your words.\n\n" +
+  "Do not draft a motion or propose what the board should resolve. What is put to the board is the " +
+  "board's business and the secretary's; yours is to say plainly what each item is.\n\n" +
   "Also return `note`: two or three sentences the chair might read to open the meeting, saying what " +
   "this agenda is mostly about and what is most pressing on it. Same register. No figures.\n\n" +
   "Return one object per item supplied, in the same order, and nothing else.";
@@ -253,9 +252,8 @@ const AGENDA_SCHEMA = {
           id: { type: "string" },
           heading: { type: "string" },
           background: { type: "string" },
-          motion: { type: "string" },
         },
-        required: ["id", "heading", "background", "motion"],
+        required: ["id", "heading", "background"],
         additionalProperties: false,
       },
     },

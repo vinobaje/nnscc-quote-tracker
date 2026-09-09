@@ -2828,7 +2828,7 @@ var BRAND_PATH = "nnsccQuoteTracker/brand";               /* the letterhead the 
 var WEEKLY_DRAFT_PATH = "nnsccQuoteTracker/weeklyDraft";   /* the report she is working on */
 var WEEKLY_COLL = "nnsccWeeklyReports";                   /* every one she has finished */
 var VIEW_BETA = CURRENT_PATH.indexOf("Beta") >= 0;   /* which report the passcode gate reads/protects */
-var BUILD_STAMP = "2026-09-08 19:55";   /* filled in by build.js — which copy of the page this is */
+var BUILD_STAMP = "2026-09-08 20:46";   /* filled in by build.js — which copy of the page this is */
 /* path of the report currently on screen */
 function reportPath() {
   return cloud.active.kind === "current" ? CURRENT_PATH : (REPORTS_COLL + "/" + cloud.active.id);
@@ -6241,11 +6241,6 @@ document.getElementById("editor").addEventListener("change", function (e) {
     agState.mins[agmin] = e.target.value;
     agSave(); renderEditor(); return;
   }
-  /* the motion, reworded. An empty box is not "no motion" — it is her saying
-     this item does not need one, which is different from never having drafted
-     it, so the override is stored either way. */
-  var agmot = e.target.dataset.agmot;
-  if (agmot) { agState.motions[agmot] = e.target.value; agSave(); return; }
   var agif = e.target.dataset.agif;
   if (agif) {
     var arow = e.target.closest("[data-agi]");

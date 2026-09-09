@@ -427,9 +427,6 @@ input:focus, select:focus { outline:2px solid var(--accent); outline-offset:-1px
 .agtitle.ro:hover { color:var(--accent); text-decoration:underline; }
 .agwhy { font-size:12px; color:var(--ink2); line-height:1.45; }
 .agcite { font-size:11.5px; color:var(--muted); font-style:italic; }
-.agmot { display:flex; align-items:center; gap:7px; margin-top:3px; }
-.agmot b { flex:none; font-size:9.5px; letter-spacing:.08em; color:var(--muted); }
-.agmot input { flex:1 1 auto; min-width:0; font-size:12px; box-sizing:border-box; }
 .agamt { flex:none; font-size:13.5px; font-weight:700; font-variant-numeric:tabular-nums;
   color:var(--ink); padding-top:1px; }
 .agrow.man input.agtitle { font-weight:650; width:100%; box-sizing:border-box; }
@@ -2898,7 +2895,7 @@ var BRAND_PATH = "nnsccQuoteTrackerBeta/brand";               /* the letterhead 
 var WEEKLY_DRAFT_PATH = "nnsccQuoteTrackerBeta/weeklyDraft";   /* the report she is working on */
 var WEEKLY_COLL = "nnsccWeeklyReportsBeta";                   /* every one she has finished */
 var VIEW_BETA = CURRENT_PATH.indexOf("Beta") >= 0;   /* which report the passcode gate reads/protects */
-var BUILD_STAMP = "2026-09-08 19:55";   /* filled in by build.js — which copy of the page this is */
+var BUILD_STAMP = "2026-09-08 20:46";   /* filled in by build.js — which copy of the page this is */
 /* path of the report currently on screen */
 function reportPath() {
   return cloud.active.kind === "current" ? CURRENT_PATH : (REPORTS_COLL + "/" + cloud.active.id);
@@ -6311,11 +6308,6 @@ document.getElementById("editor").addEventListener("change", function (e) {
     agState.mins[agmin] = e.target.value;
     agSave(); renderEditor(); return;
   }
-  /* the motion, reworded. An empty box is not "no motion" — it is her saying
-     this item does not need one, which is different from never having drafted
-     it, so the override is stored either way. */
-  var agmot = e.target.dataset.agmot;
-  if (agmot) { agState.motions[agmot] = e.target.value; agSave(); return; }
   var agif = e.target.dataset.agif;
   if (agif) {
     var arow = e.target.closest("[data-agi]");
@@ -9148,7 +9140,7 @@ function agSecLabel(k) {
   return out;
 }
 var agState = { meeting: "", time: "", place: "", kind: "board", chair: "", clock: true,
-                items: [], skip: {}, secOff: {}, mins: {}, motions: {}, ai: null, loaded: false };
+                items: [], skip: {}, secOff: {}, mins: {}, ai: null, loaded: false };
 var agSaveT = null;
 function agSave() {
   if (!cloud.on || !agendaAvailable()) return;
@@ -9159,7 +9151,7 @@ function agSave() {
       place: agState.place || "", kind: agState.kind || "board",
       chair: agState.chair || "", clock: agState.clock !== false,
       items: agState.items, skip: agState.skip, secOff: agState.secOff,
-      mins: agState.mins, motions: agState.motions, ai: agState.ai || null,
+      mins: agState.mins, ai: agState.ai || null,
       sentAt: agState.sentAt || "", sentTo: agState.sentTo || 0,
       at: firebase.firestore.FieldValue.serverTimestamp(),
       by: (cloud.user && cloud.user.email) || ""
@@ -9181,7 +9173,6 @@ function agLoad() {
     agState.secOff = d.secOff || {};
     agState.mins = d.mins || {};
     agState.ai = (d.ai && d.ai.items) ? d.ai : null;
-    agState.motions = d.motions || {};
     agState.chair = d.chair || "";
     agState.clock = d.clock !== false;
     agState.sentAt = d.sentAt || "";
@@ -9204,10 +9195,7 @@ function agGather() {
     return String(b.date || "").localeCompare(String(a.date || "")); });
   if (meets[0])
     out.minutes.push({ id: meets[0].id, title: minLabel(meets[0]),
-      why: meets[0].draft ? "Circulated in draft" : "On file",
-      amt: null,
-      motion: "That the minutes of the meeting held " + jdDate(meets[0].date) +
-              " be approved as circulated." });
+      why: meets[0].draft ? "Circulated in draft" : "On file", amt: null });
 
   /* business arising: what the board put off, and how long ago */
   d.jobs.filter(function (x) { return (x.j.status || "") === "deferred"; })
@@ -9220,10 +9208,7 @@ function agGather() {
              (x.j.statusNote ? " — “" + x.j.statusNote + "”" : ""),
         /* the passage in the minutes that recorded it, where one was linked —
            a board reading "deferred" is entitled to the page it was deferred on */
-        cite: agCite(x.j), no: x.j.no,
-        who: ((x.c.carriedBids[0] && x.c.carriedBids[0].b.contractor) || "").trim(),
-        nq: x.c.priced,
-        motion: agJobMotion(x) });
+        cite: agCite(x.j), no: x.j.no, nq: x.c.priced });
     });
 
   /* the manager's report: what is on site right now */
@@ -9258,7 +9243,7 @@ function agGather() {
       }
       out.decide.push({ id: x.j.id, jid: x.j.id, title: jobLabel(x.j),
         amt: x.c.cost, why: bits.join(" · "), cite: agCite(x.j), no: x.j.no,
-        who: who, nq: x.c.priced, motion: agJobMotion(x) });
+        nq: x.c.priced, over: !!(cb && cb.override) });
     });
 
   /* agreements where not deciding is itself a decision */
@@ -9273,15 +9258,7 @@ function agGather() {
     var cw = (c.contractor || "").trim() || "the contractor";
     out.contracts.push({ id: c.id, cid: c.id, amt: null, who: cw,
       title: ((c.contractor || "").trim() || "Contractor not named") + (c.title ? " — " + c.title : ""),
-      why: why,
-      motion: (nd != null && nd >= 0)
-        ? "That the Board give notice, on or before " + jdDate(notice) + ", to end the agreement with " +
-          cw + (c.title ? " for " + c.title : "") + (c.end ? " on " + jdDate(c.end) : "") + "."
-        : (nd != null
-            ? "That the Board note that the agreement with " + cw +
-              " has renewed for a further term, the date for notice having passed."
-            : "That the Board determine whether to renew the agreement with " + cw +
-              (c.end ? ", which ends " + jdDate(c.end) : "") + ".") });
+      why: why });
   });
   return out;
 }
@@ -9293,27 +9270,6 @@ function agCite(j) {
   if (!l) return "";
   var m = minById(l.id);
   return "Minutes of " + minLabel(m) + (l.page ? ", page " + l.page : "");
-}
-/* The motion, drafted from what the quotes actually say. The secretary should
-   be editing a sentence, not composing one at nine o'clock; and the wording
-   changes with the facts — the only quote received is not "the lowest", and a
-   quote carried over a cheaper one is a recommendation, not a low bid. */
-function agJobMotion(x) {
-  var cb = x.c.carriedBids[0];
-  if (!cb || !(x.c.cost > 0)) return "";
-  var who = (cb.b.contractor || "").trim() || "the contractor";
-  var qual = cb.override ? ", being the quotation recommended by the property manager"
-           : x.c.priced > 1 ? ", being the lowest of " + x.c.priced + " quotations received"
-           : ", being the only quotation received";
-  return "That the Board approve the quotation from " + who + " in the amount of " +
-    money(x.c.cost) + " (HST included) for " + (x.j.desc || "the work described") + qual + ".";
-}
-/* what she typed, then what Claude wrote, then what the quotes themselves say */
-function agMotionText(it) {
-  if (it && it.id && agState.motions[it.id] != null) return agState.motions[it.id];
-  var a = agAiMotion(it);
-  if (a) return a;
-  return (it && it.motion) || "";
 }
 function agManual(sec) {
   return agState.items.filter(function (i) { return i.sec === sec; });
@@ -9369,7 +9325,7 @@ function agEmailHTML() {
       esc(sec[1]) + '<span style="float:right;font-weight:400;color:#7A8794;letter-spacing:.04em">' +
       AG_TAGS[sec[3]] + "</span></div>");
     rows.forEach(function (r, i) {
-      var it = r.it, motion = agMotionText(it);
+      var it = r.it;
       h.push('<div style="margin:0 0 14px">');
       h.push('<div style="font-weight:700;font-size:14.5px">' + n + "." + (i + 1) + "&nbsp; " +
         esc(r.manual ? (it.title || "(untitled)") : it.title) +
@@ -9381,9 +9337,6 @@ function agEmailHTML() {
       if (r.manual && it.who) sub.push("Raised by " + esc(it.who));
       if (sub.length)
         h.push('<div style="font-size:13px;color:#4A5866;margin-top:2px">' + sub.join(" &nbsp;·&nbsp; ") + "</div>");
-      if (motion)
-        h.push('<div style="border-left:2px solid #1E2833;padding:5px 0 3px 10px;margin-top:6px;font-size:13.5px">' +
-          '<b style="font-size:11px;letter-spacing:.07em">MOTION:</b> ' + esc(motion) + "</div>");
       h.push("</div>");
     });
   });
@@ -9455,15 +9408,15 @@ function agSend() {
 
    The tracker knows what is on the agenda. What it has never had is the
    register — "power sweep parking lot" is a working note, not a heading a
-   director reads, and a motion assembled from a template reads like one.
+   director reads.
 
    What is sent is deliberately thin: the item's own words, whether it is
    high priority, and its circumstances already reduced to phrases with no
    numbers in them. No amount, no contractor, no count of quotations — Claude
-   cannot mangle a figure it was never given. Where the motion needs one it
-   writes {amount}, {contractor} or {quotes}, and the page fills those in from
-   the record afterwards. Anything that comes back carrying a dollar figure is
-   dropped rather than shown: it can only have been invented.
+   cannot mangle a figure it was never given, and anything that comes back
+   carrying a dollar figure is dropped rather than shown: it can only have been
+   invented. The figures on the agenda are the report's own, set beside what
+   Claude wrote rather than inside it.
 
    Nothing is applied on arrival. She reads it, keeps what reads better than
    what she had, and one button puts it all back. */
@@ -9481,8 +9434,7 @@ function agAiCirc(sec, it) {
     else if (it.nq === 1) c.push("only one quotation was received");
     if (/lapsed/.test(it.why || "")) c.push("the quotation has already lapsed");
     else if (/lapses in/.test(it.why || "")) c.push("the quotation lapses shortly");
-    if (/recommended by the property manager/.test(it.motion || ""))
-      c.push("the quotation carried is not the lowest; the property manager has recommended it");
+    if (it.over) c.push("the quotation carried is not the lowest; the property manager has recommended it");
   }
   return c;
 }
@@ -9506,10 +9458,16 @@ function agAiPayload() {
   });
   return out;
 }
-/* a figure it was never given can only have been invented */
+/* A figure it was never given can only have been invented — a price, and also a
+   count. It is told "more than one quotation was received", never how many, so
+   "quoted by three contractors" is a guess that would sit on the agenda beside
+   the report's own "2 quotes in" and contradict it. Both are dropped. */
 function agAiSafe(t) {
   var v = String(t == null ? "" : t).trim();
-  return /\$|\d[\d,]*\.\d\d/.test(v) ? "" : v;
+  if (/\$|\d[\d,]*\.\d\d/.test(v)) return "";
+  if (/\b(one|two|three|four|five|six|seven|eight|nine|ten|\d+)\s+(quotation|quote|contractor|bid|tender)s?\b/i.test(v))
+    return "";
+  return v;
 }
 function agAiKeep(raw, sent) {
   var known = {};
@@ -9519,23 +9477,9 @@ function agAiKeep(raw, sent) {
     var id = String((r && r.id) || "");
     if (!known[id]) return;                       /* an item we never sent */
     var heading = agAiSafe(r.heading).slice(0, 120);
-    var motion = agAiSafe(r.motion).slice(0, 400);
-    /* a motion that kept a brace it could not fill is not a motion */
-    if (motion && /\{(?!amount\}|contractor\}|quotes\})/.test(motion)) motion = "";
-    out.items[id] = { heading: heading, background: agAiSafe(r.background).slice(0, 300), motion: motion };
+    out.items[id] = { heading: heading, background: agAiSafe(r.background).slice(0, 300) };
   });
   return out;
-}
-/* the placeholders, filled from the record rather than from the model */
-function agAiMotion(it) {
-  if (!it || !it.id) return "";
-  var a = agState.ai && agState.ai.items[it.id];
-  if (!a || !a.motion) return "";
-  var m = a.motion
-    .replace(/\{amount\}/g, it.amt > 0 ? money(it.amt) : "the amount quoted")
-    .replace(/\{contractor\}/g, (it.who || "").trim() || "the contractor")
-    .replace(/\{quotes\}/g, it.nq != null ? String(it.nq) : "the");
-  return /[{}]/.test(m) ? "" : m;
 }
 function agAiOf(it) { return (it && it.id && agState.ai && agState.ai.items[it.id]) || null; }
 function agHeadingOf(it, fallback) {
@@ -9617,7 +9561,7 @@ function agAiRun() {
   step();
 }
 function agAiClear() {
-  if (!confirm("Put back your own wording throughout?\n\nThe headings, background lines and motions " +
+  if (!confirm("Put back the report’s own wording?\n\nThe headings and background lines " +
       "Claude wrote are discarded. Anything you typed yourself is untouched.")) return;
   agState.ai = null; agSave(); renderEditor();
 }
@@ -9648,7 +9592,7 @@ function agSummary(g) {
   return { decisions: nDec, money: sum, contracts: nCon };
 }
 function agRowHTML(sec, r, num) {
-  var it = r.it, motion = agMotionText(it);
+  var it = r.it;
   var skipped = !r.manual && agSkipped(sec, it.id);
   var h = ['<div class="agrow' + (skipped ? " off" : "") + (r.manual ? " man" : "") +
     '" data-agid="' + esc(it.id) + '"' + (r.manual ? ' data-agi="' + r.i + '"' : "") + ">"];
@@ -9668,10 +9612,6 @@ function agRowHTML(sec, r, num) {
     if (it.why) h.push('<span class="agwhy">' + esc(it.why) + "</span>");
     if (it.cite) h.push('<span class="agcite">' + esc(it.cite) + "</span>");
   }
-  /* the motion, drafted where it can be and hers to change either way */
-  h.push('<span class="agmot"><b>MOTION</b>' +
-    '<input type="text" data-agmot="' + esc(it.id) + '" value="' + esc(motion) +
-    '" placeholder="' + (r.manual ? "Draft a motion, if this item needs one" : "No motion drafted") + '"></span>');
   h.push("</span>");
   if (!r.manual && it.amt > 0) h.push('<span class="agamt">' + money(it.amt) + "</span>");
   if (r.manual) h.push('<input type="text" class="agwho" data-agif="who" value="' + esc(it.who || "") +
@@ -9813,8 +9753,7 @@ function agPrintHTML() {
     /* a heading with nothing under it is how "Call to order" has always looked
        on paper; "No items." is a screen's way of talking */
     rows.forEach(function (r, i) {
-      var it = r.it, motion = agMotionText(it);
-      var pai = agAiOf(it);
+      var it = r.it, pai = agAiOf(it);
       h.push('<div class="item"><div class="ihead"><span class="ino">' + n + "." + (i + 1) + "</span>" +
         '<span class="ittl">' + esc(r.manual ? (it.title || "(untitled)") : agHeadingOf(it, it.title)) +
         (!r.manual && pai && pai.heading && it.no ? ' <span class="iref">(Job ' + esc(it.no) + ")</span>" : "") +
@@ -9827,10 +9766,6 @@ function agPrintHTML() {
       if (r.manual && it.note) sub.push(esc(it.note));
       if (r.manual && it.who) sub.push("Raised by " + esc(it.who));
       if (sub.length) h.push('<div class="isub">' + sub.join(" &nbsp;·&nbsp; ") + "</div>");
-      if (motion)
-        h.push('<div class="motion"><div class="mtxt"><b>MOTION:</b> ' + esc(motion) + "</div>" +
-          '<div class="mline">Moved <span class="u"></span> Seconded <span class="u"></span>' +
-          '<span class="boxes">&#9744; Carried &nbsp; &#9744; Defeated &nbsp; &#9744; Deferred</span></div></div>');
       h.push("</div>");
     });
     h.push("</section>");
@@ -9878,12 +9813,6 @@ function agPrintCSS() {
     ".ittl{font-weight:700;flex:1}" +
     ".iamt{font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}" +
     ".isub{margin:1px 0 0 2.4em;font-size:9.5pt;color:#444}" +
-    ".motion{margin:6px 0 0 2.4em;border-left:2px solid #111;padding:6px 0 4px 10px}" +
-    ".mtxt{font-size:10.5pt}" +
-    ".mtxt b{letter-spacing:.08em;font-size:8.5pt}" +
-    ".mline{margin-top:7px;font-size:9pt;color:#444;display:flex;align-items:baseline;gap:6px;flex-wrap:wrap}" +
-    ".mline .u{display:inline-block;width:9em;border-bottom:1px solid #999}" +
-    ".mline .boxes{margin-left:auto;white-space:nowrap}" +
     ".none{color:#777;font-size:10pt;margin:2px 0}" +
     ".rises{margin-top:18px;font-size:10pt;text-align:right;color:#444}" +
     ".foot{margin-top:26px;border-top:1px solid #bbb;padding-top:7px;display:flex;flex-direction:column;" +
