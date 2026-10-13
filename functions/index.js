@@ -813,7 +813,9 @@ exports.nnsccTrackerAi = onCall(
         lines.push("  price: $" + Number(b.total).toFixed(2));
         if (b.qno) lines.push("  quote number: " + String(b.qno).slice(0, 60));
         if (b.date) lines.push("  quoted: " + String(b.date).slice(0, 20));
-        lines.push("  scope note as the manager typed it: " +
+        /* it may be hers or it may be what the uploaded quotation said — either
+           way it is one line on a row, and the document itself is attached */
+        lines.push("  scope note on the row: " +
           (String(b.scope || "").trim().slice(0, 1200) || "(nothing typed)"));
       });
       const blocks = [{ text: lines.join("\n") }];

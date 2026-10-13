@@ -1695,6 +1695,13 @@ body[data-view="edit"] .wrap { max-width:none; }
 .qreadacts { display:flex; gap:9px; align-items:center; flex-wrap:wrap; margin-top:10px; }
 .qreadnote { font-size:12px; color:var(--muted); margin:0; flex:1; min-width:180px; }
 .qreadnote.bad { color:var(--prio); }
+/* what the reading can put in the row besides the money */
+.qrdet { margin-top:9px; font-size:13px; }
+.qrdeth { display:flex; gap:7px; align-items:center; font-weight:600; cursor:pointer; }
+.qrdet ul { margin:5px 0 0; padding-left:27px; list-style:none; }
+.qrdet li { margin:2px 0; color:var(--ink2); }
+.qrdet li b { color:var(--ink); font-weight:600; margin-right:6px; }
+.qrdet.off ul { opacity:.45; text-decoration:line-through; }
 /* the status chip, when it is a thing to press rather than a thing to read */
 .qstbtn { cursor:pointer; border:1px solid currentColor; font:inherit; font-size:11.5px;
   font-weight:650; line-height:1.3; }
@@ -1730,6 +1737,10 @@ body[data-view="edit"] .wrap { max-width:none; }
 .qatt { display:flex; gap:5px; flex-wrap:wrap; align-items:center; }
 .qatt .attlink { font-size:12px; }
 .qnone { color:var(--muted); }
+/* the way a quotation gets onto a row: on the row, not behind the ⋯ menu */
+.qadd { font-size:11.5px; font-weight:600; color:var(--accent-ink); background:var(--accent-soft);
+        border:none; border-radius:5px; padding:3px 7px; cursor:pointer; white-space:nowrap; }
+.qadd:hover { filter:brightness(.96); }
 
 /* board actions */
 .bact { display:flex; align-items:center; gap:12px; flex-wrap:wrap; background:var(--paper);
@@ -5242,9 +5253,23 @@ function bidReadPanelHTML(jid, bi) {
   h.push('<tr class="qrsum"><td></td><td>Total of ' + n + " quotation" + (n === 1 ? "" : "s") +
     '</td><td class="qrwhy">HST included</td><td class="money">' + money(sum) + "</td></tr>");
   h.push("</tbody></table>");
+  var det = bidReadDetails();
+  if (det.length) {
+    h.push('<div class="qrdet' + (bidRead.noDet ? " off" : "") + '">' +
+      '<label class="qrdeth"><input type="checkbox" data-act="readdet"' +
+      (bidRead.noDet ? "" : " checked") + "> And fill in what the row has not got</label><ul>");
+    det.forEach(function (d) {
+      h.push("<li><b>" + esc(d.label) + "</b>" + esc(d.v) + "</li>");
+    });
+    h.push("</ul></div>");
+  }
+  var take = bidRead.noDet ? 0 : det.length;
+  var what = n && take ? "Put " + money(sum) + " and " + take + " detail" + (take === 1 ? "" : "s") + " in the row"
+    : n ? "Put " + money(sum) + " in the row"
+    : take ? "Fill in " + take + " detail" + (take === 1 ? "" : "s")
+    : "";
   h.push('<div class="qreadacts">' +
-    (n ? '<button class="btn primary" type="button" data-act="readapply">\u2713 Put ' + money(sum) +
-         " in the row</button>" : "") +
+    (what ? '<button class="btn primary" type="button" data-act="readapply">\u2713 ' + what + "</button>" : "") +
     '<button class="edbtn" type="button" data-act="readcancel">Cancel</button>' +
     '<span class="qreadnote">Nothing is saved until you press the button. Check the numbers ' +
     "against the PDFs \u2014 they are what the board will be shown.</span></div></div>");
@@ -5272,18 +5297,58 @@ function bidReadOne(f) {
       mediaType: /\.docx$/i.test(name) ? "docx" : "application/pdf", fileName: name });
   }).then(function (res) {
     var d = (res && res.data) || {};
+    /* the same reading already names the contractor, the quote number, the date
+       and what the work is; the row used to throw all four away and leave her
+       typing them off the PDF she had just uploaded */
+    var det = {
+      contractor: String(d.contractor || "").trim().slice(0, 80),
+      qno: String(d.quote_number || "").trim().slice(0, 40),
+      qdate: /^\d{4}-\d{2}-\d{2}$/.test(String(d.quote_date || "")) ? String(d.quote_date) : "",
+      notes: bidReadTrim(d.scope_notes)
+    };
     var amt = (d.amount_cad == null || d.amount_cad === "") ? null : Number(d.amount_cad);
     if (amt == null || !isFinite(amt))
-      return { name: name, incl: null, ok: false, why: "no total found in it" };
+      return { name: name, incl: null, ok: false, why: "no total found in it", det: det };
     /* levelled to HST-included, so that quotes stating their tax and quotes not
        stating it can be added to each other at all */
     var incl = d.hst_included ? amt : Math.round(amt * (1 + HST) * 100) / 100;
-    return { name: name, incl: Math.round(incl * 100) / 100, ok: true,
+    return { name: name, incl: Math.round(incl * 100) / 100, ok: true, det: det,
              why: (d.quote_number ? "#" + d.quote_number : "") +
                   (d.hst_included ? "" : (d.quote_number ? " \u00b7 " : "") + "HST added") };
   }).catch(function (e) {
-    return { name: name, incl: null, ok: false, why: (e && e.message) || "could not be read" };
+    return { name: name, incl: null, ok: false, det: null,
+             why: (e && e.message) || "could not be read" };
   });
+}
+/* a scope note belongs on one line of a table the board reads, so a paragraph
+   is cut back to a phrase — at a word, never mid-word */
+function bidReadTrim(v) {
+  var t = String(v == null ? "" : v).replace(/\s+/g, " ").trim();
+  if (t.length <= 150) return t;
+  var cut = t.slice(0, 150), sp = cut.lastIndexOf(" ");
+  return (sp > 60 ? cut.slice(0, sp) : cut).replace(/[,;:.\s]+$/, "") + "\u2026";
+}
+/* What the reading can fill in that the row has not got. Never what she has
+   already typed: a figure read off a PDF may correct her, but her own words
+   about this quote are hers, and replacing them is not reading, it is editing.
+   A file she has struck out is asked last, so striking one out moves its
+   contractor name out of the way too. */
+var BID_DET = [["contractor", "Contractor"], ["qno", "Quote #"],
+               ["qdate", "Quote date"], ["notes", "Scope note"]];
+function bidReadDetails() {
+  if (!bidRead) return [];
+  var j = findJob(bidRead.jid); if (!j) return [];
+  var b = j.bids[bidRead.bi]; if (!b) return [];
+  var rows = (bidRead.rows || []).filter(function (r) { return r.ok && r.det; })
+    .concat((bidRead.rows || []).filter(function (r) { return !r.ok && r.det; }));
+  var out = [];
+  BID_DET.forEach(function (k) {
+    if (String(b[k[0]] == null ? "" : b[k[0]]).trim()) return;   /* hers stands */
+    for (var i = 0; i < rows.length; i++) {
+      if (rows[i].det[k[0]]) { out.push({ f: k[0], label: k[1], v: rows[i].det[k[0]] }); return; }
+    }
+  });
+  return out;
 }
 function bidReadRun(j, bi) {
   var b = j.bids[bi], files = (b && b.files) || [];
@@ -5308,20 +5373,31 @@ function bidReadApply() {
   var j = findJob(bidRead.jid); if (!j) { bidRead = null; renderEditor(); return; }
   var b = j.bids[bidRead.bi]; if (!b) { bidRead = null; renderEditor(); return; }
   var kept = (bidRead.rows || []).filter(function (r) { return r.ok && r.incl != null; });
-  if (!kept.length) return;
-  var sum = Math.round(kept.reduce(function (s, r) { return s + r.incl; }, 0) * 100) / 100;
-  b.amount = sum;
-  b.hst = true;                 /* everything was levelled to HST-included above */
-  /* what the figure is made of, kept with it — the board sees one number for
-     three quotations and is entitled to know that is what it is */
-  b.parts = kept.map(function (r) { return { name: r.name, amount: r.incl }; });
-  var note = kept.length > 1
-    ? jobLabel(j) + ": " + (b.contractor || "quote") + " set to " + money(sum) + " \u2014 the total of " +
-      kept.length + " attached quotations (" + kept.map(function (r) { return money(r.amount || r.incl); }).join(" + ") + ")"
-    : jobLabel(j) + ": " + (b.contractor || "quote") + " set to " + money(sum) + " from the attached quotation";
+  var det = bidRead.noDet ? [] : bidReadDetails();
+  if (!kept.length && !det.length) return;
+  var notes = [];
+  /* the details first, so a contractor name read off the PDF is the name the
+     change log uses for the amount written in the same press */
+  det.forEach(function (d) { b[d.f] = d.v; });
+  if (det.length)
+    notes.push(jobLabel(j) + ": " + det.map(function (d) {
+      return d.label.toLowerCase() + " \u201c" + d.v + "\u201d";
+    }).join(", ") + " read off the attached quotation");
+  if (kept.length) {
+    var sum = Math.round(kept.reduce(function (s, r) { return s + r.incl; }, 0) * 100) / 100;
+    b.amount = sum;
+    b.hst = true;                 /* everything was levelled to HST-included above */
+    /* what the figure is made of, kept with it — the board sees one number for
+       three quotations and is entitled to know that is what it is */
+    b.parts = kept.map(function (r) { return { name: r.name, amount: r.incl }; });
+    notes.push(kept.length > 1
+      ? jobLabel(j) + ": " + (b.contractor || "quote") + " set to " + money(sum) + " \u2014 the total of " +
+        kept.length + " attached quotations (" + kept.map(function (r) { return money(r.amount || r.incl); }).join(" + ") + ")"
+      : jobLabel(j) + ": " + (b.contractor || "quote") + " set to " + money(sum) + " from the attached quotation");
+  }
   bidRead = null;
   qcTouch(j);
-  persist(null, [note], j.id);
+  persist(null, notes, j.id);
   renderEditor(); renderReport();
 }
 function edSecHead(t, p) {
@@ -5574,7 +5650,10 @@ function edJobCardHTML(j, ji) {
 
   /* ---- 2. quotes ---- */
   h.push('<div class="jsec"><div class="jsechead"><span class="n">2</span><h4>Quotes</h4>' +
-    '<span class="spacer"></span><button class="edbtn" type="button" data-act="addbid">+ Add quote / bid</button></div>');
+    '<span class="spacer"></span>' +
+    '<button class="edbtn" type="button" data-act="addbidfile" title="Pick the contractor\u2019s PDF \u2014 ' +
+    'Claude reads it and fills the row in">\u{1F4CE} Upload a quote</button>' +
+    '<button class="edbtn" type="button" data-act="addbid">+ Add quote / bid</button></div>');
   h.push('<div class="qwrap"><table class="qtable"><colgroup><col style="width:34px"><col style="width:20%">' +
     '<col style="width:9%"><col style="width:13%"><col style="width:9%"><col style="width:20%">' +
     '<col style="width:14%"><col style="width:10%"><col style="width:34px"></colgroup>' +
@@ -5610,7 +5689,11 @@ function edJobCardHTML(j, ji) {
       '<td data-l="HST"><select data-f="hst"><option value="no"' + (!b.hst ? " selected" : "") + ">Excluded</option>" +
       '<option value="yes"' + (b.hst ? " selected" : "") + ">Included</option></select></td>" +
       '<td data-l="Notes"><input type="text" value="' + esc(b.notes) + '" data-f="notes" placeholder="scope note"></td>' +
-      '<td data-l="Attachments"><div class="qatt">' + (files || '<span class="qnone">—</span>') + "</div></td>" +
+      '<td data-l="Attachments"><div class="qatt">' + files +
+      '<button class="qadd" type="button" data-act="attach" title="' +
+      (files ? "Attach another quotation to this row"
+             : "Attach the contractor\u2019s quotation \u2014 Claude reads it and fills this row in") +
+      '">' + (files ? "+" : "\u{1F4CE} Attach") + "</button></div></td>" +
       '<td data-l="Status">' + st + "</td>" +
       '<td class="c-act"><button class="qmore" type="button" data-act="qmore" title="More for this quote">⋯</button></td></tr>');
     if (xo) {
@@ -6608,6 +6691,7 @@ document.getElementById("editor").addEventListener("click", function (e) {
     return;
   }
   if (act === "readcancel") { bidRead = null; renderEditor(); return; }
+  if (act === "readdet") { if (bidRead) { bidRead.noDet = !bidRead.noDet; renderEditor(); } return; }
   if (act === "readapply") { bidReadApply(); return; }
   if (act === "readtoggle") {
     var ri = +e.target.getAttribute("data-ri");
@@ -6714,6 +6798,7 @@ document.getElementById("editor").addEventListener("click", function (e) {
   }
   var card = e.target.closest(".ecard"); if (!card) return;
   var ji = +card.dataset.ji, j = state.jobs[ji];
+  if (act === "addbidfile") { startAttach(ji, -1); return; }   /* the file makes the row */
   if (act === "addbid") j.bids.push({ contractor: "", qno: "", amount: null, hst: false, notes: "", files: [] });
   else if (act === "delbid") {
     var row = e.target.closest("[data-bi]");
@@ -11492,7 +11577,14 @@ document.getElementById("fileAttach").addEventListener("change", function () {
   if (!f || !attachTarget) return;
   if (f.size > 15 * 1024 * 1024) { alert("That file is over 15 MB — please attach a smaller copy."); return; }
   var j = state.jobs[attachTarget.ji]; if (!j) return;
-  var b = j.bids[attachTarget.bi]; if (!b) return;
+  /* "Upload a quote" has no row yet. The row is made here, where there is a
+     file to put in it, so a cancelled picker leaves no empty row behind. */
+  var bi = attachTarget.bi;
+  if (bi < 0) {
+    j.bids.push({ contractor: "", qno: "", amount: null, hst: false, notes: "", files: [] });
+    bi = j.bids.length - 1;
+  }
+  var b = j.bids[bi]; if (!b) return;
   var path = "quoteAttachments/" + j.id + "/" + Date.now() + "-" + f.name.replace(/[^\w.\-() ]+/g, "_");
   var note = document.getElementById("saveNote"); if (note) note.textContent = "Uploading " + f.name + "…";
   cloud.store.ref(path).put(f)
@@ -11503,6 +11595,12 @@ document.getElementById("fileAttach").addEventListener("change", function () {
       persist(null, ["Attached “" + f.name + "” to a quote on " + jobLabel(j)], j.id);
       qcTouch(j);            /* the contractor's own document says more than the note does */
       renderEditor(); renderReport();
+      /* A quotation landing on a row with no price on it was uploaded to be
+         read — she should not have to go and ask for that separately. Where
+         the row already has a price she is filing paperwork, so it is left
+         alone and the ✨ button is still there if she wants it. */
+      if (b.amount == null && cloud.fns && cloud.user && /\.(pdf|docx)$/i.test(f.name))
+        bidReadRun(j, bi);
     })
     .catch(function (e) { alert("Upload failed (" + ((e && e.code) || "error") + ")."); });
 });
