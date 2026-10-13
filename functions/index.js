@@ -324,9 +324,14 @@ const COMPARE_SYSTEM =
   "installed, not which line of the document it is and not the job's own title. Where a quote has no " +
   "scope note and no readable document, covers says exactly that and nothing more: you may not describe " +
   "it from the job title, from another quote, or from what the work would usually involve.\n" +
-  "quantity and unit: only where the quote says how many. “2 -10 lb fire extinguishers plus 1 cabinet” " +
-  "is quantity 2, unit “extinguisher”. Where the quote does not say, quantity is null and unit is empty. " +
-  "Do not infer a quantity from the price.\n" +
+  "quantity and unit: a COUNT of the separate things this price buys, and nothing else. “2 -10 lb fire " +
+  "extinguishers plus 1 cabinet” is quantity 2, unit “extinguisher”. A measurement is not a count: " +
+  "square feet, linear feet, metres, hours, kilograms and percentages say how BIG the work is, not how " +
+  "many of it there are. A proposal pricing 4 sq ft of concrete around one drain is quantity 1, unit " +
+  "“drain” — never quantity 4, unit “sq ft”: $788.18 per square foot of one patch means nothing, and " +
+  "set in a column beside another quote's price per drain it reads as half the cost when it is twice " +
+  "it. The unit must be a thing a director could count standing on the site. Where the quote does not " +
+  "say how many, quantity is null and unit is empty. Do not infer a quantity from the price.\n" +
   "warranty: the term the quote states, e.g. “10 years on the membrane”. Where the quote says nothing " +
   "about a warranty, write “not stated” — silence is not the absence of one, and must never be " +
   "reported as “no warranty”.\n" +
@@ -339,7 +344,10 @@ const COMPARE_SYSTEM =
   "add a caution. Show the working when you do: give the line figure, the total figure, and the price " +
   "you were given, so the reader can check the claim rather than take it on trust. Never state that a " +
   "price is a document total unless the arithmetic says so — a price that quietly carries work belonging to another job is the costliest error on " +
-  "this page. Empty where there is no document, or where the document prices one thing only.\n" +
+  "this page. Where the price you are given equals a document figure exactly and that figure is marked " +
+  "plus HST, the tax has been left off the price as it was entered: say so plainly, give the figure " +
+  "with HST added, and add a caution — it is a switch the manager can correct in one click, not a " +
+  "mystery. Empty where there is no document, or where the document prices one thing only.\n" +
   "includes / excludes: at most four short items each, only what is written (permits, disposal, making " +
   "good, cabinet, tax). Empty arrays where the quote is silent.\n" +
   "comparable: true only where the quotes buy substantially the same thing, so that the prices can be " +
@@ -348,12 +356,18 @@ const COMPARE_SYSTEM =
   "difference: one plain sentence a director can read on a phone, naming the contractors and what " +
   "differs between them. Empty string when they are comparable.\n" +
   "best_index: the quote that is the better value ON WHAT IS WRITTEN — weighing quantity, warranty and " +
-  "what is included, not price alone. Name one whenever what is written supports it. The cheapest quote " +
-  "being also the most fully specified is a finding worth stating plainly, not an obvious one to pass " +
-  "over. And a quote you cannot read does not stop you naming the best of the ones you can — say which " +
-  "of the readable quotes is the better value and let a caution carry the unknown one. Use null only " +
-  "where naming any of them would be a guess: where they are equally specified with nothing to choose " +
-  "between them, or where too little is written about all of them to compare at all.\n" +
+  "what is included, not price alone. You may name one ONLY where at least one other quote buys " +
+  "substantially the same thing, so that there is something for it to be better than. Quotes for " +
+  "different work, for different places, or for different numbers of the same item are not a field to " +
+  "pick a winner from: one drain priced against five drains has no better value in it, and a verdict " +
+  "drawn anyway puts a saving in front of the board that does not exist. Then best_index is null, and " +
+  "the difference you wrote is the whole answer. Where two or more quotes ARE for the same thing, name " +
+  "the better of those even if a third covers something else or could not be read at all — and say so " +
+  "in a caution. Being the most fully specified, or the only one whose arithmetic checks out, is a " +
+  "finding for cautions and not a better value: it says the paperwork is better, not the price.\n" +
+  "best_basis: what the quotes you weighed are both pricing, in a few words — “one drain”, “the " +
+  "gym-side area drain”, “two extinguishers and the cabinet”. Required whenever best_index is not " +
+  "null, and empty when it is null: a better value that cannot say what it is better AT is a guess.\n" +
   "best_reason: one sentence for that choice in the quotes' own terms, e.g. “covers two extinguishers " +
   "and the cabinet at $296.63 each against $508.50 for one”. Empty when best_index is null.\n" +
   "YOU ARE NOT AWARDING THE WORK. The board of directors awards it, and may award it to a contractor " +
@@ -388,10 +402,11 @@ const COMPARE_SCHEMA = {
     comparable: { type: "boolean" },
     difference: { type: "string" },
     best_index: { type: ["number", "null"] },
+    best_basis: { type: "string" },
     best_reason: { type: "string" },
     cautions: { type: "array", items: { type: "string" } },
   },
-  required: ["quotes", "comparable", "difference", "best_index", "best_reason", "cautions"],
+  required: ["quotes", "comparable", "difference", "best_index", "best_basis", "best_reason", "cautions"],
   additionalProperties: false,
 };
 

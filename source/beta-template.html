@@ -3215,8 +3215,10 @@ function jobCalc(j) {
   /* the quote the reading named as the better value for the money — only worth
      marking where the quotes were found NOT to be for the same thing, since
      otherwise "better value" and "lowest price" are the same row */
+  var bvBasis = (j.compare && String(j.compare.bestBasis || "").trim()) || "";
   bids.forEach(function (x, i) {
-    x.bestValue = !likeForLike && j.compare && j.compare.best === i;
+    x.bestValue = !likeForLike && !!bvBasis && j.compare.best === i;
+    x.bestBasis = x.bestValue ? bvBasis : "";
   });
   var saving = (likeForLike && alt.length) ? Math.max(0, Math.min.apply(null, alt) - cost) : 0;
   return { bids: bids, priced: priced.length, cost: cost, carriedBids: carriedBids,
@@ -3661,7 +3663,7 @@ function jdQuotesHTML(j, c) {
     else if (x.pending) note = "Awaiting quote";
     else if (x.lowest) note = "Lowest price";
     else note = "";
-    if (x.bestValue) note = "Better value for the money — " + (note || "not counted in totals");
+    if (x.bestValue) note = "Better value for " + x.bestBasis + " — " + (note || "not counted in totals");
     if (x.b.qno) note += (note ? " · " : "") + "Quote #" + x.b.qno;
     /* one number standing for several quotations says so, or the board is
        reading a total it has no way to recognise as one */
@@ -5856,6 +5858,7 @@ function qcRun(j) {
       comparable: d.comparable !== false,
       difference: String(d.difference || ""),
       best: typeof d.best_index === "number" ? d.best_index : null,
+      bestBasis: String(d.best_basis || ""),
       bestWhy: String(d.best_reason || ""),
       cautions: Array.isArray(d.cautions) ? d.cautions : []
     };
@@ -5867,14 +5870,55 @@ function qcRun(j) {
     qcRedraw();
   });
 }
+/* A unit has to be something a director could count standing on the site. Square
+   feet, hours and kilograms measure how big one piece of work is, and a price
+   divided by one of them is a price for nothing: $3,152.70 spread over the 4 sq
+   ft of concrete around a SINGLE drain gives $788.18, which then sits in a
+   column beside another quote's $1,510.00 per drain and reads as less than half
+   the cost when it is in truth nearly twice it. So measurements never divide. */
+var QC_MEASURE = new RegExp("^(?:" + [
+  "sq", "square", "lin", "linear", "lineal", "cu", "cubic",
+  "ft", "foot", "feet", "sf", "sqft", "lf", "in", "inch", "inches",
+  "yd", "yds", "yard", "yards", "m", "m2", "m3", "mm", "cm", "km",
+  "metre", "metres", "meter", "meters",
+  "hr", "hrs", "hour", "hours", "day", "days", "week", "weeks",
+  "month", "months", "year", "years",
+  "kg", "lb", "lbs", "ton", "tons", "tonne", "tonnes",
+  "l", "litre", "litres", "liter", "liters", "gal", "gallon", "gallons",
+  "percent", "pct", "%"
+].join("|") + ")$", "i");
+function qcCountable(u) {
+  var t = String(u == null ? "" : u).trim().toLowerCase()
+    .replace(/\u00b2/g, "2").replace(/\u00b3/g, "3");
+  if (!t) return false;
+  /* every word of it, so "4 sq ft" is refused as readily as "sq ft" */
+  return !t.split(/[^a-z0-9%]+/).some(function (w) { return w && QC_MEASURE.test(w); });
+}
 /* what one contractor charges for one of the thing — arithmetic, not judgement,
-   and only where that quote said how many it was pricing */
+   and only where that quote said how many of a countable thing it was pricing */
 function qcEach(j, i) {
   var q = null, tot = null;
   ((j.compare && j.compare.quotes) || []).forEach(function (x) { if (x && x.index === i) q = x; });
   qcPriced(j).forEach(function (x) { if (x.i === i) tot = x.total; });
   if (!q || tot == null || !q.quantity || q.quantity <= 1) return null;
-  return { each: tot / q.quantity, n: q.quantity, unit: q.unit || "" };
+  if (!qcCountable(q.unit)) return null;
+  return { each: tot / q.quantity, n: q.quantity, unit: String(q.unit).trim() };
+}
+/* A column headed "Each" is a column the eye reads downward, so the figures in
+   it have to be prices for the same kind of thing. Where two quotes are counting
+   different things the comparison the column invites is false however honest
+   each figure is on its own, and then it carries nothing. One quote on its own
+   saying what it charges per drain is still worth reading: there is nothing
+   beside it to be read against. */
+function qcEachAll(j) {
+  var out = {}, units = {};
+  qcPriced(j).forEach(function (x) {
+    var p = qcEach(j, x.i);
+    if (!p) return;
+    out[x.i] = p;
+    units[p.unit.toLowerCase().replace(/s$/, "")] = 1;
+  });
+  return Object.keys(units).length > 1 ? {} : out;
 }
 /* the panel under the quotes in Edit data */
 function qcCardHTML(j) {
@@ -5906,10 +5950,11 @@ function qcCardHTML(j) {
   if (cp.difference) h.push('<p class="qcdiff">' + esc(cp.difference) + "</p>");
   h.push('<table class="qctab"><thead><tr><th>Contractor</th><th>What the price covers</th>' +
     "<th>Each</th><th>Warranty</th></tr></thead><tbody>");
+  var pers = qcEachAll(j);
   qcPriced(j).forEach(function (x) {
     var q = null;
     (cp.quotes || []).forEach(function (y) { if (y && y.index === x.i) q = y; });
-    var per = qcEach(j, x.i);
+    var per = pers[x.i] || null;
     h.push("<tr><td>" + esc((x.b.contractor || "").trim() || "—") + "</td><td>" +
       esc((q && q.covers) || "—") +
       (q && q.excludes && q.excludes.length
@@ -5921,12 +5966,21 @@ function qcCardHTML(j) {
       "</td><td>" + esc((q && q.warranty) || "—") + "</td></tr>");
   });
   h.push("</tbody></table>");
-  if (cp.best != null && cp.bestWhy) {
+  /* "Better value" is only ever better at something. Where the reading could not
+     say what the quotes it weighed have in common — one drain against five
+     drains has no common footing — there is no verdict to show, and a reading
+     made before this was asked for is shown as the stale thing it is. */
+  if (cp.best != null && cp.bestWhy && !cp.bestBasis) {
+    h.push('<p class="qccaut">\u26a0 This reading named a better value without saying what the quotes ' +
+      "have in common, so it is not shown. Read them again.</p>");
+  }
+  if (cp.best != null && cp.bestWhy && cp.bestBasis) {
     var bj = null;
     qcPriced(j).forEach(function (x) { if (x.i === cp.best) bj = x; });
     if (bj) {
       var carried = (typeof j.pick === "number" ? j.pick : jobCalcAutoIndex(j)) === cp.best;
-      h.push('<p class="qcbest"><strong>Better value on what is written:</strong> ' +
+      h.push('<p class="qcbest"><strong>Better value for ' + esc(cp.bestBasis) +
+        ', on what is written:</strong> ' +
         esc((bj.b.contractor || "").trim() || "quote " + (cp.best + 1)) + " — " + esc(cp.bestWhy) +
         (carried ? ' <span class="qcok">✓ this is the quote the totals carry</span>'
           : ' <button class="edbtn" type="button" data-act="qc-carry" data-bi="' + cp.best +
