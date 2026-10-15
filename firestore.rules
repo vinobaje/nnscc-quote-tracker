@@ -163,6 +163,16 @@ service cloud.firestore {
         || (request.resource.data.diff(resource.data).affectedKeys()
               .hasOnly(['sent', 'sentAt'])
             && request.resource.data.sent == true)
+        // A draft that went missing can be made again. This points the row at the
+        // replacement draft and puts it back in the waiting list; it cannot touch the
+        // unit, the owner, the amount, the template or the date, so the notice on the
+        // record stays the notice that was recorded. A voided letter is never redrafted.
+        || (request.resource.data.diff(resource.data).affectedKeys()
+              .hasOnly(['draftId', 'sent', 'sentAt', 'redraftAt', 'redraftBy', 'redraftCount'])
+            && request.resource.data.diff(resource.data).affectedKeys()
+              .hasAny(['redraftAt'])
+            && request.resource.data.sent == false
+            && resource.data.get('voided', false) == false)
       );
       allow delete: if false;
     }

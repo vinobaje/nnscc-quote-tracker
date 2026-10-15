@@ -721,6 +721,7 @@ td input.amt { text-align:right; font-variant-numeric:tabular-nums; }
       <span class="spacer"></span>
       <button class="btn ghost" id="btnPreview">Preview the first</button>
       <button class="btn ghost ico" id="btnPdf"><span class="i"></span>Download PDF</button>
+      <button class="btn ghost" id="btnGmailCheck" title="Ask Google for Gmail access now, and say which mailbox answered. The permission lapses about weekly, and this is how you find out before a batch rather than during one.">Connect Gmail</button>
     </div>
     <div class="seclede" id="splitNote" style="margin:12px 0 0"></div>
     <div class="barnote" id="genNote" style="color:var(--muted);margin-top:6px;min-height:17px"></div>
@@ -1006,7 +1007,8 @@ var ICON = {
   eye:      svg('<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/>'),
   printer:  svg('<path d="M6 9V3h12v6M6 18H4a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8" rx="1"/>'),
   send:     svg('<path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z"/>'),
-  history:  svg('<path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l4 2"/>')
+  history:  svg('<path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l4 2"/>'),
+  redraft:  svg('<path d="M21 12a9 9 0 1 1-2.6-6.4L21 8"/><path d="M21 3v5h-5"/>')
 };
 function money(n) {
   var v = Number(n) || 0;
@@ -1138,7 +1140,7 @@ var FIELD_LIST = [
    string as plain text and never has to trust an owner name. */
 function fieldsFor(row, opts) {
   var d = fromISO(opts.date);
-  var prior = priorFor(row.unit);
+  var prior = priorFor(row.unit, opts.priorAsOf);
   return {
     owner:        esc(row.owner || "Owner"),
     unit:         esc(row.unit || ""),
@@ -1207,7 +1209,12 @@ function priorSentence(prior) {
    them. The hand-sent ones arrive either as dates imported from her own log or as a
    count she typed; the larger of the two wins, so importing a log never quietly
    lowers a number she put in herself. */
-function priorFor(unit) {
+/* asOf, where given, counts only what had already gone out by that moment. A letter
+   being drafted again has to say what it said the first time: the log now holds that
+   letter itself, and "1 previous written notice" where the original said none is not
+   a reproduction of the notice on file, it is a different letter. Imported history
+   predates every letter the app made, so only the app's own log is cut off here. */
+function priorFor(unit, asOf) {
   var k = unitKey(unit), count = 0, first = null, last = null, imported = 0;
   var known = rosterFind(unit);
   if (known) {
@@ -1226,8 +1233,9 @@ function priorFor(unit) {
     var L = A.letters[i];
     /* a test copy addressed to the person checking the tool is not a notice to anyone */
     if (unitKey(L.unit) !== k || L.voided || L.test) continue;
-    count++;
     var t = L.at && L.at.toDate ? L.at.toDate() : (L.dateISO ? fromISO(L.dateISO) : null);
+    if (asOf && t && t >= asOf) continue;
+    count++;
     if (t && (!first || t < first)) first = t;
     if (t && (!last || t > last)) last = t;
   }
@@ -1553,25 +1561,71 @@ function gmailConfigured() { return !!GMAIL_CLIENT_ID; }
 function gmailLoaded() {
   return !!(window.google && google.accounts && google.accounts.oauth2);
 }
-/* Testing-mode tokens are short-lived, so this re-prompts roughly weekly. */
-function gmailToken(cb, onFail) {
+/* Why a token request came back with nothing, in words that say what to do next.
+   Google hands back a short code and no explanation, and the two that actually happen
+   here want opposite things: let the window open, or see the window through. */
+function gmailWhy(code) {
+  var c = String(code || "").toLowerCase();
+  if (/popup_failed_to_open|popup_blocked/.test(c)) {
+    return "the browser blocked Google's sign-in window. Allow pop-ups for this site — " +
+      "the small icon at the right-hand end of the address bar — and try again.";
+  }
+  if (/popup_closed|user_cancel|abort|interaction_required|consent_required/.test(c)) {
+    return "Google's sign-in window was closed before access was given. Try again and " +
+      "see it through: on the \u201cGoogle hasn\u2019t verified this app\u201d screen choose " +
+      "Advanced, then the link to continue. That warning is there because this is a " +
+      "private tool for the office rather than a public app — it is not a fault.";
+  }
+  if (/access_denied/.test(c)) {
+    return "Google refused access. If the \u201cGoogle hasn\u2019t verified this app\u201d screen " +
+      "appeared, choose Advanced and continue past it. If it did not appear, this Google " +
+      "account is not on the app's permitted list.";
+  }
+  if (/no_session|opt_out|idpiframe|suppressed/.test(c)) {
+    return "this browser is not signed in to Google. Sign in to the office account in " +
+      "another tab, then try again.";
+  }
+  return c ? "Google said: " + c : "no reason given";
+}
+/* One failure, reported once, with the waiting callback cleared so a later attempt
+   starts clean. */
+function gmailFail(msg) {
+  var f = GM.onFail;
+  GM.pending = null; GM.onFail = null;
+  if (f) f(msg);
+}
+/* Testing-mode grants lapse after about a week, so the authorisation screen comes
+   back periodically whether or not anything has changed. force asks for it
+   deliberately — see the Connect Gmail button. */
+function gmailToken(cb, onFail, force) {
   if (!gmailConfigured()) { onFail("Gmail is not connected yet — the client ID has not been set."); return; }
   if (!gmailLoaded()) { onFail("Google sign-in did not load. Check the connection and reload."); return; }
-  if (GM.token && Date.now() < GM.expires - 60000) { cb(GM.token); return; }
+  if (!force && GM.token && Date.now() < GM.expires - 60000) { cb(GM.token); return; }
   if (!GM.client) {
     GM.client = google.accounts.oauth2.initTokenClient({
       client_id: GMAIL_CLIENT_ID,
       scope: GMAIL_SCOPE,
       callback: function (resp) {
-        var f = GM.pending; GM.pending = null;
         if (!resp || resp.error || !resp.access_token) {
-          if (GM.onFail) GM.onFail("Gmail access was not granted.");
+          gmailFail("Gmail access was not granted — " +
+            gmailWhy((resp && (resp.error || resp.error_description)) || ""));
           return;
         }
+        var f = GM.pending;
+        GM.pending = null; GM.onFail = null;
         GM.token = resp.access_token;
         GM.expires = Date.now() + (Number(resp.expires_in || 3600) * 1000);
         GM.who = null;            /* a fresh token may be a different account */
         if (f) f(GM.token);
+      },
+      /* A blocked or closed sign-in window is reported HERE, not through the callback
+         above. Without this handler the request simply never comes back: no token, no
+         error, the Email button left disabled and nothing on screen to explain it.
+         That is how 14 October 2026 failed — twenty-eight letters were printed by hand
+         because the app said nothing at all. Every failure now says something. */
+      error_callback: function (err) {
+        gmailFail("Gmail access did not complete — " +
+          gmailWhy((err && (err.type || err.message)) || ""));
       }
     });
   }
@@ -1584,7 +1638,7 @@ function gmailToken(cb, onFail) {
 
      The access is granted per Google account, so which account granted it now matters:
      see gmailWhoami, which is checked before anything is drafted. */
-  GM.client.requestAccessToken({ prompt: "" });
+  GM.client.requestAccessToken({ prompt: force ? "consent" : "" });
 }
 /* Which mailbox the app is actually holding — the drafts land wherever the token came
    from, and a silent token comes from whichever account the browser is signed in to.
@@ -1682,7 +1736,7 @@ function b64url(ascii) {
 
 /* the letter as plain text, for the body of the email that carries the PDF */
 function fieldsRaw(row, opts) {
-  var d = fromISO(opts.date), prior = priorFor(row.unit);
+  var d = fromISO(opts.date), prior = priorFor(row.unit, opts.priorAsOf);
   return {
     owner: row.owner || "Owner", unit: row.unit || "", address: row.address || "",
     amount: money(row.amount), date: fmtLongDate(d),
@@ -3140,7 +3194,7 @@ function renderHistory() {
   var h = ["<tr><th style='width:130px'>Sent</th><th style='width:86px'>Unit</th><th>Owner</th>" +
            "<th>Letter</th><th style='width:74px'>How</th>" +
            "<th class='num' style='width:104px'>Amount</th><th style='width:150px'>By</th>" +
-           "<th style='width:64px'></th></tr>"];
+           "<th style='width:78px'></th></tr>"];
   rows.forEach(function (L) {
     var when = L.at && L.at.toDate ? L.at.toDate().toLocaleDateString("en-CA", { year:"numeric", month:"short", day:"numeric" })
              : (L.dateISO || "—");
@@ -3157,10 +3211,20 @@ function renderHistory() {
       "<td>" + esc(L.templateName) + "</td>" +
       '<td><span class="chip' + (L.via === "email-draft" ? "" : " ok") + '">' + how + "</span>" +
         (L.draftId && !L.voided
-          ? '<span class="sub">' + (L.sent ? "left Drafts" : "still in Drafts") + "</span>" : "") + "</td>" +
+          ? '<span class="sub">' +
+            /* a printed letter that has since been drafted is both things, and saying
+               only one of them would hide half the record */
+            (L.via !== "email-draft" ? "also drafted \u2014 " : "") +
+            (L.sent ? "left Drafts" : "still in Drafts") + "</span>" : "") +
+        (L.redraftCount ? '<span class="sub">drafted again' +
+          (L.redraftCount > 1 ? " \u00d7" + L.redraftCount : "") + "</span>" : "") + "</td>" +
       '<td class="num">' + esc(money(L.amount)) + "</td>" +
       '<td style="font-size:12px;color:var(--muted)">' + esc(L.by) + "</td>" +
       "<td>" + (L.voided ? "" :
+        (L.test ? "" :
+          '<button class="iconbtn" data-redraft="' + esc(L._id) +
+          '" title="Make the Gmail draft for this letter again — same wording, same figures, ' +
+          'same attachments. Nothing is sent, and the record stays one letter.">' + ICON.redraft + "</button>") +
         '<button class="iconbtn del" data-void="' + esc(L._id) +
         '" title="Mark this letter void — it stays on the record but stops counting">' + ICON.trash + "</button>") +
       "</td></tr>");
@@ -3168,15 +3232,132 @@ function renderHistory() {
   $("histTbl").innerHTML = h.join("");
 }
 
-/* Voiding is the only change a letter ever accepts, and it is one-way: the rules
-   permit setting voided/voidReason/voidedBy/voidedAt and nothing else, and only to
-   true. The figures stay readable underneath so the record is corrected, not
-   rewritten — and a voided letter stops counting toward the unit's tally. */
+
+/* ---------------- drafting one letter again ----------------
+   A draft can go missing: deleted by accident, cleared out of Drafts with the rest of
+   a morning's mail, or never made at all because Gmail would not hand over a token and
+   the batch was printed instead. The letter itself is on the record either way, so what
+   is wanted is that letter again — not a new one.
+
+   So this rebuilds the notice from its own record and nothing else: the unit, the owner,
+   the amount, the template and the date that were used on the day. The roster is asked
+   only for the owner's address, because the log does not keep an email. The prior-notice
+   sentence is computed as of the original letter, so a letter re-made today still says
+   what it said then rather than counting itself as its own precedent.
+
+   The record keeps its place. A re-draft is the same notice reaching the same owner,
+   not a second notice: nothing is appended to the log, the unit's tally does not move,
+   and the row is stamped with the draft id that now exists so the waiting list follows
+   the live draft rather than a deleted one. */
+function letterById(id) {
+  for (var i = 0; i < A.letters.length; i++) if (A.letters[i]._id === id) return A.letters[i];
+  return null;
+}
+function rowFromLetter(L) {
+  var u = rosterFind(L.unit);
+  return {
+    unit: L.unit,
+    owner: L.owner || (u && u.owner) || "",
+    address: L.address || (u && u.address) || "",
+    amount: Number(L.amount) || 0,
+    tplId: L.templateId
+  };
+}
+function optsFromLetter(L) {
+  return {
+    date: L.dateISO || isoToday(),
+    dueDays: Number(L.dueDays) || 0,
+    priorAsOf: (L.at && L.at.toDate) ? L.at.toDate() : (L.dateISO ? fromISO(L.dateISO) : null)
+  };
+}
+function redraftLetter(L, btn) {
+  if (L.voided) {
+    note("histNote", "That letter is void. Generate a fresh one from the Units tab instead.", true);
+    return;
+  }
+  /* The template is the one thing that cannot be rebuilt from the log. tplFor would
+     quietly fall back to whatever is selected now, which would put different words
+     over the same record — so this refuses rather than guesses. */
+  var tpl = tplById(L.templateId);
+  if (!tpl) {
+    note("histNote", "The “" + (L.templateName || L.templateId) + "” template no longer " +
+      "exists, so that letter cannot be rebuilt word for word. Generate a fresh one from " +
+      "the Units tab.", true);
+    return;
+  }
+  var to = emailableOwners(L.unit);
+  if (!to.length) {
+    note("histNote", "Unit " + L.unit + " has no owner email on file that has opted in — " +
+      "that one prints only.", true);
+    return;
+  }
+  var row = rowFromLetter(L), o = optsFromLetter(L);
+  if (!confirm("Make the Gmail draft for Unit " + L.unit + " again?\n\n" +
+      "It rebuilds the “" + tpl.name + "” exactly as recorded — " + money(L.amount) +
+      ", dated " + (L.dateISO || "—") + " — with the same attachments, and goes to " +
+      to.join(", ") + ".\n\n" +
+      "Nothing is sent: it waits in Gmail with the others. History still shows one " +
+      "letter for this unit and the tally does not change.\n\n" +
+      "If the owner now owes a different amount, this is the wrong button — letter the " +
+      "unit again from the Units tab.")) return;
+
+  btn.disabled = true;
+  note("histNote", "Rendering the letter for Unit " + L.unit + "…", false, true);
+  gmailToken(function (token) {
+    gmailWhoami(token).then(function (who) {
+      /* No test-copy offer here. A re-draft writes to the real letter's own record,
+         so it has to be the real letter, from the mailbox that can send it. */
+      A.mailTest = false;
+      return assertOfficeMailbox(who);
+    }).then(function () {
+      var wantsForm = promisesPadForm(tpl) && !!padTemplate();
+      return renderPdf([row], tpl, o).then(function (b64) {
+        if (!wantsForm) return createGmailDraft(token, row, tpl, o, b64);
+        return padDocFor(row, o).then(function (extra) {
+          return createGmailDraft(token, row, tpl, o, b64, extra ? [extra] : []);
+        });
+      });
+    }).then(function (res) {
+      var up = {
+        draftId: (res && res.id) || "",
+        sent: false,
+        redraftAt: firebase.firestore.FieldValue.serverTimestamp(),
+        redraftBy: (A.user && A.user.email) || "",
+        redraftCount: (Number(L.redraftCount) || 0) + 1
+      };
+      /* it is waiting again, so the moment it last left Drafts is no longer true */
+      if (L.sentAt) up.sentAt = firebase.firestore.FieldValue.delete();
+      return A.db.collection(LETTERS).doc(L._id).update(up);
+    }).then(function () {
+      note("histNote", "Unit " + L.unit + " is drafted again and waiting in Gmail — read it " +
+        "there, then send it from the waiting list on the Letters tab.");
+      return loadLetters();
+    }).catch(function (e) {
+      btn.disabled = false;
+      note("histNote", "Could not re-draft Unit " + L.unit + " — " +
+        ((e && e.message) || "error"), true);
+    });
+  }, function (msg) {
+    btn.disabled = false;
+    note("histNote", msg, true);
+  });
+}
+
+/* Voiding is one-way, and the figures of a letter are never editable at all: the rules
+   permit setting voided/voidReason/voidedBy/voidedAt, marking a draft sent, and pointing
+   a row at a replacement draft. Nothing else. The figures stay readable underneath so
+   the record is corrected rather than rewritten — and a voided letter stops counting
+   toward the unit's tally. */
 $("histTbl").addEventListener("click", function (e) {
+  var rb = e.target.closest && e.target.closest("[data-redraft]");
+  if (rb) {
+    var RL = letterById(rb.getAttribute("data-redraft"));
+    if (RL) redraftLetter(RL, rb);
+    return;
+  }
   var btn = e.target.closest && e.target.closest("[data-void]");
   if (!btn) return;
-  var id = btn.getAttribute("data-void"), L = null;
-  for (var i = 0; i < A.letters.length; i++) if (A.letters[i]._id === id) L = A.letters[i];
+  var L = letterById(btn.getAttribute("data-void")), id = btn.getAttribute("data-void");
   if (!L) return;
   var reason = prompt("Void the “" + L.templateName + "” for Unit " + L.unit +
     " (" + money(L.amount) + ")?\n\n" +
@@ -4418,6 +4599,31 @@ $("btnEmail").onclick = function () {
   var tpl = currentTpl();
   if (!on.length || !tpl) return;
   emailDrafts(on, tpl, opts());
+};
+/* The Gmail permission lapses on its own about every week, and the only way that
+   announced itself was a batch that would not start. This asks for it on purpose,
+   names the mailbox that answered, and says whether a batch will work — before
+   twenty-eight letters have to be printed instead. */
+$("btnGmailCheck").onclick = function () {
+  var b = $("btnGmailCheck");
+  b.disabled = true;
+  note("genNote", "Asking Google for Gmail access\u2026", false, true);
+  gmailToken(function (token) {
+    gmailWhoami(token).then(function (who) {
+      try {
+        assertOfficeMailbox(who);
+        note("genNote", "Gmail access is live for " + who + " \u2014 drafting will work.");
+      } catch (e) {
+        note("genNote", (e && e.message) || "That is not the office mailbox.", true);
+      }
+    }, function (e) {
+      note("genNote", "Gmail answered but would not say which mailbox \u2014 " +
+        ((e && e.message) || "error"), true);
+    }).then(function () { b.disabled = false; });
+  }, function (msg) {
+    b.disabled = false;
+    note("genNote", msg, true);
+  }, true);
 };
 $("pvPrint").onclick = function () {
   document.body.classList.remove("previewing");
