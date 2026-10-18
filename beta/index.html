@@ -1057,7 +1057,16 @@ body:has(#report.tpl-packet) .wrap { max-width:1560px; }
 /* shut, the panel is its heading and nothing else — the rule that separates a
    heading from its contents has no contents to separate it from */
 .tpl-packet .pk-fold:not(.open) > .pk-foldhead { border-bottom:none; padding-bottom:0; margin-bottom:0; }
-.tpl-packet .pk-fold:not(.open) { padding-top:13px; padding-bottom:13px; }
+.tpl-packet #secE.pk-fold:not(.open) { padding-top:13px; padding-bottom:13px; }
+/* A detail card folds by the same triangle, but keeps the heading it had: the
+   badge, the sentence under it and the figure on the right all stay, so shut
+   it still answers how many and how long ago without being opened. */
+.tpl-packet .pk-sechead.pk-foldbar { cursor:pointer; user-select:none; }
+.tpl-packet .pk-sechead.pk-foldbar:hover .pk-sectitle { color:var(--pkg); }
+/* on the title's own line, where the eye already is — not out in the margin */
+.tpl-packet .pk-sectitle .pk-foldic { font-size:11px; color:var(--muted); margin-right:9px;
+  display:inline-block; vertical-align:middle; transition:transform .15s; }
+.tpl-packet .pk-fold:not(.open) > .pk-sechead { margin-bottom:0; }
 .tpl-packet #secE .notes { column-count:2; column-gap:26px; }
 .tpl-packet #secE .notes li { break-inside:avoid; }
 /* two columns of a job description on a phone is four words a line */
@@ -2906,7 +2915,7 @@ var BRAND_PATH = "nnsccQuoteTrackerBeta/brand";               /* the letterhead 
 var WEEKLY_DRAFT_PATH = "nnsccQuoteTrackerBeta/weeklyDraft";   /* the report she is working on */
 var WEEKLY_COLL = "nnsccWeeklyReportsBeta";                   /* every one she has finished */
 var VIEW_BETA = CURRENT_PATH.indexOf("Beta") >= 0;   /* which report the passcode gate reads/protects */
-var BUILD_STAMP = "2026-10-13 10:47";   /* filled in by build.js — which copy of the page this is */
+var BUILD_STAMP = "2026-10-18 18:19";   /* filled in by build.js — which copy of the page this is */
 /* path of the report currently on screen */
 function reportPath() {
   return cloud.active.kind === "current" ? CURRENT_PATH : (REPORTS_COLL + "/" + cloud.active.id);
@@ -4084,8 +4093,9 @@ function secBCards(d, ctx) {
 }
 /* Section E lists (open items, decisions, savings) — shared */
 /* Open or shut, remembered across re-renders: the manager edits something on
-   the other side of the page and this used to snap closed under her. */
-var secEOpen = false;
+   the other side of the page and these used to snap closed under her. Both
+   start shut — see each section for why. */
+var foldOpen = { e: false, past: false };
 /* What is in the fold, said on the outside of it: how many decisions, and of
    what kind, newest-first order being irrelevant to a count. */
 function secESummary(d) {
@@ -4331,6 +4341,14 @@ function pkAvatar(name) {
   return '<span class="pk-av" style="background:' + pkColor(name) + '">' + esc(pkInitials(name)) + '</span>';
 }
 /* section header with the lettered badge, serif title, subtitle and optional right block */
+/* the same heading, made the control that opens and shuts the card under it */
+function pkFoldHead(key, letter, title, sub, right) {
+  return '<div class="pk-sechead pk-foldbar" role="button" tabindex="0" data-fold="' + key +
+    '" title="Show or hide this list"><div class="pk-sechead-l">' +
+    '<span class="pk-badge">' + esc(letter) + '</span>' +
+    '<div><div class="pk-sectitle"><span class="pk-foldic">\u25b8</span>' + esc(title) + '</div>' +
+    (sub ? '<div class="pk-secsub">' + esc(sub) + '</div>' : '') + '</div></div>' + (right || '') + '</div>';
+}
 function pkSecHead(letter, title, sub, right) {
   return '<div class="pk-sechead"><div class="pk-sechead-l"><span class="pk-badge">' + esc(letter) + '</span>' +
     '<div><div class="pk-sectitle">' + esc(title) + '</div>' +
@@ -4671,12 +4689,19 @@ function renderPacketReport() {
     packetProgress(d, ctx) + '</section>');
   /* and the ones that have dropped off the back of it: a line each, and the
      whole card is still one click away in the job's own drawer */
+  /* Folded shut, like the decisions below it. This is finished work: it is
+     here to be looked up, not read through, and a board opening the packet is
+     asking about the jobs in front of it. The heading still carries how many
+     and the lede says how long ago, so shut is an answer too — and it prints
+     open, because paper has no triangle to press. */
   if (d.progPast.length)
-    h.push('<section id="secPast" class="panel pk-detailcard pk-pasttable">' +
-      pkSecHead("\u2713", "Completed earlier",
+    h.push('<section id="secPast" class="panel pk-detailcard pk-pasttable pk-fold' +
+      (foldOpen.past ? " open" : "") + '">' +
+      pkFoldHead("past", "\u2713", "Completed earlier",
         "Work signed off more than " + DONE_SETTLE_DAYS + " days ago. Click any job for its full history, " +
         "photographs and site updates.",
         '<div class="pk-totalcard"><div class="tl">Jobs completed</div><div class="tv">' + d.progPast.length + '</div></div>') +
+      '<div class="pk-foldbody">' +
       '<div class="tablewrap"><table><colgroup><col style="width:22px"><col>' +
       '<col class="pk-concol" style="width:142px">' +
       '<col class="pk-amtcol" style="width:96px">' +
@@ -4687,7 +4712,7 @@ function renderPacketReport() {
       (d.progPast.length > PAST_ROWS
         ? '<a class="pk-viewall" data-pastmore="' + d.progPast.length + '">View all ' +
           d.progPast.length + ' completed jobs \u2193</a>' : '') +
-      '</section>');
+      '</div></section>');
   /* The packet used to close on a two-up: a timeline beside the open items.
      The timeline bucketed jobs by the month their status date fell in — the
      month a decision was recorded, not when any work is scheduled — so it was
@@ -4707,8 +4732,8 @@ function renderPacketReport() {
      triangle to press. */
   var eSum = secESummary(d);
   h.push(eSum
-    ? '<section id="secE" class="panel pk-fold' + (secEOpen ? " open" : "") + '">' +
-      '<h3 class="pk-foldhead" role="button" tabindex="0" data-fold="1" ' +
+    ? '<section id="secE" class="panel pk-fold' + (foldOpen.e ? " open" : "") + '">' +
+      '<h3 class="pk-foldhead" role="button" tabindex="0" data-fold="e" ' +
       'title="Show or hide the decisions"><span class="pk-foldic">\u25b8</span>' +
       'Status &amp; board decisions' + eSum + '</h3>' +
       '<div class="pk-foldbody">' + secEBlocks(d, M, ctx.ED) + '</div></section>'
@@ -12052,7 +12077,7 @@ document.addEventListener("click", function (e) {
   if (fold) {
     e.preventDefault();
     var fsec = fold.closest(".pk-fold");
-    if (fsec) secEOpen = fsec.classList.toggle("open");
+    if (fsec) foldOpen[fold.getAttribute("data-fold")] = fsec.classList.toggle("open");
     return;
   }
   /* board-packet "View all completed jobs" → reveal the hidden rows */
