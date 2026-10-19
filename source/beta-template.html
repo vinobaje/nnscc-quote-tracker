@@ -7,14 +7,14 @@
   --line:#D9DEE3; --line-soft:#E8ECEF;
   --accent:#2D567F; --accent-ink:#24466B; --accent-soft:#EAF0F6;
   --good:#1E7A46; --good-soft:#E7F3EC; --prio:#A03636; --prio-soft:#F7ECEC;
-  --amber:#B0700F; --amber-soft:#F8EFDD; --bar:#2D567F;
+  --amber:#B0700F; --amber-soft:#F8EFDD; --bar:#2D567F; --barq:#A8BCD0;
 }
 :root[data-theme="dark"], :root[data-theme="light"] {
   --paper:#F7F8F9; --card:#FFFFFF; --ink:#1E2833; --ink2:#4A5866; --muted:#7A8794;
   --line:#D9DEE3; --line-soft:#E8ECEF;
   --accent:#2D567F; --accent-ink:#24466B; --accent-soft:#EAF0F6;
   --good:#1E7A46; --good-soft:#E7F3EC; --prio:#A03636; --prio-soft:#F7ECEC;
-  --amber:#B0700F; --amber-soft:#F8EFDD; --bar:#2D567F;
+  --amber:#B0700F; --amber-soft:#F8EFDD; --bar:#2D567F; --barq:#A8BCD0;
 }
 html { background:var(--paper); color-scheme:light; }
 body { font:15px/1.55 -apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; color:var(--ink);
@@ -307,7 +307,19 @@ tr.pend td { color:var(--muted); font-style:italic; }
 .brow { display:grid; grid-template-columns:190px 1fr 150px; gap:10px; align-items:center; padding:3.5px 0; }
 .blabel { font-size:13px; color:var(--ink2); text-align:right; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .btrack { height:16px; background:var(--line-soft); border-radius:0 4px 4px 0; }
-.bar { height:100%; background:var(--bar); border-radius:0 4px 4px 0; min-width:2px; }
+.bar { height:100%; background:var(--bar); border-radius:0 4px 4px 0; min-width:2px;
+  display:flex; overflow:hidden; }
+/* Solid where the board has committed the money, pale where it is still only a
+   price on the table. One bar, because it is one contractor; two tones, because
+   a quote nobody has decided on is not a contract. */
+.bar .bseg { height:100%; }
+.bar .bcom { background:var(--bar); }
+.bar .bwait { background:var(--barq); }
+.tpl-packet .bar .bcom { background:var(--pkg); }
+.tpl-packet .bar .bwait { background:var(--pkgq); }
+.bsplit { grid-column:2/-1; font-size:11px; color:var(--muted); margin:-1px 0 3px;
+  font-variant-numeric:tabular-nums; }
+.bsplit b { font-weight:600; color:var(--ink2); }
 .bval { font-size:13px; font-variant-numeric:tabular-nums; white-space:nowrap; }
 .bjobs { color:var(--muted); }
 .browlink { cursor:pointer; border-radius:6px; }
@@ -764,6 +776,21 @@ tr.jlink td:first-child::after { content:" ›"; color:var(--muted); }
 .dashtable { width:100%; border-collapse:collapse; font-size:13px; margin:8px 0 14px; }
 .dashtable th, .dashtable td { padding:6px 8px; border-bottom:1px solid var(--line-soft); text-align:left; }
 .dashtable td.money, .dashtable th.money { text-align:right; font-variant-numeric:tabular-nums; }
+/* a contractor's money, split by what the board has actually decided */
+.cobuck { margin:2px 0 14px; font-size:13px; }
+.cobuck div { display:flex; align-items:baseline; gap:10px; padding:3px 0; }
+.cobuck .cl { flex:1; color:var(--ink2); }
+.cobuck .cv { font-weight:600; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.cobuck .cn { width:62px; text-align:right; color:var(--muted); font-size:12px; white-space:nowrap; }
+.cobuck .cosum { border-top:1px solid var(--line); margin-top:4px; padding-top:7px; }
+.cobuck .cosum .cl { font-weight:600; color:var(--ink); }
+.cobuck .coout .cl, .cobuck .coout .cv { color:var(--muted); font-weight:400; }
+.costat { font-weight:600; white-space:nowrap; }
+.costat.codone { color:var(--good); }
+.costat.coaward { color:var(--ink); }
+.costat.cowait { color:var(--amber); }
+.costat.codead, .costat.cono { color:var(--muted); font-weight:400; }
+.cosub { font-size:11px; color:var(--muted); font-weight:400; }
 .memobox { width:min(640px,94vw); }
 .memobox textarea { width:100%; box-sizing:border-box; font:13.5px/1.55 ui-monospace,Menlo,monospace;
   padding:10px; min-height:280px; letter-spacing:normal; text-align:left; }
@@ -883,7 +910,7 @@ body:has(#report.tpl-packet) .wrap { max-width:1560px; }
 .savecard.total .sc-amt { color:#fff; }
 
 /* ---------- Board packet (Design 4: dark rail + serif header + 4-up) ---------- */
-.tpl-packet { --pkg:#16613a; }
+.tpl-packet { --pkg:#16613a; --pkgq:#A3C4AF; }
 .tpl-packet .pk-shell { display:grid; grid-template-columns:216px 1fr; background:var(--card);
   border:1px solid var(--line); border-radius:12px; box-shadow:0 1px 3px rgba(30,40,51,.07); }
 @media screen and (max-width:900px){ .tpl-packet .pk-shell { grid-template-columns:1fr; } }
@@ -1000,6 +1027,7 @@ body:has(#report.tpl-packet) .wrap { max-width:1560px; }
 .tpl-packet .brow { grid-template-columns:76px 1fr 82px; gap:7px; padding:2.5px 0; }
 .tpl-packet .blabel { font-size:14px; } .tpl-packet .bval { font-size:14px; }
 .tpl-packet .bjobs { display:none; }               /* drop the "· N" job count to save width */
+.tpl-packet .bsplit { font-size:10.5px; margin:-2px 0 4px; }
 .tpl-packet .btrack { height:13px; } .tpl-packet .bar { background:var(--pkg); }
 .tpl-packet .ov-donut { flex-direction:column; gap:10px; align-items:center; text-align:center; }
 .tpl-packet .ov-legend { align-self:stretch; }
@@ -2623,12 +2651,13 @@ var META_DEFAULTS = { title: "Contractor Quote Report", condoName: "Waterview Co
   headA: "High-priority jobs — approval requested",
   headB: "Competitive bid comparisons",
   headC: "Standard-priority schedule, by contractor",
-  headD: "Committed spend by contractor",
+  headD: "Spend by contractor",
   headE: "Open items for the board",
   ledeA: "Jobs flagged high priority. Where a job carries a “bids” badge, competing quotes were obtained — see Section B; the carried (lowest) amount is shown here.",
   ledeB: "Jobs where more than one contractor was invited to quote. The lowest received bid is flagged; invited contractors who have not yet returned a quote show as pending.",
   ledeC: "All standard-priority jobs, in the board’s chosen order. Per-contractor totals are in Section D.",
-  ledeD: "Value of carried quotes per contractor (job count after each amount).",
+  ledeD: "Value of carried quotes per contractor, split by what the board has decided: " +
+    "completed, awarded, or still awaiting a decision.",
   ledeE: "" };
 /* What a section is called in the jump strip, as against on the page. A heading
    earns its length where it sits ("Committed spend by contractor"); in a row of
@@ -2640,7 +2669,8 @@ var NAV_WORDS = {
   "High-priority jobs — approval requested": "High priority",
   "Competitive bid comparisons": "Bids",
   "Standard-priority schedule, by contractor": "Schedule",
-  "Committed spend by contractor": "Spend",
+  "Committed spend by contractor": "Spend",   /* reports saved under the old wording */
+  "Spend by contractor": "Spend",
   "Open items for the board": "Open items"
 };
 /* short label for the floating nav pills: heading up to the first dash/comma, capped */
@@ -2670,6 +2700,21 @@ var STOPPED_SET = { rejected:1, deferred:1, cancelled:1 };
    decisions still lists them with the date — but they are out of the arithmetic. */
 var DEAD_SET = { rejected:1, cancelled:1 };
 function countsAsSpend(j) { return !DEAD_SET[j.status || "quoted"]; }
+/* Money is committed by a decision, not by a crew arriving. A job still at
+   "quoted" is a price on the table and nobody is owed it — summing those under
+   one heading called committed spend is how a contractor with four quotes in
+   front of the board came to look like a contractor with four contracts.
+   Deferred sits with awaiting: the board has put it off, not taken it on. */
+var SPEND_BUCKETS = [["done", "Completed"], ["awarded", "Awarded / in progress"],
+                     ["waiting", "Awaiting the board"]];
+function spendBucket(j) {
+  var st = (j && j.status) || "quoted";
+  if (st === "completed") return "done";
+  return APPROVED_SET[st] ? "awarded" : "waiting";
+}
+function emptyBuckets() { return { n: 0, tot: 0, done: 0, doneN: 0, awarded: 0, awardedN: 0, waiting: 0, waitingN: 0 }; }
+/* round figures: a sub-line under a bar in a 76px column has no room for cents */
+function money0(v) { return "$" + Math.round(Number(v) || 0).toLocaleString("en-CA"); }
 /* A finished job stops being work in progress, but not on the day it finishes.
    For a few weeks after the crew leaves there are still photographs to add, an
    invoice to match against the quote, a director asking how it went — so it
@@ -3296,11 +3341,15 @@ function computeAll() {
   /* nobody is waiting on a quote for a job that is not going ahead */
   var pendingCount = spend.reduce(function (s, x) { return s + x.c.pendingNames.length; }, 0);
   var roll = {};
-  spend.forEach(function (x) { x.c.carriedBids.forEach(function (cb) {
-    var nm = (cb.b.contractor || "—").trim() || "—";
-    if (!roll[nm]) roll[nm] = { n: 0, tot: 0 };
-    roll[nm].n++; roll[nm].tot += cb.total;
-  }); });
+  spend.forEach(function (x) {
+    var bk = spendBucket(x.j);
+    x.c.carriedBids.forEach(function (cb) {
+      var nm = (cb.b.contractor || "—").trim() || "—";
+      if (!roll[nm]) roll[nm] = emptyBuckets();
+      roll[nm].n++; roll[nm].tot += cb.total;
+      roll[nm][bk] += cb.total; roll[nm][bk + "N"]++;
+    });
+  });
   var approvedTotal = 0, stCounts = {}, staleBids = 0;
   jobs.forEach(function (x) {
     var st = x.j.status || "quoted";
@@ -4136,12 +4185,29 @@ function spendBars(d) {
     .sort(function (a, b) { return b.v.tot - a.v.tot; });
   var mx = rollArr.length ? rollArr[0].v.tot : 1;
   var h = [];
-  rollArr.forEach(function (r) {
-    h.push('<div class="brow browlink" data-cn="' + esc(r.nm) + '" role="button" tabindex="0" title="Show all quotes from ' + esc(r.nm) + '"><div class="blabel">' + esc(r.nm) + '</div><div class="btrack">' +
-      '<div class="bar" style="width:' + (r.v.tot / mx * 100).toFixed(1) + '%"></div></div>' +
-      '<div class="bval">' + money(r.v.tot) + '<span class="bjobs"> · ' + r.v.n + "</span></div></div>");
-  });
-  return h.join("") || '<p class="seclede">No committed spend yet.</p>';
+  rollArr.forEach(function (r) { h.push(spendBarRow(r.nm, r.v, mx)); });
+  return h.join("") || '<p class="seclede">Nothing quoted yet.</p>';
+}
+/* One contractor: the bar split where the board has and has not decided, and
+   underneath, in words, which part is which. Two figures and not three, because
+   the line is there to say what the bar's two tones are — finished against
+   under way is a question for the drill-down, which has the width for it, and
+   three figures do not fit a 165px column without wrapping every row. Omitted
+   where there is only one part, a split of one being the figure again. */
+function spendBarRow(nm, v, mx) {
+  var com = v.done + v.awarded;
+  var parts = [];
+  if (com > 0) parts.push("<b>committed</b> " + money0(com));
+  if (v.waiting > 0) parts.push("<b>quoted</b> " + money0(v.waiting));
+  return '<div class="brow browlink" data-cn="' + esc(nm) +
+    '" role="button" tabindex="0" title="Show all quotes from ' + esc(nm) +
+    '"><div class="blabel">' + esc(nm) + '</div><div class="btrack">' +
+    '<div class="bar" style="width:' + (v.tot / mx * 100).toFixed(1) + '%">' +
+    '<span class="bseg bcom" style="width:' + (v.tot ? com / v.tot * 100 : 0).toFixed(1) + '%"></span>' +
+    '<span class="bseg bwait" style="width:' + (v.tot ? v.waiting / v.tot * 100 : 0).toFixed(1) + '%"></span>' +
+    "</div></div>" +
+    '<div class="bval">' + money(v.tot) + '<span class="bjobs"> · ' + v.n + "</span></div>" +
+    (parts.length > 1 ? '<div class="bsplit">' + parts.join(" · ") + "</div>" : "") + "</div>";
 }
 /* overview slices/savers shared by both alternate templates */
 function overviewData(d) {
@@ -4648,7 +4714,7 @@ function renderPacketReport() {
   h.push(tplBanners(ctx.ED));
   /* dense 4-up: spend | donut | high-priority | top savings */
   h.push('<div class="pk-grid4">');
-  h.push('<section id="secD" class="panel"><h3>Committed spend by contractor</h3>' + spendBars(d) +
+  h.push('<section id="secD" class="panel"><h3>Spend by contractor</h3>' + spendBars(d) +
     '<a class="pk-spendmore" href="#secC">View full contractor spend breakdown →</a></section>');
   h.push('<section class="panel"><h3>Jobs by priority</h3>' + priorityDonut(d, ov) +
     '<div class="pk-note">🔒 High-priority jobs require board approval. The lowest received quote for each is shown in the High Priority Jobs table.</div></section>');
@@ -4985,11 +5051,7 @@ function renderClassicReport() {
   if (state.ai && state.ai.spendNote)
     h.push('<p class="seclede ainarr">' + tE("ai:spendNote", state.ai.spendNote, "AI note") + "</p>");
   h.push('<p class="seclede">' + tE("meta:ledeD", M.ledeD, "Section description") + '</p><div class="chart">');
-  rollArr.forEach(function (r) {
-    h.push('<div class="brow browlink" data-cn="' + esc(r.nm) + '" role="button" tabindex="0" title="Show all quotes from ' + esc(r.nm) + '"><div class="blabel">' + esc(r.nm) + '</div><div class="btrack">' +
-      '<div class="bar" style="width:' + (r.v.tot / mx * 100).toFixed(1) + '%"></div></div>' +
-      '<div class="bval">' + money(r.v.tot) + '<span class="bjobs"> · ' + r.v.n + "</span></div></div>");
-  });
+  rollArr.forEach(function (r) { h.push(spendBarRow(r.nm, r.v, mx)); });
   h.push("</div></section>");
 
   /* Section E */
@@ -6320,7 +6382,11 @@ function aiBuildStats() {
       savings_vs_next_bid_cad: x.c.saving || 0 };
   });
   var roll = Object.keys(d.roll).map(function (nm) {
-    return { contractor: nm, jobs: d.roll[nm].n, total_cad: Math.round(d.roll[nm].tot * 100) / 100 };
+    var v = d.roll[nm];
+    return { contractor: nm, jobs: v.n, total_cad: Math.round(v.tot * 100) / 100,
+             completed_cad: Math.round(v.done * 100) / 100,
+             awarded_cad: Math.round(v.awarded * 100) / 100,
+             awaiting_board_cad: Math.round(v.waiting * 100) / 100 };
   }).sort(function (a, b) { return b.total_cad - a.total_cad; });
   return { condominium: state.meta.condoName, registration: state.meta.regNo,
     manager: state.meta.manager, buildings: state.meta.buildings,
@@ -11857,6 +11923,24 @@ document.getElementById("btnDash").onclick = openDashboard;
 document.getElementById("dashClose").onclick = function () { document.getElementById("dashOverlay").classList.remove("open"); };
 document.getElementById("dashOverlay").addEventListener("click", function (e) { if (e.target === this) this.classList.remove("open"); });
 
+/* What happened to the job, and only then whether this is the quote the report
+   carries. The column used to say "lowest", which answers which quote counts
+   and was being read as what the board had done about it — so a job nobody had
+   decided looked the same as one already finished. */
+function coStatusHTML(r) {
+  var x = r.x;
+  if (!x.carried)
+    return x.total != null ? '<span class="costat cono">higher bid</span>'
+      : (x.pending ? '<span class="costat cono">awaiting quote</span>' : "—");
+  var st = r.j.status || "quoted";
+  var cls = st === "completed" ? "codone" : APPROVED_SET[st] ? "coaward"
+    : DEAD_SET[st] ? "codead" : "cowait";
+  var sub = (r.c && r.c.priced > 1)
+    ? (x.override ? "carried over the lowest" : "lowest quote") : "only quote";
+  return '<span class="costat ' + cls + '">' +
+    esc(st === "quoted" ? "Awaiting the board" : statusLabel(st)) + "</span>" +
+    '<div class="cosub">' + sub + "</div>";
+}
 /* Section D: click a contractor bar → popup listing all their quotes (read-only) */
 var dashAllJobs = null;   /* flat all-periods job list, set when the dashboard opens */
 function openContractorOverlay(name, jobsList) {
@@ -11866,25 +11950,49 @@ function openContractorOverlay(name, jobsList) {
   var allPeriods = !!(jobsList && jobsList.length);
   var rows = [];
   jobs.forEach(function (j) {
-    jobCalc(j).bids.forEach(function (x) {
-      if (String(x.b.contractor || "").trim().toLowerCase() === key) rows.push({ j: j, x: x });
+    var c = jobCalc(j);
+    c.bids.forEach(function (x) {
+      if (String(x.b.contractor || "").trim().toLowerCase() === key) rows.push({ j: j, x: x, c: c });
     });
   });
   rows.sort(function (a, b) { return (b.x.carried ? 1 : 0) - (a.x.carried ? 1 : 0) || (a.j.no - b.j.no); });
-  var wonTot = 0, won = 0;
-  rows.forEach(function (r) { if (r.x.carried) { wonTot += r.x.total; won++; } });
+  /* Three totals, because committed is a decision. One figure called "counted
+     toward committed spend" covered money on jobs the board had not reached —
+     and it counted carried quotes on cancelled jobs too, so it could come out
+     larger than the bar it was opened from. */
+  var bk = emptyBuckets(), out = { tot: 0, n: 0 };
+  rows.forEach(function (r) {
+    if (!r.x.carried || r.x.total == null) return;
+    if (!countsAsSpend(r.j)) { out.tot += r.x.total; out.n++; return; }
+    var k = spendBucket(r.j);
+    bk.n++; bk.tot += r.x.total; bk[k] += r.x.total; bk[k + "N"]++;
+  });
+  var jn = function (n) { return n + " job" + (n === 1 ? "" : "s"); };
   var t = document.getElementById("contractorTitle");
   if (t) t.textContent = String(name).trim() + (allPeriods ? " — quotes (all periods)" : " — quotes");
   var h = [];
-  h.push('<p class="histempty" style="margin:0 0 4px">' + rows.length + " quote" + (rows.length === 1 ? "" : "s") +
-    " on record · lowest on " + won + " job" + (won === 1 ? "" : "s") + " · " + money(wonTot) + " counted toward committed spend (incl. HST).</p>");
+  h.push('<p class="histempty" style="margin:0 0 6px">' + rows.length + " quote" + (rows.length === 1 ? "" : "s") +
+    " on record · carried on " + jn(bk.n) + ". Every amount includes HST.</p>");
+  if (bk.n || out.n) {
+    h.push('<div class="cobuck">');
+    SPEND_BUCKETS.forEach(function (b) {
+      if (!bk[b[0] + "N"]) return;
+      h.push('<div><span class="cl">' + b[1] + '</span><span class="cv">' + money(bk[b[0]]) +
+        '</span><span class="cn">' + jn(bk[b[0] + "N"]) + "</span></div>");
+    });
+    h.push('<div class="cosum"><span class="cl">All live jobs</span><span class="cv">' + money(bk.tot) +
+      '</span><span class="cn">' + jn(bk.n) + "</span></div>");
+    if (out.n)
+      h.push('<div class="coout"><span class="cl">Rejected or cancelled — out of the figures</span>' +
+        '<span class="cv">' + money(out.tot) + '</span><span class="cn">' + jn(out.n) + "</span></div>");
+    h.push("</div>");
+  }
   if (!rows.length) h.push('<p class="histempty">No quotes found for this contractor.</p>');
   else {
-    h.push('<table class="dashtable"><thead><tr><th>Job</th><th>Quote #</th><th class="money">Amount (incl. HST)</th><th>In totals</th></tr></thead><tbody>');
+    h.push('<table class="dashtable"><thead><tr><th>Job</th><th>Quote #</th><th class="money">Amount (incl. HST)</th><th>Status</th></tr></thead><tbody>');
     rows.forEach(function (r) {
       var amt = r.x.total != null ? money(r.x.total) : (String(r.x.b.contractor || "").trim() ? "pending" : "—");
-      var tag = r.x.carried ? '<span style="color:#16273f;font-weight:600">lowest</span>' :
-        (r.x.total != null ? '<span style="color:var(--muted)">higher bid</span>' : (r.x.pending ? "awaiting quote" : "—"));
+      var tag = coStatusHTML(r);
       var notes = r.x.b.notes ? '<div style="font-size:11.5px;color:var(--muted)">' + esc(r.x.b.notes) + "</div>" : "";
       var files = (Array.isArray(r.x.b.files) && r.x.b.files.length) ?
         ' <span class="attlink" role="button" tabindex="0" style="font-size:11px" data-attstash="' +
