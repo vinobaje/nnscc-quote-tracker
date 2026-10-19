@@ -960,7 +960,8 @@ body:has(#report.tpl-packet) .wrap { max-width:1560px; }
 .tpl-packet .brow { grid-template-columns:76px 1fr 82px; gap:7px; padding:2.5px 0; }
 .tpl-packet .blabel { font-size:14px; } .tpl-packet .bval { font-size:14px; }
 .tpl-packet .bjobs { display:none; }               /* drop the "· N" job count to save width */
-.tpl-packet .bsplit { font-size:10.5px; margin:-2px 0 4px; }
+/* hugging the row it belongs to, or it reads as a caption on the next one */
+.tpl-packet .bsplit { font-size:10.5px; margin:-4px 0 7px; }
 .tpl-packet .btrack { height:13px; } .tpl-packet .bar { background:var(--pkg); }
 .tpl-packet .ov-donut { flex-direction:column; gap:10px; align-items:center; text-align:center; }
 .tpl-packet .ov-legend { align-self:stretch; }
@@ -981,6 +982,7 @@ body:has(#report.tpl-packet) .wrap { max-width:1560px; }
 .tpl-packet .pk-viewall:hover { background:#124f2f; }
 .tpl-packet .pk-hptable:not(.hp-all) .pk-hp-extra { display:none; }
 .tpl-packet .pk-pasttable:not(.past-all) .pk-past-extra { display:none; }
+.tpl-packet .pk-spendtable:not(.spend-all) .pk-spend-extra { display:none; }
 /* how much of a record a finished job left behind, said in the row rather than
    made to be discovered by opening each one */
 .tpl-packet .pk-pastup { font-size:11px; font-weight:600; color:var(--muted); white-space:nowrap;
@@ -1001,6 +1003,7 @@ body:has(#report.tpl-packet) .wrap { max-width:1560px; }
 /* "view full contractor spend report" link under the bars */
 .tpl-packet .pk-spendmore { display:block; text-align:center; margin-top:12px; padding-top:11px;
   border-top:1px solid var(--line-soft); font-size:12px; font-weight:600; color:var(--pkg); text-decoration:none; }
+.tpl-packet .pk-spendmore { cursor:pointer; }
 .tpl-packet .pk-spendmore:hover { text-decoration:underline; }
 /* open items: two columns like the mockup */
 /* a section that opens and shuts: shut by default, and its heading is the
@@ -2254,6 +2257,7 @@ body[data-view="edit"] .wrap { max-width:none; }
   /* everything hidden behind a "show all" control is printed in full */
   .tpl-packet .pk-hptable .pk-hp-extra { display:table-row !important; }
   .tpl-packet .pk-pasttable .pk-past-extra { display:table-row !important; }
+  .tpl-packet .pk-spendtable .pk-spend-extra { display:grid !important; }
   .tpl-packet .pk-fold .pk-foldbody { display:block !important; margin-top:12px; }
   .tpl-packet .pk-fold .pk-foldic { display:none; }
   .tpl-packet .pk-updrest[hidden] { display:block !important; }
@@ -2893,7 +2897,7 @@ var BRAND_PATH = "nnsccQuoteTracker/brand";               /* the letterhead the 
 var WEEKLY_DRAFT_PATH = "nnsccQuoteTracker/weeklyDraft";   /* the report she is working on */
 var WEEKLY_COLL = "nnsccWeeklyReports";                   /* every one she has finished */
 var VIEW_BETA = CURRENT_PATH.indexOf("Beta") >= 0;   /* which report the passcode gate reads/protects */
-var BUILD_STAMP = "2026-10-19 16:53";   /* filled in by build.js — which copy of the page this is */
+var BUILD_STAMP = "2026-10-19 19:15";   /* filled in by build.js — which copy of the page this is */
 /* path of the report currently on screen */
 function reportPath() {
   return cloud.active.kind === "current" ? CURRENT_PATH : (REPORTS_COLL + "/" + cloud.active.id);
@@ -4112,27 +4116,39 @@ function secEBlocks(d, M, EDITOR) {
   h.push("</ul>");
   return h.join("");
 }
-/* contractor-spend bars (Section D body) — shared; reuses the .browlink popup */
+/* Twenty-seven contractors is a thousand pixels of panel in a row of panels
+   five hundred tall, and the fourteen at the bottom are a few thousand dollars
+   between them. So the ones worth a glance are shown and the tail folds, with
+   its own total on the control so shut is still an answer. On paper it all
+   prints: there is nothing to press. */
+var SPEND_ROWS = 12;   /* as the completed-jobs table folds at twelve */
 function spendBars(d) {
   var rollArr = Object.keys(d.roll).map(function (nm) { return { nm: nm, v: d.roll[nm] }; })
     .sort(function (a, b) { return b.v.tot - a.v.tot; });
-  var mx = rollArr.length ? rollArr[0].v.tot : 1;
-  var h = [];
-  rollArr.forEach(function (r) { h.push(spendBarRow(r.nm, r.v, mx)); });
-  return h.join("") || '<p class="seclede">Nothing quoted yet.</p>';
+  if (!rollArr.length) return '<p class="seclede">Nothing quoted yet.</p>';
+  var mx = rollArr[0].v.tot || 1;
+  var h = [], restTot = 0;
+  rollArr.forEach(function (r, i) {
+    if (i >= SPEND_ROWS) restTot += r.v.tot;
+    h.push(spendBarRow(r.nm, r.v, mx, i >= SPEND_ROWS ? "pk-spend-extra" : ""));
+  });
+  var rest = rollArr.length - SPEND_ROWS;
+  if (rest > 0)
+    h.push('<a class="pk-spendmore" data-spendmore="' + rest + '" data-spendtot="' + esc(money0(restTot)) +
+      '">' + rest + " more contractor" + (rest === 1 ? "" : "s") + " \u00b7 " + money0(restTot) + " \u2193</a>");
+  return h.join("");
 }
 /* One contractor: the bar split where the board has and has not decided, and
-   underneath, in words, which part is which. Two figures and not three, because
-   the line is there to say what the bar's two tones are — finished against
-   under way is a question for the drill-down, which has the width for it, and
-   three figures do not fit a 165px column without wrapping every row. Omitted
-   where there is only one part, a split of one being the figure again. */
-function spendBarRow(nm, v, mx) {
+   under it the one figure that changes a decision — how much of that total
+   nobody has said yes to. Two figures wrapped onto a second line in a 165px
+   column, which doubled the height of every row that had a split; the solid
+   part of the bar says the rest, and the drill-down has all three. Omitted
+   where the bar is one tone, the split then being the total again. */
+function spendBarRow(nm, v, mx, extra) {
   var com = v.done + v.awarded;
-  var parts = [];
-  if (com > 0) parts.push("<b>committed</b> " + money0(com));
-  if (v.waiting > 0) parts.push("<b>quoted</b> " + money0(v.waiting));
-  return '<div class="brow browlink" data-cn="' + esc(nm) +
+  var split = (com > 0 && v.waiting > 0)
+    ? money0(v.waiting) + " not yet committed" : "";
+  return '<div class="brow browlink' + (extra ? " " + extra : "") + '" data-cn="' + esc(nm) +
     '" role="button" tabindex="0" title="Show all quotes from ' + esc(nm) +
     '"><div class="blabel">' + esc(nm) + '</div><div class="btrack">' +
     '<div class="bar" style="width:' + (v.tot / mx * 100).toFixed(1) + '%">' +
@@ -4140,7 +4156,7 @@ function spendBarRow(nm, v, mx) {
     '<span class="bseg bwait" style="width:' + (v.tot ? v.waiting / v.tot * 100 : 0).toFixed(1) + '%"></span>' +
     "</div></div>" +
     '<div class="bval">' + money(v.tot) + '<span class="bjobs"> · ' + v.n + "</span></div>" +
-    (parts.length > 1 ? '<div class="bsplit">' + parts.join(" · ") + "</div>" : "") + "</div>";
+    (split ? '<div class="bsplit">' + split + "</div>" : "") + "</div>";
 }
 /* overview slices/savers shared by both alternate templates */
 function overviewData(d) {
@@ -4647,8 +4663,8 @@ function renderPacketReport() {
   h.push(tplBanners(ctx.ED));
   /* dense 4-up: spend | donut | high-priority | top savings */
   h.push('<div class="pk-grid4">');
-  h.push('<section id="secD" class="panel"><h3>Spend by contractor</h3>' + spendBars(d) +
-    '<a class="pk-spendmore" href="#secC">View full contractor spend breakdown →</a></section>');
+  h.push('<section id="secD" class="panel pk-spendtable"><h3>Spend by contractor</h3>' +
+    spendBars(d) + "</section>");
   h.push('<section class="panel"><h3>Jobs by priority</h3>' + priorityDonut(d, ov) +
     '<div class="pk-note">🔒 High-priority jobs require board approval. The lowest received quote for each is shown in the High Priority Jobs table.</div></section>');
   h.push('<section id="secA" class="panel pk-hptable"><h3>High priority jobs — approval requested</h3>' +
@@ -4977,15 +4993,11 @@ function renderClassicReport() {
   h.push("</tbody></table></div>" + decidedNote(d, "std") + "</section>");
 
   /* Section D */
-  var rollArr = Object.keys(d.roll).map(function (nm) { return { nm: nm, v: d.roll[nm] }; })
-    .sort(function (a, b) { return b.v.tot - a.v.tot; });
-  var mx = rollArr.length ? rollArr[0].v.tot : 1;
-  h.push('<section id="secD"><div class="kicker">Section D</div><h2' + hA("headD") + ">" + esc(M.headD) + "</h2>");
+  h.push('<section id="secD" class="pk-spendtable"><div class="kicker">Section D</div><h2' + hA("headD") + ">" + esc(M.headD) + "</h2>");
   if (state.ai && state.ai.spendNote)
     h.push('<p class="seclede ainarr">' + tE("ai:spendNote", state.ai.spendNote, "AI note") + "</p>");
-  h.push('<p class="seclede">' + tE("meta:ledeD", M.ledeD, "Section description") + '</p><div class="chart">');
-  rollArr.forEach(function (r) { h.push(spendBarRow(r.nm, r.v, mx)); });
-  h.push("</div></section>");
+  h.push('<p class="seclede">' + tE("meta:ledeD", M.ledeD, "Section description") + '</p><div class="chart">' +
+    spendBars(d) + "</div></section>");
 
   /* Section E */
   var pend = d.spend.filter(function (x) { return x.c.pendingNames.length; });
@@ -11375,6 +11387,20 @@ document.addEventListener("click", function (e) {
     e.preventDefault();
     var fsec = fold.closest(".pk-fold");
     if (fsec) foldOpen[fold.getAttribute("data-fold")] = fsec.classList.toggle("open");
+    return;
+  }
+  /* the spend panel's folded tail */
+  var smore = e.target.closest("[data-spendmore]");
+  if (smore) {
+    e.preventDefault();
+    var spanel = smore.closest(".pk-spendtable");
+    if (spanel) {
+      var sopen = spanel.classList.toggle("spend-all");
+      smore.textContent = sopen ? "Show fewer \u2191"
+        : smore.getAttribute("data-spendmore") + " more contractor" +
+          (smore.getAttribute("data-spendmore") === "1" ? "" : "s") + " \u00b7 " +
+          smore.getAttribute("data-spendtot") + " \u2193";
+    }
     return;
   }
   /* board-packet "View all completed jobs" → reveal the hidden rows */
