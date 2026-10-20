@@ -7,14 +7,14 @@
   --line:#D9DEE3; --line-soft:#E8ECEF;
   --accent:#2D567F; --accent-ink:#24466B; --accent-soft:#EAF0F6;
   --good:#1E7A46; --good-soft:#E7F3EC; --prio:#A03636; --prio-soft:#F7ECEC;
-  --amber:#B0700F; --amber-soft:#F8EFDD; --bar:#2D567F; --barm:#7FA3C4; --barq:#E8C25C;
+  --amber:#B0700F; --amber-soft:#F8EFDD; --bar:#2D567F; --barm:#7FA3C4; --barq:#D3E0EC;
 }
 :root[data-theme="dark"], :root[data-theme="light"] {
   --paper:#F7F8F9; --card:#FFFFFF; --ink:#1E2833; --ink2:#4A5866; --muted:#7A8794;
   --line:#D9DEE3; --line-soft:#E8ECEF;
   --accent:#2D567F; --accent-ink:#24466B; --accent-soft:#EAF0F6;
   --good:#1E7A46; --good-soft:#E7F3EC; --prio:#A03636; --prio-soft:#F7ECEC;
-  --amber:#B0700F; --amber-soft:#F8EFDD; --bar:#2D567F; --barm:#7FA3C4; --barq:#E8C25C;
+  --amber:#B0700F; --amber-soft:#F8EFDD; --bar:#2D567F; --barm:#7FA3C4; --barq:#D3E0EC;
 }
 html { background:var(--paper); color-scheme:light; }
 body { font:15px/1.55 -apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; color:var(--ink);
@@ -328,10 +328,11 @@ tr.pend td { color:var(--muted); font-style:italic; }
    read as solid, finished work. With nothing beside it to compare against,
    a mid green is just green. They sit at 3 now.
 
-   Awaiting the board is yellow, not a third green: it is the one state that
-   is waiting on somebody, it is the colour the drill-down already prints
-   "Awaiting the board" in, and a change of hue says "different" in a way
-   another step of lightness could not.
+   All three are shades of the one green, darkest for what is settled. A
+   yellow third tone was tried and turned the panel into a column of yellow,
+   since most of the money is still with the board. One hue works only if the
+   steps are wide: finished-to-under-way is 2.75 here, under-way-to-awaiting
+   about 2, against the 1.86 that failed.
 
    There is no fourth, empty region. It used to mean "smaller than the largest
    contractor", which on a panel headed Spend by contractor reads as money left
@@ -975,7 +976,7 @@ body:has(#report.tpl-packet) .wrap { max-width:1560px; }
 .savecard.total .sc-amt { color:#fff; }
 
 /* ---------- Board packet (Design 4: dark rail + serif header + 4-up) ---------- */
-.tpl-packet { --pkg:#16613a; --pkgm:#5FAC82; --pkgq:#E8C25C; }
+.tpl-packet { --pkg:#16613a; --pkgm:#5FAC82; --pkgq:#C9E1D1; }
 .tpl-packet .pk-shell { display:grid; grid-template-columns:216px 1fr; background:var(--card);
   border:1px solid var(--line); border-radius:12px; box-shadow:0 1px 3px rgba(30,40,51,.07); }
 @media screen and (max-width:900px){ .tpl-packet .pk-shell { grid-template-columns:1fr; } }
