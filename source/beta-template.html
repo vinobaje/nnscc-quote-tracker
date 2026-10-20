@@ -304,10 +304,19 @@ tr.pend td { color:var(--muted); font-style:italic; }
 .sched td { font-size:14px; }
 
 .chart { background:var(--card); border:1px solid var(--line); border-radius:6px; padding:16px 18px; }
-.brow { display:grid; grid-template-columns:190px 1fr 150px; gap:10px; align-items:center; padding:3.5px 0; }
-.blabel { font-size:13px; color:var(--ink2); text-align:right; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.btrack { height:16px; background:var(--line-soft); border-radius:0 4px 4px 0; }
-.bar { height:100%; background:var(--bar); border-radius:0 4px 4px 0; min-width:2px;
+/* A contractor is called something, and 76px of it was all that showed: the
+   panel had two bars both reading "Townsen…", which is not a tidiness problem
+   but two companies the reader cannot tell apart. So the name has the line to
+   itself with the amount at the end of it, and the bar runs the full width
+   underneath — where it is three times as long as it was, and the split in it
+   is legible rather than a smudge. */
+.brow { display:grid; grid-template-columns:1fr auto; gap:0 12px; align-items:baseline;
+  padding:8px 0; }
+.brow + .brow { border-top:1px solid var(--line-soft); }
+.blabel { font-size:13px; color:var(--ink2); }
+.btrack { grid-column:1/-1; height:10px; background:var(--line-soft); border-radius:5px;
+  margin-top:5px; }
+.bar { height:100%; background:var(--bar); border-radius:5px; min-width:2px;
   display:flex; overflow:hidden; }
 /* Solid where the board has committed the money, pale where it is still only a
    price on the table. One bar, because it is one contractor; two tones, because
@@ -317,10 +326,10 @@ tr.pend td { color:var(--muted); font-style:italic; }
 .bar .bwait { background:var(--barq); }
 .tpl-packet .bar .bcom { background:var(--pkg); }
 .tpl-packet .bar .bwait { background:var(--pkgq); }
-.bsplit { grid-column:2/-1; font-size:11px; color:var(--muted); margin:-1px 0 3px;
+.bsplit { grid-column:1/-1; font-size:11px; color:var(--muted); margin:5px 0 0;
   font-variant-numeric:tabular-nums; }
 .bsplit b { font-weight:600; color:var(--ink2); }
-.bval { font-size:13px; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.bval { font-size:13px; font-variant-numeric:tabular-nums; white-space:nowrap; text-align:right; }
 .bjobs { color:var(--muted); }
 .browlink { cursor:pointer; border-radius:6px; }
 .browlink:hover, .browlink:focus-visible { background:rgba(22,39,63,.06); outline:none; }
@@ -1052,12 +1061,12 @@ body:has(#report.tpl-packet) .wrap { max-width:1560px; }
 /* grid items must be allowed to shrink so their content wraps instead of
    overflowing (pk-shell clips overflow to keep the rounded corners) */
 .tpl-packet .pk-grid4 > *, .tpl-packet .pk-grid2 > *, .tpl-packet .pk-detail > * { min-width:0; }
-.tpl-packet .brow { grid-template-columns:76px 1fr 82px; gap:7px; padding:2.5px 0; }
-.tpl-packet .blabel { font-size:14px; } .tpl-packet .bval { font-size:14px; }
+.tpl-packet .brow { gap:0 8px; padding:5px 0; }
+.tpl-packet .blabel { font-size:13px; } .tpl-packet .bval { font-size:13px; }
+.tpl-packet .btrack { height:9px; margin-top:3px; }
 .tpl-packet .bjobs { display:none; }               /* drop the "· N" job count to save width */
-/* hugging the row it belongs to, or it reads as a caption on the next one */
-.tpl-packet .bsplit { font-size:10.5px; margin:-4px 0 7px; }
-.tpl-packet .btrack { height:13px; } .tpl-packet .bar { background:var(--pkg); }
+.tpl-packet .bsplit { font-size:10.5px; margin:3px 0 0; }
+.tpl-packet .bar { background:var(--pkg); }
 .tpl-packet .ov-donut { flex-direction:column; gap:10px; align-items:center; text-align:center; }
 .tpl-packet .ov-legend { align-self:stretch; }
 .tpl-packet .pk-note { margin-top:12px; background:var(--amber-soft); border:1px solid #ecd9b3; border-radius:8px;
@@ -2325,9 +2334,8 @@ body[data-view="edit"] .wrap { max-width:none; }
   /* the two detail sections and the closing pair stack, full width each */
   .tpl-packet .pk-detail2, .tpl-packet .pk-grid2 { grid-template-columns:1fr; }
   .tpl-packet .savegrid { grid-template-columns:repeat(2,1fr); }
-  /* full contractor names — no ellipsis on paper */
-  .tpl-packet .brow { grid-template-columns:132px 1fr 84px; }
-  .tpl-packet .blabel { white-space:normal; overflow:visible; text-overflow:clip; font-size:12px; }
+  /* the names print in full because they are no longer cut anywhere */
+  .tpl-packet .blabel { font-size:12px; }
   .tpl-packet .bval { font-size:12px; }
   /* tables: screen sizes are set for a 1560px canvas, paper is half that */
   .tpl-packet .pk-cmptable td, .tpl-packet .pk-schedtable td { font-size:13px; padding:7px 8px; }
@@ -4220,7 +4228,9 @@ function secEBlocks(d, M, EDITOR) {
    between them. So the ones worth a glance are shown and the tail folds, with
    its own total on the control so shut is still an answer. On paper it all
    prints: there is nothing to press. */
-var SPEND_ROWS = 12;   /* as the completed-jobs table folds at twelve */
+/* Eight, not twelve: the name's own line costs a row about sixteen pixels, and
+   twelve of those put the panel back above the ones beside it. */
+var SPEND_ROWS = 8;
 function spendBars(d) {
   var rollArr = Object.keys(d.roll).map(function (nm) { return { nm: nm, v: d.roll[nm] }; })
     .sort(function (a, b) { return b.v.tot - a.v.tot; });
@@ -4245,16 +4255,18 @@ function spendBars(d) {
    where the bar is one tone, the split then being the total again. */
 function spendBarRow(nm, v, mx, extra) {
   var com = v.done + v.awarded;
+  /* what is unsettled first, as in the drill-down and for the same reason.
+     Omitted where the bar is one tone: the split is then the total again. */
   var split = (com > 0 && v.waiting > 0)
-    ? money0(v.waiting) + " not yet committed" : "";
+    ? money0(v.waiting) + " not yet committed \u00b7 " + money0(com) + " committed" : "";
   return '<div class="brow browlink' + (extra ? " " + extra : "") + '" data-cn="' + esc(nm) +
     '" role="button" tabindex="0" title="Show all quotes from ' + esc(nm) +
-    '"><div class="blabel">' + esc(nm) + '</div><div class="btrack">' +
-    '<div class="bar" style="width:' + (v.tot / mx * 100).toFixed(1) + '%">' +
+    '"><div class="blabel">' + esc(nm) + "</div>" +
+    '<div class="bval">' + money(v.tot) + '<span class="bjobs"> · ' + v.n + "</span></div>" +
+    '<div class="btrack"><div class="bar" style="width:' + (v.tot / mx * 100).toFixed(1) + '%">' +
     '<span class="bseg bcom" style="width:' + (v.tot ? com / v.tot * 100 : 0).toFixed(1) + '%"></span>' +
     '<span class="bseg bwait" style="width:' + (v.tot ? v.waiting / v.tot * 100 : 0).toFixed(1) + '%"></span>' +
     "</div></div>" +
-    '<div class="bval">' + money(v.tot) + '<span class="bjobs"> · ' + v.n + "</span></div>" +
     (split ? '<div class="bsplit">' + split + "</div>" : "") + "</div>";
 }
 /* overview slices/savers shared by both alternate templates */
@@ -11951,9 +11963,9 @@ function openDashboard() {
         var mx = rollAll[names[0]] || 1;
         h.push('<div class="rephead">Spend by contractor — all periods</div><div class="chart" style="margin-top:6px">');
         names.slice(0, 12).forEach(function (nm) {
-          h.push('<div class="brow browlink" data-cn="' + esc(nm) + '" data-scope="dash" role="button" tabindex="0" title="Show all quotes from ' + esc(nm) + '"><div class="blabel">' + esc(nm) + '</div><div class="btrack">' +
-            '<div class="bar" style="width:' + (rollAll[nm] / mx * 100).toFixed(1) + '%"></div></div>' +
-            '<div class="bval">' + money(rollAll[nm]) + "</div></div>");
+          h.push('<div class="brow browlink" data-cn="' + esc(nm) + '" data-scope="dash" role="button" tabindex="0" title="Show all quotes from ' + esc(nm) + '"><div class="blabel">' + esc(nm) + "</div>" +
+            '<div class="bval">' + money(rollAll[nm]) + "</div>" +
+            '<div class="btrack"><div class="bar" style="width:' + (rollAll[nm] / mx * 100).toFixed(1) + '%"></div></div></div>');
         });
         h.push("</div>");
       }
