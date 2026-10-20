@@ -794,6 +794,31 @@ tr.jlink td:first-child::after { content:" ›"; color:var(--muted); }
 /* the break between groups is mostly air: a darker rule alone is lost among
    the rules every row already has */
 .dashtable tr.cogap > td { border-top:1px solid var(--line); padding-top:14px; }
+#contractorBody .dashtable td:nth-child(2):empty::after { content:"\2014"; color:var(--muted); }
+/* The drill-down on a phone. Four columns, one of them a job description, do
+   not fit 335px: the status column fell off the right edge, taking with it the
+   one thing the panel was opened to find out. So each quote becomes a block —
+   the job, then its amount and where it stands on the line under it — and the
+   quote-number column, which is a dash on nearly every row, goes where it is
+   empty. */
+@media screen and (max-width:600px) {
+  #contractorBody .dashtable thead { display:none; }
+  #contractorBody .dashtable tbody { display:block; }
+  #contractorBody .dashtable tr { display:flex; flex-wrap:wrap; align-items:baseline;
+    gap:2px 10px; padding:9px 7px 9px 0; border-bottom:1px solid var(--line-soft); }
+  #contractorBody .dashtable tr td { display:block; border:none; padding:0; }
+  #contractorBody .dashtable tr td:nth-child(1) { flex:1 0 100%; }
+  #contractorBody .dashtable tr td:nth-child(2) { order:3; color:var(--muted); font-size:12px; }
+  #contractorBody .dashtable tr td:nth-child(2):empty { display:none; }
+  #contractorBody .dashtable tr td:nth-child(3) { order:2; text-align:left; font-weight:600; }
+  #contractorBody .dashtable tr td:nth-child(4) { order:4; margin-left:auto; text-align:right; }
+  /* the group break is on the row, not on four cells of it */
+  #contractorBody .dashtable tr.cogap { border-top:1px solid var(--line); padding-top:15px; }
+  #contractorBody .dashtable tr.cogap > td { border-top:none; padding-top:0; }
+  /* clear of the scrollbar the list puts down the right-hand edge */
+  #contractorBody .cobuck div { gap:8px; padding-right:7px; }
+  #contractorBody .cobuck .cn { width:42px; font-size:11px; }
+}
 .memobox { width:min(640px,94vw); }
 .memobox textarea { width:100%; box-sizing:border-box; font:13.5px/1.55 ui-monospace,Menlo,monospace;
   padding:10px; min-height:280px; letter-spacing:normal; text-align:left; }
@@ -2712,8 +2737,12 @@ function countsAsSpend(j) { return !DEAD_SET[j.status || "quoted"]; }
    one heading called committed spend is how a contractor with four quotes in
    front of the board came to look like a contractor with four contracts.
    Deferred sits with awaiting: the board has put it off, not taken it on. */
-var SPEND_BUCKETS = [["done", "Completed"], ["awarded", "Awarded / in progress"],
-                     ["waiting", "Awaiting the board"]];
+/* What the board has not settled first, and finished work last: the question
+   this panel is opened with is what still needs deciding, and completed work
+   is there to be looked up. It is also the order the job travels in. The
+   totals and the list under them share this order — see coRank. */
+var SPEND_BUCKETS = [["waiting", "Awaiting the board"], ["awarded", "Awarded / in progress"],
+                     ["done", "Completed"]];
 function spendBucket(j) {
   var st = (j && j.status) || "quoted";
   if (st === "completed") return "done";
@@ -2967,7 +2996,7 @@ var BRAND_PATH = "nnsccQuoteTrackerBeta/brand";               /* the letterhead 
 var WEEKLY_DRAFT_PATH = "nnsccQuoteTrackerBeta/weeklyDraft";   /* the report she is working on */
 var WEEKLY_COLL = "nnsccWeeklyReportsBeta";                   /* every one she has finished */
 var VIEW_BETA = CURRENT_PATH.indexOf("Beta") >= 0;   /* which report the passcode gate reads/protects */
-var BUILD_STAMP = "2026-10-19 21:15";   /* filled in by build.js — which copy of the page this is */
+var BUILD_STAMP = "2026-10-19 21:24";   /* filled in by build.js — which copy of the page this is */
 /* path of the report currently on screen */
 function reportPath() {
   return cloud.active.kind === "current" ? CURRENT_PATH : (REPORTS_COLL + "/" + cloud.active.id);
@@ -11944,7 +11973,7 @@ function coRank(r) {
   if (!countsAsSpend(r.j)) return 4;        /* rejected or cancelled, carried or not */
   if (!r.x.carried) return 3;               /* a higher bid is in no total */
   var b = spendBucket(r.j);
-  return b === "done" ? 0 : b === "awarded" ? 1 : 2;
+  return b === "waiting" ? 0 : b === "awarded" ? 1 : 2;
 }
 /* What happened to the job, and only then whether this is the quote the report
    carries. The column used to say "lowest", which answers which quote counts
@@ -12035,7 +12064,7 @@ function openContractorOverlay(name, jobsList) {
       var rk = coRank(r), gap = (ri && rk !== coRank(rows[ri - 1])) ? "cogap" : "";
       var cls = (opens || gap) ? ' class="' + (opens + (opens && gap ? " " : "") + gap) + '"' : "";
       h.push("<tr" + cls + (opens ? jdData(r.j) : "") + "><td><strong>" + esc(r.j.no) + "</strong> · " + esc(r.j.desc || "job") + per + notes + "</td>" +
-        "<td>" + esc(r.x.b.qno || "—") + "</td>" +
+        "<td>" + (r.x.b.qno ? "#" + esc(r.x.b.qno) : "") + "</td>" +
         '<td class="money">' + amt + files + "</td>" +
         "<td>" + tag + "</td></tr>");
     });
