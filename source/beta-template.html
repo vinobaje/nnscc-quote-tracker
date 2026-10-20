@@ -316,11 +316,17 @@ tr.pend td { color:var(--muted); font-style:italic; }
 .blabel { font-size:13px; color:var(--ink2); }
 .btrack { grid-column:1/-1; height:10px; background:var(--line-soft); border-radius:5px;
   margin-top:5px; }
-.bar { height:100%; background:var(--bar); border-radius:5px; min-width:2px;
+.bar { height:100%; width:100%; background:var(--bar); border-radius:5px;
   display:flex; overflow:hidden; }
 /* Solid where the board has committed the money, pale where it is still only a
    price on the table. One bar, because it is one contractor; two tones, because
-   a quote nobody has decided on is not a contract. */
+   a quote nobody has decided on is not a contract — and no third tone, because
+   a bar that was part empty raised a question it could not answer. The empty
+   part meant "smaller than the largest contractor", and was read as money left
+   to spend. Every bar fills the track now and divides it between the two
+   things it is actually about. What it cost: the bars no longer show one
+   contractor against another. The list is in order of size and the figure is
+   printed beside the name, which is where that comparison now lives. */
 .bar .bseg { height:100%; }
 .bar .bcom { background:var(--bar); }
 .bar .bwait { background:var(--barq); }
@@ -4269,11 +4275,10 @@ function spendBars(d) {
   var rollArr = Object.keys(d.roll).map(function (k) { return { nm: d.roll[k].name || k, v: d.roll[k] }; })
     .sort(function (a, b) { return b.v.tot - a.v.tot; });
   if (!rollArr.length) return '<p class="seclede">Nothing quoted yet.</p>';
-  var mx = rollArr[0].v.tot || 1;
   var h = [], restTot = 0;
   rollArr.forEach(function (r, i) {
     if (i >= SPEND_ROWS) restTot += r.v.tot;
-    h.push(spendBarRow(r.nm, r.v, mx, i >= SPEND_ROWS ? "pk-spend-extra" : ""));
+    h.push(spendBarRow(r.nm, r.v, i >= SPEND_ROWS ? "pk-spend-extra" : ""));
   });
   var rest = rollArr.length - SPEND_ROWS;
   if (rest > 0)
@@ -4287,7 +4292,7 @@ function spendBars(d) {
    column, which doubled the height of every row that had a split; the solid
    part of the bar says the rest, and the drill-down has all three. Omitted
    where the bar is one tone, the split then being the total again. */
-function spendBarRow(nm, v, mx, extra) {
+function spendBarRow(nm, v, extra) {
   var com = v.done + v.awarded;
   /* what is unsettled first, as in the drill-down and for the same reason.
      Omitted where the bar is one tone: the split is then the total again. */
@@ -4297,7 +4302,7 @@ function spendBarRow(nm, v, mx, extra) {
     '" role="button" tabindex="0" title="Show all quotes from ' + esc(nm) +
     '"><div class="blabel">' + esc(nm) + "</div>" +
     '<div class="bval">' + money(v.tot) + '<span class="bjobs"> · ' + v.n + "</span></div>" +
-    '<div class="btrack"><div class="bar" style="width:' + (v.tot / mx * 100).toFixed(1) + '%">' +
+    '<div class="btrack"><div class="bar">' +
     '<span class="bseg bcom" style="width:' + (v.tot ? com / v.tot * 100 : 0).toFixed(1) + '%"></span>' +
     '<span class="bseg bwait" style="width:' + (v.tot ? v.waiting / v.tot * 100 : 0).toFixed(1) + '%"></span>' +
     "</div></div>" +
