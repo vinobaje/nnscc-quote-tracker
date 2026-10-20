@@ -791,6 +791,9 @@ tr.jlink td:first-child::after { content:" ›"; color:var(--muted); }
 .costat.cowait { color:var(--amber); }
 .costat.codead, .costat.cono { color:var(--muted); font-weight:400; }
 .cosub { font-size:11px; color:var(--muted); font-weight:400; }
+/* the break between groups is mostly air: a darker rule alone is lost among
+   the rules every row already has */
+.dashtable tr.cogap > td { border-top:1px solid var(--line); padding-top:14px; }
 .memobox { width:min(640px,94vw); }
 .memobox textarea { width:100%; box-sizing:border-box; font:13.5px/1.55 ui-monospace,Menlo,monospace;
   padding:10px; min-height:280px; letter-spacing:normal; text-align:left; }
@@ -11935,6 +11938,14 @@ document.getElementById("btnDash").onclick = openDashboard;
 document.getElementById("dashClose").onclick = function () { document.getElementById("dashOverlay").classList.remove("open"); };
 document.getElementById("dashOverlay").addEventListener("click", function (e) { if (e.target === this) this.classList.remove("open"); });
 
+/* Where a quote sits in the totals above the table: finished, under way, still
+   with the board, in no total at all, or on a job that is over. */
+function coRank(r) {
+  if (!countsAsSpend(r.j)) return 4;        /* rejected or cancelled, carried or not */
+  if (!r.x.carried) return 3;               /* a higher bid is in no total */
+  var b = spendBucket(r.j);
+  return b === "done" ? 0 : b === "awarded" ? 1 : 2;
+}
 /* What happened to the job, and only then whether this is the quote the report
    carries. The column used to say "lowest", which answers which quote counts
    and was being read as what the board had done about it — so a job nobody had
@@ -11967,7 +11978,11 @@ function openContractorOverlay(name, jobsList) {
       if (String(x.b.contractor || "").trim().toLowerCase() === key) rows.push({ j: j, x: x, c: c });
     });
   });
-  rows.sort(function (a, b) { return (b.x.carried ? 1 : 0) - (a.x.carried ? 1 : 0) || (a.j.no - b.j.no); });
+  /* The same order as the totals above the table. Job number is the board's
+     own priority ordering of the report, which means something in the packet
+     and almost nothing in one contractor's list — and a total grouped one way
+     over a list ordered another is a total nobody can check by looking. */
+  rows.sort(function (a, b) { return coRank(a) - coRank(b) || (a.j.no - b.j.no); });
   /* Three totals, because committed is a decision. One figure called "counted
      toward committed spend" covered money on jobs the board had not reached —
      and it counted carried quotes on cancelled jobs too, so it could come out
@@ -12002,7 +12017,7 @@ function openContractorOverlay(name, jobsList) {
   if (!rows.length) h.push('<p class="histempty">No quotes found for this contractor.</p>');
   else {
     h.push('<table class="dashtable"><thead><tr><th>Job</th><th>Quote #</th><th class="money">Amount (incl. HST)</th><th>Status</th></tr></thead><tbody>');
-    rows.forEach(function (r) {
+    rows.forEach(function (r, ri) {
       var amt = r.x.total != null ? money(r.x.total) : (String(r.x.b.contractor || "").trim() ? "pending" : "—");
       var tag = coStatusHTML(r);
       var notes = r.x.b.notes ? '<div style="font-size:11.5px;color:var(--muted)">' + esc(r.x.b.notes) + "</div>" : "";
@@ -12013,8 +12028,13 @@ function openContractorOverlay(name, jobsList) {
       var per = r.j._period ? '<span style="font-size:11px;color:var(--muted)"> · ' + esc(r.j._period) + "</span>" : "";
       /* a job from an archived period is not in the current report, so there is
          nothing to open for it */
-      var opens = !allPeriods && findJob(r.j.id) ? ' class="jrow"' + jdData(r.j) : "";
-      h.push("<tr" + opens + "><td><strong>" + esc(r.j.no) + "</strong> · " + esc(r.j.desc || "job") + per + notes + "</td>" +
+      var opens = !allPeriods && findJob(r.j.id) ? "jrow" : "";
+      /* one rule where the group changes: the status column already colours
+         them, and three heading rows in a nine-row table costs more than it
+         tells */
+      var rk = coRank(r), gap = (ri && rk !== coRank(rows[ri - 1])) ? "cogap" : "";
+      var cls = (opens || gap) ? ' class="' + (opens + (opens && gap ? " " : "") + gap) + '"' : "";
+      h.push("<tr" + cls + (opens ? jdData(r.j) : "") + "><td><strong>" + esc(r.j.no) + "</strong> · " + esc(r.j.desc || "job") + per + notes + "</td>" +
         "<td>" + esc(r.x.b.qno || "—") + "</td>" +
         '<td class="money">' + amt + files + "</td>" +
         "<td>" + tag + "</td></tr>");
