@@ -7,14 +7,14 @@
   --line:#D9DEE3; --line-soft:#E8ECEF;
   --accent:#2D567F; --accent-ink:#24466B; --accent-soft:#EAF0F6;
   --good:#1E7A46; --good-soft:#E7F3EC; --prio:#A03636; --prio-soft:#F7ECEC;
-  --amber:#B0700F; --amber-soft:#F8EFDD; --bar:#2D567F; --barq:#A8BCD0;
+  --amber:#B0700F; --amber-soft:#F8EFDD; --bar:#2D567F; --barm:#6888A8; --barq:#A8BCD0;
 }
 :root[data-theme="dark"], :root[data-theme="light"] {
   --paper:#F7F8F9; --card:#FFFFFF; --ink:#1E2833; --ink2:#4A5866; --muted:#7A8794;
   --line:#D9DEE3; --line-soft:#E8ECEF;
   --accent:#2D567F; --accent-ink:#24466B; --accent-soft:#EAF0F6;
   --good:#1E7A46; --good-soft:#E7F3EC; --prio:#A03636; --prio-soft:#F7ECEC;
-  --amber:#B0700F; --amber-soft:#F8EFDD; --bar:#2D567F; --barq:#A8BCD0;
+  --amber:#B0700F; --amber-soft:#F8EFDD; --bar:#2D567F; --barm:#6888A8; --barq:#A8BCD0;
 }
 html { background:var(--paper); color-scheme:light; }
 body { font:15px/1.55 -apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; color:var(--ink);
@@ -318,20 +318,35 @@ tr.pend td { color:var(--muted); font-style:italic; }
   margin-top:5px; }
 .bar { height:100%; width:100%; background:var(--bar); border-radius:5px;
   display:flex; overflow:hidden; }
-/* Solid where the board has committed the money, pale where it is still only a
-   price on the table. One bar, because it is one contractor; two tones, because
-   a quote nobody has decided on is not a contract — and no third tone, because
-   a bar that was part empty raised a question it could not answer. The empty
-   part meant "smaller than the largest contractor", and was read as money left
-   to spend. Every bar fills the track now and divides it between the two
-   things it is actually about. What it cost: the bars no longer show one
-   contractor against another. The list is in order of size and the figure is
-   printed beside the name, which is where that comparison now lives. */
+/* The three states the money is in, darkest to palest, left to right: work
+   that is finished, work the board has awarded but nobody has finished yet,
+   and a price still waiting on a decision. Darkest first, because that is the
+   money that is settled.
+
+   Two tones conflated the first two, so a contractor whose work was all done
+   drew exactly the same bar as one whose work was all still to come.
+
+   There is no fourth, empty region. It used to mean "smaller than the largest
+   contractor", which on a panel headed Spend by contractor reads as money left
+   to spend, and is not. Every bar fills its track and divides it between the
+   things it is actually about; the list is in order of size and the figure is
+   printed beside the name, which is where that comparison lives now. */
 .bar .bseg { height:100%; }
 .bar .bcom { background:var(--bar); }
+.bar .bprog { background:var(--barm); }
 .bar .bwait { background:var(--barq); }
 .tpl-packet .bar .bcom { background:var(--pkg); }
+.tpl-packet .bar .bprog { background:var(--pkgm); }
 .tpl-packet .bar .bwait { background:var(--pkgq); }
+/* one legend for the panel, rather than naming the colours on every row */
+.bkey { display:flex; flex-wrap:wrap; gap:4px 12px; margin:11px 0 0; padding-top:9px;
+  border-top:1px solid var(--line-soft); font-size:10.5px; color:var(--muted); }
+.bkey span { display:flex; align-items:center; gap:5px; white-space:nowrap; }
+.bkey i { width:9px; height:9px; border-radius:2px; display:inline-block; }
+.bkey .k1 { background:var(--bar); } .bkey .k2 { background:var(--barm); } .bkey .k3 { background:var(--barq); }
+.tpl-packet .bkey .k1 { background:var(--pkg); }
+.tpl-packet .bkey .k2 { background:var(--pkgm); }
+.tpl-packet .bkey .k3 { background:var(--pkgq); }
 .bsplit { grid-column:1/-1; font-size:11px; color:var(--muted); margin:5px 0 0;
   font-variant-numeric:tabular-nums; }
 .bsplit b { font-weight:600; color:var(--ink2); }
@@ -953,7 +968,7 @@ body:has(#report.tpl-packet) .wrap { max-width:1560px; }
 .savecard.total .sc-amt { color:#fff; }
 
 /* ---------- Board packet (Design 4: dark rail + serif header + 4-up) ---------- */
-.tpl-packet { --pkg:#16613a; --pkgq:#A3C4AF; }
+.tpl-packet { --pkg:#16613a; --pkgm:#4E8B66; --pkgq:#A3C4AF; }
 .tpl-packet .pk-shell { display:grid; grid-template-columns:216px 1fr; background:var(--card);
   border:1px solid var(--line); border-radius:12px; box-shadow:0 1px 3px rgba(30,40,51,.07); }
 @media screen and (max-width:900px){ .tpl-packet .pk-shell { grid-template-columns:1fr; } }
@@ -3033,7 +3048,7 @@ var BRAND_PATH = "nnsccQuoteTrackerBeta/brand";               /* the letterhead 
 var WEEKLY_DRAFT_PATH = "nnsccQuoteTrackerBeta/weeklyDraft";   /* the report she is working on */
 var WEEKLY_COLL = "nnsccWeeklyReportsBeta";                   /* every one she has finished */
 var VIEW_BETA = CURRENT_PATH.indexOf("Beta") >= 0;   /* which report the passcode gate reads/protects */
-var BUILD_STAMP = "2026-10-19 22:37";   /* filled in by build.js — which copy of the page this is */
+var BUILD_STAMP = "2026-10-20 00:05";   /* filled in by build.js — which copy of the page this is */
 /* path of the report currently on screen */
 function reportPath() {
   return cloud.active.kind === "current" ? CURRENT_PATH : (REPORTS_COLL + "/" + cloud.active.id);
@@ -4280,6 +4295,9 @@ function spendBars(d) {
     if (i >= SPEND_ROWS) restTot += r.v.tot;
     h.push(spendBarRow(r.nm, r.v, i >= SPEND_ROWS ? "pk-spend-extra" : ""));
   });
+  h.push('<div class="bkey">' + BAR_SEGS.map(function (b, i) {
+    return '<span><i class="k' + (i + 1) + '"></i>' + b[2] + "</span>";
+  }).join("") + "</div>");
   var rest = rollArr.length - SPEND_ROWS;
   if (rest > 0)
     h.push('<a class="pk-spendmore" data-spendmore="' + rest + '" data-spendtot="' + esc(money0(restTot)) +
@@ -4292,20 +4310,30 @@ function spendBars(d) {
    column, which doubled the height of every row that had a split; the solid
    part of the bar says the rest, and the drill-down has all three. Omitted
    where the bar is one tone, the split then being the total again. */
+/* The segments, darkest first: the key, the class, what the legend calls it,
+   and the shorter form the line under a bar uses. The legend spells "awaiting
+   the board" out once, so forty-six characters of it on every row — which
+   wrapped, and put thirteen pixels on each — is a word the panel has already
+   said. */
+var BAR_SEGS = [["done", "bcom", "completed", "completed"],
+                ["awarded", "bprog", "in progress", "in progress"],
+                ["waiting", "bwait", "awaiting the board", "awaiting"]];
 function spendBarRow(nm, v, extra) {
-  var com = v.done + v.awarded;
-  /* what is unsettled first, as in the drill-down and for the same reason.
-     Omitted where the bar is one tone: the split is then the total again. */
-  var split = (com > 0 && v.waiting > 0)
-    ? money0(v.waiting) + " not yet committed \u00b7 " + money0(com) + " committed" : "";
+  var segs = BAR_SEGS.map(function (b) {
+    return '<span class="bseg ' + b[1] + '" style="width:' +
+      (v.tot ? v[b[0]] / v.tot * 100 : 0).toFixed(1) + '%"></span>';
+  }).join("");
+  /* The states this contractor's money is actually in, least settled first —
+     the order the drill-down takes, and for the same reason. Omitted where
+     there is only one: the split would be the total again. */
+  var parts = BAR_SEGS.slice().reverse().filter(function (b) { return v[b[0]] > 0; })
+    .map(function (b) { return money0(v[b[0]]) + " " + b[3]; });
+  var split = parts.length > 1 ? parts.join(" \u00b7 ") : "";
   return '<div class="brow browlink' + (extra ? " " + extra : "") + '" data-cn="' + esc(nm) +
     '" role="button" tabindex="0" title="Show all quotes from ' + esc(nm) +
     '"><div class="blabel">' + esc(nm) + "</div>" +
     '<div class="bval">' + money(v.tot) + '<span class="bjobs"> · ' + v.n + "</span></div>" +
-    '<div class="btrack"><div class="bar">' +
-    '<span class="bseg bcom" style="width:' + (v.tot ? com / v.tot * 100 : 0).toFixed(1) + '%"></span>' +
-    '<span class="bseg bwait" style="width:' + (v.tot ? v.waiting / v.tot * 100 : 0).toFixed(1) + '%"></span>' +
-    "</div></div>" +
+    '<div class="btrack"><div class="bar">' + segs + "</div></div>" +
     (split ? '<div class="bsplit">' + split + "</div>" : "") + "</div>";
 }
 /* overview slices/savers shared by both alternate templates */
