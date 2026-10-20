@@ -7,14 +7,14 @@
   --line:#D9DEE3; --line-soft:#E8ECEF;
   --accent:#2D567F; --accent-ink:#24466B; --accent-soft:#EAF0F6;
   --good:#1E7A46; --good-soft:#E7F3EC; --prio:#A03636; --prio-soft:#F7ECEC;
-  --amber:#B0700F; --amber-soft:#F8EFDD; --bar:#2D567F; --barm:#6888A8; --barq:#A8BCD0;
+  --amber:#B0700F; --amber-soft:#F8EFDD; --bar:#2D567F; --barm:#7FA3C4; --barq:#E8C25C;
 }
 :root[data-theme="dark"], :root[data-theme="light"] {
   --paper:#F7F8F9; --card:#FFFFFF; --ink:#1E2833; --ink2:#4A5866; --muted:#7A8794;
   --line:#D9DEE3; --line-soft:#E8ECEF;
   --accent:#2D567F; --accent-ink:#24466B; --accent-soft:#EAF0F6;
   --good:#1E7A46; --good-soft:#E7F3EC; --prio:#A03636; --prio-soft:#F7ECEC;
-  --amber:#B0700F; --amber-soft:#F8EFDD; --bar:#2D567F; --barm:#6888A8; --barq:#A8BCD0;
+  --amber:#B0700F; --amber-soft:#F8EFDD; --bar:#2D567F; --barm:#7FA3C4; --barq:#E8C25C;
 }
 html { background:var(--paper); color-scheme:light; }
 body { font:15px/1.55 -apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; color:var(--ink);
@@ -318,13 +318,20 @@ tr.pend td { color:var(--muted); font-style:italic; }
   margin-top:5px; }
 .bar { height:100%; width:100%; background:var(--bar); border-radius:5px;
   display:flex; overflow:hidden; }
-/* The three states the money is in, darkest to palest, left to right: work
-   that is finished, work the board has awarded but nobody has finished yet,
-   and a price still waiting on a decision. Darkest first, because that is the
-   money that is settled.
+/* The three states the money is in, left to right: work that is finished,
+   work the board has awarded but nobody has finished yet, and a price still
+   waiting on a decision. Settled money first.
 
-   Two tones conflated the first two, so a contractor whose work was all done
-   drew exactly the same bar as one whose work was all still to come.
+   Finished and under way are two greens, and they have to be far apart:
+   the first ramp put them at a contrast of 1.86, so a bar that was all one
+   of them — Complete Plumbing, every dollar awarded and none of it done —
+   read as solid, finished work. With nothing beside it to compare against,
+   a mid green is just green. They sit at 3 now.
+
+   Awaiting the board is yellow, not a third green: it is the one state that
+   is waiting on somebody, it is the colour the drill-down already prints
+   "Awaiting the board" in, and a change of hue says "different" in a way
+   another step of lightness could not.
 
    There is no fourth, empty region. It used to mean "smaller than the largest
    contractor", which on a panel headed Spend by contractor reads as money left
@@ -968,7 +975,7 @@ body:has(#report.tpl-packet) .wrap { max-width:1560px; }
 .savecard.total .sc-amt { color:#fff; }
 
 /* ---------- Board packet (Design 4: dark rail + serif header + 4-up) ---------- */
-.tpl-packet { --pkg:#16613a; --pkgm:#4E8B66; --pkgq:#A3C4AF; }
+.tpl-packet { --pkg:#16613a; --pkgm:#5FAC82; --pkgq:#E8C25C; }
 .tpl-packet .pk-shell { display:grid; grid-template-columns:216px 1fr; background:var(--card);
   border:1px solid var(--line); border-radius:12px; box-shadow:0 1px 3px rgba(30,40,51,.07); }
 @media screen and (max-width:900px){ .tpl-packet .pk-shell { grid-template-columns:1fr; } }
@@ -5805,8 +5812,14 @@ function edJobCardHTML(j, ji) {
   }).join("");
   var awNames = [];
   j.bids.forEach(function (b) { var nm = (b.contractor || "").trim(); if (nm && awNames.indexOf(nm) < 0) awNames.push(nm); });
+  /* The award is matched to a quote by contractor key, not by the exact
+     characters. Correcting a contractor's name on the row above used to orphan
+     it in silence: this select fell back to "not awarded" while the job itself
+     went on saying who had won, and the report above kept printing it. */
+  var awKey = conKey(j.awardedTo);
+  var awHit = awKey ? awNames.filter(function (nm) { return conKey(nm) === awKey; })[0] : "";
   var awOpts = '<option value="">— not awarded —</option>' + awNames.map(function (nm) {
-    return '<option value="' + esc(nm) + '"' + ((j.awardedTo || "") === nm ? " selected" : "") + ">" + esc(nm) + "</option>";
+    return '<option value="' + esc(nm) + '"' + (awHit === nm ? " selected" : "") + ">" + esc(nm) + "</option>";
   }).join("");
   var pv = j.pct == null ? (j.status === "completed" ? 100 : 0) : j.pct;
   h.push('<div class="jbody"><div class="jctl">' +
@@ -5819,7 +5832,12 @@ function edJobCardHTML(j, ji) {
       '</label><input type="date" value="' + esc(j.statusDate || "") + '" data-f="statusDate"></div>' +
     '<div class="f"><label>Awarded to</label><select data-f="awardedTo">' + awOpts + "</select>" +
       (APPROVED_SET[j.status || "quoted"] && !j.awardedTo
-        ? '<span class="fwarn">\u2691 Approved with no contractor recorded</span>' : "") + "</div>" +
+        ? '<span class="fwarn">\u2691 Approved with no contractor recorded</span>'
+        /* a name no quote on this job carries: a different spelling the key
+           cannot bridge, or the wrong contractor recorded altogether */
+        : (awKey && !awHit
+          ? '<span class="fwarn">\u2691 Awarded to \u201c' + esc(String(j.awardedTo).trim()) +
+            '\u201d, who has no quote on this job</span>' : "")) + "</div>" +
     '<div class="f"><label>Award date</label><input type="date" value="' + esc(j.awardDate || "") + '" data-f="awardDate"></div>' +
     '<div class="f" style="flex:1;min-width:210px"><label>Site progress</label><div class="pgrp">' +
     '<input type="range" min="0" max="100" step="5" value="' + pv + '" data-f="pct" data-live="1">' +
