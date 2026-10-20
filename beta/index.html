@@ -2740,6 +2740,24 @@ var STOPPED_SET = { rejected:1, deferred:1, cancelled:1 };
    decisions still lists them with the date — but they are out of the arithmetic. */
 var DEAD_SET = { rejected:1, cancelled:1 };
 function countsAsSpend(j) { return !DEAD_SET[j.status || "quoted"]; }
+/* Two spellings of one company are one company. The bars keyed on the name
+   exactly as typed and the drill-down keyed on it lowercased, so "Discount
+   Reno" and "discount Reno" drew two bars — and clicking either opened a list
+   holding both, a total larger than the bar it was opened from. One key for
+   both now: capitals, full stops and stray spaces are accidents of typing,
+   not different contractors.
+
+   A different WORD still means a different contractor. "Townsend Plumbing"
+   and "Townsend Plumbing & Heating" stay apart, and so does a transposed
+   "ACB Locksmith", because guessing which near-matches are the same company
+   is how two real contractors get added together. Those are for the manager
+   to settle, in the name field, where it is written down. */
+function conKey(s) {
+  return String(s == null ? "" : s).toLowerCase()
+    .replace(/&/g, " and ")
+    .replace(/[.,'\u2018\u2019\u201c\u201d"]/g, "")
+    .replace(/\s+/g, " ").trim();
+}
 /* Money is committed by a decision, not by a crew arriving. A job still at
    "quoted" is a price on the table and nobody is owed it — summing those under
    one heading called committed spend is how a contractor with four quotes in
@@ -2843,16 +2861,21 @@ function carriedFlag(cb, cls) {
 }
 /* light totals for any raw jobs array (used by the cross-period dashboard) */
 function calcJobsTotals(jobs) {
-  var t = { total: 0, hp: 0, approved: 0, savings: 0, n: (jobs || []).length, roll: {} };
+  /* roll is keyed by conKey so one contractor is one entry across periods;
+     rollName carries a spelling to show for each key */
+  var t = { total: 0, hp: 0, approved: 0, savings: 0, n: (jobs || []).length, roll: {}, rollName: {} };
   (jobs || []).forEach(function (j) {
     var c = jobCalc(j);
     t.total += c.cost; t.savings += c.saving;
     if (j.priority) t.hp++;
     if (APPROVED_SET[j.status]) t.approved += c.cost;
     c.carriedBids.forEach(function (cb) {
-      var nm = (cb.b.contractor || "—").trim() || "—";
-      if (!t.roll[nm]) t.roll[nm] = 0;
-      t.roll[nm] += cb.total;
+      var raw = (cb.b.contractor || "").trim() || "—";
+      var k = conKey(raw) || "—";
+      /* the fullest spelling seen wins, so a period that only ever saw the
+         short form does not name the contractor for all of them */
+      if (!t.rollName[k] || raw.length > t.rollName[k].length) t.rollName[k] = raw;
+      t.roll[k] = (t.roll[k] || 0) + cb.total;
     });
   });
   return t;
@@ -3004,7 +3027,7 @@ var BRAND_PATH = "nnsccQuoteTrackerBeta/brand";               /* the letterhead 
 var WEEKLY_DRAFT_PATH = "nnsccQuoteTrackerBeta/weeklyDraft";   /* the report she is working on */
 var WEEKLY_COLL = "nnsccWeeklyReportsBeta";                   /* every one she has finished */
 var VIEW_BETA = CURRENT_PATH.indexOf("Beta") >= 0;   /* which report the passcode gate reads/protects */
-var BUILD_STAMP = "2026-10-19 21:38";   /* filled in by build.js — which copy of the page this is */
+var BUILD_STAMP = "2026-10-19 21:47";   /* filled in by build.js — which copy of the page this is */
 /* path of the report currently on screen */
 function reportPath() {
   return cloud.active.kind === "current" ? CURRENT_PATH : (REPORTS_COLL + "/" + cloud.active.id);
@@ -3384,15 +3407,26 @@ function computeAll() {
   var savings = spend.reduce(function (s, x) { return s + x.c.saving; }, 0);
   /* nobody is waiting on a quote for a job that is not going ahead */
   var pendingCount = spend.reduce(function (s, x) { return s + x.c.pendingNames.length; }, 0);
-  var roll = {};
+  var roll = {}, rollSpellings = {};
   spend.forEach(function (x) {
     var bk = spendBucket(x.j);
     x.c.carriedBids.forEach(function (cb) {
-      var nm = (cb.b.contractor || "—").trim() || "—";
-      if (!roll[nm]) roll[nm] = emptyBuckets();
-      roll[nm].n++; roll[nm].tot += cb.total;
-      roll[nm][bk] += cb.total; roll[nm][bk + "N"]++;
+      var raw = (cb.b.contractor || "").trim() || "—";
+      var k = conKey(raw) || "—";
+      if (!roll[k]) { roll[k] = emptyBuckets(); rollSpellings[k] = {}; }
+      rollSpellings[k][raw] = (rollSpellings[k][raw] || 0) + 1;
+      roll[k].n++; roll[k].tot += cb.total;
+      roll[k][bk] += cb.total; roll[k][bk + "N"]++;
     });
+  });
+  /* which spelling to show: the one used most, and the fullest where that ties */
+  Object.keys(roll).forEach(function (k) {
+    var best = "", bn = -1;
+    Object.keys(rollSpellings[k]).forEach(function (nm) {
+      var n = rollSpellings[k][nm];
+      if (n > bn || (n === bn && nm.length > best.length)) { best = nm; bn = n; }
+    });
+    roll[k].name = best || k;
   });
   var approvedTotal = 0, stCounts = {}, staleBids = 0;
   jobs.forEach(function (x) {
@@ -4232,7 +4266,7 @@ function secEBlocks(d, M, EDITOR) {
    twelve of those put the panel back above the ones beside it. */
 var SPEND_ROWS = 8;
 function spendBars(d) {
-  var rollArr = Object.keys(d.roll).map(function (nm) { return { nm: nm, v: d.roll[nm] }; })
+  var rollArr = Object.keys(d.roll).map(function (k) { return { nm: d.roll[k].name || k, v: d.roll[k] }; })
     .sort(function (a, b) { return b.v.tot - a.v.tot; });
   if (!rollArr.length) return '<p class="seclede">Nothing quoted yet.</p>';
   var mx = rollArr[0].v.tot || 1;
@@ -6439,7 +6473,7 @@ function aiBuildStats() {
   });
   var roll = Object.keys(d.roll).map(function (nm) {
     var v = d.roll[nm];
-    return { contractor: nm, jobs: v.n, total_cad: Math.round(v.tot * 100) / 100,
+    return { contractor: v.name || nm, jobs: v.n, total_cad: Math.round(v.tot * 100) / 100,
              completed_cad: Math.round(v.done * 100) / 100,
              awarded_cad: Math.round(v.awarded * 100) / 100,
              awaiting_board_cad: Math.round(v.waiting * 100) / 100 };
@@ -11940,13 +11974,17 @@ function openDashboard() {
       periods.forEach(function (pr) {
         (pr.jobs || []).forEach(function (j) { var cp = Object.assign({}, j); cp._period = pr.name; dashAllJobs.push(cp); });
       });
-      var h = [], grand = 0, grandApproved = 0, grandSavings = 0, rollAll = {};
+      var h = [], grand = 0, grandApproved = 0, grandSavings = 0, rollAll = {}, rollAllName = {};
       h.push('<table class="dashtable"><thead><tr><th>Period</th><th class="money">Jobs</th>' +
         '<th class="money">Committed</th><th class="money">Board approved</th><th class="money">Saved via bids</th></tr></thead><tbody>');
       periods.forEach(function (pr) {
         var t = calcJobsTotals(pr.jobs);
         grand += t.total; grandApproved += t.approved; grandSavings += t.savings;
-        Object.keys(t.roll).forEach(function (nm) { rollAll[nm] = (rollAll[nm] || 0) + t.roll[nm]; });
+        Object.keys(t.roll).forEach(function (k) {
+          rollAll[k] = (rollAll[k] || 0) + t.roll[k];
+          if (!rollAllName[k] || (t.rollName[k] || "").length > rollAllName[k].length)
+            rollAllName[k] = t.rollName[k] || k;
+        });
         h.push("<tr><td>" + esc(pr.name) + '</td><td class="money">' + t.n + '</td><td class="money">' + money(t.total) +
           '</td><td class="money">' + money(t.approved) + '</td><td class="money">' + money(t.savings) + "</td></tr>");
       });
@@ -11962,10 +12000,11 @@ function openDashboard() {
       if (names.length) {
         var mx = rollAll[names[0]] || 1;
         h.push('<div class="rephead">Spend by contractor — all periods</div><div class="chart" style="margin-top:6px">');
-        names.slice(0, 12).forEach(function (nm) {
+        names.slice(0, 12).forEach(function (k) {
+          var nm = rollAllName[k] || k;
           h.push('<div class="brow browlink" data-cn="' + esc(nm) + '" data-scope="dash" role="button" tabindex="0" title="Show all quotes from ' + esc(nm) + '"><div class="blabel">' + esc(nm) + "</div>" +
-            '<div class="bval">' + money(rollAll[nm]) + "</div>" +
-            '<div class="btrack"><div class="bar" style="width:' + (rollAll[nm] / mx * 100).toFixed(1) + '%"></div></div></div>');
+            '<div class="bval">' + money(rollAll[k]) + "</div>" +
+            '<div class="btrack"><div class="bar" style="width:' + (rollAll[k] / mx * 100).toFixed(1) + '%"></div></div></div>');
         });
         h.push("</div>");
       }
@@ -12008,7 +12047,7 @@ function coStatusHTML(r) {
 /* Section D: click a contractor bar → popup listing all their quotes (read-only) */
 var dashAllJobs = null;   /* flat all-periods job list, set when the dashboard opens */
 function openContractorOverlay(name, jobsList) {
-  var key = String(name || "").trim().toLowerCase();
+  var key = conKey(name);
   if (!key) return;
   var jobs = (jobsList && jobsList.length) ? jobsList : state.jobs;
   var allPeriods = !!(jobsList && jobsList.length);
@@ -12016,7 +12055,7 @@ function openContractorOverlay(name, jobsList) {
   jobs.forEach(function (j) {
     var c = jobCalc(j);
     c.bids.forEach(function (x) {
-      if (String(x.b.contractor || "").trim().toLowerCase() === key) rows.push({ j: j, x: x, c: c });
+      if (conKey(x.b.contractor) === key) rows.push({ j: j, x: x, c: c });
     });
   });
   /* The same order as the totals above the table. Job number is the board's
