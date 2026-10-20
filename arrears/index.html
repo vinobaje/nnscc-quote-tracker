@@ -212,6 +212,9 @@ label.ck input { width:auto; margin:0; }
 .oname { font-weight:600; color:var(--ink); font-size:13.5px; }
 .omail { font-size:11.5px; color:var(--accent-ink); margin-top:2px; overflow-wrap:anywhere; }
 .omail.none { color:var(--muted); font-style:italic; }
+.omail .byhand { display:inline-block; font-size:10.5px; font-style:normal; color:var(--muted);
+  border:1px solid var(--line); border-radius:4px; padding:0 4px; margin-left:5px;
+  vertical-align:1px; }
 .occ { display:flex; flex-direction:column; gap:4px; align-items:flex-start; }
 #rosterTbl .addr { color:var(--ink2); font-size:12.5px; }
 .acts { text-align:right; white-space:nowrap; }
@@ -527,6 +530,10 @@ body.previewing { padding-top:52px; }
 .dedit label { font-size:11.5px; font-weight:700; color:var(--ink2); display:flex;
   flex-direction:column; gap:4px; }
 .dedit input, .dedit textarea { font-size:13px; }
+.mailhint { grid-column:1/-1; font-size:11.5px; font-weight:400; color:var(--muted);
+  margin:-6px 0 0; line-height:1.45; }
+.mailhint b { color:var(--ink2); }
+.mailhint.bad { color:var(--prio); font-weight:700; }
 @media (max-width:700px) { .dedit { grid-template-columns:1fr; } }
 .detail { background:#FBFCFD; border:1px solid var(--line-soft); border-radius:7px;
   padding:12px 14px; margin:2px 0 8px; }
@@ -1789,12 +1796,30 @@ function letterPlainText(row, tpl, opts) {
 }
 
 /* owners only, opted in only — a tenant must never receive the owner's arrears */
-function emailableOwners(unit) {
-  var u = rosterFind(unit);
-  if (!u) return [];
+/* Deliberately loose. The job is to catch a name, a phone number or half an address
+   typed into the wrong box — not to adjudicate what an address may legally contain. */
+var EMAIL_RE = /^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]{2,}$/;
+function cleanEmail(v) {
+  var t = String(v == null ? "" : v).replace(/^\s+|\s+$/g, "");
+  return EMAIL_RE.test(t) ? t : "";
+}
+/* What the management system gave us for the owners of this unit. */
+function importedOwnerEmails(u) {
   return peopleBy(u, /owner/i).filter(function (p) {
     return p.email && !/^no$/i.test(p.optIn || "");
   }).map(function (p) { return p.email; }).filter(function (e, i, a) { return a.indexOf(e) === i; });
+}
+/* An address typed in by hand lives on the unit, not among its people, for one
+   reason: the User Manager import assigns ex.people wholesale, so an address Sarah
+   had to go and find would disappear the next time the roster was refreshed. On the
+   unit it survives every import the app does. */
+function emailableOwners(unit) {
+  var u = rosterFind(unit);
+  if (!u) return [];
+  var out = importedOwnerEmails(u);
+  var typed = cleanEmail(u.ownerEmail);
+  if (typed && out.indexOf(typed) < 0) out.push(typed);
+  return out;
 }
 
 function postDraft(token, raw) {
@@ -2460,6 +2485,61 @@ function priorProvenance(u, i) {
     ' <button class="linkbtn" data-unimport="' + i + '">Remove the imported dates</button>' +
     "</div>";
 }
+/* What this unit's letters will do, said while the address is being typed. An
+   address with a typo in it does not stop a batch — the unit quietly drops out of
+   the emailable list and prints instead — and a tool that lets that happen without
+   a word is the tool that printed twenty-eight letters in silence. */
+function mailHintHtml(u) {
+  var raw = String(u.ownerEmail == null ? "" : u.ownerEmail).replace(/^\s+|\s+$/g, "");
+  var typed = cleanEmail(raw);
+  if (raw && !typed) {
+    return "\u201c" + esc(raw) + "\u201d is not an email address \u2014 letters for this " +
+      "unit will still print only.";
+  }
+  var have = importedOwnerEmails(u);
+  var all = have.slice();
+  if (typed && all.indexOf(typed) < 0) all.push(typed);
+  var optedOut = peopleBy(u, /owner/i).filter(function (p) {
+    return p.email && /^no$/i.test(p.optIn || "");
+  });
+  if (!all.length) {
+    return "No email on file \u2014 letters for this unit print only. Type an address " +
+      "here to email them instead." +
+      (optedOut.length ? "<br>The record says this owner has opted out of email." : "");
+  }
+  return "Letters for this unit go to <b>" + esc(all.join(", ")) + "</b>" +
+    (typed && !have.length
+      ? " \u2014 kept on the unit, so re-importing the roster will not remove it."
+      : typed
+        ? " \u2014 the address on file and the one typed here, both of them."
+        : "") + "." +
+    (optedOut.length
+      ? "<br>Another owner address on this unit is marked opted out of email and is left alone."
+      : "");
+}
+function paintMailHint(u) {
+  var el = document.getElementById("mailHint");
+  if (!el || !u) return;
+  var raw = String(u.ownerEmail == null ? "" : u.ownerEmail).replace(/^\s+|\s+$/g, "");
+  el.className = "mailhint" + (raw && !cleanEmail(raw) ? " bad" : "");
+  el.innerHTML = mailHintHtml(u);
+}
+/* "no email on file" left standing on a unit she has just given an address to would
+   send her looking for a bug that is not there. */
+function rosterMailLine(u, mails) {
+  var raw = String(u.ownerEmail == null ? "" : u.ownerEmail).replace(/^\s+|\s+$/g, "");
+  var typed = cleanEmail(raw);
+  var shown = (mails || []).slice();
+  if (typed && shown.indexOf(typed) < 0) shown.push(typed);
+  if (shown.length) {
+    return '<div class="omail">' + esc(shown.join(" \u00b7 ")) +
+      (typed ? '<span class="byhand">added by hand</span>' : "") + "</div>";
+  }
+  if (raw) {
+    return '<div class="omail none">\u201c' + esc(raw) + "\u201d is not a usable email address</div>";
+  }
+  return '<div class="omail none">no email on file</div>';
+}
 function personCard(p) {
   var head = '<div class="p-head"><b>' + esc(p.name || "—") + "</b>" +
     (p.role ? ' <span class="chip' + (/non-resident/i.test(p.role) ? " warn" : (/owner/i.test(p.role) ? " ok" : "")) + '">' +
@@ -2484,6 +2564,13 @@ function unitDetail(u, i) {
         '<input type="text" data-r="' + i + '" data-k="owner" value="' + esc(u.owner) + '" id="focusOwner"></label>' +
       '<label style="grid-column:1/-1">Mailing address a letter is sent to' +
         '<textarea rows="3" data-r="' + i + '" data-k="address">' + esc(u.address) + "</textarea></label>" +
+      '<label style="grid-column:1/-1">Email address for letters' +
+        '<input type="email" spellcheck="false" autocapitalize="off" autocorrect="off" ' +
+        'data-r="' + i + '" data-k="ownerEmail" value="' + esc(u.ownerEmail || "") +
+        '" placeholder="' + esc(importedOwnerEmails(u).length
+            ? "leave empty to use the address already on file"
+            : "name@example.com") + '"></label>' +
+      '<div class="mailhint" id="mailHint"></div>' +
       '<label>Notices already sent, before this tool' +
         '<input type="number" min="0" max="99" data-r="' + i + '" data-k="priorCount" value="' +
         esc(u.priorCount === 0 || u.priorCount ? u.priorCount : "") + '" placeholder="0"></label>' +
@@ -2692,8 +2779,7 @@ function renderRoster() {
         '" data-det="' + i + '" title="Show the full record">' + ICON.chevron + "</button></td>" +
       '<td><span class="unitpill">' + esc(u.unit || "—") + "</span></td>" +
       '<td><div class="oname">' + esc(u.owner || "—") + "</div>" +
-        (mails.length ? '<div class="omail">' + esc(mails.join(" · ")) + "</div>"
-                      : '<div class="omail none">no email on file</div>') + "</td>" +
+        rosterMailLine(u, mails) + "</td>" +
       '<td><div class="occ">' + (chips || '<span class="sub">—</span>') + "</div></td>" +
       '<td class="addr">' + esc(u.address || "—").split("\n").join("<br>") + "</td>" +
       '<td class="acts">' +
@@ -2705,6 +2791,7 @@ function renderRoster() {
   });
   if (!rows.length) h.push('<tr><td class="empty" colspan="6">Nothing matches “' + esc(q) + '”.</td></tr>');
   t.innerHTML = h.join("");
+  if (A.editUnit != null && A.units[A.editUnit]) paintMailHint(A.units[A.editUnit]);
 
   var tenanted = A.units.filter(function (u) { return peopleBy(u, /tenant/i).length || u.tenant; }).length;
   var nonRes = A.units.filter(function (u) { return u.nonResident; }).length;
@@ -4652,7 +4739,11 @@ $("rosterTbl").addEventListener("input", function (e) {
   var key = e.target.getAttribute("data-k");
   A.units[+i][key] = (key === "priorCount")
     ? (e.target.value === "" ? "" : Math.max(0, Math.floor(Number(e.target.value) || 0)))
+    /* stored trimmed, but the box is left alone so the caret does not jump while
+       an address is half pasted */
+    : (key === "ownerEmail") ? e.target.value.replace(/^\s+|\s+$/g, "")
     : e.target.value;
+  if (key === "ownerEmail") paintMailHint(A.units[+i]);
   A.dirtyRoster = true;
   note("rosterNote", "Unsaved changes");
 });
