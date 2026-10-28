@@ -53,11 +53,29 @@ async function callClaude(key, system, user, schema, maxTokens, model, effort) {
 
 // Shared extraction prompt + schema for reading a contractor quote (pasted text
 // or an uploaded PDF / Word file) into structured job fields.
+// A contractor's estimate often prices several unrelated pieces of work at
+// once — Rooterworx's #35607 priced five drains, an asphalt patch, a crack, a
+// grinding job and a sewer pump on one page — and the report wants the price of
+// ONE of them. Reading "the total" off such a page put $34,770.10 against a
+// drain job whose line was $14,500.00. So the reader lists every priced line,
+// is told which job it is reading for, and says which lines are that job.
 const QUOTE_EXTRACT_SYSTEM =
   "You extract structured data from contractor quotes sent to a condominium property manager. " +
-  "Extract only what the text actually says; leave unknown fields empty/null. " +
-  "amount_cad is the quoted price as a plain number (no currency symbols). " +
-  "hst_included is true only if the text says tax/HST is included. " +
+  "Extract only what the text actually says; leave unknown fields empty/null.\n" +
+  "lines: every separately priced item on the quote, in order, as written — its short heading and " +
+  "its amount as printed on that line, as a plain number. A quote that states one price for one " +
+  "piece of work has one line. Do not list subtotal, tax or total rows as lines.\n" +
+  "lines_include_hst: true only when the line amounts themselves include HST. Where the quote adds " +
+  "HST underneath a subtotal, the lines are before tax and this is false.\n" +
+  "for_this_job: you may be told the job the property manager is reading this quote for, and the " +
+  "other jobs open in the same report. Mark true the lines that are that job's work, and false the " +
+  "lines that are other work — including work that is plainly one of the other jobs listed. When no " +
+  "job is named, mark every line true. Where it is genuinely unclear whether a line belongs, mark it " +
+  "true and say so in line_note.\n" +
+  "amount_cad: the sum of the lines marked for_this_job, on the same footing as the lines (so " +
+  "hst_included equals lines_include_hst). NEVER give the quote's grand total as the price of one " +
+  "job unless every line is that job — a total that quietly carries other work is the costliest " +
+  "error this reading can make.\n" +
   "quote_date is ISO YYYY-MM-DD if a date is given or inferable, else empty. " +
   "high_priority is true only for urgent/safety/emergency work.";
 const QUOTE_SCHEMA = {
@@ -71,9 +89,24 @@ const QUOTE_SCHEMA = {
     hst_included: { type: "boolean" },
     scope_notes: { type: "string" },
     quote_date: { type: "string" },
+    lines: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          description: { type: "string" },
+          amount: { type: ["number", "null"] },
+          for_this_job: { type: "boolean" },
+          line_note: { type: "string" },
+        },
+        required: ["description", "amount", "for_this_job", "line_note"],
+        additionalProperties: false,
+      },
+    },
+    lines_include_hst: { type: "boolean" },
   },
   required: ["job_description", "high_priority", "contractor", "quote_number",
-             "amount_cad", "hst_included", "scope_notes", "quote_date"],
+             "amount_cad", "hst_included", "scope_notes", "quote_date", "lines", "lines_include_hst"],
   additionalProperties: false,
 };
 
@@ -585,8 +618,11 @@ exports.nnsccTrackerAi = onCall(
     if (request.data && request.data.parse === true) {
       const text = String(request.data.text || "").slice(0, 20000);
       if (!text.trim()) throw new HttpsError("invalid-argument", "No quote text provided.");
+      /* the lines are asked for here too, so a pasted email pricing three
+         things is not entered as one job at the price of all three */
       return await callClaude(key, QUOTE_EXTRACT_SYSTEM,
-        "Contractor quote text:\n\n" + text, QUOTE_SCHEMA, 800);
+        "No job has been named: this quote is being read to create a new job.\n\n" +
+        "Contractor quote text:\n\n" + text, QUOTE_SCHEMA, 6000, CONTRACT_MODEL);
     }
 
     // ----- mode: quote intake from an uploaded FILE (PDF read natively; .docx text-extracted) -----
@@ -594,12 +630,24 @@ exports.nnsccTrackerAi = onCall(
       const b64 = String(request.data.fileB64 || "");
       if (!b64) throw new HttpsError("invalid-argument", "No file was provided.");
       const media = String(request.data.mediaType || "");
+      /* which job this quote is being read for, and what else is open — the
+         difference between a line that is this work and one that is not */
+      const forJob = String(request.data.jobDesc || "").trim().slice(0, 300);
+      const others = (Array.isArray(request.data.otherJobs) ? request.data.otherJobs : [])
+        .map((t) => String(t || "").trim().slice(0, 120)).filter(Boolean).slice(0, 80);
+      const ctx = forJob
+        ? "It is being read for this job: " + forJob + "\n" +
+          (others.length ? "Other jobs open in the same report:\n- " + others.join("\n- ") + "\n" : "")
+        : "No job has been named: this quote is being read to create a new job.\n";
       if (media === "application/pdf") {
         // Claude reads the PDF directly — works for digital and scanned quotes.
+        // The stronger model, because the price it picks goes in front of the
+        // board and a wrong line is worth thousands.
         return await callClaude(key, QUOTE_EXTRACT_SYSTEM, [
           { type: "document", source: { type: "base64", media_type: "application/pdf", data: b64 } },
-          { type: "text", text: "The attached PDF is a contractor's quote to a condominium property manager. Extract the fields from it." },
-        ], QUOTE_SCHEMA, 800);
+          { type: "text", text: "The attached PDF is a contractor's quote to a condominium property manager. " +
+            ctx + "Extract the fields from it." },
+        ], QUOTE_SCHEMA, 6000, CONTRACT_MODEL);
       }
       if (media === "docx") {
         let text = "";
@@ -613,7 +661,8 @@ exports.nnsccTrackerAi = onCall(
         if (!text.trim()) {
           throw new HttpsError("invalid-argument", "That document looks empty or image-only — save it as a PDF so Claude can read it.");
         }
-        return await callClaude(key, QUOTE_EXTRACT_SYSTEM, "Contractor quote text:\n\n" + text, QUOTE_SCHEMA, 800);
+        return await callClaude(key, QUOTE_EXTRACT_SYSTEM, ctx + "\nContractor quote text:\n\n" + text,
+          QUOTE_SCHEMA, 6000, CONTRACT_MODEL);
       }
       throw new HttpsError("invalid-argument", "Unsupported file — upload a PDF or a Word .docx file.");
     }

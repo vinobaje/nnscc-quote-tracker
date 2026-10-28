@@ -1731,6 +1731,16 @@ body[data-view="edit"] .wrap { max-width:none; }
 .qreadtbl .qrnm { font-weight:600; word-break:break-all; }
 .qreadtbl .qrwhy { color:var(--muted); font-size:12px; }
 .qreadtbl .qrsum td { border-bottom:none; border-top:2px solid var(--line); font-weight:700; padding-top:8px; }
+/* a document priced line by line: its name once, its lines indented under it */
+.qreadtbl .qrfile td { font-size:12px; color:var(--ink2); font-weight:600; padding-top:9px; border-bottom:none; }
+.qreadtbl .qrline { font-weight:500; padding-left:14px; word-break:normal; }
+.qreadtbl .qrleft td { border-bottom:none; color:var(--muted); font-size:12px; padding-top:2px; }
+.iplines { margin:8px 0 2px; padding:8px 10px; border:1px solid var(--amber-soft); background:#FFFCF5;
+  border-radius:6px; font-size:12.5px; }
+.iplines .iplhead { color:var(--amber); font-weight:600; margin-bottom:5px; }
+.iplines label { display:flex; gap:8px; align-items:baseline; padding:2px 0; cursor:pointer; }
+.iplines label span { flex:1; }
+.iplines label b { font-weight:600; font-variant-numeric:tabular-nums; white-space:nowrap; }
 .qreadacts { display:flex; gap:9px; align-items:center; flex-wrap:wrap; margin-top:10px; }
 .qreadnote { font-size:12px; color:var(--muted); margin:0; flex:1; min-width:180px; }
 .qreadnote.bad { color:var(--prio); }
@@ -2989,7 +2999,7 @@ var BRAND_PATH = "nnsccQuoteTracker/brand";               /* the letterhead the 
 var WEEKLY_DRAFT_PATH = "nnsccQuoteTracker/weeklyDraft";   /* the report she is working on */
 var WEEKLY_COLL = "nnsccWeeklyReports";                   /* every one she has finished */
 var VIEW_BETA = CURRENT_PATH.indexOf("Beta") >= 0;   /* which report the passcode gate reads/protects */
-var BUILD_STAMP = "2026-10-20 00:18";   /* filled in by build.js — which copy of the page this is */
+var BUILD_STAMP = "2026-10-28 19:59";   /* filled in by build.js — which copy of the page this is */
 /* path of the report currently on screen */
 function reportPath() {
   return cloud.active.kind === "current" ? CURRENT_PATH : (REPORTS_COLL + "/" + cloud.active.id);
@@ -3776,8 +3786,8 @@ function jdQuotesHTML(j, c) {
     if (x.b.qno) note += (note ? " · " : "") + "Quote #" + x.b.qno;
     /* one number standing for several quotations says so, or the board is
        reading a total it has no way to recognise as one */
-    if (x.b.parts && x.b.parts.length > 1)
-      note += (note ? " · " : "") + "total of " + x.b.parts.length + " quotations";
+    var pnote = partsNote(x.b.parts);
+    if (pnote) note += (note ? " · " : "") + pnote;
     if (x.b.notes) note += (note ? " · " : "") + x.b.notes;
     var n = (x.b.files || []).length;
     var files = n
@@ -5389,20 +5399,37 @@ function bidReadPanelHTML(jid, bi) {
   if (bidRead.err)
     return '<div class="qread"><p class="qreadnote bad">\u26A0 ' + esc(bidRead.err) + "</p>" +
       '<button class="edbtn" type="button" data-act="readcancel">Close</button></div>';
-  var rows = bidRead.rows || [], sum = 0, n = 0;
+  var rows = bidRead.rows || [], sum = 0, n = 0, left = 0, leftN = 0, files = {}, anyLine = false;
   var h = ['<div class="qread"><table class="qreadtbl"><tbody>'];
   rows.forEach(function (r, ri) {
-    if (r.ok && r.incl != null) { sum += r.incl; n++; }
+    if (r.ok && r.incl != null) { sum += r.incl; n++; files[r.name] = 1; }
+    if (r.line) anyLine = true;
+    if (r.line && !r.ok && r.incl != null) { left += r.incl; leftN++; }
+    /* a document priced line by line gets its name once, over its lines */
+    if (r.line && (!ri || rows[ri - 1].name !== r.name))
+      h.push('<tr class="qrfile"><td></td><td colspan="3">\u{1F4CE} ' + esc(r.name) +
+        ' <span class="qrwhy">\u00b7 prices ' + (r.of || "several") + " separate items</span></td></tr>");
     h.push("<tr" + (r.ok ? "" : ' class="off"') + '><td class="qrck">' +
       (r.incl == null ? "" : '<input type="checkbox" data-act="readtoggle" data-ri="' + ri + '"' +
-        (r.ok ? " checked" : "") + ' title="Include this quotation in the total">') + "</td>" +
-      '<td class="qrnm">' + esc(r.name) + "</td>" +
+        (r.ok ? " checked" : "") + ' title="' + (r.line ? "Count this line" : "Include this quotation") +
+        ' in the total">') + "</td>" +
+      '<td class="qrnm' + (r.line ? " qrline" : "") + '">' + esc(r.line || r.name) + "</td>" +
       '<td class="qrwhy">' + esc(r.why || "") + "</td>" +
       '<td class="money">' + (r.incl == null ? "\u2014" : money(r.incl)) + "</td></tr>");
   });
   sum = Math.round(sum * 100) / 100;
-  h.push('<tr class="qrsum"><td></td><td>Total of ' + n + " quotation" + (n === 1 ? "" : "s") +
+  var nf = Object.keys(files).length;
+  var what0 = !n ? "Nothing counted"
+    : !anyLine ? "Total of " + n + " quotation" + (n === 1 ? "" : "s")
+    : nf === 1 ? n + " line" + (n === 1 ? "" : "s") + " of the quotation"
+    : n + " lines from " + nf + " quotations";
+  h.push('<tr class="qrsum"><td></td><td>' + what0 +
     '</td><td class="qrwhy">HST included</td><td class="money">' + money(sum) + "</td></tr>");
+  /* the part of the document that is not this job, said in so many words */
+  if (leftN)
+    h.push('<tr class="qrleft"><td></td><td colspan="2">Left out: ' + leftN + " line" +
+      (leftN === 1 ? "" : "s") + " priced as other work</td>" +
+      '<td class="money">' + money(Math.round(left * 100) / 100) + "</td></tr>");
   h.push("</tbody></table>");
   var det = bidReadDetails();
   if (det.length) {
@@ -5426,11 +5453,12 @@ function bidReadPanelHTML(jid, bi) {
     "against the PDFs \u2014 they are what the board will be shown.</span></div></div>");
   return h.join("");
 }
-/* one attached file → its total, read by Claude off the document itself */
-function bidReadOne(f) {
+/* One attached file → the rows it offers the panel, read by Claude off the
+   document itself, knowing which job it is reading for and what else is open. */
+function bidReadOne(f, ctx) {
   var name = String(f.name || "attachment");
   if (!/\.pdf$/i.test(name) && !/\.docx$/i.test(name))
-    return Promise.resolve({ name: name, incl: null, ok: false, why: "not a PDF" });
+    return Promise.resolve([{ name: name, incl: null, ok: false, why: "not a PDF" }]);
   return fetch(f.url).then(function (r) {
     if (!r.ok) throw new Error("could not fetch");
     return r.blob();
@@ -5445,7 +5473,8 @@ function bidReadOne(f) {
   }).then(function (b64) {
     if (!b64) throw new Error("empty file");
     return cloud.fns.httpsCallable("nnsccTrackerAi")({ parseFile: true, fileB64: b64,
-      mediaType: /\.docx$/i.test(name) ? "docx" : "application/pdf", fileName: name });
+      mediaType: /\.docx$/i.test(name) ? "docx" : "application/pdf", fileName: name,
+      jobDesc: (ctx && ctx.desc) || "", otherJobs: (ctx && ctx.others) || [] });
   }).then(function (res) {
     var d = (res && res.data) || {};
     /* the same reading already names the contractor, the quote number, the date
@@ -5457,19 +5486,66 @@ function bidReadOne(f) {
       qdate: /^\d{4}-\d{2}-\d{2}$/.test(String(d.quote_date || "")) ? String(d.quote_date) : "",
       notes: bidReadTrim(d.scope_notes)
     };
-    var amt = (d.amount_cad == null || d.amount_cad === "") ? null : Number(d.amount_cad);
-    if (amt == null || !isFinite(amt))
-      return { name: name, incl: null, ok: false, why: "no total found in it", det: det };
-    /* levelled to HST-included, so that quotes stating their tax and quotes not
-       stating it can be added to each other at all */
-    var incl = d.hst_included ? amt : Math.round(amt * (1 + HST) * 100) / 100;
-    return { name: name, incl: Math.round(incl * 100) / 100, ok: true, det: det,
-             why: (d.quote_number ? "#" + d.quote_number : "") +
-                  (d.hst_included ? "" : (d.quote_number ? " \u00b7 " : "") + "HST added") };
+    return bidReadRows(name, d, det);
   }).catch(function (e) {
-    return { name: name, incl: null, ok: false, det: null,
-             why: (e && e.message) || "could not be read" };
+    return [{ name: name, incl: null, ok: false, det: null,
+              why: (e && e.message) || "could not be read" }];
   });
+}
+/* One document's reading → the rows the panel offers.
+
+   A contractor's estimate often prices several unrelated pieces of work, and
+   the row wants ONE of them. Rooterworx #35607 priced five area drains, an
+   asphalt patch, a crack, a grinding job and a sewer pump; its $34,770.10
+   total went in against the drain job, whose own line was $14,500.00. So a
+   document with several priced lines is offered line by line: the lines the
+   reading matched to this job ticked, the rest shown struck through, so she
+   sees what is being counted AND what is being left out, and disagrees with
+   either by a tick.
+
+   Every figure is levelled to HST-included before it is shown. Lines are
+   usually before tax, with HST added under a subtotal — and taking the
+   tax-included total but marking it as before tax is how that same row came
+   to charge the HST twice. */
+function bidReadRows(name, d, det) {
+  var qno = d.quote_number ? "#" + String(d.quote_number).trim() : "";
+  var lines = (Array.isArray(d.lines) ? d.lines : []).filter(function (l) {
+    return l && l.amount != null && l.amount !== "" && isFinite(+l.amount);
+  });
+  if (lines.length) {
+    var incl = !!d.lines_include_hst;
+    return lines.map(function (l, li) {
+      var many = lines.length > 1;
+      var why = [qno, incl ? "" : "HST added",
+        l.for_this_job ? "" : "other work",
+        String(l.line_note || "").trim().slice(0, 90)].filter(Boolean).join(" \u00b7 ");
+      return { name: name, of: lines.length, det: det, ok: !!l.for_this_job, why: why,
+        line: many ? (String(l.description || "").trim() || "line " + (li + 1)).slice(0, 90) : "",
+        incl: Math.round((incl ? +l.amount : +l.amount * (1 + HST)) * 100) / 100 };
+    });
+  }
+  /* a reply that itemised nothing: the document's own figure, as before */
+  var amt = (d.amount_cad == null || d.amount_cad === "") ? null : Number(d.amount_cad);
+  if (amt == null || !isFinite(amt))
+    return [{ name: name, incl: null, ok: false, why: "no total found in it", det: det }];
+  return [{ name: name, of: 1, det: det, ok: true, line: "",
+    incl: Math.round((d.hst_included ? amt : amt * (1 + HST)) * 100) / 100,
+    why: qno + (d.hst_included ? "" : (qno ? " \u00b7 " : "") + "HST added") }];
+}
+/* What one figure on a row is made of, said where the board reads it: several
+   quotations added up, several lines of one, or one line of a quotation that
+   prices more than this job — the last being the case a director most needs
+   told, since the document's own total is not this job's price. Parts saved
+   before lines were read carry neither line nor count, and read as they did. */
+function partsNote(parts) {
+  if (!Array.isArray(parts) || !parts.length) return "";
+  var files = {};
+  parts.forEach(function (p) { files[(p && p.name) || ""] = 1; });
+  var nf = Object.keys(files).length;
+  if (nf > 1) return "total of " + nf + " quotations" + (parts.length > nf ? ", " + parts.length + " lines" : "");
+  if (parts.length > 1) return parts.length + " lines of one quotation";
+  if ((parts[0].of || 1) > 1) return "one line of a quotation pricing " + parts[0].of + " items";
+  return "";
 }
 /* a scope note belongs on one line of a table the board reads, so a paragraph
    is cut back to a phrase — at a word, never mid-word */
@@ -5508,6 +5584,12 @@ function bidReadRun(j, bi) {
   bidRead = { jid: j.id, bi: bi, busy: "Claude is reading " + files.length + " file" +
     (files.length === 1 ? "" : "s") + "\u2026", err: "", rows: [] };
   renderEditor();
+  /* the job this is for, and the other open work, so a line that is plainly
+     another job is recognised as one */
+  var ctx = { desc: String(j.desc || "").trim(),
+    others: liveJobs().filter(function (x) {
+      return x.id !== j.id && countsAsSpend(x) && x.status !== "completed" && String(x.desc || "").trim();
+    }).map(function (x) { return "Job " + x.no + ": " + String(x.desc).trim(); }).slice(0, 80) };
   var out = [], i = 0;
   (function next() {
     if (i >= files.length) {
@@ -5516,7 +5598,7 @@ function bidReadRun(j, bi) {
     var f = files[i++];
     bidRead.busy = "Reading " + i + " of " + files.length + " \u2014 " + (f.name || "attachment") + "\u2026";
     renderEditor();
-    bidReadOne(f).then(function (r) { out.push(r); next(); });
+    bidReadOne(f, ctx).then(function (r) { out = out.concat(r); next(); });
   })();
 }
 function bidReadApply() {
@@ -5540,11 +5622,14 @@ function bidReadApply() {
     b.hst = true;                 /* everything was levelled to HST-included above */
     /* what the figure is made of, kept with it — the board sees one number for
        three quotations and is entitled to know that is what it is */
-    b.parts = kept.map(function (r) { return { name: r.name, amount: r.incl }; });
-    notes.push(kept.length > 1
-      ? jobLabel(j) + ": " + (b.contractor || "quote") + " set to " + money(sum) + " \u2014 the total of " +
-        kept.length + " attached quotations (" + kept.map(function (r) { return money(r.amount || r.incl); }).join(" + ") + ")"
-      : jobLabel(j) + ": " + (b.contractor || "quote") + " set to " + money(sum) + " from the attached quotation");
+    b.parts = kept.map(function (r) {
+      return { name: r.name, line: r.line || "", of: r.of || 1, amount: r.incl };
+    });
+    var pn = partsNote(b.parts);
+    notes.push(jobLabel(j) + ": " + (b.contractor || "quote") + " set to " + money(sum) +
+      (pn ? " \u2014 " + pn + " (" + kept.map(function (r) {
+        return (r.line ? r.line + " " : "") + money(r.incl);
+      }).join(" + ") + ")" : " from the attached quotation"));
   }
   bidRead = null;
   qcTouch(j);
@@ -6836,6 +6921,7 @@ document.getElementById("editor").addEventListener("click", function (e) {
   if (act === "intake-file") { aiIntakeStartFile(); return; }
   if (act === "intake-commit") { aiIntakeCommit(); return; }
   if (act === "intake-cancel") { aiIntakeCancel(); return; }
+  if (act === "intake-line") { intakeLinesSync(); return; }
   if (act === "viewpass-set") { viewPassSet(); return; }
   if (act === "dir-add") {
     dirState.list.push({ name: "", phone: "", email: "", insuranceExp: "" });
@@ -10355,6 +10441,7 @@ function aiIntakeShowPreview(d) {
       '<label style="' + fs + '">Amount (CAD)<input id="ipAmount" type="number" step="0.01" style="' + inp + '" value="' + v(amt) + '"></label>' +
       '<label style="' + fs + '">Quote date<input id="ipQdate" type="date" style="' + inp + '" value="' + v(d.quote_date || todayISO()) + '"></label>' +
     "</div>" +
+    intakeLinesHTML(d) +
     '<label style="' + fs + ';display:inline-flex;align-items:center;gap:6px;margin:8px 0"><input type="checkbox" id="ipHst"' + (d.hst_included ? " checked" : "") + "> HST already included in the amount</label>" +
     '<label style="' + fs + '">Notes<textarea id="ipNotes" rows="2" style="' + inp + '">' + v(d.scope_notes) + "</textarea></label>" +
     '<div style="display:flex;gap:8px;margin-top:10px">' +
@@ -10364,6 +10451,40 @@ function aiIntakeShowPreview(d) {
   box.style.display = "";
   intakeStatus("Claude filled these in — review and confirm.");
   box.scrollIntoView({ block: "nearest" });
+}
+/* A quotation that prices several separate items is shown item by item, every
+   one ticked to begin with — no job has been named yet, so nothing can be
+   matched — and the amount above follows the ticks. Creating one job at the
+   price of five is the mistake this is here to stop. */
+function intakeLines(d) {
+  return (Array.isArray(d && d.lines) ? d.lines : []).filter(function (l) {
+    return l && l.amount != null && l.amount !== "" && isFinite(+l.amount);
+  });
+}
+function intakeLinesHTML(d) {
+  var lines = intakeLines(d);
+  if (lines.length < 2) return "";
+  var tax = d.lines_include_hst ? "" : " + HST";
+  return '<div class="iplines"><div class="iplhead">\u26a0 This quotation prices ' + lines.length +
+    " separate items. Untick the ones that are not this job \u2014 the amount follows.</div>" +
+    lines.map(function (l, i) {
+      return '<label><input type="checkbox" data-act="intake-line" data-li="' + i + '"' +
+        (l.for_this_job !== false ? " checked" : "") + "> <span>" + esc(String(l.description || "item " + (i + 1))) +
+        '</span><b>' + money(+l.amount) + tax + "</b></label>";
+    }).join("") + "</div>";
+}
+function intakeLinesSync() {
+  var lines = intakeLines(intakePending);
+  if (lines.length < 2) return;
+  var sum = 0;
+  document.querySelectorAll('#intakePreview input[data-act="intake-line"]').forEach(function (cb) {
+    if (cb.checked) sum += +lines[+cb.getAttribute("data-li")].amount;
+  });
+  var a = document.getElementById("ipAmount");
+  if (a) a.value = sum ? (Math.round(sum * 100) / 100).toFixed(2) : "";
+  /* the lines carry their own tax footing; the amount takes the same one */
+  var hb = document.getElementById("ipHst");
+  if (hb) hb.checked = !!intakePending.lines_include_hst;
 }
 function aiIntakeCancel() {
   intakePending = null;
