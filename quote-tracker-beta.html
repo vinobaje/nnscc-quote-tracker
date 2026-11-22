@@ -3066,7 +3066,7 @@ var BRAND_PATH = "nnsccQuoteTrackerBeta/brand";               /* the letterhead 
 var WEEKLY_DRAFT_PATH = "nnsccQuoteTrackerBeta/weeklyDraft";   /* the report she is working on */
 var WEEKLY_COLL = "nnsccWeeklyReportsBeta";                   /* every one she has finished */
 var VIEW_BETA = CURRENT_PATH.indexOf("Beta") >= 0;   /* which report the passcode gate reads/protects */
-var BUILD_STAMP = "2026-10-28 19:59";   /* filled in by build.js — which copy of the page this is */
+var BUILD_STAMP = "2026-11-21 22:46";   /* filled in by build.js — which copy of the page this is */
 /* path of the report currently on screen */
 function reportPath() {
   return cloud.active.kind === "current" ? CURRENT_PATH : (REPORTS_COLL + "/" + cloud.active.id);
@@ -5526,6 +5526,23 @@ function bidReadOne(f, ctx) {
   var name = String(f.name || "attachment");
   if (!/\.pdf$/i.test(name) && !/\.docx$/i.test(name))
     return Promise.resolve([{ name: name, incl: null, ok: false, why: "not a PDF" }]);
+  var media = /\.docx$/i.test(name) ? "docx" : "application/pdf";
+  /* a filed attachment is read where it is filed, so its size is the file
+     store's limit and not what a browser can push back up through one call */
+  var call = f.path
+    ? docReadCall({ parseFile: true, path: f.path, mediaType: media, fileName: name,
+        jobDesc: (ctx && ctx.desc) || "", otherJobs: (ctx && ctx.others) || [] })
+    : bidReadOneBytes(f, name, media, ctx);
+  return call.then(function (res) {
+    return bidReadDone(name, res);
+  }).catch(function (e) {
+    return [{ name: name, incl: null, ok: false, det: null,
+              why: (e && e.message) || "could not be read" }];
+  });
+}
+/* An attachment from before files were stored with their path: the old way,
+   through the browser, capped to what one call can carry. */
+function bidReadOneBytes(f, name, media, ctx) {
   return fetch(f.url).then(function (r) {
     if (!r.ok) throw new Error("could not fetch");
     return r.blob();
@@ -5539,25 +5556,23 @@ function bidReadOne(f, ctx) {
     });
   }).then(function (b64) {
     if (!b64) throw new Error("empty file");
-    return cloud.fns.httpsCallable("nnsccTrackerAi")({ parseFile: true, fileB64: b64,
-      mediaType: /\.docx$/i.test(name) ? "docx" : "application/pdf", fileName: name,
+    return docReadCall({ parseFile: true, fileB64: b64, mediaType: media, fileName: name,
       jobDesc: (ctx && ctx.desc) || "", otherJobs: (ctx && ctx.others) || [] });
-  }).then(function (res) {
-    var d = (res && res.data) || {};
-    /* the same reading already names the contractor, the quote number, the date
-       and what the work is; the row used to throw all four away and leave her
-       typing them off the PDF she had just uploaded */
-    var det = {
-      contractor: String(d.contractor || "").trim().slice(0, 80),
-      qno: String(d.quote_number || "").trim().slice(0, 40),
-      qdate: /^\d{4}-\d{2}-\d{2}$/.test(String(d.quote_date || "")) ? String(d.quote_date) : "",
-      notes: bidReadTrim(d.scope_notes)
-    };
-    return bidReadRows(name, d, det);
-  }).catch(function (e) {
-    return [{ name: name, incl: null, ok: false, det: null,
-              why: (e && e.message) || "could not be read" }];
   });
+}
+/* the reply, whichever way the document reached the reader */
+function bidReadDone(name, res) {
+  var d = (res && res.data) || {};
+  /* the same reading already names the contractor, the quote number, the date
+     and what the work is; the row used to throw all four away and leave her
+     typing them off the PDF she had just uploaded */
+  var det = {
+    contractor: String(d.contractor || "").trim().slice(0, 80),
+    qno: String(d.quote_number || "").trim().slice(0, 40),
+    qdate: /^\d{4}-\d{2}-\d{2}$/.test(String(d.quote_date || "")) ? String(d.quote_date) : "",
+    notes: bidReadTrim(d.scope_notes)
+  };
+  return bidReadRows(name, d, det);
 }
 /* One document's reading → the rows the panel offers.
 
@@ -6228,7 +6243,8 @@ function qcRun(j) {
   var jid = j.id, fp = qcFP(j);
   qcBusy[jid] = true; delete qcErr[jid];
   qcRedraw();
-  cloud.fns.httpsCallable("nnsccTrackerAi")({
+  /* up to six attachments read in one call: the long wait, like every read */
+  docReadCall({
     compare: true,
     engine: qcEngine().k,
     model: qcModel(),
@@ -7852,13 +7868,20 @@ document.addEventListener("change", function (e) {
   if (note) note.textContent = "Uploading “" + file.name + "”…";
   var path = "contractFiles/" + c.id + "/" + Date.now() + "-" + file.name.replace(/[^\w.\-() ]+/g, "_");
   cloud.store.ref(path).put(file).then(function () {
-    c.files = c.files || [];
-    c.files.push({ name: file.name, path: path, size: file.size });
+    /* The contract as it is NOW, not as it was when the upload started. A save
+       during a long upload — her own typing, or another editor's — replaces the
+       register's objects, and the file used to be recorded on the old copy,
+       which nothing saves: attached, then silently not there. */
+    var cur = conById(c.id);
+    if (!cur) { cloud.store.ref(path).delete().catch(function () {}); return; }   /* contract deleted meanwhile */
+    var rec = { name: file.name, path: path, size: file.size };
+    cur.files = cur.files || [];
+    cur.files.push(rec);
     conSave();
     if (note) note.textContent = "";
     renderEditor(); renderReport();
     /* the document is here, so read it now rather than making her ask */
-    if (cloud.fns && /\.(pdf|docx)$/i.test(file.name)) conAiRead(c.id, file);
+    if (cloud.fns && /\.(pdf|docx)$/i.test(file.name)) conAiRead(cur.id, rec);
   }).catch(function (err) {
     if (note) note.textContent = "Upload failed (" + ((err && err.code) || "error") + ") — nothing was saved.";
   });
@@ -7942,34 +7965,60 @@ function conAiFail(cid, text) {
   conAiBusy = ""; conAiMsg = { cid: cid, text: text };
   renderEditor();
 }
-/* file may be the one just chosen, or null to re-read what is already attached */
-function conAiRead(cid, file) {
+/* A document chosen off her computer is filed first and then read where it
+   was filed, the same as an attachment — one way in, one size limit, and
+   nothing pushed through the call itself. Resolves to the stored file. The
+   ceiling is the folder's own (see storage.rules). */
+var DOC_FILE_MAX = { "quoteAttachments/": 15, "contractFiles/": 20 };
+var DOC_FILE_KIND = { "quoteAttachments/": "a quotation", "contractFiles/": "a contract or schedule" };
+function docFileFirst(file, folder) {
+  var top = folder.split("/")[0] + "/", cap = DOC_FILE_MAX[top] || 15;
+  if (file.size > cap * 1024 * 1024)
+    return Promise.reject({ message: "That file is " + (Math.round(file.size / 1048576 * 10) / 10) +
+      " MB \u2014 " + (DOC_FILE_KIND[top] || "a document") + " can be up to " + cap +
+      " MB. Attach a smaller copy (a black-and-white scan is usually a fraction of the size)." });
+  if (!cloud.store) return Promise.reject({ message: "File storage is not available here." });
+  var path = folder + Date.now() + "-" + String(file.name || "document").replace(/[^\w.\-() ]+/g, "_");
+  var ref = cloud.store.ref(path);
+  return ref.put(file).then(function () { return ref.getDownloadURL(); })
+    .then(function (url) { return { name: file.name, path: path, size: file.size, url: url }; });
+}
+function docUnfile(path) {
+  if (path && cloud.store) { try { cloud.store.ref(path).delete().catch(function () {}); } catch (e) {} }
+}
+/* A document read can take a minute or two on a long scan, and the Firebase
+   SDK waits 70 seconds for a call by default — after which it gives up with
+   "deadline-exceeded" while the function carries on, still reading and still
+   charged for. Every document read goes through here instead, waiting just
+   past the function's own five-minute limit so that a real timeout is the
+   function's to report, with its own words. */
+var DOC_READ_WAIT_MS = 310 * 1000;
+function docReadCall(payload) {
+  return cloud.fns.httpsCallable("nnsccTrackerAi", { timeout: DOC_READ_WAIT_MS })(payload);
+}
+/* rec is the record just filed, or null to re-read the latest attached one.
+   Name, type and path all come from that one record, so the reading and the
+   label on it can never describe two different documents. */
+function conAiRead(cid, rec) {
   var c = conById(cid); if (!c) return;
   conAiPending = null; conAiMsg = null;
   if (!isEditor() || !cloud.fns || !cloud.user) {
     conAiFail(cid, "Sign in as the property manager to have the document read."); return;
   }
-  var stored = (c.files || [])[(c.files || []).length - 1];
-  var name = String((file ? file.name : (stored && stored.name)) || "");
-  if (!file && !stored) { conAiFail(cid, "Attach the signed document first."); return; }
+  var stored = (rec && rec.path) ? rec : (c.files || [])[(c.files || []).length - 1];
+  var name = String((stored && stored.name) || "");
+  if (!stored) { conAiFail(cid, "Attach the signed document first."); return; }
   var lower = name.toLowerCase();
   var media = /\.pdf$/.test(lower) ? "application/pdf" : (/\.docx$/.test(lower) ? "docx" : "");
   if (!media) { conAiFail(cid, "Claude can read a PDF or a Word .docx file — “" + name + "” is neither."); return; }
   conAiBusy = cid; renderEditor();
-  (file ? Promise.resolve(file) : conBlobData(stored.path)).then(function (blob) {
-    if (blob.size > 8 * 1024 * 1024)
-      throw { code: "too-big", message: "That document is over 8 MB — Claude can read a smaller copy, or fill the details in by hand." };
-    return new Promise(function (res, rej) {
-      var r = new FileReader();
-      r.onload = function () { res(String(r.result || "").split(",")[1] || ""); };
-      r.onerror = function () { rej({ message: "Could not read that file." }); };
-      r.readAsDataURL(blob);
-    });
-  }).then(function (b64) {
-    if (!b64) throw { message: "Could not read that file." };
-    return cloud.fns.httpsCallable("nnsccTrackerAi")({
-      contract: true, fileB64: b64, mediaType: media, fileName: name });
-  }).then(function (res) {
+  /* The document is read where it is filed: the browser sends its path and the
+     function fetches it. It used to download the file, encode it and send it
+     back up — a third larger again — and refused anything over 8 MB to make it
+     fit, so a colour scan could be attached but never read. A file just chosen
+     is filed before this runs, so the stored copy is always the one to send. */
+  if (!stored || !stored.path) { conAiFail(cid, "Attach the signed document first."); return; }
+  docReadCall({ contract: true, path: stored.path, mediaType: media, fileName: name }).then(function (res) {
     if (conAiBusy !== cid) return;                     /* superseded while it ran */
     conAiBusy = "";
     conAiPending = { cid: cid, d: res.data || {}, src: name };
@@ -9266,15 +9315,19 @@ function actImportRead(file) {
   var name = (file.name || "").toLowerCase();
   var media = /\.pdf$/.test(name) ? "application/pdf" : (/\.docx$/.test(name) ? "docx" : "");
   if (!media) { actImportMsg = "Claude can read a PDF or a Word .docx — “" + file.name + "” is neither."; renderEditor(); return; }
-  if (file.size > 8 * 1024 * 1024) { actImportMsg = "That file is over 8 MB — send a smaller copy."; renderEditor(); return; }
   actImport = null;
-  actImportMsg = "\u{2728} Reading “" + file.name + "” — this takes about half a minute.";
+  actImportMsg = "\u{2728} Reading \u201c" + file.name + "\u201d \u2014 this takes about half a minute.";
   renderEditor();
-  var r = new FileReader();
-  r.onload = function () {
-    var b64 = String(r.result || "").split(",")[1] || "";
-    cloud.fns.httpsCallable("nnsccTrackerAi")({ schedule: true, fileB64: b64, mediaType: media, fileName: file.name })
+  /* Filed just long enough to be read, then removed: a schedule letter is not
+     kept, only the visits read off it. Filing it means its size limit is the
+     file store's, not what a single call can carry. */
+  var filed = null;
+  docFileFirst(file, "contractFiles/schedules/").then(function (fd) {
+    filed = fd;
+    return docReadCall({ schedule: true, path: fd.path, mediaType: media, fileName: file.name });
+  })
       .then(function (res) {
+        docUnfile(filed && filed.path);
         var d = res.data || {};
         var picked = {};
         (d.visits || []).forEach(function (x, i) { picked[i] = !!x.date; });
@@ -9283,13 +9336,11 @@ function actImportRead(file) {
         renderEditor();
       })
       .catch(function (e) {
+        docUnfile(filed && filed.path);
         actImport = null;
-        actImportMsg = "\u26A0 Could not read it — " + ((e && e.message) || "something went wrong") + ".";
+        actImportMsg = "\u26A0 Could not read it \u2014 " + ((e && e.message) || "something went wrong") + ".";
         renderEditor();
       });
-  };
-  r.onerror = function () { actImportMsg = "Could not read that file."; renderEditor(); };
-  r.readAsDataURL(file);
 }
 function actImportSave() {
   if (!actImport || !isEditor()) return;
@@ -11204,13 +11255,22 @@ function intakeCardHTML() {
       '<button class="btn primary" data-act="intake-run" type="button">✨ Read pasted quote</button>' +
       '<button class="btn" data-act="intake-file" type="button">📄 Upload quote PDF / Word…</button>' +
       '<span class="savenote" id="intakeStatus"></span></div>');
-    h.push('<div id="intakePreview" style="display:none;margin-top:12px"></div>');
+    /* drawn again on a re-render rather than wiped: a preview that vanished
+       kept its filed quotation with no Cancel left to let it go */
+    h.push(intakePending
+      ? '<div id="intakePreview" style="margin-top:12px">' + intakePreviewHTML(intakePending) + "</div>"
+      : '<div id="intakePreview" style="display:none;margin-top:12px"></div>');
   }
   h.push("</div></div>");
   return h.join("");
 }
 function intakeStatus(t) { var el = document.getElementById("intakeStatus"); if (el) el.textContent = t; }
 var intakePending = null;
+/* Every intake request — a file chosen, a pasted quote read — takes the next
+   number, and a reply is shown only if no newer request has started since.
+   A reply that has been overtaken lets go of the file it filed. Cancel moves
+   the number on too, so a read still running when she cancelled is dropped. */
+var intakeSeq = 0;
 function aiIntakeErr(e) {
   var code = (e && e.code) || "";
   intakeStatus(code === "functions/failed-precondition" ? "⚠ " + e.message : "⚠ " + ((e && e.message) || "could not read the quote"));
@@ -11222,9 +11282,10 @@ function aiIntakeRun() {
   if (!text) { intakeStatus("Paste a quote, or use Upload for a PDF / Word file."); return; }
   if (!cloud.fns || !cloud.user) { intakeStatus("Sign in first."); return; }
   intakeStatus("Claude is reading the quote…");
+  var my = ++intakeSeq;
   cloud.fns.httpsCallable("nnsccTrackerAi")({ parse: true, text: text })
-    .then(function (res) { aiIntakeShowPreview(res.data || {}); })
-    .catch(aiIntakeErr);
+    .then(function (res) { if (my === intakeSeq) aiIntakeShowPreview(res.data || {}, null); })
+    .catch(function (e) { if (my === intakeSeq) aiIntakeErr(e); });
 }
 /* file path → open the picker; the #aiIntakeFile handler reads + parses it */
 function aiIntakeStartFile() {
@@ -11233,16 +11294,31 @@ function aiIntakeStartFile() {
   var el = document.getElementById("aiIntakeFile"); if (el) el.click();
 }
 /* editable confirmation card — nothing is written to Firestore until “Add this job” */
-function aiIntakeShowPreview(d) {
+/* The one place a preview is put up or replaced, and so the one place the
+   quotation filed for the previous preview is let go: a file is removed when
+   nothing refers to it any more, and at no other moment. Removing it earlier —
+   when a second file was merely chosen — left the first preview on screen
+   pointing at a file already gone, and "Add this job" saved a dead attachment.
+   A job that has been added owns its file; by then intakePending is null and
+   there is nothing here to let go. */
+function aiIntakeShowPreview(d, file) {
+  var old = intakePending && intakePending.file;
+  if (old && (!file || file.path !== old.path)) docUnfile(old.path);
   intakePending = d || {};
+  intakePending.file = file || null;
   var box = document.getElementById("intakePreview");
   if (!box) return;
+  box.innerHTML = intakePreviewHTML(intakePending);
+  box.style.display = "";
+  intakeStatus("Claude filled these in \u2014 review and confirm.");
+  box.scrollIntoView({ block: "nearest" });
+}
+function intakePreviewHTML(d) {
   function v(x) { return esc(x == null ? "" : String(x)); }
   var amt = (d.amount_cad != null && d.amount_cad !== "") ? d.amount_cad : "";
   var fs = "font-size:12px;color:var(--ink2)";
   var inp = "width:100%;box-sizing:border-box;margin-top:2px";
-  box.innerHTML =
-    '<div style="border:1px solid var(--line);border-radius:8px;padding:12px 14px;background:var(--panel,#f7f9fc)">' +
+  return '<div style="border:1px solid var(--line);border-radius:8px;padding:12px 14px;background:var(--panel,#f7f9fc)">' +
     '<div style="font-weight:600;margin-bottom:8px">Review before saving — edit anything that’s off, then confirm.</div>' +
     '<label style="' + fs + '">Job description<input id="ipDesc" style="' + inp + '" value="' + v(d.job_description) + '"></label>' +
     '<label style="' + fs + ';display:inline-flex;align-items:center;gap:6px;margin:8px 0"><input type="checkbox" id="ipPri"' + (d.high_priority ? " checked" : "") + "> High priority</label>" +
@@ -11255,13 +11331,12 @@ function aiIntakeShowPreview(d) {
     intakeLinesHTML(d) +
     '<label style="' + fs + ';display:inline-flex;align-items:center;gap:6px;margin:8px 0"><input type="checkbox" id="ipHst"' + (d.hst_included ? " checked" : "") + "> HST already included in the amount</label>" +
     '<label style="' + fs + '">Notes<textarea id="ipNotes" rows="2" style="' + inp + '">' + v(d.scope_notes) + "</textarea></label>" +
+    (d.file ? '<div style="' + fs + ';margin-top:6px">\u{1F4CE} ' + v(d.file.name) +
+      " \u2014 kept on the job when you add it</div>" : "") +
     '<div style="display:flex;gap:8px;margin-top:10px">' +
       '<button class="btn primary" data-act="intake-commit" type="button">✓ Add this job</button>' +
       '<button class="btn" data-act="intake-cancel" type="button">Cancel</button>' +
     "</div></div>";
-  box.style.display = "";
-  intakeStatus("Claude filled these in — review and confirm.");
-  box.scrollIntoView({ block: "nearest" });
 }
 /* A quotation that prices several separate items is shown item by item, every
    one ticked to begin with — no job has been named yet, so nothing can be
@@ -11297,7 +11372,13 @@ function intakeLinesSync() {
   var hb = document.getElementById("ipHst");
   if (hb) hb.checked = !!intakePending.lines_include_hst;
 }
-function aiIntakeCancel() {
+function aiIntakeCancel(kept) {
+  /* the quotation filed for this preview goes with it, unless the job took it;
+     and a read still running when she cancelled is dropped when it lands */
+  if (!kept) {
+    intakeSeq++;
+    if (intakePending && intakePending.file) docUnfile(intakePending.file.path);
+  }
   intakePending = null;
   var box = document.getElementById("intakePreview");
   if (box) { box.innerHTML = ""; box.style.display = "none"; }
@@ -11313,12 +11394,13 @@ function aiIntakeCommit() {
     bids: [{ contractor: gv("ipContractor").trim(), qno: gv("ipQno").trim(),
       amount: amtRaw === "" ? null : +amtRaw,
       hst: gc("ipHst"), notes: gv("ipNotes").trim(),
-      qdate: gv("ipQdate") || todayISO(), files: [] }] };
+      qdate: gv("ipQdate") || todayISO(),
+      files: (intakePending && intakePending.file) ? [intakePending.file] : [] }] };
   state.jobs.push(nj);
   orderJobs(state.jobs);
   persist(null, ['AI intake added job “' + nj.desc + '” (confirmed by editor)'], nj.id);
   var ta = document.getElementById("aiIntakeText"); if (ta) ta.value = "";
-  aiIntakeCancel();
+  aiIntakeCancel(true);
   renderEditor(); renderReport();
   var added = document.querySelector('#editor .ecard[data-jid="' + nj.id + '"]');
   if (added) added.scrollIntoView({ block: "center" });
@@ -12117,19 +12199,28 @@ document.getElementById("aiIntakeFile").addEventListener("change", function () {
   var isPdf = f.type === "application/pdf" || /\.pdf$/.test(name);
   var isDocx = /\.docx$/.test(name) || f.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
   if (!isPdf && !isDocx) { intakeStatus("Choose a PDF or a Word .docx file (old .doc isn’t supported — save it as a PDF)."); return; }
-  if (f.size > 8 * 1024 * 1024) { intakeStatus("That file is over 8 MB — attach a smaller copy or paste the text instead."); return; }
-  intakeStatus("Sending “" + f.name + "” to Claude…");
-  var reader = new FileReader();
-  reader.onload = function () {
-    var b64 = String(reader.result || "").split(",")[1] || "";
-    if (!b64) { intakeStatus("Could not read that file."); return; }
-    cloud.fns.httpsCallable("nnsccTrackerAi")({ parseFile: true, fileB64: b64,
-      mediaType: isPdf ? "application/pdf" : "docx", fileName: f.name })
-      .then(function (res) { aiIntakeShowPreview(res.data || {}); })
-      .catch(aiIntakeErr);
-  };
-  reader.onerror = function () { intakeStatus("Could not read that file."); };
-  reader.readAsDataURL(f);
+  /* Filed before it is read: the size limit is the file store's rather than
+     what one call can carry, and the job this creates keeps the quotation
+     instead of arriving with no attachment and asking for the same PDF again.
+     The preview already on screen is left alone until this one replaces it —
+     if this read fails, that one can still be added, with its file intact. */
+  var my = ++intakeSeq;
+  intakeStatus("Filing \u201c" + f.name + "\u201d\u2026");
+  var filed = null;
+  docFileFirst(f, "quoteAttachments/intake/").then(function (fd) {
+    filed = fd;
+    if (my !== intakeSeq) throw { overtaken: true };
+    intakeStatus("Claude is reading \u201c" + f.name + "\u201d\u2026");
+    return docReadCall({ parseFile: true, path: fd.path,
+      mediaType: isPdf ? "application/pdf" : "docx", fileName: f.name });
+  }).then(function (res) {
+    if (my !== intakeSeq) throw { overtaken: true };
+    aiIntakeShowPreview(res.data || {}, filed);
+  }).catch(function (e) {
+    if (filed) docUnfile(filed.path);
+    if (e && e.overtaken) return;          /* a newer request owns the screen */
+    if (my === intakeSeq) aiIntakeErr(e);
+  });
 });
 
 /* ---------- cross-period dashboard (beta) ---------- */

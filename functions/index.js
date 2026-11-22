@@ -9,6 +9,67 @@ const AI_MODEL = "claude-haiku-4-5";
 // handful of times a year, and a misread date is expensive.
 const CONTRACT_MODEL = "claude-sonnet-5";
 
+// A document already in the file store is read from there, by this function,
+// with the project's own credentials. The browser used to download it, encode
+// it as text and send it back up through the call — a third larger again — and
+// was capped at 8 MB to fit, so a contract scan of 9 to 20 MB could be stored
+// but never read. Now the browser sends the file's path and nothing else.
+//
+// Each mode names the one folder it reads from: the quote reader cannot be
+// pointed at the signed contracts or the minute book, whatever path it is sent.
+// The caller is already a verified editor (checked before any mode runs), and
+// editors may read every one of these folders anyway, so this narrows rather
+// than widens what anyone can reach.
+// Above every folder's own upload ceiling (quotes 15 MB, contracts 20 MB, in
+// storage.rules), so for a file that could be filed at all it never decides
+// anything: it is here so that nothing unexpected is pulled into the function. Anthropic's own ceiling is far above it — 128 MB per request and
+// 600 pages on Sonnet 5 (platform.claude.com/docs/en/build-with-claude/pdf-support).
+const STORED_DOC_MAX = 25 * 1024 * 1024;
+async function storedDocB64(path, prefix) {
+  const p = String(path || "");
+  /* Segments, not characters: "Contract with ABC Ltd..pdf" is an ordinary file
+     name and has a ".." in it. Refusing any ".." refused every contractor whose
+     name ends in "Ltd." or "Inc.". A file store has no directories to climb out
+     of anyway; the prefix is what keeps a mode in its own folder, and an empty,
+     "." or ".." segment is refused only because no path this app builds has one. */
+  const rest = p.startsWith(prefix) ? p.slice(prefix.length) : "";
+  if (!rest || rest.split("/").some((seg) => seg === "" || seg === "." || seg === "..")) {
+    throw new HttpsError("invalid-argument", "That document is not one this can read.");
+  }
+  const file = admin.storage().bucket(CONTRACT_BUCKET).file(p);
+  let size = 0;
+  try {
+    const [meta] = await file.getMetadata();
+    size = Number(meta.size) || 0;
+  } catch (e) {
+    throw new HttpsError("not-found", "That document is no longer in the file store.");
+  }
+  // asked before the download, so a file too large to send is never pulled in
+  if (size > STORED_DOC_MAX) throw docTooLarge(size);
+  const [buf] = await file.download();
+  return buf.toString("base64");
+}
+function docTooLarge(bytes) {
+  const mb = (n) => (Math.round(n / 1024 / 1024 * 10) / 10).toFixed(1);
+  return new HttpsError("failed-precondition",
+    "That document is " + mb(bytes) + " MB, and Claude can read up to " + mb(STORED_DOC_MAX) +
+    " MB at once — attach a smaller copy (a black-and-white scan is usually a fraction of the size), " +
+    "or fill the details in by hand.");
+}
+// The refusals a long scan can draw from Anthropic, said in the manager's terms
+// rather than the API's. A page is up to ~4,500 tokens as text and image
+// together, so a very long scan fills the context before it reaches the 600-page
+// limit: both come back as "too many pages", which is what they mean to her.
+function docRefusal(e) {
+  const m = String((e && e.message) || "");
+  if ((/page/i.test(m) && /(limit|maximum|exceed|too many)/i.test(m)) || /prompt is too long/i.test(m)) {
+    return new HttpsError("failed-precondition",
+      "That document has more pages than Claude can read at once — attach the signed pages only, " +
+      "or fill the details in by hand.");
+  }
+  return e;
+}
+
 // One Claude structured-output call; returns the parsed JSON object.
 async function callClaude(key, system, user, schema, maxTokens, model, effort) {
   // These models think before they answer, and the thinking is spent out of
@@ -591,8 +652,16 @@ const WEEKLY_SCHEMA = {
 //  {memo:true, stats}    → draft a cover memo to the board
 //  {stats}               → (default) report narrative: summary + spendNote + openNote
 // The Anthropic key lives in Firestore (nnsccQuoteTrackerConfig/main), unreadable by clients.
+// 1 GiB: a 20 MB contract is held as bytes, then as base64 text a third
+// larger, then inside the request body, and an instance takes up to 80 calls at
+// once (the 2nd-gen default). Measured, each 20 MB read in flight adds about
+// 80 MB, so 512 MiB fitted three and not much more; 1 GiB fits several with
+// room, and costs next to nothing at a handful of reads a day. 300 s: Sonnet
+// reading a long scan can run past two minutes, and the browser now waits 310 s
+// for it (docReadCall), not the SDK's default 70 s, which gave up on reads that
+// would have finished.
 exports.nnsccTrackerAi = onCall(
-  { region: "us-central1", memory: "256MiB", timeoutSeconds: 120, maxInstances: 3 },
+  { region: "us-central1", memory: "1GiB", timeoutSeconds: 300, maxInstances: 3 },
   async (request) => {
     const auth = request.auth;
     if (!auth || !auth.token || !auth.token.email || auth.token.email_verified !== true) {
@@ -627,7 +696,11 @@ exports.nnsccTrackerAi = onCall(
 
     // ----- mode: quote intake from an uploaded FILE (PDF read natively; .docx text-extracted) -----
     if (request.data && request.data.parseFile === true) {
-      const b64 = String(request.data.fileB64 || "");
+      /* an attached quote is read where it is filed; a file chosen for a new
+         job, not yet filed anywhere, still arrives as text */
+      const b64 = request.data.path
+        ? await storedDocB64(request.data.path, "quoteAttachments/")
+        : String(request.data.fileB64 || "");
       if (!b64) throw new HttpsError("invalid-argument", "No file was provided.");
       const media = String(request.data.mediaType || "");
       /* which job this quote is being read for, and what else is open — the
@@ -647,7 +720,7 @@ exports.nnsccTrackerAi = onCall(
           { type: "document", source: { type: "base64", media_type: "application/pdf", data: b64 } },
           { type: "text", text: "The attached PDF is a contractor's quote to a condominium property manager. " +
             ctx + "Extract the fields from it." },
-        ], QUOTE_SCHEMA, 6000, CONTRACT_MODEL);
+        ], QUOTE_SCHEMA, 6000, CONTRACT_MODEL).catch((e) => { throw docRefusal(e); });
       }
       if (media === "docx") {
         let text = "";
@@ -704,7 +777,10 @@ exports.nnsccTrackerAi = onCall(
 
     // ----- mode: read a contractor's schedule of visits -----
     if (request.data && request.data.schedule === true) {
-      const b64 = String(request.data.fileB64 || "");
+      /* filed by the browser just long enough to be read (it removes it after) */
+      const b64 = request.data.path
+        ? await storedDocB64(request.data.path, "contractFiles/schedules/")
+        : String(request.data.fileB64 || "");
       const media = String(request.data.mediaType || "");
       const ask = "Read every visit this schedule names, for the property manager's calendar. " +
         "Today is " + new Date().toISOString().slice(0, 10) + ".";
@@ -712,7 +788,7 @@ exports.nnsccTrackerAi = onCall(
         return await callClaude(key, SCHEDULE_SYSTEM, [
           { type: "document", source: { type: "base64", media_type: "application/pdf", data: b64 } },
           { type: "text", text: ask },
-        ], SCHEDULE_SCHEMA, 2500, CONTRACT_MODEL);
+        ], SCHEDULE_SCHEMA, 2500, CONTRACT_MODEL).catch((e) => { throw docRefusal(e); });
       }
       if (b64 && media === "docx") {
         let text = "";
@@ -735,16 +811,21 @@ exports.nnsccTrackerAi = onCall(
 
     // ----- mode: read a signed contract (PDF or .docx) for the register -----
     if (request.data && request.data.contract === true) {
-      const b64 = String(request.data.fileB64 || "");
+      const b64 = request.data.path
+        ? await storedDocB64(request.data.path, "contractFiles/")
+        : String(request.data.fileB64 || "");
       if (!b64) throw new HttpsError("invalid-argument", "No document was provided.");
       const media = String(request.data.mediaType || "");
       const ask = "The attached document is a signed service agreement between a contractor and a " +
         "condominium corporation. Read it for the register and write the board's summary.";
       if (media === "application/pdf") {
+        // Room for the model to think as well as answer: a long scanned
+        // agreement takes more deliberation than a two-page quote, and 1500
+        // tokens left a long one to come back cut off and unreadable.
         return await callClaude(key, CONTRACT_SYSTEM, [
           { type: "document", source: { type: "base64", media_type: "application/pdf", data: b64 } },
           { type: "text", text: ask },
-        ], CONTRACT_SCHEMA, 1500, CONTRACT_MODEL);
+        ], CONTRACT_SCHEMA, 6000, CONTRACT_MODEL).catch((e) => { throw docRefusal(e); });
       }
       if (media === "docx") {
         let text = "";
@@ -759,7 +840,7 @@ exports.nnsccTrackerAi = onCall(
           throw new HttpsError("invalid-argument", "That document looks empty or image-only — save it as a PDF so Claude can read it.");
         }
         return await callClaude(key, CONTRACT_SYSTEM, ask + "\n\nAgreement text:\n\n" + text,
-          CONTRACT_SCHEMA, 1500, CONTRACT_MODEL);
+          CONTRACT_SCHEMA, 6000, CONTRACT_MODEL);
       }
       throw new HttpsError("invalid-argument", "Unsupported file — a contract must be a PDF or a Word .docx file.");
     }
