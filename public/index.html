@@ -2813,10 +2813,12 @@ function bidExpired(b) {
   return !!e && conDaysUntil(e) < 0;
 }
 /* extra per-bid facts for the report: quote date, expiry, attachments */
-function bidMetaHTML(b, jid, bi) {
+function bidMetaHTML(b, jid, bi, only) {
   var bits = [];
-  if (b.qdate) bits.push("quoted " + esc(b.qdate) + (bidExpired(b) ? ' <span class="expired">⚠ expired</span>' : ""));
-  (b.files || []).forEach(function (f, fi) {
+  /* "only": an option row under its quotation — no date, and just its own files */
+  if (b.qdate && !only) bits.push("quoted " + esc(b.qdate) + (bidExpired(b) ? ' <span class="expired">⚠ expired</span>' : ""));
+  (only ? only : (b.files || []).map(function (f, fi) { return { f: f, fi: fi }; })).forEach(function (o) {
+    var f = o.f, fi = o.fi;
     /* href is kept so ⌘-click still opens a tab; a plain click uses the viewer */
     bits.push('<a class="attlink" href="' + esc(f.url) + '" data-att="' + esc(jid) + ":" + bi + ":" + fi +
       '" data-attcap="' + esc(b.contractor || "") + '" title="View this attachment">📎 ' + esc(f.name) + "</a>");
@@ -3007,7 +3009,7 @@ var BRAND_PATH = "nnsccQuoteTracker/brand";               /* the letterhead the 
 var WEEKLY_DRAFT_PATH = "nnsccQuoteTracker/weeklyDraft";   /* the report she is working on */
 var WEEKLY_COLL = "nnsccWeeklyReports";                   /* every one she has finished */
 var VIEW_BETA = CURRENT_PATH.indexOf("Beta") >= 0;   /* which report the passcode gate reads/protects */
-var BUILD_STAMP = "2026-11-22 21:53";   /* filled in by build.js — which copy of the page this is */
+var BUILD_STAMP = "2026-11-22 21:59";   /* filled in by build.js — which copy of the page this is */
 /* path of the report currently on screen */
 function reportPath() {
   return cloud.active.kind === "current" ? CURRENT_PATH : (REPORTS_COLL + "/" + cloud.active.id);
@@ -3327,6 +3329,24 @@ function bidShowOrder(j, c) {
     });
   });
   return out.concat(tail);
+}
+/* A field a quotation's options share (contractor, quote number, date,
+   validity), set on one of its rows, holds for all of them. k0 is the
+   quotation's key as it was before the change, so a quotation keyed by its
+   contractor (rows split before the id existed) is still found. */
+function bidShareField(j, bi, k0, f) {
+  if (!k0 || k0.indexOf("row") === 0) return;
+  var v = j.bids[bi][f];
+  j.bids.forEach(function (x, xi) { if (xi !== bi && bidQuoteKey(x, xi) === k0) x[f] = v; });
+}
+/* the files a row shows: all of them on a quotation's first row; on an option
+   row below it, only those its first row does not already show */
+function bidOwnFiles(j, g) {
+  var b = j.bids[g.bi], files = (b && b.files) || [];
+  var head = {};
+  if (!g.first) ((j.bids[g.head] && j.bids[g.head].files) || []).forEach(function (f) { if (f && f.path) head[f.path] = 1; });
+  return files.map(function (f, fi) { return { f: f, fi: fi }; })
+    .filter(function (o) { return o.f && !(o.f.path && head[o.f.path]); });
 }
 function bidQuoteKey(b, i) {
   var o = b && b.optOf;
@@ -3852,9 +3872,10 @@ function jdQuotesHTML(j, c) {
     var pnote = partsNote(x.b.parts);
     if (pnote) note += (note ? " · " : "") + pnote;
     if (x.b.notes) note += (note ? " · " : "") + x.b.notes;
-    var n = g.first ? (x.b.files || []).length : 0;
+    var ownF = bidOwnFiles(j, g).map(function (o) { return o.f; });
+    var n = ownF.length;
     var files = n
-      ? '<span class="attlink" role="button" tabindex="0" data-attstash="' + fvStashRef(x.b.files) +
+      ? '<span class="attlink" role="button" tabindex="0" data-attstash="' + fvStashRef(ownF) +
         '" data-atti="0" data-attcap="' + esc((x.b.contractor || "quote")) + '">\u{1F4CE} ' +
         n + " file" + (n === 1 ? "" : "s") + "</span>"
       : '<span class="jdwho">—</span>';
@@ -4586,11 +4607,13 @@ function packetSecB(d, ctx) {
       /* contractor / scope / amount are click-to-edit for the signed-in property manager */
       var cName = tEdit("bid:" + jid + ":" + bi + ":contractor", cb.b.contractor, "Contractor");
       /* click the paperclip line to read the quote in the in-page viewer */
-      /* the file and the date belong to the quotation: on its first row only */
-      var att = (g.first && cb.b.files && cb.b.files.length)
+      /* the shared file and the date belong to the quotation: on its first
+         row; an option row shows only a file of its own */
+      var own = bidOwnFiles(x.j, g);
+      var att = own.length
         ? '<span class="pk-att attlink" role="button" tabindex="0" data-att="' + jid + ":" + bi +
-          '" data-attcap="' + esc(name) + '" title="View the attached quote">📎 ' + cb.b.files.length +
-          ' attachment' + (cb.b.files.length > 1 ? "s" : "") + "</span>" : "";
+          '" data-attcap="' + esc(name) + '" title="View the attached quote">📎 ' + own.length +
+          ' attachment' + (own.length > 1 ? "s" : "") + "</span>" : "";
       var con = '<td class="pk-c-con"><div class="pk-cflex">' + pkAvatar(name) + '<span class="pk-cwrap"><span class="pk-cn">' + cName + "</span>" + att + "</span></div></td>";
       var scope = ctx.ED ? tEdit("bid:" + jid + ":" + bi + ":notes", cb.b.notes, "Add scope note") : (esc(cb.b.notes) || "—");
       var dateCell = !g.first ? '<td class="pk-c-date pk-nodate"></td>'
@@ -4987,7 +5010,7 @@ function cmpRows(x) {
     var cName = tEdit("bid:" + jid + ":" + bi + ":contractor", cb.b.contractor, "Contractor");
     var cNote = ed ? tEdit("bid:" + jid + ":" + bi + ":notes", cb.b.notes, "Add scope note")
                    : (esc(cb.b.notes) || '<span class="nonote">—</span>');
-    if (g.first) cNote += bidMetaHTML(cb.b, jid, bi);      /* date and file: once per quotation */
+    cNote += bidMetaHTML(cb.b, jid, bi, g.first ? null : bidOwnFiles(x.j, g));   /* date and shared file: once per quotation */
     if (cb.total == null) {
       var amtP = ed ? tEdit("bid:" + jid + ":" + bi + ":amount", "", "Enter amount") : "Quote pending";
       r.push('<tr class="pend"><td>' + cName + "</td><td>" + cNote +
@@ -6459,8 +6482,6 @@ function edJobCardHTML(j, ji) {
     /* an option row under its quotation's first row shares its contractor,
        quote number, date and PDF, and does not say them again */
     var same = !g.first;
-    var headPaths = {};
-    if (same) ((j.bids[g.head] && j.bids[g.head].files) || []).forEach(function (f) { if (f && f.path) headPaths[f.path] = 1; });
     var st = x.bestValue
       ? '<span class="qst best">★ Best value</span>'
       : x.carried
@@ -6477,8 +6498,8 @@ function edJobCardHTML(j, ji) {
           '">\u2728 Read ' + (b.files.length > 1 ? "the " + b.files.length + " quotes" : "the quote") + "</button>"
         : ((b.contractor || "").trim() ? '<span class="qst pen">Pending</span>' : ""));
     /* each file once: in this cell, with its ✕ beside it while the row is open */
-    var files = (b.files || []).map(function (f, fi) {
-      if (!f || (same && f.path && headPaths[f.path])) return "";
+    var files = bidOwnFiles(j, g).map(function (o) {
+      var f = o.f, fi = o.fi;
       return '<a class="attlink" href="' + esc(f.url) + '" data-att="' + esc(j.id) + ":" + bi + ":" + fi +
         '" data-attcap="' + esc(b.contractor || "") + '" title="' + esc(f.name) + '">📎 ' +
         esc(f.name.length > 16 ? f.name.slice(0, 15) + "…" : f.name) + "</a>" +
@@ -6513,13 +6534,15 @@ function edJobCardHTML(j, ji) {
         (same ? "" :
           '<label>Quote date <input type="date" value="' + esc(b.qdate || "") + '" data-f="qdate"></label>' +
           '<label>Valid <input type="number" min="1" style="width:64px" value="' + esc(b.validDays || 60) + '" data-f="validDays"> days</label>' +
-          (bidExpired(b) ? ' <span class="expired">⚠ expired</span>' : "") +
-          ((b.files || []).length && x.total != null
-            ? '<button class="edbtn" type="button" data-act="readfiles" title="Claude reads the ' +
-              'attached quote' + ((b.files || []).length > 1 ? "s and adds their totals up" : " again") + '">\u2728 Read ' +
-              ((b.files || []).length > 1 ? "and add up these " + b.files.length + " quotes" : "again") +
-              "</button>"
-            : "")) +
+          (bidExpired(b) ? ' <span class="expired">⚠ expired</span>' : "")) +
+        /* reading, on any row with a file — unless its Status cell already
+           offers it (a row with a file and no price yet) */
+        ((b.files || []).length && !x.unpriced
+          ? '<button class="edbtn" type="button" data-act="readfiles" title="Claude reads the ' +
+            'attached quote' + ((b.files || []).length > 1 ? "s and adds their totals up" : "") + '">\u2728 Read ' +
+            ((b.files || []).length > 1 ? "and add up these " + b.files.length + " quotes"
+              : x.total != null ? "again" : "this quote") + "</button>"
+          : "") +
         '<span class="spacer" style="flex:1"></span>' +
         '<button class="edbtn danger" type="button" data-act="delbid">' + (isOpt ? "Remove this option" : "Delete quote") +
         "</button></div></td></tr>");
@@ -7337,6 +7360,7 @@ document.getElementById("editor").addEventListener("change", function (e) {
   }
   else if (row) {
     var b = j.bids[+row.dataset.bi]; if (!b) return;
+    var bi0 = +row.dataset.bi, k0 = bidQuoteKey(b, bi0);
     if (f === "amount") {
       var parsed = edParseAmt(e.target.value);
       if (parsed != null && !isFinite(parsed)) return;      /* ignore unparseable typing */
@@ -7351,12 +7375,7 @@ document.getElementById("editor").addEventListener("change", function (e) {
     /* what a quotation's options share is edited once, on its first row, and
        holds for every option of it (the key is the quotation's id, which an
        edit to the name or number cannot change) */
-    if (f === "contractor" || f === "qno" || f === "qdate" || f === "validDays") {
-      var bi0 = +row.dataset.bi, k0 = bidQuoteKey(b, bi0);
-      if (k0.indexOf("row") !== 0) j.bids.forEach(function (x, xi) {
-        if (xi !== bi0 && bidQuoteKey(x, xi) === k0) x[f] = b[f];
-      });
-    }
+    if (f === "contractor" || f === "qno" || f === "qdate" || f === "validDays") bidShareField(j, bi0, k0, f);
     /* a price or a scope note changed — read the quotes against each other again */
     if (f === "amount" || f === "hst" || f === "notes" || f === "contractor") qcTouch(j);
   }
@@ -7620,7 +7639,14 @@ document.getElementById("editor").addEventListener("click", function (e) {
     if (!fc || !fr) return;
     var fj = state.jobs[+fc.dataset.ji]; if (!fj) return;
     var fb = fj.bids[+fr.dataset.bi]; if (!fb || !fb.files) return;
+    var fbi = +fr.dataset.bi, fk = bidQuoteKey(fb, fbi);
     var rm = fb.files.splice(+actEl.dataset.fi, 1)[0];
+    /* the PDF a quotation's options share goes from all of them at once —
+       removing it from one used to move it down onto the next */
+    if (rm && rm.path && fk.indexOf("row") !== 0) fj.bids.forEach(function (x, xi) {
+      if (xi === fbi || bidQuoteKey(x, xi) !== fk) return;
+      x.files = (x.files || []).filter(function (f) { return !(f && f.path === rm.path); });
+    });
     if (rm && rm.path && cloud.store && !quoteFileHeld(rm.path)) { try { cloud.store.ref(rm.path).delete().catch(function(){}); } catch (er) {} }
     persist(); qcTouch(fj); renderEditor(); renderReport(); return;
   }
@@ -13648,7 +13674,9 @@ function commitEdit(el) {
     } else if (f === "contractor") {
       if (!val && b.amount == null) { el.textContent = b.contractor || ""; return; }  /* don't let a pending row vanish */
       if (sameText(b.contractor, val)) { el.textContent = val; return; }
+      var kc = bidQuoteKey(b, +p[2]);
       b.contractor = val;
+      bidShareField(jb, +p[2], kc, "contractor");
     } else if (f === "notes") {
       if (sameText(b.notes, val)) { el.textContent = val; return; }
       b.notes = val;
