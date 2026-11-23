@@ -23,7 +23,7 @@ const X = new Function("cloud", "document", "esc", "money", "todayISO", [
   gv("DOC_FILE_MAX", "};"), gv("DOC_FILE_KIND", "};"), gv("DOC_READ_WAIT_MS", ";"),
   grab("docFileFirst"), grab("docUnfile"), grab("docReadCall"),
   grab("intakeStatus"), grab("aiIntakeErr"), grab("aiIntakeShowPreview"), grab("intakePreviewHTML"),
-  grab("intakeLines"), grab("intakeLinesHTML"), grab("intakeRows"), grab("intakeQuotes"), grab("optLine"), grab("optionQuotes"), grab("aiIntakeCancel"), grab("aiIntakeRun"),
+  grab("intakeLines"), grab("intakeLinesHTML"), grab("intakeRows"), grab("intakeQuotes"), grab("optLine"), grab("optionQuotes"), grab("optKey"), grab("aiIntakeCancel"), grab("aiIntakeRun"),
   "function pick(file) { (function () {" + handlerBody + "}).call({ files: [file], value: '' }); }",
   "return { pick, aiIntakeRun, aiIntakeCancel, pending: function () { return intakePending; }," +
   " commit: function () { var f = intakePending && intakePending.file; aiIntakeCancel(true); return f; } };",

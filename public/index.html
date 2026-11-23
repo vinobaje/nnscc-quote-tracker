@@ -3001,7 +3001,7 @@ var BRAND_PATH = "nnsccQuoteTracker/brand";               /* the letterhead the 
 var WEEKLY_DRAFT_PATH = "nnsccQuoteTracker/weeklyDraft";   /* the report she is working on */
 var WEEKLY_COLL = "nnsccWeeklyReports";                   /* every one she has finished */
 var VIEW_BETA = CURRENT_PATH.indexOf("Beta") >= 0;   /* which report the passcode gate reads/protects */
-var BUILD_STAMP = "2026-11-22 19:56";   /* filled in by build.js — which copy of the page this is */
+var BUILD_STAMP = "2026-11-22 20:02";   /* filled in by build.js — which copy of the page this is */
 /* path of the report currently on screen */
 function reportPath() {
   return cloud.active.kind === "current" ? CURRENT_PATH : (REPORTS_COLL + "/" + cloud.active.id);
@@ -5411,8 +5411,8 @@ function bidReadPanelHTML(jid, bi) {
     if (r.line && (!ri || rows[ri - 1].name !== r.name))
       h.push('<tr class="qrfile"><td></td><td colspan="3">\u{1F4CE} ' + esc(r.name) +
         ' <span class="qrwhy">\u00b7 ' + (!r.nopt ? "prices " + (r.of || "several") + " separate items"
-          : r.nopt === r.of ? "offers " + r.nopt + " options \u2014 the board chooses one"
-          : "prices " + r.of + " items, " + r.nopt + " of them options to choose between") + "</span></td></tr>");
+          : r.allOpt ? "offers " + r.nopt + " options \u2014 the board chooses one"
+          : "prices " + r.of + " items, with " + r.nopt + " options to choose between") + "</span></td></tr>");
     h.push("<tr" + (r.ok ? "" : ' class="off"') + '><td class="qrck">' +
       (r.incl == null ? "" : '<input type="checkbox" data-act="readtoggle" data-ri="' + ri + '"' +
         (r.ok ? " checked" : "") + ' title="' + (r.opt ? "Make this option a quote of its own"
@@ -5499,7 +5499,7 @@ function bidReadOne(f, ctx) {
         jobDesc: (ctx && ctx.desc) || "", otherJobs: (ctx && ctx.others) || [] })
     : bidReadOneBytes(f, name, media, ctx);
   return call.then(function (res) {
-    return bidReadDone(name, res);
+    return bidReadDone(name, res).map(function (r) { if (f.path) r.path = f.path; return r; });
   }).catch(function (e) {
     return [{ name: name, incl: null, ok: false, det: null,
               why: (e && e.message) || "could not be read" }];
@@ -5566,14 +5566,18 @@ function bidReadRows(name, d, det) {
        both were ticked, added, and $30,922.45 went in for a job that costs
        $12,831.15 or $18,091.30. Alternatives are marked as such, and one line
        marked alone is just a line. */
-    var nopt = many ? lines.filter(function (l) { return String(l.option || "").trim(); }).length : 0;
+    var keys = {};
+    if (many) lines.forEach(function (l) { var k = optKey(l.option); if (k) keys[k] = 1; });
+    var nopt = Object.keys(keys).length;
+    if (nopt < 2) nopt = 0;
+    var allOpt = !!nopt && lines.every(function (l) { return optKey(l.option); });
     return lines.map(function (l, li) {
-      var opt = nopt > 1 ? String(l.option || "").trim().slice(0, 40) : "";
+      var opt = nopt ? String(l.option || "").trim().slice(0, 40) : "";
       var why = [qno, incl ? "" : "HST added",
         l.for_this_job ? "" : "other work",
         String(l.line_note || "").trim().slice(0, 90)].filter(Boolean).join(" \u00b7 ");
       return { name: name, of: lines.length, det: det, ok: !!l.for_this_job, why: why,
-        opt: opt, nopt: opt ? nopt : 0,
+        opt: opt, nopt: opt ? nopt : 0, allOpt: allOpt,
         line: many ? optLine(opt, String(l.description || "").trim() || "line " + (li + 1)).slice(0, 90) : "",
         incl: Math.round((incl ? +l.amount : +l.amount * (1 + HST)) * 100) / 100 };
     });
@@ -5599,24 +5603,59 @@ function optLine(opt, desc) {
 function optionQuotes(rows) {
   var kept = (rows || []).filter(function (r) { return r && r.ok && r.incl != null; });
   var shared = kept.filter(function (r) { return !r.opt; });
-  var opts = kept.filter(function (r) { return r.opt; });
+  /* an option may be priced over several lines — supply, then install — so
+     the lines are gathered by option, and an option is one quote however
+     many lines it has. Two files in one row with the same options (one per
+     building) give Option 1 of each together, which is the choice offered. */
+  var groups = [], byKey = {};
+  kept.forEach(function (r) {
+    if (!r.opt) return;
+    var k = optKey(r.opt);
+    if (!byKey[k]) { byKey[k] = { key: k, label: r.opt, nopt: r.nopt, lines: [] }; groups.push(byKey[k]); }
+    byKey[k].lines.push(r);
+  });
+  groups.forEach(function (g) {
+    g.line = g.lines.length === 1 ? g.lines[0].line
+      : (g.label + ": " + g.lines.map(function (l) { return l.line; }).join(" + ")).slice(0, 200);
+    g.incl = g.lines.reduce(function (s, l) { return s + l.incl; }, 0);
+  });
   var base = shared.reduce(function (s, r) { return s + r.incl; }, 0);
-  function quote(o) {
-    return { opt: o, rows: o ? shared.concat([o]) : shared,
-             sum: Math.round((base + (o ? o.incl : 0)) * 100) / 100 };
+  function quote(g) {
+    return { opt: g, rows: g ? shared.concat(g.lines) : shared,
+             sum: Math.round((base + (g ? g.incl : 0)) * 100) / 100 };
   }
-  if (!opts.length) return shared.length ? [quote(null)] : [];
-  return opts.map(quote);
+  if (!groups.length) return shared.length ? [quote(null)] : [];
+  return groups.map(quote);
 }
 /* Where each of those quotes goes. One stays in the row being read; each other
    option gets a row of its own, unless a row on this job already holds it, as
    one will when a row that was split once is read again. The row keeps the
    option it already had. */
 function optKey(v) { return String(v || "").toLowerCase().replace(/[^a-z0-9]/g, ""); }
-function bidHoldsOpt(b, o) {
-  return ((b && b.parts) || []).some(function (p) {
-    return p && p.name === o.name && (p.opt ? optKey(p.opt) === optKey(o.opt) : p.line === o.line);
+/* Same file means the same stored file, not the same name: two contractors
+   each sending "Quote.pdf" with an Option 1 and an Option 2 are four quotes.
+   Parts saved without a path fall back to the name, and then only on a row of
+   the same contractor or quote number. Same option means the same label, or
+   — a reading that worded the label differently — the same money. */
+function bidHoldsOpt(x, g, b) {
+  var o = g.lines[0];
+  var ck = function (v) { return String(v || "").toLowerCase().replace(/[^a-z0-9]/g, ""); };
+  var bc = ck((b && b.contractor) || (o.det && o.det.contractor));
+  var bq = String((b && b.qno) || (o.det && o.det.qno) || "").trim();
+  var parts = ((x && x.parts) || []).filter(function (p) {
+    if (!p) return false;
+    if (p.path && o.path) return p.path === o.path;
+    if (p.name !== o.name) return false;
+    if (x === b) return true;
+    return (bc && ck(x.contractor) === bc) || (bq && String(x.qno || "").trim() === bq);
   });
+  if (!parts.length) return false;
+  if (parts.some(function (p) {
+    return p.opt ? optKey(p.opt) === g.key : g.lines.some(function (l) { return l.line === p.line; });
+  })) return true;
+  var held = parts.filter(function (p) { return p.opt; })
+    .reduce(function (s, p) { return s + (+p.amount || 0); }, 0);
+  return held > 0 && Math.abs(held - g.incl) < 0.01;
 }
 function bidReadPlan(j, bi) {
   var quotes = optionQuotes(bidRead && bidRead.rows);
@@ -5624,10 +5663,10 @@ function bidReadPlan(j, bi) {
   var b = j && j.bids[bi];
   if (!quotes.length || !b) return plan;
   if (!quotes[0].opt) { plan.here = quotes[0]; return plan; }
-  quotes.forEach(function (q) { if (!plan.here && bidHoldsOpt(b, q.opt)) plan.here = q; });
+  quotes.forEach(function (q) { if (!plan.here && bidHoldsOpt(b, q.opt, b)) plan.here = q; });
   quotes.forEach(function (q) {
     if (q === plan.here) return;
-    if (j.bids.some(function (x, xi) { return xi !== bi && bidHoldsOpt(x, q.opt); })) plan.dup.push(q);
+    if (j.bids.some(function (x, xi) { return xi !== bi && bidHoldsOpt(x, q.opt, b); })) plan.dup.push(q);
     else if (!plan.here) plan.here = q;
     else plan.add.push(q);
   });
@@ -5636,6 +5675,7 @@ function bidReadPlan(j, bi) {
 function bidPartsOf(q) {
   return q.rows.map(function (r) {
     var p = { name: r.name, line: r.line || "", of: r.of || 1, amount: r.incl };
+    if (r.path) p.path = r.path;
     if (r.opt) { p.opt = r.opt; p.nopt = r.nopt; }
     return p;
   });
@@ -10641,7 +10681,11 @@ function intakePreviewHTML(d) {
   /* a quotation of options: the fields are the first option's, and each other
      option goes in beside it as a quote of its own */
   var iq = intakeQuotes(d, null);
-  if (iq.length && iq[0].opt) { amt = iq[0].sum; note0 = iq[0].opt.line; }
+  var hst0 = d.hst_included;
+  if (iq.length && iq[0].opt) { amt = iq[0].sum; note0 = iq[0].opt.line; hst0 = d.lines_include_hst; }
+  /* the note last put in the box, so a change of ticks may replace it while
+     she has not typed over it, and not once she has */
+  d.autoNote = String(note0 == null ? "" : note0);
   var fs = "font-size:12px;color:var(--ink2)";
   var inp = "width:100%;box-sizing:border-box;margin-top:2px";
   return '<div style="border:1px solid var(--line);border-radius:8px;padding:12px 14px;background:var(--panel,#f7f9fc)">' +
@@ -10655,7 +10699,7 @@ function intakePreviewHTML(d) {
       '<label style="' + fs + '">Quote date<input id="ipQdate" type="date" style="' + inp + '" value="' + v(d.quote_date || todayISO()) + '"></label>' +
     "</div>" +
     intakeLinesHTML(d) +
-    '<label style="' + fs + ';display:inline-flex;align-items:center;gap:6px;margin:8px 0"><input type="checkbox" id="ipHst"' + (d.hst_included ? " checked" : "") + "> HST already included in the amount</label>" +
+    '<label style="' + fs + ';display:inline-flex;align-items:center;gap:6px;margin:8px 0"><input type="checkbox" id="ipHst"' + (hst0 ? " checked" : "") + "> HST already included in the amount</label>" +
     '<label style="' + fs + '">Notes<textarea id="ipNotes" rows="2" style="' + inp + '">' + v(note0) + "</textarea></label>" +
     (d.file ? '<div style="' + fs + ';margin-top:6px">\u{1F4CE} ' + v(d.file.name) +
       " \u2014 kept on the job when you add it</div>" : "") +
@@ -10676,13 +10720,15 @@ function intakeLines(d) {
 /* the lines as the reading panel has them, so options are worked out once */
 function intakeRows(d, ticks) {
   var lines = intakeLines(d);
-  var nopt = lines.filter(function (l) { return String(l.option || "").trim(); }).length;
-  if (nopt < 2) nopt = 0;
-  var name = (d && d.file && d.file.name) || "";
+  var keys = {};
+  lines.forEach(function (l) { var k = optKey(l.option); if (k) keys[k] = 1; });
+  var nopt = Object.keys(keys).length;
+  if (nopt < 2 || lines.length < 2) nopt = 0;
+  var name = (d && d.file && d.file.name) || "", path = (d && d.file && d.file.path) || "";
   return lines.map(function (l, i) {
     var opt = nopt ? String(l.option || "").trim().slice(0, 40) : "";
     return { ok: ticks ? !!ticks[i] : l.for_this_job !== false, incl: +l.amount, opt: opt,
-      nopt: opt ? nopt : 0, of: lines.length, name: name,
+      nopt: opt ? nopt : 0, of: lines.length, name: name, path: path,
       line: optLine(opt, String(l.description || "").trim() || "item " + (i + 1)).slice(0, 90) };
   });
 }
@@ -10698,7 +10744,7 @@ function intakeLinesHTML(d) {
   var rows = intakeRows(d, null);
   if (rows.length < 2) return "";
   var tax = d.lines_include_hst ? "" : " + HST";
-  var nopt = rows.filter(function (r) { return r.opt; }).length;
+  var nopt = rows.reduce(function (m, r) { return Math.max(m, r.nopt || 0); }, 0);
   return '<div class="iplines"><div class="iplhead">\u26a0 ' + (nopt
       ? "This quotation offers " + nopt + " options for the board to choose between. Each ticked " +
         "option is added as a quote of its own on this job \u2014 the amount and notes above are the first one\u2019s."
@@ -10722,6 +10768,12 @@ function intakeLinesSync() {
   /* the lines carry their own tax footing; the amount takes the same one */
   var hb = document.getElementById("ipHst");
   if (hb) hb.checked = !!intakePending.lines_include_hst;
+  /* the amount is now this option's; so is the note, unless she wrote her own */
+  var nt = document.getElementById("ipNotes");
+  if (nt && iq.length && iq[0].opt && nt.value === String(intakePending.autoNote || "")) {
+    nt.value = iq[0].opt.line;
+    intakePending.autoNote = nt.value;
+  }
 }
 function aiIntakeCancel(kept) {
   /* the quotation filed for this preview goes with it, unless the job took it;
@@ -10753,9 +10805,9 @@ function aiIntakeCommit() {
     var b0 = nj.bids[0], hstIn = gc("ipHst");
     var partsFor = function (q) {
       return q.rows.map(function (r) {
-        return { name: r.name, line: r.line, of: r.of, opt: r.opt || undefined, nopt: r.nopt || undefined,
+        return { name: r.name, path: r.path || undefined, line: r.line, of: r.of, opt: r.opt || undefined, nopt: r.nopt || undefined,
           amount: Math.round((hstIn ? r.incl : r.incl * (1 + HST)) * 100) / 100 };
-      }).map(function (p) { if (!p.opt) { delete p.opt; delete p.nopt; } return p; });
+      }).map(function (p) { if (!p.opt) { delete p.opt; delete p.nopt; } if (!p.path) delete p.path; return p; });
     };
     b0.parts = partsFor(iq[0]);
     iq.slice(1).forEach(function (q) {

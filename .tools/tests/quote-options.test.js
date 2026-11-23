@@ -32,7 +32,9 @@ const firenza = { contractor: "Firenza Plumbing & Heating Ltd.", quote_number: "
   lines: [
     { description: "Option #1 – Single PRV", amount: 11355, for_this_job: true, line_note: "", option: "Option #1" },
     { description: "Dual PRV (2\" and 3\" Clayton)", amount: 16010, for_this_job: true, line_note: "", option: "Option #2" }] };
-const rows = X.bidReadDone(FILE, { data: firenza });
+const PATH = "quoteAttachments/j25/1-" + FILE;
+const readAt = (path, data, name) => X.bidReadDone(name || FILE, { data }).map((r) => Object.assign(r, { path }));
+const rows = readAt(PATH, firenza);
 
 /* reading */
 is(rows.map((r) => r.opt), ["Option #1", "Option #2"], "each alternative carries its label");
@@ -95,23 +97,25 @@ is(X.log().length, 3, "the note, the amount and the new row are each logged");
 is(X.read(), null, "the panel closes");
 
 /* read either row again: nothing is duplicated, each keeps its own option */
-X.set({ jid: "j25", bi: 2, rows: X.bidReadDone(FILE, { data: firenza }) }, [job]);
+X.set({ jid: "j25", bi: 2, rows: readAt(PATH, firenza) }, [job]);
 plan = X.bidReadPlan(job, 2);
-is([plan.here.opt.opt, plan.add.length, plan.dup.length], ["Option #2", 0, 1], "row 2 read again stays option 2");
-X.set({ jid: "j25", bi: 1, rows: X.bidReadDone(FILE, { data: firenza }) }, [job]);
+is([plan.here.opt.label, plan.add.length, plan.dup.length], ["Option #2", 0, 1], "row 2 read again stays option 2");
+X.set({ jid: "j25", bi: 1, rows: readAt(PATH, firenza) }, [job]);
 plan = X.bidReadPlan(job, 1);
-is([plan.here.opt.opt, plan.add.length, plan.dup.length], ["Option #1", 0, 1], "row 1 read again stays option 1");
+is([plan.here.opt.label, plan.add.length, plan.dup.length], ["Option #1", 0, 1], "row 1 read again stays option 1");
 /* the labels a second reading words differently still match */
 const reworded = JSON.parse(JSON.stringify(firenza));
 reworded.lines[0].option = "Option 1"; reworded.lines[1].option = "option #2"; reworded.lines[1].description = "Two PRVs";
-X.set({ jid: "j25", bi: 1, rows: X.bidReadDone(FILE, { data: reworded }) }, [job]);
+X.set({ jid: "j25", bi: 1, rows: readAt(PATH, reworded) }, [job]);
 is(X.bidReadPlan(job, 1).add.length, 0, "a reworded reading adds no duplicate");
 /* a blank row reading the same file finds both options already have rows */
-X.set({ jid: "j25", bi: 0, rows: X.bidReadDone(FILE, { data: firenza }) }, [job]);
+X.set({ jid: "j25", bi: 0, rows: readAt(PATH, firenza) }, [job]);
 plan = X.bidReadPlan(job, 0);
 is([plan.here, plan.add.length, plan.dup.length], [null, 0, 2], "nothing is put twice");
 
 /* a file two rows share */
+/* parts remember the stored file they came from */
+is(job.bids[2].parts[0].path, "quoteAttachments/j25/1-" + FILE, "parts carry the file's path");
 is(X.quoteFileHeld(job.bids[1].files[0].path), true, "held by both rows");
 job.bids[1].files = [];
 is(X.quoteFileHeld(job.bids[2].files[0].path), true, "removed from one, still held by the other");
@@ -124,9 +128,63 @@ X.set({ jid: "j9", bi: 0, rows: items }, [job]);
 X.bidReadApply();
 is([job.bids.length, job.bids[0].amount, job.bids[0].parts.some((p) => p.opt)], [1, 150, false], "items: one row, summed");
 
+/* review 1: an option priced over several lines is ONE quote */
+const multi = X.bidReadRows("m.pdf", { lines_include_hst: true, lines: [
+  { description: "Supply", amount: 5000, for_this_job: true, line_note: "", option: "Option A" },
+  { description: "Install", amount: 3000, for_this_job: true, line_note: "", option: "Option A" },
+  { description: "Supply", amount: 8000, for_this_job: true, line_note: "", option: "Option B" },
+  { description: "Install", amount: 4000, for_this_job: true, line_note: "", option: "Option B" }] }, null);
+is(multi.map((r) => r.nopt), [2, 2, 2, 2], "four lines, two options");
+is(X.optionQuotes(multi).map((x) => [x.opt.label, x.sum]), [["Option A", 8000], ["Option B", 12000]], "each option's lines together");
+is(X.intakeQuotes({ file: { name: "m.pdf" }, lines: [
+  { description: "Supply", amount: 5000, for_this_job: true, option: "Option A" },
+  { description: "Install", amount: 3000, for_this_job: true, option: "Option A" },
+  { description: "Supply", amount: 8000, for_this_job: true, option: "Option B" },
+  { description: "Install", amount: 4000, for_this_job: true, option: "Option B" }] }, null).map((x) => x.sum), [8000, 12000], "intake groups the same way");
+/* two files in one row, one per building, the same options: Option 1 of each together */
+const bA = X.bidReadRows("A.pdf", { lines_include_hst: true, lines: [
+  { description: "Bldg A single", amount: 100, for_this_job: true, line_note: "", option: "Option 1" },
+  { description: "Bldg A dual", amount: 200, for_this_job: true, line_note: "", option: "Option 2" }] }, null);
+const bB = X.bidReadRows("B.pdf", { lines_include_hst: true, lines: [
+  { description: "Bldg B single", amount: 10, for_this_job: true, line_note: "", option: "Option 1" },
+  { description: "Bldg B dual", amount: 20, for_this_job: true, line_note: "", option: "Option 2" }] }, null);
+is(X.optionQuotes(bA.concat(bB)).map((x) => x.sum), [110, 220], "per-building files: option 1 with option 1");
+
+/* review 2: two contractors, both sending "Quote.pdf" with Option 1 / Option 2 */
+const q2 = (c) => ({ contractor: c, quote_number: c === "X Ltd" ? "11" : "22", lines_include_hst: true, lines: [
+  { description: "One unit", amount: c === "X Ltd" ? 1000 : 1100, for_this_job: true, line_note: "", option: "Option 1" },
+  { description: "Two units", amount: c === "X Ltd" ? 2000 : 2100, for_this_job: true, line_note: "", option: "Option 2" }] });
+const two = { id: "j7", bids: [
+  { contractor: "", qno: "", amount: null, hst: false, notes: "", files: [{ name: "Quote.pdf", path: "qa/j7/1-Quote.pdf" }] },
+  { contractor: "", qno: "", amount: null, hst: false, notes: "", files: [{ name: "Quote.pdf", path: "qa/j7/2-Quote.pdf" }] }] };
+X.set({ jid: "j7", bi: 0, rows: readAt("qa/j7/1-Quote.pdf", q2("X Ltd"), "Quote.pdf") }, [two]);
+X.bidReadApply();
+X.set({ jid: "j7", bi: 1, rows: readAt("qa/j7/2-Quote.pdf", q2("Y Inc"), "Quote.pdf") }, [two]);
+plan = X.bidReadPlan(two, 1);
+is([!!plan.here, plan.add.length, plan.dup.length], [true, 1, 0], "Y's options are Y's, not taken for X's");
+X.bidReadApply();
+is(two.bids.map((b) => [b.contractor, b.amount]), [["X Ltd", 1000], ["Y Inc", 1100], ["X Ltd", 2000], ["Y Inc", 2100]], "four quotes, two each");
+/* parts saved before paths: same name is the same file only for the same contractor */
+const legacy = { id: "j8", bids: [
+  { contractor: "X Ltd", qno: "11", amount: 1000, parts: [{ name: "Quote.pdf", opt: "Option 1", amount: 1000, line: "One unit" }], files: [] },
+  { contractor: "X Ltd", qno: "11", amount: 2000, parts: [{ name: "Quote.pdf", opt: "Option 2", amount: 2000, line: "Two units" }], files: [] },
+  { contractor: "Y Inc", qno: "", amount: null, notes: "", files: [] }] };
+X.set({ jid: "j8", bi: 2, rows: X.bidReadDone("Quote.pdf", { data: q2("Y Inc") }) }, [legacy]);
+is(X.bidReadPlan(legacy, 2).dup.length, 0, "old parts: another contractor's same-named file is not a match");
+X.set({ jid: "j8", bi: 0, rows: X.bidReadDone("Quote.pdf", { data: q2("X Ltd") }) }, [legacy]);
+is(X.bidReadPlan(legacy, 0).dup.length, 1, "old parts: the same contractor's is");
+/* a re-read whose label changed but whose money did not */
+const relabel = JSON.parse(JSON.stringify(firenza));
+relabel.lines[0].option = "Single PRV"; relabel.lines[1].option = "Dual PRV";
+X.set({ jid: "j25", bi: 1, rows: readAt(PATH, relabel) }, [liveJob()]);
+const lj = liveJob(); X.set({ jid: "j25", bi: 1, rows: readAt(PATH, firenza) }, [lj]); X.bidReadApply();
+X.set({ jid: "j25", bi: 1, rows: readAt(PATH, relabel) }, [lj]);
+plan = X.bidReadPlan(lj, 1);
+is([plan.here && plan.here.sum, plan.add.length, plan.dup.length], [12831.15, 0, 1], "relabelled options are matched by their money");
+
 /* AI intake: the same rule */
 const d = Object.assign({ file: { name: FILE, path: "p" } }, firenza);
-is(X.intakeQuotes(d, null).map((x) => [x.opt.opt, x.sum]), [["Option #1", 11355], ["Option #2", 16010]], "intake: one quote per option, on the lines' footing");
+is(X.intakeQuotes(d, null).map((x) => [x.opt.label, x.sum]), [["Option #1", 11355], ["Option #2", 16010]], "intake: one quote per option, on the lines' footing");
 is(X.intakeQuotes(d, { 0: false, 1: true }).map((x) => x.sum), [16010], "intake: ticks choose");
 is(X.intakeQuotes({ lines: firenza.lines.map((l) => Object.assign({}, l, { option: "" })) }, null).map((x) => x.sum), [27365], "intake without options adds as before");
 
