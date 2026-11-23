@@ -3013,7 +3013,7 @@ var BRAND_PATH = "nnsccQuoteTracker/brand";               /* the letterhead the 
 var WEEKLY_DRAFT_PATH = "nnsccQuoteTracker/weeklyDraft";   /* the report she is working on */
 var WEEKLY_COLL = "nnsccWeeklyReports";                   /* every one she has finished */
 var VIEW_BETA = CURRENT_PATH.indexOf("Beta") >= 0;   /* which report the passcode gate reads/protects */
-var BUILD_STAMP = "2026-11-22 23:24";   /* filled in by build.js — which copy of the page this is */
+var BUILD_STAMP = "2026-11-22 23:57";   /* filled in by build.js — which copy of the page this is */
 /* path of the report currently on screen */
 function reportPath() {
   return cloud.active.kind === "current" ? CURRENT_PATH : (REPORTS_COLL + "/" + cloud.active.id);
@@ -7983,6 +7983,7 @@ function edWorkspaceAction(act, el, e) {
         renew: false, noticeDays: "", amount: "", period: "year", notes: "", files: [] });
       conSave(); renderEditor(); return true;
     }
+    case "conupclose": { conUpMsg = null; renderEditor(); return true; }
     case "condel": {
       var cc = el.closest("[data-cid]"); if (!cc) return true;
       var cd = conById(cc.dataset.cid); if (!cd) return true;
@@ -8210,6 +8211,7 @@ function conCardHTML() {
         ((c.files || []).length
           ? '<button class="edbtn" type="button" data-act="conairead" title="Claude reads the attached document and fills in the details">\u{2728} Read it with Claude</button>'
           : "") + "</div>" +
+        conUpNoteHTML(c) +
         conAiBoxHTML(c) +
         (k.notice ? '<p class="rephint">Notice deadline: ' + esc(jdDate(k.notice)) + "</p>" : "") + "</div>" +
       '<div class="f wide"><label>Insurance</label>' +
@@ -8470,11 +8472,15 @@ document.addEventListener("change", function (e) {
   if (e.target.id !== "conFile") return;
   var file = e.target.files[0]; e.target.value = "";
   var c = conById(conAttachId); conAttachId = null;
-  var note = document.getElementById("conNote");
   if (!file || !c) return;
-  if (!cloud.store || !isEditor()) { if (note) note.textContent = "Sign in as the property manager to attach a document."; return; }
-  if (file.size > 20 * 1024 * 1024) { if (note) note.textContent = "That file is over 20 MB — attach a smaller copy."; return; }
-  if (note) note.textContent = "Uploading “" + file.name + "”…";
+  if (!cloud.store || !isEditor()) { conUpNote(c.id, "Sign in as the property manager to attach a document.", true); return; }
+  if (file.size > 20 * 1024 * 1024) {
+    conUpNote(c.id, "\u201c" + file.name + "\u201d is " + (Math.round(file.size / 1048576 * 10) / 10) +
+      " MB \u2014 documents can be up to 20 MB. A scan made at a lower resolution, or saved with " +
+      "\u201cReduce file size\u201d, will fit. Nothing was attached.", true);
+    return;
+  }
+  conUpNote(c.id, "Uploading \u201c" + file.name + "\u201d\u2026");
   var path = "contractFiles/" + c.id + "/" + Date.now() + "-" + file.name.replace(/[^\w.\-() ]+/g, "_");
   cloud.store.ref(path).put(file).then(function () {
     /* The contract as it is NOW, not as it was when the upload started. A save
@@ -8487,14 +8493,28 @@ document.addEventListener("change", function (e) {
     cur.files = cur.files || [];
     cur.files.push(rec);
     conSave();
-    if (note) note.textContent = "";
+    conUpMsg = null;
     renderEditor(); renderReport();
     /* the document is here, so read it now rather than making her ask */
     if (cloud.fns && /\.(pdf|docx)$/i.test(file.name)) conAiRead(cur.id, rec);
   }).catch(function (err) {
-    if (note) note.textContent = "Upload failed (" + ((err && err.code) || "error") + ") — nothing was saved.";
+    conUpNote(c.id, "The upload of \u201c" + file.name + "\u201d failed (" + ((err && err.code) || "error") +
+      ") \u2014 nothing was attached. Try again.", true);
   });
 });
+/* What happened to a document she attached, said on that contract's own card,
+   under its buttons. It used to be one line at the top of the section, often
+   off the screen, so a file over the limit looked as if nothing had happened. */
+var conUpMsg = null;        /* { cid, text, bad } */
+function conUpNote(cid, text, bad) {
+  conUpMsg = { cid: cid, text: text, bad: !!bad };
+  renderEditor();
+}
+function conUpNoteHTML(c) {
+  if (!conUpMsg || conUpMsg.cid !== c.id) return "";
+  return '<p class="' + (conUpMsg.bad ? "conaierr" : "conaibusy") + '">' + esc(conUpMsg.text) +
+    (conUpMsg.bad ? ' <button class="edbtn" type="button" data-act="conupclose" style="margin-left:6px">OK</button>' : "") + "</p>";
+}
 
 /* ---------- Claude reads the signed agreement ----------
    The document says everything the register wants to know, so a manager should
