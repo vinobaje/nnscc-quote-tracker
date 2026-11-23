@@ -133,8 +133,15 @@ const QUOTE_EXTRACT_SYSTEM =
   "lines that are other work — including work that is plainly one of the other jobs listed. When no " +
   "job is named, mark every line true. Where it is genuinely unclear whether a line belongs, mark it " +
   "true and say so in line_note.\n" +
+  "option: some quotes offer ALTERNATIVES for the same work — Option #1 or Option #2, repair or " +
+  "replace, one unit or two — and the client buys ONE of them. Give each alternative's line its " +
+  "label as the quote words it (\u201cOption #1\u201d, \u201cOption B\u201d, \u201cAlternate 2\u201d), and leave " +
+  "option empty on every other line. A charge that applies whichever alternative is chosen has an " +
+  "empty option. An optional extra bought on top of the work is not an alternative: its option is " +
+  "empty. Alternatives are never added together — their sum is a price nobody quoted.\n" +
   "amount_cad: the sum of the lines marked for_this_job, on the same footing as the lines (so " +
-  "hst_included equals lines_include_hst). NEVER give the quote's grand total as the price of one " +
+  "hst_included equals lines_include_hst) — where some lines are alternatives, the lines with no " +
+  "option plus the FIRST alternative only. NEVER give the quote's grand total as the price of one " +
   "job unless every line is that job — a total that quietly carries other work is the costliest " +
   "error this reading can make.\n" +
   "quote_date is ISO YYYY-MM-DD if a date is given or inferable, else empty. " +
@@ -159,8 +166,9 @@ const QUOTE_SCHEMA = {
           amount: { type: ["number", "null"] },
           for_this_job: { type: "boolean" },
           line_note: { type: "string" },
+          option: { type: "string" },
         },
-        required: ["description", "amount", "for_this_job", "line_note"],
+        required: ["description", "amount", "for_this_job", "line_note", "option"],
         additionalProperties: false,
       },
     },
@@ -414,6 +422,10 @@ const COMPARE_SYSTEM =
   "directors who must decide which to accept.\n" +
   "Read only what each quote itself says — its scope note and any document attached to it. Never carry " +
   "a detail from one quote onto another, and never add a detail no quote states.\n" +
+  "Two quotes may be two alternatives priced in ONE quotation (the quote says which option it is). " +
+  "Each is a quote in its own right at its own price, the board chooses between them, and they share " +
+  "a document: read only the option that quote is for, and set an option against the other " +
+  "contractors' matching option, never against the sum of a contractor's options.\n" +
   "covers: one line saying what that price buys, in the quote's own terms — what is supplied and " +
   "installed, not which line of the document it is and not the job's own title. Where a quote has no " +
   "scope note and no readable document, covers says exactly that and nothing more: you may not describe " +
@@ -943,6 +955,7 @@ exports.nnsccTrackerAi = onCall(
         lines.push("  price: $" + Number(b.total).toFixed(2));
         if (b.qno) lines.push("  quote number: " + String(b.qno).slice(0, 60));
         if (b.date) lines.push("  quoted: " + String(b.date).slice(0, 20));
+        if (b.part) lines.push("  this price is: " + String(b.part).slice(0, 240));
         /* it may be hers or it may be what the uploaded quotation said — either
            way it is one line on a row, and the document itself is attached */
         lines.push("  scope note on the row: " +
@@ -953,6 +966,9 @@ exports.nnsccTrackerAi = onCall(
       // The quote documents themselves — the scope note is the manager's
       // shorthand, the attachment is what the contractor actually wrote.
       let budget = 14 * 1024 * 1024, taken = 0;
+      // Two options from one quotation are two rows holding the same file:
+      // it is sent once, and the second row is told where it already went.
+      const sentAs = new Map();
       for (const b of bids) {
         if (b.total == null) continue;
         const files = Array.isArray(b.files) ? b.files.slice(0, 2) : [];
@@ -960,6 +976,11 @@ exports.nnsccTrackerAi = onCall(
           if (taken >= 6 || !f || !f.path) continue;
           const path = String(f.path);
           if (!path.startsWith("quoteAttachments/")) continue;   // only ever a quote attachment
+          if (sentAs.has(path)) {
+            blocks.push({ text: "Quote " + b.i + "'s document is the one already attached to quote " +
+              sentAs.get(path) + " (" + String(f.name || "") + ")." });
+            continue;
+          }
           const name = String(f.name || "");
           const ext = name.toLowerCase().split(".").pop();
           const media = ext === "pdf" ? "application/pdf"
@@ -973,6 +994,7 @@ exports.nnsccTrackerAi = onCall(
           } catch (e) { continue; }                               // a missing file is not a failed comparison
           if (buf.length > 6 * 1024 * 1024 || buf.length > budget) continue;
           budget -= buf.length; taken++;
+          sentAs.set(path, b.i);
           blocks.push({ text: "Attached to quote " + b.i + " (" +
             (String(b.contractor || "").trim() || "unnamed contractor") + "): " + name });
           blocks.push({ media: media, b64: buf.toString("base64"), name: name });

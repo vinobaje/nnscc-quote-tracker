@@ -8,6 +8,7 @@ const X = new Function(["var HST = 0.13, bidRead = null, JOBS = [];",
   "function findJob(id) { return JOBS.filter(function (x) { return x.id === id; })[0] || null; }",
   gv("BID_DET", '["notes", "Scope note"]];'),
   grab("bidReadRows"), grab("partsNote"), grab("intakeLines"), grab("bidReadDetails"), grab("bidReadDone"), grab("bidReadTrim"),
+  grab("optLine"), grab("optionQuotes"), grab("optKey"), grab("bidHoldsOpt"), grab("bidReadPlan"),
   "return { bidReadRows, partsNote, intakeLines, bidReadDetails, bidReadDone, set: function (b, j) { bidRead = b; JOBS = j; } };"].join("\n"))();
 let pass = 0, fail = 0;
 const is = (g, w, t) => { JSON.stringify(g) === JSON.stringify(w) ? pass++ : (fail++, console.log("FAIL  " + t + "\n      got  " + JSON.stringify(g) + "\n      want " + JSON.stringify(w))); };
