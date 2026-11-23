@@ -4488,6 +4488,14 @@ function donutSVG(slices, top, bot) {
 
    The tables and the donut were moved onto this basis already. These were the
    last figures on the page still counting the wider set. */
+/* "since July 2026": approved spend is counted from when this report's
+   records began, which is the current period's name when that is a month */
+function approvedSub(d) {
+  var nm = String(activeReportName() || "").trim();
+  var since = /^[A-Za-z]+ \d{4}$/.test(nm) ? "since " + nm : "";
+  var parts = [since, d.completedCount ? "incl. completed" : ""].filter(Boolean);
+  return parts.length ? parts.join(" \u00b7 ") : "approved spend";
+}
 function statCards(d) {
   /* What this number is, said on the card. It is one quote per job added up —
      the lowest priced one, unless the property manager carried a different
@@ -4502,8 +4510,7 @@ function statCards(d) {
     { k: "std", c: "sd", ic: "📁", v: money(d.nhpWTotal), l: "Standard priority", s: awaiting(d.nhpW.length) },
     { k: "saved", c: "sv", ic: "📈", v: money(d.savings), l: "Saved via bids", s: "vs. highest bids" },
     { k: "pending", c: "pd", ic: "⏳", v: String(d.pendingCount), l: "Bids pending", s: "open for quotes" },
-    { k: "approved", c: "ap", ic: "✅", v: money(d.approvedTotal), l: "Board approved",
-      s: d.completedCount ? "includes completed" : "approved spend" },
+    { k: "approved", c: "ap", ic: "✅", v: money(d.approvedTotal), l: "Board approved", s: approvedSub(d) },
     { k: "completed", c: "ap", ic: "🏁", v: money(d.completedTotal), l: "Completed",
       s: d.completedCount + " job" + (d.completedCount === 1 ? "" : "s") + " finished" }
   ];
@@ -5213,7 +5220,7 @@ function renderClassicReport() {
   tile("hp", "hp", money(d.hpWTotal), "High priority", d.hpW.length + " awaiting decision");
   tile("std", "", money(d.nhpWTotal), "Standard", d.nhpW.length + " awaiting decision");
   tile("saved", "sv", money(d.savings), "Saved via bids", "vs. highest bids");
-  tile("approved", "ap", money(d.approvedTotal), "Board approved", d.completedCount ? "includes completed" : "approved spend");
+  tile("approved", "ap", money(d.approvedTotal), "Board approved", esc(approvedSub(d)));
   tile("completed", "ap", money(d.completedTotal), "Completed",
     d.completedCount + " job" + (d.completedCount === 1 ? "" : "s") + " finished");
   tile("pending", "pd", String(d.pendingCount), "Bids pending", "open for quotes");
