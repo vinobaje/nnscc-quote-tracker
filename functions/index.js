@@ -459,6 +459,11 @@ const COMPARE_SYSTEM =
   "comparable: true only where the quotes buy substantially the same thing, so that the prices can be " +
   "set against each other as they stand. False where one covers more equipment, more area, a longer " +
   "warranty, or work the others exclude.\n" +
+  "Where quotes are options of one quotation (each says which option it is), judge comparable option " +
+  "against matching option across contractors — single against single, dual against dual. A " +
+  "contractor's own options always differ from each other; that is the choice the board is offered, " +
+  "and it is never by itself a reason for comparable to be false. Comparable is true when every " +
+  "option has a counterpart of the same scope from another contractor.\n" +
   "difference: one plain sentence a director can read on a phone, naming the contractors and what " +
   "differs between them. Empty string when they are comparable.\n" +
   "best_index: the quote that is the better value ON WHAT IS WRITTEN — weighing quantity, warranty and " +
