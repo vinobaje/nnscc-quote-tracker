@@ -3552,11 +3552,13 @@ function computeAll() {
     });
     roll[k].name = best || k;
   });
-  var approvedTotal = 0, stCounts = {}, staleBids = 0;
+  var approvedTotal = 0, completedTotal = 0, completedCount = 0, stCounts = {}, staleBids = 0;
   jobs.forEach(function (x) {
     var st = x.j.status || "quoted";
     stCounts[st] = (stCounts[st] || 0) + 1;
     if (APPROVED_SET[st]) approvedTotal += x.c.cost;
+    /* finished work, a part of the approved spend the board asked to see on its own */
+    if (st === "completed") { completedTotal += x.c.cost; completedCount++; }
     x.j.bids.forEach(function (b) { if (bidExpired(b)) staleBids++; });
   });
   return { jobs: jobs, spend: spend, dead: dead, hp: hp, nhp: nhp, total: total, hpTotal: hpTotal,
@@ -3566,7 +3568,8 @@ function computeAll() {
            waitTotal: sum(wait), hpWTotal: sum(hpW), nhpWTotal: sum(nhpW),
            progNow: progNow, progPast: progPast,
            savings: savings, pendingCount: pendingCount, roll: roll,
-           approvedTotal: approvedTotal, stCounts: stCounts, staleBids: staleBids };
+           approvedTotal: approvedTotal, completedTotal: completedTotal, completedCount: completedCount,
+           stCounts: stCounts, staleBids: staleBids };
 }
 
 /* The Condo Super credit that closes every report. It is part of the document,
@@ -3608,6 +3611,12 @@ function openStatBreakdown(kind) {
       " still awaiting a decision, each counted at the quote in the report totals — the lowest, " +
       "unless another was chosen. Jobs the board has already decided are not here.";
     rows = set.map(jobRow).sort(function (a, b) { return b.amt - a.amt; });
+    total = rows.reduce(function (t, r) { return t + r.amt; }, 0);
+  } else if (kind === "completed") {
+    var done = d.spend.filter(function (x) { return x.j.status === "completed"; });
+    title = "Completed work";
+    lede = "Jobs finished, each at the quote carried in the report totals. This is part of the board-approved spend.";
+    rows = done.map(jobRow).sort(function (a, b) { return b.amt - a.amt; });
     total = rows.reduce(function (t, r) { return t + r.amt; }, 0);
   } else if (kind === "approved") {
     var ap = d.spend.filter(function (x) { return APPROVED_SET[x.j.status]; });
@@ -4493,7 +4502,10 @@ function statCards(d) {
     { k: "std", c: "sd", ic: "📁", v: money(d.nhpWTotal), l: "Standard priority", s: awaiting(d.nhpW.length) },
     { k: "saved", c: "sv", ic: "📈", v: money(d.savings), l: "Saved via bids", s: "vs. highest bids" },
     { k: "pending", c: "pd", ic: "⏳", v: String(d.pendingCount), l: "Bids pending", s: "open for quotes" },
-    { k: "approved", c: "ap", ic: "✅", v: money(d.approvedTotal), l: "Board approved", s: "approved spend" }
+    { k: "approved", c: "ap", ic: "✅", v: money(d.approvedTotal), l: "Board approved",
+      s: d.completedCount ? "includes completed" : "approved spend" },
+    { k: "completed", c: "ap", ic: "🏁", v: money(d.completedTotal), l: "Completed",
+      s: d.completedCount + " job" + (d.completedCount === 1 ? "" : "s") + " finished" }
   ];
   /* the figure only means something once there is a register to count */
   if (canSeeContracts() && conState.list.length) {
@@ -5201,7 +5213,9 @@ function renderClassicReport() {
   tile("hp", "hp", money(d.hpWTotal), "High priority", d.hpW.length + " awaiting decision");
   tile("std", "", money(d.nhpWTotal), "Standard", d.nhpW.length + " awaiting decision");
   tile("saved", "sv", money(d.savings), "Saved via bids", "vs. highest bids");
-  tile("approved", "ap", money(d.approvedTotal), "Board approved", "approved spend");
+  tile("approved", "ap", money(d.approvedTotal), "Board approved", d.completedCount ? "includes completed" : "approved spend");
+  tile("completed", "ap", money(d.completedTotal), "Completed",
+    d.completedCount + " job" + (d.completedCount === 1 ? "" : "s") + " finished");
   tile("pending", "pd", String(d.pendingCount), "Bids pending", "open for quotes");
   if (canSeeContracts() && conState.list.length) {
     var nAtt2 = conAttentionCount();
