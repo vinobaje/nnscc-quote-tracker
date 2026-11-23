@@ -17,10 +17,10 @@ const X = new Function(["var HST = 0.13, bidRead = null, state = { jobs: [] }, L
   "var document = { querySelectorAll: function () { return []; } };",
   gv("BID_DET", '["notes", "Scope note"]];'),
   ["bidReadRows", "partsNote", "bidReadDetails", "bidReadDone", "bidReadTrim", "optLine", "optionQuotes",
-   "optKey", "bidHoldsOpt", "bidReadPlan", "bidPartsOf", "bidHeldOpts", "bidSameFile", "bidOptOf", "bidOwnOpt", "bidReadQid", "quoteFileHeld", "bidReadApply", "bidReadPanelHTML",
+   "optKey", "bidHoldsOpt", "bidReadPlan", "bidPartsOf", "bidHeldOpts", "bidSameFile", "bidOptOf", "bidOwnOpt", "bidReadQid", "optBare", "jobCalc", "bidQuoteKey", "bidTotal", "conKey", "quoteFileHeld", "bidReadApply", "bidReadPanelHTML",
    "intakeLines", "intakeRows", "intakeQuotes", "intakeTicks"].map(grab).join("\n"),
   "return { bidReadRows, partsNote, bidReadDetails, bidReadDone, optionQuotes, bidReadPlan, quoteFileHeld, bidPartsOf,",
-  "  bidReadApply, bidReadPanelHTML, intakeQuotes, intakeRows,",
+  "  bidReadApply, bidReadPanelHTML, intakeQuotes, intakeRows, jobCalc,",
   "  set: function (b, jobs) { bidRead = b; state.jobs = jobs; LOG = []; }, log: function () { return LOG; }, read: function () { return bidRead; } };"].join("\n"))();
 let pass = 0, fail = 0;
 const is = (g, w, t) => { JSON.stringify(g) === JSON.stringify(w) ? pass++ : (fail++, console.log("FAIL  " + t + "\n      got  " + JSON.stringify(g) + "\n      want " + JSON.stringify(w))); };
@@ -252,11 +252,16 @@ X.set({ jid: "h1", bi: 0, rows: readAt("qa/h1/s.pdf", shq2, "s.pdf") }, [shj]);
 plan = X.bidReadPlan(shj, 0);
 is([plan.here && plan.here.sum, plan.add.length, plan.dup.length], [1500, 0, 1], "relabelled with a shared line: matched by own price");
 
-/* round 3: equal prices AND relabelled: no guess — the row is left alone */
+/* round 3/4: equal prices relabelled: the unchanged wording settles which is which */
 const eq = JSON.parse(JSON.stringify(same)); eq.lines[0].option = "Option 1"; eq.lines[1].option = "Option 2";
 X.set({ jid: "s1", bi: 1, rows: readAt("qa/s1/a.pdf", eq, "a.pdf") }, [sj]);
 plan = X.bidReadPlan(sj, 1);
-is([plan.blocked, plan.here, plan.add.length], ["Option B", null, 0], "equal prices relabelled: refuses to guess");
+is([plan.blocked, plan.here && plan.here.opt.line, plan.add.length, plan.dup.length], ["", "Option 2 \u2013 Replace riser", 0, 1], "equal prices relabelled: Replace stays Replace");
+/* equal prices, relabelled AND reworded: no guess — the row is left alone */
+const eq2 = JSON.parse(JSON.stringify(eq)); eq2.lines[0].description = "Fix the riser"; eq2.lines[1].description = "New riser";
+X.set({ jid: "s1", bi: 1, rows: readAt("qa/s1/a.pdf", eq2, "a.pdf") }, [sj]);
+plan = X.bidReadPlan(sj, 1);
+is([plan.blocked, plan.here, plan.add.length], ["Option B", null, 0], "cannot tell: refuses to guess");
 is(/could not tell which of its options/.test(X.bidReadPanelHTML("s1", 1)), true, "and says so");
 const before = JSON.stringify(sj.bids); X.bidReadApply();
 is(JSON.stringify(sj.bids), before, "nothing changes");
@@ -275,6 +280,43 @@ const bl = { id: "b1", bids: [
   { contractor: "", qno: "", amount: null, notes: "", files: [{ name: "Quote.pdf", path: "qa/b1/new.pdf" }] }] };
 X.set({ jid: "b1", bi: 1, rows: readAt("qa/b1/new.pdf", q2("Y Inc"), "Quote.pdf") }, [bl]);
 is(X.bidReadPlan(bl, 1).dup.length, 0, "a stored file is not matched by name to an old one");
+
+/* round 4: three options, two at one price, relabelled: re-reading the third adds nothing */
+const tri = { contractor: "Acme", quote_number: "77", lines_include_hst: true, lines: [
+  { description: "Repair", amount: 5000, for_this_job: true, line_note: "", option: "Option A" },
+  { description: "Patch", amount: 5000, for_this_job: true, line_note: "", option: "Option B" },
+  { description: "Replace", amount: 7000, for_this_job: true, line_note: "", option: "Option C" }] };
+const tj3 = { id: "t3", bids: [{ contractor: "", qno: "", amount: null, hst: false, notes: "", files: [{ name: "q.pdf", path: "qa/t3/q.pdf" }] }] };
+X.set({ jid: "t3", bi: 0, rows: readAt("qa/t3/q.pdf", tri, "q.pdf") }, [tj3]); X.bidReadApply();
+const tri2 = JSON.parse(JSON.stringify(tri)); tri2.lines.forEach((l, i) => { l.option = "Option " + (i + 1); });
+X.set({ jid: "t3", bi: 2, rows: readAt("qa/t3/q.pdf", tri2, "q.pdf") }, [tj3]);
+plan = X.bidReadPlan(tj3, 2);
+is([plan.here && plan.here.sum, plan.add.length, plan.dup.length], [7000, 0, 2], "tied and relabelled: matched by wording, nothing added");
+const tri3 = JSON.parse(JSON.stringify(tri2)); tri3.lines[0].description = "Fix it"; tri3.lines[1].description = "Mend it";
+X.set({ jid: "t3", bi: 2, rows: readAt("qa/t3/q.pdf", tri3, "q.pdf") }, [tj3]);
+plan = X.bidReadPlan(tj3, 2);
+is([plan.add.length, plan.dup.length], [0, 2], "tied, relabelled and reworded: the two rows still hold the two options");
+
+/* round 4: rows split before the quotation id: a re-read gives the id to both */
+const lq = { id: "lq", bids: [
+  { contractor: "X Co", qno: "1", amount: 1000, hst: true, files: [{ name: "x.pdf", path: "qa/lq/x.pdf" }],
+    optOf: { opt: "Option 1", okey: "option1", nopt: 2, name: "x.pdf", path: "qa/lq/x.pdf", amount: 1000, line: "Option 1 \u2013 A" } },
+  { contractor: "X Co", qno: "1", amount: 2000, hst: true, files: [{ name: "x.pdf", path: "qa/lq/x.pdf" }],
+    optOf: { opt: "Option 2", okey: "option2", nopt: 2, name: "x.pdf", path: "qa/lq/x.pdf", amount: 2000, line: "Option 2 \u2013 B" } }] };
+const lqRead = { contractor: "X Co", quote_number: "1", lines_include_hst: true, lines: [
+  { description: "A", amount: 1000, for_this_job: true, line_note: "", option: "Option 1" },
+  { description: "B", amount: 2000, for_this_job: true, line_note: "", option: "Option 2" }] };
+is(X.jobCalc(lq).saving, 0, "before: one quotation");
+X.set({ jid: "lq", bi: 0, rows: readAt("qa/lq/x.pdf", lqRead, "x.pdf") }, [lq]); X.bidReadApply();
+is([!!lq.bids[0].optOf.qid, lq.bids[0].optOf.qid === lq.bids[1].optOf.qid, X.jobCalc(lq).saving], [true, true, 0], "after a re-read: both rows share the id, still no saving");
+
+/* round 4: a split row reused for another contractor starts its own quotation */
+const ru = { id: "ru", bids: [{ contractor: "", qno: "", amount: null, hst: false, notes: "", files: [{ name: "x.pdf", path: "qa/ru/x.pdf" }] }] };
+X.set({ jid: "ru", bi: 0, rows: readAt("qa/ru/x.pdf", lqRead, "x.pdf") }, [ru]); X.bidReadApply();
+const oldQ = ru.bids[0].optOf.qid;
+ru.bids[0].files = [{ name: "y.pdf", path: "qa/ru/y.pdf" }]; ru.bids[0].contractor = "Y Inc"; ru.bids[0].qno = "";
+X.set({ jid: "ru", bi: 0, rows: readAt("qa/ru/y.pdf", q2("Y Inc"), "y.pdf") }, [ru]); X.bidReadApply();
+is([ru.bids[0].optOf.qid !== oldQ, ru.bids[0].optOf.qid === ru.bids[2].optOf.qid, ru.bids[1].optOf.qid === oldQ], [true, true, true], "Y's options get their own id; X's row keeps X's");
 
 /* AI intake: the same rule */
 const d = Object.assign({ file: { name: FILE, path: "p" } }, firenza);

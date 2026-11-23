@@ -5781,7 +5781,15 @@ function bidHoldsOpt(x, g, b, keys, byMoney) {
   var amt = x.optOf && x.optOf.own != null ? +x.optOf.own
     : gone.filter(function (h) { return h !== x.optOf; })
         .reduce(function (s, h) { return s + (+h.amount || 0); }, 0);
+  if (!(amt > 0) && x.optOf && x.optOf.amount != null) amt = +x.optOf.amount;
   return amt > 0 && Math.abs(amt - g.incl) < 0.01;
+}
+/* an option line's wording without its label, which a second reading may
+   word differently ("Option A – Repair" and "Option 1 – Repair" are one line) */
+function optBare(line, label) {
+  var t = String(line || "").toLowerCase();
+  if (label) t = t.split(String(label).toLowerCase()).join(" ");
+  return optKey(t);
 }
 /* the option a row was split as, if it was split from this file */
 function bidOwnOpt(b, o) {
@@ -5816,25 +5824,39 @@ function bidReadPlan(j, bi) {
   });
   /* money, for labels the reading no longer uses: only where exactly one
      option fits, or the line's wording settles it — never a guess between two */
+  var unsure = [];      /* rows that hold one of several options, not knowing which */
   order.forEach(function (xi) {
     if (used[xi]) return;
     var x = j.bids[xi];
     var fit = [];
     quotes.forEach(function (q, qi) { if (at[qi] == null && bidHoldsOpt(x, q.opt, b, keys, true)) fit.push(qi); });
     if (fit.length > 1) {
-      var lines = bidHeldOpts(x).map(function (h) { return h.line; }).filter(Boolean);
-      fit = fit.filter(function (qi) {
-        return quotes[qi].opt.lines.some(function (l) { return lines.indexOf(l.line) >= 0; }) ||
-          lines.indexOf(quotes[qi].opt.line) >= 0;
+      var held = bidHeldOpts(x).map(function (h) { return optBare(h.line, h.opt); }).filter(Boolean);
+      var narrowed = fit.filter(function (qi) {
+        var g = quotes[qi].opt;
+        return g.lines.some(function (l) { return held.indexOf(optBare(l.line, g.label)) >= 0; }) ||
+          held.indexOf(optBare(g.line, g.label)) >= 0;
       });
+      if (narrowed.length) fit = narrowed;
     }
     if (fit.length === 1) { at[fit[0]] = xi; used[xi] = true; }
+    else if (fit.length > 1) unsure.push({ xi: xi, fit: fit });
   });
+  /* rows that between them plainly hold these options, just not which is
+     which: the options have rows already, and none is added again */
+  var held = {}, holders = 0;
+  unsure.forEach(function (u) {
+    if (u.xi === bi) return;
+    holders++;
+    u.fit.forEach(function (qi) { if (at[qi] == null) held[qi] = u.xi; });
+  });
+  if (holders && holders >= Object.keys(held).length)
+    Object.keys(held).forEach(function (qi) { at[+qi] = held[qi]; used[held[qi]] = true; });
   /* this row is an option of this file and could not be told apart: change
      nothing, rather than make it into its sibling */
   if (mine && !used[bi]) { plan.blocked = mine.opt; return plan; }
   quotes.forEach(function (q, qi) {
-    if (at[qi] === bi) plan.here = q;
+    if (at[qi] === bi) { plan.here = q; plan.matched = true; }
     else if (at[qi] != null) { plan.dup.push(q); plan.dupAt.push(at[qi]); }
   });
   quotes.forEach(function (q, qi) {
@@ -5855,7 +5877,9 @@ function bidOptOf(q, qid) {
 /* one id for every row of one quotation: the one its rows already share,
    or a new one */
 function bidReadQid(j, b, plan) {
-  if (b.optOf && b.optOf.qid && plan.here && plan.here.opt) return b.optOf.qid;
+  /* this row's own id only when it was matched to the file being read: a row
+     reused for another contractor's quote starts a quotation of its own */
+  if (b.optOf && b.optOf.qid && plan.matched) return b.optOf.qid;
   for (var i = 0; i < plan.dupAt.length; i++) {
     var d = j.bids[plan.dupAt[i]];
     if (d && d.optOf && d.optOf.qid) return d.optOf.qid;
@@ -5972,6 +5996,12 @@ function bidReadApply() {
   var det = bidRead.noDet ? [] : bidReadDetails();
   if (!plan.here && !det.length) return;
   var qid = (plan.here && plan.here.opt) || plan.add.length ? bidReadQid(j, b, plan) : "";
+  /* every row of the quotation carries the id, the ones already split
+     included, so none is left on a key of its own */
+  if (qid) plan.dupAt.forEach(function (xi) {
+    var d = j.bids[xi];
+    if (d && d.optOf && d.optOf.okey && d.optOf.qid !== qid) d.optOf.qid = qid;
+  });
   var notes = [];
   /* the details first, so a contractor name read off the PDF is the name the
      change log uses for the amount written in the same press */
