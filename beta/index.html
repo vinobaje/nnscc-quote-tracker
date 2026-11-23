@@ -3080,7 +3080,7 @@ var BRAND_PATH = "nnsccQuoteTrackerBeta/brand";               /* the letterhead 
 var WEEKLY_DRAFT_PATH = "nnsccQuoteTrackerBeta/weeklyDraft";   /* the report she is working on */
 var WEEKLY_COLL = "nnsccWeeklyReportsBeta";                   /* every one she has finished */
 var VIEW_BETA = CURRENT_PATH.indexOf("Beta") >= 0;   /* which report the passcode gate reads/protects */
-var BUILD_STAMP = "2026-11-22 22:19";   /* filled in by build.js — which copy of the page this is */
+var BUILD_STAMP = "2026-11-22 23:14";   /* filled in by build.js — which copy of the page this is */
 /* path of the report currently on screen */
 function reportPath() {
   return cloud.active.kind === "current" ? CURRENT_PATH : (REPORTS_COLL + "/" + cloud.active.id);
@@ -8246,8 +8246,18 @@ function conCardHTML() {
       '<div class="f"><label>Amount</label><input type="text" inputmode="decimal" data-conf="amount" value="' +
         esc(c.amount === "" || c.amount == null ? "" : c.amount) + '" placeholder="1450.00"></div>' +
       '<div class="f"><label>Charged</label><select data-conf="period">' + pOpts + "</select></div>" +
+      '<div class="f"><label>Yearly increase (%)</label><input type="text" inputmode="decimal" data-conf="escPct" value="' +
+        esc(c.escPct === "" || c.escPct == null ? "" : c.escPct) + '" placeholder="none"></div>' +
       '<div class="f"><label>Renews automatically</label><label class="echk" style="margin:0;font-weight:400">' +
         '<input type="checkbox" data-conf="renew"' + (c.renew ? " checked" : "") + "> yes</label></div>" +
+      (c.renew ? '<div class="f"><label>Each renewal (years)</label><input type="text" inputmode="numeric" data-conf="renewYears" value="' +
+        esc(c.renewYears === "" || c.renewYears == null ? "" : c.renewYears) + '" placeholder="e.g. 3"></div>' : "") +
+      ((k.now && k.now.year > 1) || k.rolled
+        ? '<p class="rephint wide" style="grid-column:1/-1;margin:0">' + [
+            k.now && k.now.year > 1 ? "Now " + money(k.now.amount) + " " + conPeriodLabel(c.period) +
+              " (contract year " + k.now.year + ", +" + esc(c.escPct) + "% a year)" : "",
+            k.rolled ? "Renewed automatically \u2014 current term ends " + jdDate(k.termEnd) : ""
+          ].filter(Boolean).join(" \u00b7 ") + "</p>" : "") +
       '<div class="f"><label>Notice needed (days)</label><input type="text" inputmode="numeric" data-conf="noticeDays" value="' +
         esc(c.noticeDays === "" || c.noticeDays == null ? "" : c.noticeDays) + '" placeholder="60"></div>' +
       '<div class="f wide"><label>Notes for the board</label><input type="text" data-conf="notes" value="' +
@@ -8326,11 +8336,13 @@ function conSectionHTML(ED) {
     var k = conCalc(c), d = conDir(c.contractor);
     var term = [];
     if (c.start) term.push("Started " + jdDate(c.start));
-    term.push(c.end ? "Ends " + jdDate(c.end) : "No end date recorded");
+    term.push(!c.end ? "No end date recorded"
+      : k.rolled ? "Renewed automatically to " + jdDate(k.termEnd) : "Ends " + jdDate(c.end));
     var cost = "";
-    if (c.amount !== "" && c.amount != null && !isNaN(Number(c.amount))) {
-      cost = money(Number(c.amount)) + " " + conPeriodLabel(c.period);
+    if (k.now) {
+      cost = money(k.now.amount) + " " + conPeriodLabel(c.period);
       if (k.annual && c.period === "month") cost += " · " + money(k.annual) + " a year";
+      if (k.now.year > 1) cost += " (rises " + c.escPct + "% a year; " + money(Number(c.amount)) + " in year 1)";
     }
     var files = (c.files || []).length;
     h.push('<div class="concard ' + k.state + '">' +
@@ -8471,7 +8483,8 @@ document.getElementById("editor").addEventListener("change", function (e) {
   var c = conById(card.dataset.cid); if (!c) return;
   c[f] = (f === "renew") ? e.target.checked : e.target.value;
   conSave();
-  if (f === "end" || f === "renew" || f === "noticeDays" || f === "contractor") renderEditor();
+  if (f === "end" || f === "renew" || f === "noticeDays" || f === "contractor" || f === "amount" ||
+      f === "period" || f === "escPct" || f === "renewYears" || f === "start") renderEditor();
   renderReport();
 });
 document.getElementById("editor").addEventListener("input", function (e) {
@@ -8567,12 +8580,18 @@ var CON_AI_FIELDS = [
   ["amount", "Amount", function (d) { return d.amount_cad == null ? "" : String(d.amount_cad); }],
   ["period", "Charged", function (d) { return String(d.period || ""); }],
   ["renew", "Renews automatically", function (d) { return d.auto_renew ? "yes" : "no"; }],
+  ["renewYears", "Each renewal", function (d) { return d.renew_years == null ? "" : String(d.renew_years); }],
+  ["escPct", "Yearly increase", function (d) { return d.increase_pct == null ? "" : String(d.increase_pct); }],
   ["noticeDays", "Notice needed", function (d) { return d.notice_days == null ? "" : String(d.notice_days); }]
 ];
 function conFieldNow(c, f) {
   /* an unticked "renews automatically" is the box's default, not something the
      manager said — so a document that says it renews is news, not a conflict */
   if (f === "renew") return c.renew ? "yes" : "";
+  /* "a year" is what a new contract starts with, not something she chose:
+     until there is an amount it is no answer, and a document that says
+     "monthly" must not arrive as a clash she has to notice and tick */
+  if (f === "period" && (c.amount === "" || c.amount == null)) return "";
   var v = c[f];
   return v == null ? "" : String(v).trim();
 }
@@ -8581,6 +8600,8 @@ function conFieldShow(f, v) {
   if (f === "start" || f === "end") return jdDate(v);
   if (f === "period") return conPeriodLabel(v);
   if (f === "noticeDays") return v + " days";
+  if (f === "escPct") return v + "% a year";
+  if (f === "renewYears") return v + " year" + (+v === 1 ? "" : "s");
   if (f === "amount") return isNaN(Number(v)) ? v : money(Number(v));
   return v;
 }
@@ -9597,6 +9618,7 @@ function conSave() {
       start: c.start || "", end: c.end || "", renew: !!c.renew,
       noticeDays: c.noticeDays == null ? "" : c.noticeDays,
       amount: c.amount == null ? "" : c.amount, period: c.period || "year",
+      escPct: c.escPct == null ? "" : c.escPct, renewYears: c.renewYears == null ? "" : c.renewYears,
       notes: c.notes || "", summary: c.summary || "",
       summaryAt: c.summaryAt || "", summarySrc: c.summarySrc || "",
       files: (c.files || []).map(function (f) {
@@ -9635,28 +9657,57 @@ function conDaysUntil(iso) {
    can be given before it rolls over for another term */
 function conNoticeBy(c) {
   if (!c.renew || !c.end || !(+c.noticeDays > 0)) return "";
-  var p3 = String(c.end).slice(0, 10).split("-");
+  var p3 = conTermEnd(c).split("-");
   if (p3.length !== 3) return "";
   var d = new Date(+p3[0], +p3[1] - 1, +p3[2]);
   d.setDate(d.getDate() - Math.round(+c.noticeDays));
   return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
 }
+/* A contract that renews automatically does not expire at the end of its
+   first term: it runs on, term after term, until someone gives notice. The
+   end that matters is the end of the term it is in now. */
+function conTermEnd(c) {
+  var e = String(c.end || "").slice(0, 10);
+  var yrs = Math.round(+c.renewYears || 0);
+  if (!c.renew || !(yrs > 0) || !/^\d{4}-\d{2}-\d{2}$/.test(e)) return e;
+  var p = e.split("-"), y = +p[0], guard = 0;
+  while (conDaysUntil(y + "-" + p[1] + "-" + p[2]) < 0 && guard++ < 50) y += yrs;
+  return y + "-" + p[1] + "-" + p[2];
+}
+/* The price now. The amount is the first year's, as the document states it;
+   a fixed yearly increase is added once for each full contract year since it
+   started — $8,688 a month in 2022, +2.7% a year. */
+function conAmountNow(c) {
+  var a = Number(c.amount);
+  if (!a || isNaN(a)) return null;
+  var pct = +c.escPct || 0, st = String(c.start || "").slice(0, 10);
+  if (!(pct > 0) || !/^\d{4}-\d{2}-\d{2}$/.test(st)) return { amount: a, year: 1 };
+  var sp = st.split("-"), now = new Date();
+  var yrs = now.getFullYear() - +sp[0];
+  if (now.getMonth() + 1 < +sp[1] || (now.getMonth() + 1 === +sp[1] && now.getDate() < +sp[2])) yrs--;
+  yrs = Math.max(0, yrs);
+  return { amount: Math.round(a * Math.pow(1 + pct / 100, yrs) * 100) / 100, year: yrs + 1 };
+}
 function conAnnual(c) {
-  var a3 = Number(c.amount);
-  if (!a3 || isNaN(a3)) return null;
-  if (c.period === "month") return a3 * 12;
+  var now = conAmountNow(c);
+  if (!now) return null;
+  var a3 = now.amount;
+  if (c.period === "month") return Math.round(a3 * 12 * 100) / 100;
   if (c.period === "year") return a3;
   return null;                                  /* per visit / fixed price: not a yearly commitment */
 }
 function conCalc(c) {
-  var days = conDaysUntil(c.end), notice = conNoticeBy(c), nDays = conDaysUntil(notice);
+  var term = conTermEnd(c), rolled = !!c.end && term !== String(c.end).slice(0, 10);
+  var days = conDaysUntil(term), notice = conNoticeBy(c), nDays = conDaysUntil(notice);
   var state2, label;
   if (!c.end) { state2 = "open"; label = "No end date"; }
+  else if (rolled && days > 90) { state2 = "active"; label = "Renewed to " + jdDate(term); }
   else if (days < 0) { state2 = "expired"; label = "Expired " + jdDate(c.end); }
   else if (days === 0) { state2 = "soon"; label = "Ends today"; }
   else if (days <= 90) { state2 = "soon"; label = "Ends in " + days + " day" + (days === 1 ? "" : "s"); }
   else { state2 = "active"; label = "Active"; }
-  return { days: days, notice: notice, noticeDays: nDays, state: state2, label: label, annual: conAnnual(c) };
+  return { days: days, notice: notice, noticeDays: nDays, state: state2, label: label, annual: conAnnual(c),
+           termEnd: term, rolled: rolled, now: conAmountNow(c) };
 }
 /* The contractor's insurance expiry, read from the directory the manager
    already keeps. A lapsed certificate on a contractor who is on site every
@@ -9712,7 +9763,7 @@ function conRenewals(days) {
 }
 function conSorted() {
   return conState.list.slice().sort(function (a4, b4) {
-    var da = conDaysUntil(a4.end), db = conDaysUntil(b4.end);
+    var da = conDaysUntil(conTermEnd(a4)), db = conDaysUntil(conTermEnd(b4));
     if (da == null && db == null) return String(a4.contractor || "").localeCompare(String(b4.contractor || ""));
     if (da == null) return 1;
     if (db == null) return -1;
@@ -10424,12 +10475,13 @@ function agGather() {
   /* agreements where not deciding is itself a decision */
   if (canSeeContracts()) conRenewals(90).forEach(function (c) {
     var notice = conNoticeBy(c), nd = notice ? conDaysUntil(notice) : null;
-    var ed = c.end ? conDaysUntil(c.end) : null;
+    var tEnd2 = conTermEnd(c);
+    var ed = tEnd2 ? conDaysUntil(tEnd2) : null;
     var why = nd != null
       ? (nd < 0
           ? "⚠ notice was due " + jdDate(notice) + " — it has renewed for another term"
           : "Notice must be given by " + jdDate(notice) + " (" + nd + " days) or it renews")
-      : (ed != null ? "Ends " + jdDate(c.end) + " (" + ed + " days)" : "Ending soon");
+      : (ed != null ? "Ends " + jdDate(tEnd2) + " (" + ed + " days)" : "Ending soon");
     var cw = (c.contractor || "").trim() || "the contractor";
     out.contracts.push({ id: c.id, cid: c.id, amt: null, who: cw,
       title: ((c.contractor || "").trim() || "Contractor not named") + (c.title ? " — " + c.title : ""),
@@ -11648,7 +11700,8 @@ function alertList() {
   conState.list.forEach(function (c) {
     var who = (c.contractor || "").trim() || "Contractor not named";
     var label = who + (c.title ? " — " + c.title : "");
-    var notice = conNoticeBy(c), endD = conDaysUntil(c.end);
+    var tEnd = conTermEnd(c);
+    var notice = conNoticeBy(c), endD = conDaysUntil(tEnd);
     if (notice) {
       var nd = conDaysUntil(notice);
       if (nd != null && nd <= cfg.contractDays && nd > -60)
@@ -11658,13 +11711,13 @@ function alertList() {
             ? "The deadline to give notice passed " + alertWhen(nd) + " (" + jdDate(notice) +
               ") — this agreement renews for another term."
             : "Notice to end this agreement must be given by " + jdDate(notice) + " (" + alertWhen(nd) +
-              "), otherwise it renews automatically" + (c.end ? " on " + jdDate(c.end) : "") + "." });
+              "), otherwise it renews automatically" + (tEnd ? " on " + jdDate(tEnd) : "") + "." });
     } else if (endD != null && endD <= cfg.contractDays && endD > -60) {
       out.push({ kind: "contract", audience: "all", days: endD,
         severity: endD < 0 ? "passed" : (endD <= 14 ? "urgent" : "soon"), title: label,
         detail: endD < 0
-          ? "This agreement ended " + alertWhen(endD) + " (" + jdDate(c.end) + ")."
-          : "This agreement ends " + jdDate(c.end) + " (" + alertWhen(endD) + ")" +
+          ? "This agreement ended " + alertWhen(endD) + " (" + jdDate(tEnd) + ")."
+          : "This agreement ends " + jdDate(tEnd) + " (" + alertWhen(endD) + ")" +
             (c.renew ? " and renews automatically." : " and does not renew on its own.") });
     }
     if (ED && !(c.files || []).length)

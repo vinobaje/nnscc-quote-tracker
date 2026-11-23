@@ -193,6 +193,15 @@ const CONTRACT_SYSTEM =
   "Dates are ISO YYYY-MM-DD. amount_cad is the recurring contract price as a plain number, " +
   "excluding one-off extras quoted separately; taxes excluded unless the document says otherwise. " +
   "period says how that amount is charged: month, year, visit, or fixed for a one-time total.\n" +
+  "amount_cad and period are the price AS THE DOCUMENT STATES IT for the first period, never converted: " +
+  "\u201c$8,688.00 Monthly ($104,256.00 annually) for the first year\u201d is 8688 with period month — not " +
+  "104256, and not 8688 a year.\n" +
+  "increase_pct: where the agreement raises the price by a fixed percentage each year (\u201cthe price will " +
+  "increase 2.7% per annum\u201d), that percentage as a number (2.7); null where it sets no such increase " +
+  "or ties it to something not stated (an index).\n" +
+  "renew_years: where it renews automatically, the length of each renewal term in years (\u201crenewed for " +
+  "consecutive periods equal to the initial term\u201d of three years is 3); null where it does not renew " +
+  "automatically or the length is not stated. end is the end of the INITIAL term, as the document dates it.\n" +
   "notice_days is the number of days' written notice needed to stop it renewing, if stated.\n" +
   "board_summary is 90-130 words of plain English for a reader over 65 with no legal background: " +
   "who the contractor is, what they do and how often, what it costs a year, how long it runs, " +
@@ -213,12 +222,14 @@ const CONTRACT_SCHEMA = {
     notice_days: { type: ["number", "null"] },
     amount_cad: { type: ["number", "null"] },
     period: { type: "string", enum: ["month", "year", "visit", "fixed", ""] },
+    increase_pct: { type: ["number", "null"] },
+    renew_years: { type: ["number", "null"] },
     board_summary: { type: "string" },
     watch_out: { type: "string" },
     unclear: { type: "array", items: { type: "string" } },
   },
   required: ["contractor", "title", "start", "end", "auto_renew", "notice_days",
-             "amount_cad", "period", "board_summary", "watch_out", "unclear"],
+             "amount_cad", "period", "increase_pct", "renew_years", "board_summary", "watch_out", "unclear"],
   additionalProperties: false,
 };
 
@@ -1594,10 +1605,22 @@ function alertDate(iso) {
 function alertMoney(n) {
   return "$" + Number(n || 0).toLocaleString("en-CA", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
+// The end of the term a contract is in now. One that renews automatically runs
+// on, term after term, so its first end date is long gone and means nothing —
+// M.C. Mechanical's HVAC agreement "ended" in 2025 and renewed to 2028.
+function alertTermEnd(c, today) {
+  const e = String(c.end || "").slice(0, 10);
+  const yrs = Math.round(+c.renewYears || 0);
+  if (!c.renew || !(yrs > 0) || !/^\d{4}-\d{2}-\d{2}$/.test(e)) return e;
+  const p = e.split("-");
+  let y = +p[0], guard = 0;
+  while (alertDaysUntil(y + "-" + p[1] + "-" + p[2], today) < 0 && guard++ < 50) y += yrs;
+  return y + "-" + p[1] + "-" + p[2];
+}
 // the last day notice can be given before a contract renews itself
-function alertNoticeBy(c) {
+function alertNoticeBy(c, today) {
   if (!c.renew || !c.end || !(+c.noticeDays > 0)) return "";
-  const p = String(c.end).slice(0, 10).split("-");
+  const p = alertTermEnd(c, today).split("-");
   if (p.length !== 3) return "";
   const d = new Date(Date.UTC(+p[0], +p[1] - 1, +p[2]));
   d.setUTCDate(d.getUTCDate() - Math.round(+c.noticeDays));
@@ -1626,8 +1649,9 @@ function buildAlerts(data, cfg, todayISO) {
     const who = (c.contractor || "").trim() || "Contractor not named";
     const what = (c.title || "").trim();
     const label = who + (what ? " — " + what : "");
-    const notice = alertNoticeBy(c);
-    const endDays = alertDaysUntil(c.end, today);
+    const notice = alertNoticeBy(c, today);
+    const termEnd = alertTermEnd(c, today);
+    const endDays = alertDaysUntil(termEnd, today);
     if (notice) {
       const nd = alertDaysUntil(notice, today);
       /* a deadline that went by months ago is history, not news — the register
@@ -1644,19 +1668,19 @@ function buildAlerts(data, cfg, todayISO) {
               ") — this agreement renews for another term."
             : "Notice to end this agreement must be given by " + alertDate(notice) + " (" + alertWhen(nd) +
               "), otherwise it renews automatically" +
-              (c.end ? " on " + alertDate(c.end) : "") + ".",
+              (termEnd ? " on " + alertDate(termEnd) : "") + ".",
         });
       }
     } else if (endDays != null && endDays <= cfg.contractDays && endDays > -60) {
       out.push({
-        key: "con-end-" + c.id + "-" + c.end,
+        key: "con-end-" + c.id + "-" + termEnd,
         kind: "contract", audience: "all",
         severity: endDays < 0 ? "passed" : (endDays <= 14 ? "urgent" : "soon"),
-        days: endDays, when: alertDate(c.end),
+        days: endDays, when: alertDate(termEnd),
         title: label,
         detail: endDays < 0
-          ? "This agreement ended " + alertWhen(endDays) + " (" + alertDate(c.end) + ")."
-          : "This agreement ends " + alertDate(c.end) + " (" + alertWhen(endDays) + ")" +
+          ? "This agreement ended " + alertWhen(endDays) + " (" + alertDate(termEnd) + ")."
+          : "This agreement ends " + alertDate(termEnd) + " (" + alertWhen(endDays) + ")" +
             (c.renew ? " and renews automatically." : " and does not renew on its own."),
       });
     }
