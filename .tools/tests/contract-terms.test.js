@@ -10,7 +10,7 @@ function at(iso) {   /* the register's functions, run as if today were iso */
   function D(...a) { return a.length ? new RealDate(...a) : new RealDate(fixed.getTime()); }
   D.prototype = RealDate.prototype; D.now = () => fixed.getTime(); D.UTC = RealDate.UTC;
   return new Function("Date", ["function jdDate(s) { return s; }",
-    ["conDaysUntil", "conNum", "conAddMonths", "conTermEnd", "conAmountNow", "conAnnual", "conNoticeBy", "conCalc"].map(grab).join("\n"),
+    ["conDaysUntil", "conMoney", "conNum", "conAddMonths", "conTermEnd", "conAmountNow", "conAnnual", "conNoticeBy", "conCalc"].map(grab).join("\n"),
     "return { conTermEnd, conAmountNow, conAnnual, conNoticeBy, conCalc };"].join("\n"))(D);
 }
 let pass = 0, fail = 0;
@@ -38,6 +38,7 @@ X = at("2026-11-22");
 const typed = Object.assign({}, hvac, { amount: "8688", escPct: "2.7%", renewYears: "3 years", noticeDays: "60" });
 is([X.conAmountNow(typed).amount, X.conCalc(typed).label], [9664.99, "Renewed to 2028-08-31"], "'2.7%' and '3 years' are read as 2.7 and 3");
 is(X.conAmountNow(Object.assign({}, hvac, { escPct: "2,7" })).amount, 9664.99, "a comma decimal too");
+is([X.conAmountNow(Object.assign({}, hvac, { amount: "8,688" })).amount, X.conAmountNow(Object.assign({}, hvac, { amount: "$8,688.00" })).amount], [9664.99, 9664.99], "an amount's comma is thousands");
 /* review: Feb 29, and terms that are not whole years */
 const leap = { end: "2024-02-29", renew: true, renewYears: 3, noticeDays: 60, amount: 1, period: "year", start: "2021-03-01" };
 is([X.conTermEnd(leap), X.conNoticeBy(leap)], ["2027-02-28", "2026-12-30"], "Feb 29 rolls to Feb 28, a real day");

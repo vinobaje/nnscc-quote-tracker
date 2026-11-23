@@ -9663,6 +9663,12 @@ function conNoticeBy(c) {
   d.setDate(d.getDate() - Math.round(+c.noticeDays));
   return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
 }
+/* A dollar amount as typed: "$8,688.00" — the comma is thousands, never a
+   decimal point. (Number("8,688") was NaN, so such an amount counted as none.) */
+function conMoney(v) {
+  var n = parseFloat(String(v == null ? "" : v).replace(/[^0-9.\-]/g, ""));
+  return isFinite(n) ? n : 0;
+}
 /* A number out of a box she typed in: "2.7%", "2,7", "3 years" all count. */
 function conNum(v) {
   var t = String(v == null ? "" : v).trim();
@@ -9694,7 +9700,7 @@ function conTermEnd(c) {
    started — $8,688 a month in 2022, +2.7% a year. A contract that has ended
    stops rising on the day it ended. */
 function conAmountNow(c) {
-  var a = conNum(c.amount);
+  var a = conMoney(c.amount);
   if (!a) return null;
   var pct = conNum(c.escPct), st = String(c.start || "").slice(0, 10);
   if (!(pct > 0) || !/^\d{4}-\d{2}-\d{2}$/.test(st)) return { amount: a, year: 1 };
