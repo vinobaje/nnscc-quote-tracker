@@ -3080,7 +3080,7 @@ var BRAND_PATH = "nnsccQuoteTrackerBeta/brand";               /* the letterhead 
 var WEEKLY_DRAFT_PATH = "nnsccQuoteTrackerBeta/weeklyDraft";   /* the report she is working on */
 var WEEKLY_COLL = "nnsccWeeklyReportsBeta";                   /* every one she has finished */
 var VIEW_BETA = CURRENT_PATH.indexOf("Beta") >= 0;   /* which report the passcode gate reads/protects */
-var BUILD_STAMP = "2026-11-22 22:05";   /* filled in by build.js — which copy of the page this is */
+var BUILD_STAMP = "2026-11-22 22:07";   /* filled in by build.js — which copy of the page this is */
 /* path of the report currently on screen */
 function reportPath() {
   return cloud.active.kind === "current" ? CURRENT_PATH : (REPORTS_COLL + "/" + cloud.active.id);
@@ -4682,8 +4682,9 @@ function packetSecB(d, ctx) {
          row; an option row shows only a file of its own */
       var own = bidOwnFiles(x.j, g);
       var att = own.length
-        ? '<span class="pk-att attlink" role="button" tabindex="0" data-att="' + jid + ":" + bi +
-          '" data-attcap="' + esc(name) + '" title="View the attached quote">📎 ' + own.length +
+        ? '<span class="pk-att attlink" role="button" tabindex="0" data-attstash="' +
+          fvStashRef(own.map(function (o) { return o.f; })) + '" data-atti="0"' +
+          ' data-attcap="' + esc(name) + '" title="View the attached quote">📎 ' + own.length +
           ' attachment' + (own.length > 1 ? "s" : "") + "</span>" : "";
       var con = '<td class="pk-c-con"><div class="pk-cflex">' + pkAvatar(name) + '<span class="pk-cwrap"><span class="pk-cn">' + cName + "</span>" + att + "</span></div></td>";
       var scope = ctx.ED ? tEdit("bid:" + jid + ":" + bi + ":notes", cb.b.notes, "Add scope note") : (esc(cb.b.notes) || "—");
@@ -6152,8 +6153,18 @@ function bidReadDetails() {
   }
   return out;
 }
+/* The files a read of this row takes: its own. An option row under its
+   quotation holds the shared PDF too; if it also has a revision of its own,
+   reading both would add the revision to the original. */
+function bidReadFiles(j, bi) {
+  var g = bidShowOrder(j, jobCalc(j)).filter(function (x) { return x.bi === bi; })[0];
+  var all = (j.bids[bi] && j.bids[bi].files) || [];
+  if (!g || g.first) return all;
+  var own = bidOwnFiles(j, g).map(function (o) { return o.f; });
+  return own.length ? own : all;
+}
 function bidReadRun(j, bi) {
-  var b = j.bids[bi], files = (b && b.files) || [];
+  var b = j.bids[bi], files = b ? bidReadFiles(j, bi) : [];
   if (!files.length) return;
   if (!cloud.fns || !cloud.user) { alert("Sign in first."); return; }
   bidRead = { jid: j.id, bi: bi, bref: b, sig: bidReadSig(b), busy: "Claude is reading " + files.length + " file" +
@@ -6237,7 +6248,11 @@ function bidReadApply() {
   if (answered) notes.push(answered);
   /* the details first, so a contractor name read off the PDF is the name the
      change log uses for the amount written in the same press */
-  det.forEach(function (d) { b[d.f] = d.v; });
+  var kDet = bidQuoteKey(b, bidRead.bi), biDet = bidRead.bi;
+  det.forEach(function (d) {
+    b[d.f] = d.v;
+    if (d.f === "contractor" || d.f === "qno" || d.f === "qdate") bidShareField(j, biDet, kDet, d.f);
+  });
   if (det.length)
     notes.push(jobLabel(j) + ": " + det.map(function (d) {
       return d.label.toLowerCase() + " \u201c" + d.v + "\u201d";
@@ -6249,7 +6264,10 @@ function bidReadApply() {
     /* what the figure is made of, kept with it — the board sees one number for
        three quotations and is entitled to know that is what it is */
     b.parts = bidPartsOf(plan.here);
-    if (plan.here.opt) b.optOf = bidOptOf(plan.here, qid, b.contractor); else if (b.optOf) delete b.optOf;
+    if (plan.here.opt) b.optOf = bidOptOf(plan.here, qid, b.contractor);
+    /* a document with one price read into a row that is an option — a revised
+       price for that option — leaves it that option, at its new price */
+    else if (b.optOf) { b.optOf.amount = plan.here.sum; b.optOf.own = plan.here.sum; }
     var pn = partsNote(b.parts);
     notes.push(jobLabel(j) + ": " + (b.contractor || "quote") + " set to " + money(sum) +
       (pn ? " \u2014 " + pn + " (" + kept.map(function (r) {
@@ -6566,6 +6584,9 @@ function edJobCardHTML(j, ji) {
     /* an option row under its quotation's first row shares its contractor,
        quote number, date and PDF, and does not say them again */
     var same = !g.first;
+    /* whether the Status cell carries the read button: the panel offers it
+       whenever this does not */
+    var stRead = !x.bestValue && !x.carried && x.total == null && x.unpriced;
     var st = x.bestValue
       ? '<span class="qst best">★ Best value</span>'
       : x.carried
@@ -6621,11 +6642,13 @@ function edJobCardHTML(j, ji) {
           (bidExpired(b) ? ' <span class="expired">⚠ expired</span>' : "")) +
         /* reading, on any row with a file — unless its Status cell already
            offers it (a row with a file and no price yet) */
-        ((b.files || []).length && !x.unpriced
-          ? '<button class="edbtn" type="button" data-act="readfiles" title="Claude reads the ' +
-            'attached quote' + ((b.files || []).length > 1 ? "s and adds their totals up" : "") + '">\u2728 Read ' +
-            ((b.files || []).length > 1 ? "and add up these " + b.files.length + " quotes"
-              : x.total != null ? "again" : "this quote") + "</button>"
+        ((b.files || []).length && !stRead
+          ? (function () {
+              var nR = bidReadFiles(j, bi).length;
+              return '<button class="edbtn" type="button" data-act="readfiles" title="Claude reads the ' +
+                'attached quote' + (nR > 1 ? "s and adds their totals up" : "") + '">\u2728 Read ' +
+                (nR > 1 ? "and add up these " + nR + " quotes" : x.total != null ? "again" : "this quote") + "</button>";
+            })()
           : "") +
         '<span class="spacer" style="flex:1"></span>' +
         '<button class="edbtn danger" type="button" data-act="delbid">' + (isOpt ? "Remove this option" : "Delete quote") +

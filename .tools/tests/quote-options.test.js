@@ -17,10 +17,10 @@ const X = new Function(["var HST = 0.13, bidRead = null, state = { jobs: [] }, L
   "var document = { querySelectorAll: function () { return []; } };",
   gv("BID_DET", '["notes", "Scope note"]];'),
   ["bidReadRows", "partsNote", "bidReadDetails", "bidReadDone", "bidReadTrim", "optLine", "optionQuotes",
-   "optKey", "bidHoldsOpt", "bidReadPlan", "bidPartsOf", "bidHeldOpts", "bidSameFile", "bidOptOf", "bidOwnOpt", "bidReadQid", "optBare", "jobCalc", "bidQuoteKey", "bidTotal", "conKey", "quoteFileHeld", "bidReadApply", "bidReadAnswer", "bidReadAnswerApply", "bidReadView", "bidReadSync", "bidReadSig", "jobFilesOnce", "bidReadPanelHTML",
+   "optKey", "bidHoldsOpt", "bidReadPlan", "bidPartsOf", "bidHeldOpts", "bidSameFile", "bidOptOf", "bidOwnOpt", "bidReadQid", "optBare", "jobCalc", "bidQuoteKey", "bidTotal", "conKey", "quoteFileHeld", "bidReadApply", "bidReadAnswer", "bidReadAnswerApply", "bidReadView", "bidReadSync", "bidReadSig", "jobFilesOnce", "bidShareField", "bidShowOrder", "bidOwnFiles", "bidReadFiles", "bidReadPanelHTML",
    "intakeLines", "intakeRows", "intakeQuotes", "intakeTicks"].map(grab).join("\n"),
   "return { bidReadRows, partsNote, bidReadDetails, bidReadDone, optionQuotes, bidReadPlan, quoteFileHeld, bidPartsOf,",
-  "  bidReadApply, bidReadAnswer, bidReadPanelHTML, intakeQuotes, intakeRows, jobCalc, jobFilesOnce, bidReadSig,",
+  "  bidReadApply, bidReadAnswer, bidReadPanelHTML, intakeQuotes, intakeRows, jobCalc, jobFilesOnce, bidReadSig, bidReadFiles,",
   "  set: function (b, jobs) { bidRead = b; state.jobs = jobs; LOG = []; }, log: function () { return LOG; }, read: function () { return bidRead; } };"].join("\n"))();
 let pass = 0, fail = 0;
 const is = (g, w, t) => { JSON.stringify(g) === JSON.stringify(w) ? pass++ : (fail++, console.log("FAIL  " + t + "\n      got  " + JSON.stringify(g) + "\n      want " + JSON.stringify(w))); };
@@ -489,6 +489,24 @@ X.set({ jid: "cj", bi: 1, bref: cj.bids[1], sig: X.bidReadSig(cj.bids[1]),
 cj = JSON.parse(JSON.stringify(cj)); X.set(X.read(), [cj]);   /* a snapshot: same rows, new objects */
 X.bidReadApply();
 is([cj.bids[1].amount, cj.bids[0].amount], [1000, null], "a fresh copy of the job: the price still goes to the right row");
+
+/* re-review: an option row with its own revised PDF reads only that */
+const rv = { id: "rv", bids: [{ contractor: "", qno: "", amount: null, hst: false, notes: "", files: [{ name: FILE, path: PATH }] }] };
+X.set({ jid: "rv", bi: 0, rows: readAt(PATH, firenza) }, [rv]); X.bidReadApply();
+rv.bids[1].files.push({ name: "revised.pdf", path: "qa/rv/revised.pdf" });
+is(X.bidReadFiles(rv, 1).map((f) => f.name), ["revised.pdf"], "the option row reads its revision, not the shared PDF too");
+is(X.bidReadFiles(rv, 0).map((f) => f.name), [FILE], "the first row reads the quotation");
+const rev = { contractor: "Firenza Plumbing & Heating Ltd.", quote_number: "1957HTGRC", amount_cad: 15000, hst_included: false, lines: [] };
+X.set({ jid: "rv", bi: 1, rows: readAt("qa/rv/revised.pdf", rev, "revised.pdf") }, [rv]); X.bidReadApply();
+is([rv.bids[1].amount, rv.bids[1].optOf && rv.bids[1].optOf.opt, rv.bids[1].optOf && rv.bids[1].optOf.qid === rv.bids[0].optOf.qid, X.jobCalc(rv).saving],
+   [16950, "Option #2", true, 0], "a one-price revision keeps the row as Option #2, in its quotation, at the new price");
+
+/* re-review: details read on an option row hold for the whole quotation */
+const dd = { id: "dd", bids: [{ contractor: "", qno: "", amount: null, hst: false, notes: "", qdate: "", files: [{ name: FILE, path: PATH }] }] };
+const noDate = JSON.parse(JSON.stringify(firenza)); noDate.quote_date = ""; noDate.contractor = "";
+X.set({ jid: "dd", bi: 0, rows: readAt(PATH, noDate) }, [dd]); X.bidReadApply();
+X.set({ jid: "dd", bi: 1, rows: readAt(PATH, firenza) }, [dd]); X.bidReadApply();
+is(dd.bids.map((b) => [b.contractor, b.qdate]), [["Firenza Plumbing & Heating Ltd.", "2026-11-20"], ["Firenza Plumbing & Heating Ltd.", "2026-11-20"]], "contractor and date read on Option #2 reach Option #1 too");
 
 /* AI intake: the same rule */
 const d = Object.assign({ file: { name: FILE, path: "p" } }, firenza);
