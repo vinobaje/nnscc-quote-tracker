@@ -3001,7 +3001,7 @@ var BRAND_PATH = "nnsccQuoteTracker/brand";               /* the letterhead the 
 var WEEKLY_DRAFT_PATH = "nnsccQuoteTracker/weeklyDraft";   /* the report she is working on */
 var WEEKLY_COLL = "nnsccWeeklyReports";                   /* every one she has finished */
 var VIEW_BETA = CURRENT_PATH.indexOf("Beta") >= 0;   /* which report the passcode gate reads/protects */
-var BUILD_STAMP = "2026-11-22 20:45";   /* filled in by build.js — which copy of the page this is */
+var BUILD_STAMP = "2026-11-22 20:53";   /* filled in by build.js — which copy of the page this is */
 /* path of the report currently on screen */
 function reportPath() {
   return cloud.active.kind === "current" ? CURRENT_PATH : (REPORTS_COLL + "/" + cloud.active.id);
@@ -5441,7 +5441,14 @@ function bidReadPanelHTML(jid, bi) {
   sum = Math.round(sum * 100) / 100;
   var nf = Object.keys(files).length;
   var plan = bidReadPlan(findJob(jid), bi);
-  if (plan.blocked) {
+  if (plan.ask) {
+    h.push('<tr class="qrleft"><td></td><td colspan="3">This row is ' + esc(plan.ask) +
+      " of a quotation that came in as pasted text, with no document. Is this document that same quotation?" +
+      '<div class="qreadacts" style="margin-top:6px">' +
+      '<button class="btn" type="button" data-act="readsame">Same quotation \u2014 this row stays ' + esc(plan.ask) + "</button>" +
+      '<button class="edbtn" type="button" data-act="readfresh">A different quote \u2014 read it fresh</button>' +
+      "</div></td></tr>");
+  } else if (plan.blocked) {
     h.push('<tr class="qrleft"><td></td><td colspan="3">\u26a0 This row is ' + esc(plan.blocked) +
       " of a quotation that was split into options, and this reading " +
       (plan.quotes[0] && plan.quotes[0].opt ? "could not tell which of its options this row is"
@@ -5501,6 +5508,7 @@ function bidReadPanelHTML(jid, bi) {
     : plan.here ? "Put " + money(plan.here.sum) + " in the row"
     : take ? "Fill in " + dets
     : "";
+  if (plan.ask) what = "";       /* her answer first */
   h.push('<div class="qreadacts">' +
     (what ? '<button class="btn primary" type="button" data-act="readapply">\u2713 ' + what + "</button>" : "") +
     '<button class="edbtn" type="button" data-act="readcancel">Cancel</button>' +
@@ -5681,7 +5689,7 @@ function bidHeldOpts(x) {
 }
 function bidSameFile(x, h, o, b) {
   if (h.path && o.path) return h.path === o.path;
-  if (x === b) return optConOwn(b, o);
+  if (x === b) return true;   /* a record with no path is settled by asking first (bidReadPlan) */
   /* the row holds this very stored file */
   if (o.path && (x.files || []).some(function (f) { return f && f.path === o.path; })) return true;
   var ck = function (v) { return String(v || "").toLowerCase().replace(/[^a-z0-9]/g, ""); };
@@ -5729,32 +5737,7 @@ function bidOwnOpt(b, o) {
   var t = b && b.optOf;
   if (!t || !t.okey || (t.nopt || 0) < 2) return null;
   if (t.path && o.path) return t.path === o.path ? t : null;
-  if (!optConOwn(b, o)) return null;
   return (!t.name || !o.name || t.name === o.name) ? t : null;
-}
-/* Is a row's option record, kept without a stored path (a quote pasted as
-   text), still this contractor's? Yes unless neither the row's contractor
-   now nor the name on the document being read is the one it was made for —
-   which is what happens when a row is reused for another contractor. Names
-   are compared loosely: the email said "Firenza Plumbing", the letterhead
-   says "Firenza Plumbing & Heating Ltd.", and that is one firm. */
-function conLoose(a, b) {
-  function n(v) {
-    return conKey(v).replace(/\b(ltd|limited|inc|incorporated|corp|corporation|co|company|llc)\b/g, " ")
-      .replace(/[^a-z0-9]/g, "");
-  }
-  var x = n(a), y = n(b);
-  if (!x || !y) return false;
-  if (x === y) return true;
-  var s = x.length < y.length ? x : y, l = s === x ? y : x;
-  return s.length >= 4 && l.indexOf(s) === 0;
-}
-function optConOwn(b, o) {
-  var tc = b && b.optOf && b.optOf.con;
-  if (!tc) return true;
-  var names = [b.contractor, o && o.det && o.det.contractor].filter(function (v) { return String(v || "").trim(); });
-  if (!names.length) return true;
-  return names.some(function (v) { return conLoose(v, tc); });
 }
 function bidReadPlan(j, bi) {
   var quotes = optionQuotes(bidRead && bidRead.rows);
@@ -5762,6 +5745,14 @@ function bidReadPlan(j, bi) {
   var b = j && j.bids[bi];
   if (!quotes.length || !b) return plan;
   var first = quotes[0].opt ? quotes[0].opt.lines[0] : quotes[0].rows[0];
+  /* A row made from a quote pasted as text is an option with no file to tell
+     it by. Whether this document is that quotation, or the row has been
+     reused for another one, is not something a name can settle — two firms
+     can share the start of one — so she is asked, and nothing happens until
+     she answers. */
+  if (b.optOf && b.optOf.okey && (b.optOf.nopt || 0) >= 2 && !b.optOf.path && first && first.path) {
+    plan.ask = b.optOf.opt; return plan;
+  }
   var mine = first && bidOwnOpt(b, first);
   if (!quotes[0].opt) {
     /* a row that is one option, read again by a reading that found no
@@ -5968,11 +5959,39 @@ function bidReadRun(j, bi) {
     bidReadOne(f, ctx).then(function (r) { out = out.concat(r); next(); });
   })();
 }
+/* Her answer to "is this document that pasted-text quotation?" Same: the
+   quotation's rows are tied to this document's file, and the reading goes on
+   from there. Different: this row stops being an option of the old one, and
+   the document is read into it like any other. */
+function bidReadAnswer(same) {
+  if (!bidRead || bidRead.busy) return;
+  var j = findJob(bidRead.jid), b = j && j.bids[bidRead.bi];
+  if (!b || !b.optOf) return;
+  var f = (bidRead.rows || []).filter(function (r) { return r.path; })[0];
+  var note;
+  if (same && f) {
+    var qid = b.optOf.qid;
+    j.bids.forEach(function (x) {
+      var t = x.optOf;
+      if (t && !t.path && (x === b || (qid && t.qid === qid))) { t.path = f.path; t.name = f.name; }
+    });
+    note = jobLabel(j) + ": " + (b.contractor || "quote") + " \u2014 " + b.optOf.opt +
+      " confirmed as the quotation in " + f.name;
+  } else {
+    note = jobLabel(j) + ": " + (b.contractor || "quote") + " \u2014 no longer " + b.optOf.opt +
+      " of the pasted-text quotation; read as a quote of its own";
+    delete b.optOf;
+    if (b.parts) delete b.parts;
+  }
+  persist(null, [note], j.id);
+  renderEditor();
+}
 function bidReadApply() {
   if (!bidRead || bidRead.busy) return;
   var j = findJob(bidRead.jid); if (!j) { bidRead = null; renderEditor(); return; }
   var b = j.bids[bidRead.bi]; if (!b) { bidRead = null; renderEditor(); return; }
   var plan = bidReadPlan(j, bidRead.bi);
+  if (plan.ask) return;
   var det = bidRead.noDet ? [] : bidReadDetails();
   if (!plan.here && !det.length) return;
   var qid = (plan.here && plan.here.opt) || plan.add.length ? bidReadQid(j, b, plan) : "";
@@ -7336,6 +7355,7 @@ document.getElementById("editor").addEventListener("click", function (e) {
   if (act === "readcancel") { bidRead = null; renderEditor(); return; }
   if (act === "readdet") { if (bidRead) { bidRead.noDet = !bidRead.noDet; renderEditor(); } return; }
   if (act === "readapply") { bidReadApply(); return; }
+  if (act === "readsame" || act === "readfresh") { bidReadAnswer(act === "readsame"); return; }
   if (act === "readtoggle") {
     var ri = +e.target.getAttribute("data-ri");
     if (bidRead && bidRead.rows && bidRead.rows[ri]) {
