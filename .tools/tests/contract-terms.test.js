@@ -48,6 +48,10 @@ X = at("2028-07-15");
 is(X.conCalc(hvac).label, "Renews 2028-08-31", "notice passed: it renews");
 X = at("2028-06-15");
 is(X.conCalc(Object.assign({}, hvac, { noticeDays: "" })).label, "Renews in 77 days", "no notice period: 'Renews in N days'");
+X = at("2028-08-31");
+is(X.conCalc(Object.assign({}, hvac, { noticeDays: "" })).label, "Renews today", "on its last day it renews today");
+X = at("2026-11-22");
+is(X.conNoticeBy(Object.assign({}, hvac, { noticeDays: "60 days" })), "2028-07-02", "'60 days' is 60 days");
 /* review: an ended contract stops rising when it ends */
 X = at("2030-01-01");
 const ended = { start: "2022-09-01", end: "2025-08-31", renew: false, amount: 8688, period: "month", escPct: 2.7 };
@@ -58,7 +62,7 @@ function fgrab(n) { const i = fsrc.indexOf("\nfunction " + n + "("); if (i < 0) 
 const S = new Function(["alertDaysUntil", "alertNum", "alertAddMonths", "alertTermEnd", "alertNoticeBy"].map(fgrab).join("\n") + "return { alertTermEnd, alertNoticeBy };")();
 const T = Date.UTC(2026, 10, 22);
 X = at("2026-11-22");
-[hvac, typed, leap, { end: "2025-06-30", renew: true, renewYears: 1.5, noticeDays: 30 }].forEach((c, i) => {
+[hvac, typed, leap, { end: "2025-06-30", renew: true, renewYears: 1.5, noticeDays: 30 }, Object.assign({}, hvac, { noticeDays: "60 days" })].forEach((c, i) => {
   is([S.alertTermEnd(c, T), S.alertNoticeBy(c, T)], [X.conTermEnd(c), X.conNoticeBy(c)], "emails and page agree (" + i + ")");
 });
 

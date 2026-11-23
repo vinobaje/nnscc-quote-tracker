@@ -3013,7 +3013,7 @@ var BRAND_PATH = "nnsccQuoteTracker/brand";               /* the letterhead the 
 var WEEKLY_DRAFT_PATH = "nnsccQuoteTracker/weeklyDraft";   /* the report she is working on */
 var WEEKLY_COLL = "nnsccWeeklyReports";                   /* every one she has finished */
 var VIEW_BETA = CURRENT_PATH.indexOf("Beta") >= 0;   /* which report the passcode gate reads/protects */
-var BUILD_STAMP = "2026-11-22 23:20";   /* filled in by build.js — which copy of the page this is */
+var BUILD_STAMP = "2026-11-22 23:24";   /* filled in by build.js — which copy of the page this is */
 /* path of the report currently on screen */
 function reportPath() {
   return cloud.active.kind === "current" ? CURRENT_PATH : (REPORTS_COLL + "/" + cloud.active.id);
@@ -8188,7 +8188,7 @@ function conCardHTML() {
       ((k.now && k.now.year > 1) || k.rolled
         ? '<p class="rephint wide" style="grid-column:1/-1;margin:0">' + [
             k.now && k.now.year > 1 ? "Now " + money(k.now.amount) + " " + conPeriodLabel(c.period) +
-              " (contract year " + k.now.year + ", +" + esc(c.escPct) + "% a year)" : "",
+              " (contract year " + k.now.year + ", +" + conNum(c.escPct) + "% a year)" : "",
             k.rolled ? "Renewed automatically \u2014 current term ends " + jdDate(k.termEnd) : ""
           ].filter(Boolean).join(" \u00b7 ") + "</p>" : "") +
       '<div class="f"><label>Notice needed (days)</label><input type="text" inputmode="numeric" data-conf="noticeDays" value="' +
@@ -8275,7 +8275,7 @@ function conSectionHTML(ED) {
     if (k.now) {
       cost = money(k.now.amount) + " " + conPeriodLabel(c.period);
       if (k.annual && c.period === "month") cost += " · " + money(k.annual) + " a year";
-      if (k.now.year > 1) cost += " (rises " + c.escPct + "% a year; " + money(Number(c.amount)) + " in year 1)";
+      if (k.now.year > 1) cost += " (rises " + conNum(c.escPct) + "% a year; " + money(conMoney(c.amount)) + " in year 1)";
     }
     var files = (c.files || []).length;
     h.push('<div class="concard ' + k.state + '">' +
@@ -9589,11 +9589,11 @@ function conDaysUntil(iso) {
 /* the date that actually matters on a renewing contract: the last day notice
    can be given before it rolls over for another term */
 function conNoticeBy(c) {
-  if (!c.renew || !c.end || !(+c.noticeDays > 0)) return "";
+  if (!c.renew || !c.end || !(conNum(c.noticeDays) > 0)) return "";
   var p3 = conTermEnd(c).split("-");
   if (p3.length !== 3) return "";
   var d = new Date(+p3[0], +p3[1] - 1, +p3[2]);
-  d.setDate(d.getDate() - Math.round(+c.noticeDays));
+  d.setDate(d.getDate() - Math.round(conNum(c.noticeDays)));
   return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
 }
 /* A dollar amount as typed: "$8,688.00" — the comma is thousands, never a
@@ -9665,7 +9665,10 @@ function conCalc(c) {
   /* renewing, and the notice date for this term has gone by: it renews,
      nothing can stop it now, so it is not something "ending" */
   else if (c.renew && days >= 0 && nDays != null && nDays < 0) { state2 = "active"; label = "Renews " + jdDate(term); }
-  else if (c.renew && days > 0 && days <= 90) { state2 = "soon"; label = "Renews in " + days + " day" + (days === 1 ? "" : "s"); }
+  else if (c.renew && days >= 0 && days <= 90) {
+    state2 = "soon";
+    label = days === 0 ? "Renews today" : "Renews in " + days + " day" + (days === 1 ? "" : "s");
+  }
   else if (days < 0) { state2 = "expired"; label = "Expired " + jdDate(c.end); }
   else if (days === 0) { state2 = "soon"; label = "Ends today"; }
   else if (days <= 90) { state2 = "soon"; label = "Ends in " + days + " day" + (days === 1 ? "" : "s"); }
