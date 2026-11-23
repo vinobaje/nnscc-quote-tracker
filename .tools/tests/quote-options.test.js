@@ -17,9 +17,9 @@ const X = new Function(["var HST = 0.13, bidRead = null, state = { jobs: [] }, L
   "var document = { querySelectorAll: function () { return []; } };",
   gv("BID_DET", '["notes", "Scope note"]];'),
   ["bidReadRows", "partsNote", "bidReadDetails", "bidReadDone", "bidReadTrim", "optLine", "optionQuotes",
-   "optKey", "bidHoldsOpt", "bidReadPlan", "bidPartsOf", "quoteFileHeld", "bidReadApply", "bidReadPanelHTML",
+   "optKey", "bidHoldsOpt", "bidReadPlan", "bidPartsOf", "bidHeldOpts", "bidSameFile", "bidOptOf", "quoteFileHeld", "bidReadApply", "bidReadPanelHTML",
    "intakeLines", "intakeRows", "intakeQuotes", "intakeTicks"].map(grab).join("\n"),
-  "return { bidReadRows, partsNote, bidReadDetails, bidReadDone, optionQuotes, bidReadPlan, quoteFileHeld,",
+  "return { bidReadRows, partsNote, bidReadDetails, bidReadDone, optionQuotes, bidReadPlan, quoteFileHeld, bidPartsOf,",
   "  bidReadApply, bidReadPanelHTML, intakeQuotes, intakeRows,",
   "  set: function (b, jobs) { bidRead = b; state.jobs = jobs; LOG = []; }, log: function () { return LOG; }, read: function () { return bidRead; } };"].join("\n"))();
 let pass = 0, fail = 0;
@@ -92,7 +92,8 @@ const nb = job.bids[2];
 is([nb.contractor, nb.qno, nb.amount, nb.hst, nb.qdate, nb.notes],
    ["Firenza Plumbing & Heating Ltd.", "1957HTGRC", 18091.3, true, "2026-11-20", "Option #2 – Dual PRV (2\" and 3\" Clayton)"], "the new row is option 2");
 is([nb.files.length, nb.files[0].path === job.bids[1].files[0].path, nb.files[0] !== job.bids[1].files[0]], [1, true, true], "it holds the same file, as its own copy");
-is(X.partsNote(nb.parts), "one of 2 options priced in the quotation", "the board is told what the price is");
+is(X.partsNote(nb.parts), "Option #2, one of 2 options priced in the quotation", "the board is told what the price is");
+is([nb.optOf.opt, nb.optOf.path, nb.optOf.amount], ["Option #2", PATH, 18091.3], "the new row knows which option it is");
 is(X.log().length, 3, "the note, the amount and the new row are each logged");
 is(X.read(), null, "the panel closes");
 
@@ -181,6 +182,61 @@ const lj = liveJob(); X.set({ jid: "j25", bi: 1, rows: readAt(PATH, firenza) }, 
 X.set({ jid: "j25", bi: 1, rows: readAt(PATH, relabel) }, [lj]);
 plan = X.bidReadPlan(lj, 1);
 is([plan.here && plan.here.sum, plan.add.length, plan.dup.length], [12831.15, 0, 1], "relabelled options are matched by their money");
+
+/* re-review A: two options at the same price, re-read: each keeps its own */
+const same = { contractor: "Acme", quote_number: "Q1", lines_include_hst: false, lines: [
+  { description: "Repair riser", amount: 5000, for_this_job: true, line_note: "", option: "Option A" },
+  { description: "Replace riser", amount: 5000, for_this_job: true, line_note: "", option: "Option B" }] };
+const sj = { id: "s1", bids: [{ contractor: "", qno: "", amount: null, hst: false, notes: "", files: [{ name: "a.pdf", path: "qa/s1/a.pdf" }] }] };
+X.set({ jid: "s1", bi: 0, rows: readAt("qa/s1/a.pdf", same, "a.pdf") }, [sj]); X.bidReadApply();
+X.set({ jid: "s1", bi: 1, rows: readAt("qa/s1/a.pdf", same, "a.pdf") }, [sj]);
+plan = X.bidReadPlan(sj, 1);
+is([plan.here.opt.label, plan.add.length, plan.dup.map((q) => q.opt.label)], ["Option B", 0, ["Option A"]], "same price: row 2 stays Option B");
+X.bidReadApply();
+is(sj.bids.map((b) => b.optOf.opt), ["Option A", "Option B"], "and nothing is lost");
+
+/* re-review B: labels alike for 40 characters are still two options */
+const longL = X.bidReadRows("l.pdf", { lines_include_hst: true, lines: [
+  { description: "x", amount: 1000, for_this_job: true, line_note: "", option: "Alternate 1 - replace the full riser stack in copper type L" },
+  { description: "y", amount: 3000, for_this_job: true, line_note: "", option: "Alternate 1 - replace the full riser stack in PEX-a with sleeves" }] }, null);
+is(X.optionQuotes(longL).map((q) => q.sum), [1000, 3000], "long labels: two quotes");
+
+/* re-review C: an option's own extra lines are not 'shared' */
+const own = X.bidReadRows("o.pdf", { lines_include_hst: true, lines: [
+  { description: "Supply A", amount: 1000, for_this_job: true, line_note: "", option: "Option A" },
+  { description: "Install A", amount: 500, for_this_job: true, line_note: "", option: "Option A" },
+  { description: "Supply B", amount: 2000, for_this_job: true, line_note: "", option: "Option B" }] }, null);
+is(X.partsNote(X.bidPartsOf(X.optionQuotes(own)[0])), "Option A, one of 2 options priced in the quotation", "no phantom shared line");
+const fee = X.optionQuotes(withFee);
+is(X.partsNote(X.bidPartsOf(fee[1])), "Option B, one of 2 options priced in the quotation, with 1 line that come with every option", "a real shared line is counted");
+
+/* re-review E: an amount typed over (parts removed) still knows its option */
+const ej = liveJob(); X.set({ jid: "j25", bi: 1, rows: readAt(PATH, firenza) }, [ej]); X.bidReadApply();
+ej.bids[2].amount = 18091.31; delete ej.bids[2].parts;
+X.set({ jid: "j25", bi: 1, rows: readAt(PATH, firenza) }, [ej]);
+plan = X.bidReadPlan(ej, 1);
+is([plan.add.length, plan.dup.length], [0, 1], "typed-over row is still option 2: no duplicate");
+
+/* re-review F: rows made from pasted text (no file), then a PDF attached and read */
+const tj = { id: "t1", bids: [
+  { contractor: "Firenza Plumbing & Heating Ltd.", qno: "1957HTGRC", amount: 11355, files: [],
+    parts: [{ name: "", opt: "Option #1", okey: "option1", amount: 12831.15, line: "Option #1 \u2013 Single PRV" }],
+    optOf: { opt: "Option #1", okey: "option1", nopt: 2, name: "", amount: 12831.15 } },
+  { contractor: "Firenza Plumbing & Heating Ltd.", qno: "1957HTGRC", amount: 16010, files: [],
+    parts: [{ name: "", opt: "Option #2", okey: "option2", amount: 18091.3, line: "Option #2" }],
+    optOf: { opt: "Option #2", okey: "option2", nopt: 2, name: "", amount: 18091.3 } }] };
+tj.bids[0].files = [{ name: FILE, path: PATH }];
+X.set({ jid: "t1", bi: 0, rows: readAt(PATH, firenza) }, [tj]);
+plan = X.bidReadPlan(tj, 0);
+is([plan.here && plan.here.opt.label, plan.add.length, plan.dup.length], ["Option #1", 0, 1], "pasted-text rows are recognised once a PDF is read");
+
+/* re-review G: an old attachment with no path, blank contractor, details unticked */
+const gj = { id: "g1", bids: [{ contractor: "", qno: "", amount: null, hst: false, notes: "", files: [{ name: "old.pdf", url: "u" }] }] };
+const gRead = () => X.bidReadDone("old.pdf", { data: firenza });
+X.set({ jid: "g1", bi: 0, rows: gRead(), noDet: true }, [gj]); X.bidReadApply();
+X.set({ jid: "g1", bi: 0, rows: gRead(), noDet: true }, [gj]);
+plan = X.bidReadPlan(gj, 0);
+is([gj.bids.length, plan.add.length, plan.dup.length], [2, 0, 1], "no-path attachment: second read adds nothing");
 
 /* AI intake: the same rule */
 const d = Object.assign({ file: { name: FILE, path: "p" } }, firenza);

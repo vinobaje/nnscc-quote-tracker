@@ -3346,9 +3346,21 @@ function bidTotal(b) {
 }
 
 /* derived facts for one job */
+/* Which quotation a row is. Two rows that are options of one quotation are
+   one quote the board chooses within, not two contractors bidding against
+   each other: they are not counted as two bids, and the gap between them is
+   not money saved by tendering. */
+function bidQuoteKey(b, i) {
+  var o = b && b.optOf;
+  if (!o || !o.okey) return "row" + i;
+  return "opt|" + (o.path || o.name || "") + "|" + conKey(b.contractor) + "|" + String(b.qno || "").trim();
+}
 function jobCalc(j) {
-  var bids = j.bids.map(function (b) { return { b: b, total: bidTotal(b) }; });
+  var bids = j.bids.map(function (b, i) { return { b: b, total: bidTotal(b), qk: bidQuoteKey(b, i) }; });
   var priced = bids.filter(function (x) { return x.total != null; });
+  var pricedQ = {};
+  priced.forEach(function (x) { pricedQ[x.qk] = 1; });
+  var nPricedQ = Object.keys(pricedQ).length;
   var minT = priced.length ? Math.min.apply(null, priced.map(function (x) { return x.total; })) : null;
   /* Which quote the report carries. Normally the lowest price wins on its own.
      j.pick lets the property manager override that when the board awards on
@@ -3371,15 +3383,17 @@ function jobCalc(j) {
        5 quotes received" out of four contractors and a blank. */
     x.blank = !x.hasDoc && x.total == null && !(x.b.contractor || "").trim() &&
               !String(x.b.notes || "").trim() && !String(x.b.qno || "").trim();
-    x.lowest = priced.length > 1 && x.total === minT;
+    x.lowest = nPricedQ > 1 && x.total === minT;
     /* exactly one bid is carried — with tied lowest quotes the first one counts,
        so a tie can never double-count in the totals */
     x.carried = pick != null ? (i === pick) : (x.total != null && i === firstLowest);
-    x.override = (pick != null && i === pick && !x.lowest && priced.length > 1);
+    x.override = (pick != null && i === pick && !x.lowest && nPricedQ > 1);
   });
   var carriedBids = bids.filter(function (x) { return x.carried; });
   var cost = carriedBids.reduce(function (s, x) { return s + x.total; }, 0);
-  var alt = bids.filter(function (x) { return x.total != null && !x.carried; })
+  var carriedQ = {};
+  carriedBids.forEach(function (x) { carriedQ[x.qk] = 1; });
+  var alt = bids.filter(function (x) { return x.total != null && !x.carried && !carriedQ[x.qk]; })
                 .map(function (x) { return x.total; });
   /* A saving is the difference between two prices for the SAME thing. Where the
      quotes have been read and found to buy different things, the difference is
@@ -3394,10 +3408,14 @@ function jobCalc(j) {
     x.bestBasis = x.bestValue ? bvBasis : "";
   });
   var saving = (likeForLike && alt.length) ? Math.max(0, Math.min.apply(null, alt) - cost) : 0;
-  return { bids: bids, priced: priced.length, cost: cost, carriedBids: carriedBids,
+  var invitedQ = {}, rowsN = 0;
+  bids.forEach(function (x) { if (!x.blank) { invitedQ[x.qk] = 1; rowsN++; } });
+  return { bids: bids, priced: nPricedQ, cost: cost, carriedBids: carriedBids,
            likeForLike: likeForLike,
            saving: Math.round(saving * 100) / 100,
-           invited: bids.filter(function (x) { return !x.blank; }).length,
+           invited: Object.keys(invitedQ).length,
+           /* rows on the job, options included: what there is to expand and compare */
+           rows: rowsN,
            pendingNames: bids.filter(function (x) { return x.pending && !x.unpriced; })
                              .map(function (x) { return x.b.contractor; }),
            unpricedNames: bids.filter(function (x) { return x.unpriced; })
@@ -4247,7 +4265,7 @@ function secCRows(d, ctx) {
 }
 /* Section B cards (bid comparisons) — shared */
 function secBCards(d, ctx) {
-  var multi = d.wait.filter(function (x) { return x.c.invited > 1; });
+  var multi = d.wait.filter(function (x) { return x.c.rows > 1; });
   if (!multi.length) return '<p class="seclede">No jobs currently have more than one bid.</p>';
   var h = [];
   multi.forEach(function (x) {
@@ -4570,7 +4588,7 @@ function pkSecHead(letter, title, sub, right) {
 
 /* ---- Section B (packet): competitive bid comparisons ---- */
 function packetSecB(d, ctx) {
-  var multi = d.wait.filter(function (x) { return x.c.invited > 1; });
+  var multi = d.wait.filter(function (x) { return x.c.rows > 1; });
   /* what is genuinely still out with a contractor, and separately what has come
      back and is waiting on somebody here to read the price off it */
   var pend = 0, unp = 0;
@@ -4634,8 +4652,8 @@ function packetSecC(d, ctx) {
     var notes = []; x.c.carriedBids.forEach(function (cb) {
       if (cb.b.notes && notes.indexOf(cb.b.notes) < 0) notes.push(cb.b.notes); });
     var note = notes.length ? '<span class="pk-jobnote">' + esc(notes.join(" · ")) + "</span>" : "";
-    var bidsChip = x.c.invited > 1
-      ? ' <span class="bids expand" role="button" tabindex="0" title="Show the competing quotes">' + x.c.invited + " bids</span>"
+    var bidsChip = x.c.rows > 1
+      ? ' <span class="bids expand" role="button" tabindex="0" title="Show the competing quotes">' + bidsWord(x.c) + "</span>"
       : "";
     var amt = x.c.cost ? money(x.c.cost) : '<span class="pendchip">Pending</span>';
     rows.push("<tr" + jrowAttrs(x.j) + '><td class="pk-ord"><span class="pk-oline" style="background:' + color + '"></span>' +
@@ -4976,9 +4994,13 @@ function tEdit(path, text, ph) {
 }
 /* "N bids" counts the contractors on the job, not the rows in the editor — an
    empty line is not a bid, and it used to be counted as one everywhere. */
-function badge(x) { return x.c.invited > 1
+function badge(x) { return x.c.rows > 1
   ? ' <span class="bids expand" role="button" tabindex="0" title="Show the competing quotes">' +
-    x.c.invited + " bids</span>" : ""; }
+    bidsWord(x.c) + "</span>" : ""; }
+/* "3 bids" counts quotations; one contractor's options are said as options */
+function bidsWord(c) {
+  return c.invited > 1 ? c.invited + " bids" : c.rows + " options";
+}
 
 /* rows of one job's quote comparison — shared by Section B and the inline expansions.
    Contractor / scope note / amount are click-to-edit for signed-in editors. */
@@ -5010,7 +5032,7 @@ function cmpRows(x) {
   return r.join("");
 }
 function bidRowHTML(x, colspan) {
-  if (x.c.invited < 2) return "";
+  if (x.c.rows < 2) return "";
   return '<tr class="bidrow" hidden><td colspan="' + colspan + '"><div class="bidrow-inner">' +
     '<table class="cmp"><thead><tr><th>Contractor</th><th>Scope note</th>' +
     '<th class="money">Total (incl. HST)</th><th></th></tr></thead><tbody>' +
@@ -5157,7 +5179,7 @@ function renderClassicReport() {
          money(d.hpWTotal) + "</td></tr></tbody></table></div>" + decidedNote(d, "hp") + "</section>");
 
   /* Section B */
-  var multi = d.wait.filter(function (x) { return x.c.invited > 1; });
+  var multi = d.wait.filter(function (x) { return x.c.rows > 1; });
   h.push('<section id="secB"><div class="kicker">Section B</div><h2' + hA("headB") + ">" + esc(M.headB) + "</h2>");
   h.push('<p class="seclede">' + tE("meta:ledeB", M.ledeB, "Section description") + "</p>");
   if (!multi.length) h.push('<p class="seclede">No jobs currently have more than one bid.</p>');
@@ -5493,7 +5515,7 @@ function bidReadPanelHTML(jid, bi) {
   var plan = bidReadPlan(findJob(jid), bi);
   if (plan.quotes.length && plan.quotes[0].opt) {
     /* options are not added up: one figure per option, and where each goes */
-    var nSh = plan.quotes[0].rows.length - 1;
+    var nSh = plan.quotes[0].rows.filter(function (r) { return !r.opt; }).length;
     var tail = nSh ? " + " + nSh + " shared line" + (nSh === 1 ? "" : "s") : "";
     var first = true;
     var optRow = function (q, where, cls) {
@@ -5639,12 +5661,12 @@ function bidReadRows(name, d, det) {
     if (nopt < 2) nopt = 0;
     var allOpt = !!nopt && lines.every(function (l) { return optKey(l.option); });
     return lines.map(function (l, li) {
-      var opt = nopt ? String(l.option || "").trim().slice(0, 40) : "";
+      var opt = nopt ? String(l.option || "").trim().slice(0, 60) : "";
       var why = [qno, incl ? "" : "HST added",
         l.for_this_job ? "" : "other work",
         String(l.line_note || "").trim().slice(0, 90)].filter(Boolean).join(" \u00b7 ");
       return { name: name, of: lines.length, det: det, ok: !!l.for_this_job, why: why,
-        opt: opt, nopt: opt ? nopt : 0, allOpt: allOpt,
+        opt: opt, okey: opt ? optKey(l.option) : "", nopt: opt ? nopt : 0, allOpt: allOpt,
         line: many ? optLine(opt, String(l.description || "").trim() || "line " + (li + 1)).slice(0, 90) : "",
         incl: Math.round((incl ? +l.amount : +l.amount * (1 + HST)) * 100) / 100 };
     });
@@ -5677,7 +5699,7 @@ function optionQuotes(rows) {
   var groups = [], byKey = {};
   kept.forEach(function (r) {
     if (!r.opt) return;
-    var k = optKey(r.opt);
+    var k = r.okey || optKey(r.opt);
     if (!byKey[k]) { byKey[k] = { key: k, label: r.opt, nopt: r.nopt, lines: [] }; groups.push(byKey[k]); }
     byKey[k].lines.push(r);
   });
@@ -5699,30 +5721,58 @@ function optionQuotes(rows) {
    one will when a row that was split once is read again. The row keeps the
    option it already had. */
 function optKey(v) { return String(v || "").toLowerCase().replace(/[^a-z0-9]/g, ""); }
-/* Same file means the same stored file, not the same name: two contractors
-   each sending "Quote.pdf" with an Option 1 and an Option 2 are four quotes.
-   Parts saved without a path fall back to the name, and then only on a row of
-   the same contractor or quote number. Same option means the same label, or
-   — a reading that worded the label differently — the same money. */
-function bidHoldsOpt(x, g, b) {
-  var o = g.lines[0];
+/* Which row already holds which option of the quotation being read.
+
+   A row that is one option carries optOf — the option and the file it came
+   from — set when it was split and kept however its amount is later typed
+   over, since a typed amount changes the price, not which option it is.
+   Rows split before optOf existed are recognised by their parts.
+
+   Same file is the same stored file (its path), not the same name: two
+   contractors each sending "Quote.pdf" are four quotes. Where a row's record
+   has no path (an old attachment, or a quote pasted as text), it is the same
+   file only on a row of the same contractor or quote number, or one holding
+   an attachment of that name.
+
+   Labels are matched first, across every row; a held option whose label the
+   new reading no longer uses is matched by its money after that, each row at
+   most once — two options at the same price are never taken for each other. */
+function bidHeldOpts(x) {
+  var held = [];
+  if (x && x.optOf && x.optOf.okey) held.push(x.optOf);
+  ((x && x.parts) || []).forEach(function (p) {
+    if (p && (p.opt || p.line)) held.push(p);
+  });
+  return held;
+}
+function bidSameFile(x, h, o, b) {
+  if (h.path && o.path) return h.path === o.path;
+  if (x === b) return true;
   var ck = function (v) { return String(v || "").toLowerCase().replace(/[^a-z0-9]/g, ""); };
   var bc = ck((b && b.contractor) || (o.det && o.det.contractor));
   var bq = String((b && b.qno) || (o.det && o.det.qno) || "").trim();
-  var parts = ((x && x.parts) || []).filter(function (p) {
-    if (!p) return false;
-    if (p.path && o.path) return p.path === o.path;
-    if (p.name !== o.name) return false;
-    if (x === b) return true;
-    return (bc && ck(x.contractor) === bc) || (bq && String(x.qno || "").trim() === bq);
+  var xc = ck(x.contractor), xq = String(x.qno || "").trim();
+  if (xc && bc && xc !== bc) return false;
+  if (xq && bq && xq !== bq) return false;
+  if ((bc && xc === bc) || (bq && xq === bq)) return !h.name || !o.name || h.name === o.name;
+  return (x.files || []).some(function (f) { return f && (f.name || "attachment") === o.name; });
+}
+function bidHoldsOpt(x, g, b, keys, byMoney) {
+  var o = g.lines[0];
+  var held = bidHeldOpts(x).filter(function (h) { return bidSameFile(x, h, o, b); });
+  if (!byMoney) return held.some(function (h) {
+    var k = h.okey || optKey(h.opt);
+    return k ? k === g.key : g.lines.some(function (l) { return l.line === h.line; });
   });
-  if (!parts.length) return false;
-  if (parts.some(function (p) {
-    return p.opt ? optKey(p.opt) === g.key : g.lines.some(function (l) { return l.line === p.line; });
-  })) return true;
-  var held = parts.filter(function (p) { return p.opt; })
-    .reduce(function (s, p) { return s + (+p.amount || 0); }, 0);
-  return held > 0 && Math.abs(held - g.incl) < 0.01;
+  /* money only for an option label the reading no longer has */
+  var gone = held.filter(function (h) {
+    var k = h.okey || optKey(h.opt);
+    return k && !keys[k];
+  });
+  if (!gone.length) return false;
+  var amt = x.optOf && x.optOf.amount != null ? +x.optOf.amount
+    : gone.reduce(function (s, h) { return s + (+h.amount || 0); }, 0);
+  return amt > 0 && Math.abs(amt - g.incl) < 0.01;
 }
 function bidReadPlan(j, bi) {
   var quotes = optionQuotes(bidRead && bidRead.rows);
@@ -5730,20 +5780,43 @@ function bidReadPlan(j, bi) {
   var b = j && j.bids[bi];
   if (!quotes.length || !b) return plan;
   if (!quotes[0].opt) { plan.here = quotes[0]; return plan; }
-  quotes.forEach(function (q) { if (!plan.here && bidHoldsOpt(b, q.opt, b)) plan.here = q; });
-  quotes.forEach(function (q) {
-    if (q === plan.here) return;
-    if (j.bids.some(function (x, xi) { return xi !== bi && bidHoldsOpt(x, q.opt, b); })) plan.dup.push(q);
-    else if (!plan.here) plan.here = q;
+  var keys = {};
+  quotes.forEach(function (q) { keys[q.opt.key] = 1; });
+  var at = [], used = {};
+  /* this row first, then the others; labels, then money */
+  var order = [bi].concat(j.bids.map(function (x, xi) { return xi; }).filter(function (xi) { return xi !== bi; }));
+  [false, true].forEach(function (byMoney) {
+    order.forEach(function (xi) {
+      if (used[xi]) return;
+      for (var qi = 0; qi < quotes.length; qi++) {
+        if (at[qi] != null) continue;
+        if (bidHoldsOpt(j.bids[xi], quotes[qi].opt, b, keys, byMoney)) { at[qi] = xi; used[xi] = true; return; }
+      }
+    });
+  });
+  quotes.forEach(function (q, qi) {
+    if (at[qi] === bi) plan.here = q;
+    else if (at[qi] != null) plan.dup.push(q);
+  });
+  quotes.forEach(function (q, qi) {
+    if (at[qi] != null) return;
+    if (!plan.here && !used[bi]) plan.here = q;
     else plan.add.push(q);
   });
   return plan;
+}
+/* the option a row is, kept apart from what its figure is made of */
+function bidOptOf(q) {
+  var g = q.opt, o = g.lines[0];
+  var r = { opt: g.label, okey: g.key, nopt: g.nopt || 0, name: o.name || "", amount: q.sum, line: g.line };
+  if (o.path) r.path = o.path;
+  return r;
 }
 function bidPartsOf(q) {
   return q.rows.map(function (r) {
     var p = { name: r.name, line: r.line || "", of: r.of || 1, amount: r.incl };
     if (r.path) p.path = r.path;
-    if (r.opt) { p.opt = r.opt; p.nopt = r.nopt; }
+    if (r.opt) { p.opt = r.opt; p.okey = r.okey || optKey(r.opt); p.nopt = r.nopt; }
     return p;
   });
 }
@@ -5765,9 +5838,9 @@ function partsNote(parts) {
   /* one alternative of several: what that option costs, and the board is
      choosing between it and the others, not buying them all */
   var o = parts.filter(function (p) { return p && p.opt; })[0];
-  if (o) return "one of " + (o.nopt || "several") + " options priced in the quotation" +
-    (parts.length > 1 ? ", with " + (parts.length - 1) + " line" + (parts.length > 2 ? "s" : "") +
-      " that come with every option" : "");
+  var sh = parts.filter(function (p) { return p && !p.opt; }).length;
+  if (o) return o.opt + ", one of " + (o.nopt || "several") + " options priced in the quotation" +
+    (sh ? ", with " + sh + " line" + (sh > 1 ? "s" : "") + " that come with every option" : "");
   var files = {};
   parts.forEach(function (p) { files[(p && p.name) || ""] = 1; });
   var nf = Object.keys(files).length;
@@ -5863,6 +5936,7 @@ function bidReadApply() {
     /* what the figure is made of, kept with it — the board sees one number for
        three quotations and is entitled to know that is what it is */
     b.parts = bidPartsOf(plan.here);
+    if (plan.here.opt) b.optOf = bidOptOf(plan.here); else if (b.optOf) delete b.optOf;
     var pn = partsNote(b.parts);
     notes.push(jobLabel(j) + ": " + (b.contractor || "quote") + " set to " + money(sum) +
       (pn ? " \u2014 " + pn + " (" + kept.map(function (r) {
@@ -5878,7 +5952,7 @@ function bidReadApply() {
       notes: q.opt.line, qdate: b.qdate || "",
       files: (b.files || []).filter(function (f) { return from[f.name || "attachment"]; })
         .map(function (f) { var c = {}; for (var k in f) c[k] = f[k]; return c; }),
-      parts: bidPartsOf(q) };
+      parts: bidPartsOf(q), optOf: bidOptOf(q) };
     if (b.validDays) nb.validDays = b.validDays;
     j.bids.push(nb);
     notes.push(jobLabel(j) + ": " + (nb.contractor || "quote") + " \u2014 " + q.opt.line +
@@ -6424,7 +6498,8 @@ function qcRun(j) {
       bids: qcPriced(j).map(function (x) {
         return { i: x.i, contractor: x.b.contractor || "", total: x.total,
                  scope: x.b.notes || "", qno: x.b.qno || "", date: x.b.qdate || "",
-                 part: partsNote(x.b.parts),
+                 part: partsNote(x.b.parts) || (x.b.optOf && x.b.optOf.okey ? x.b.optOf.opt + ", one of " +
+                   (x.b.optOf.nopt || "several") + " options priced in the quotation" : ""),
                  files: (x.b.files || []).map(function (f) { return { name: f.name, path: f.path }; }) };
       })
     }
@@ -11537,8 +11612,9 @@ function intakeRows(d, ticks) {
   if (nopt < 2 || lines.length < 2) nopt = 0;
   var name = (d && d.file && d.file.name) || "", path = (d && d.file && d.file.path) || "";
   return lines.map(function (l, i) {
-    var opt = nopt ? String(l.option || "").trim().slice(0, 40) : "";
+    var opt = nopt ? String(l.option || "").trim().slice(0, 60) : "";
     return { ok: ticks ? !!ticks[i] : l.for_this_job !== false, incl: +l.amount, opt: opt,
+      okey: opt ? optKey(l.option) : "",
       nopt: opt ? nopt : 0, of: lines.length, name: name, path: path,
       line: optLine(opt, String(l.description || "").trim() || "item " + (i + 1)).slice(0, 90) };
   });
@@ -11616,16 +11692,24 @@ function aiIntakeCommit() {
     var b0 = nj.bids[0], hstIn = gc("ipHst");
     var partsFor = function (q) {
       return q.rows.map(function (r) {
-        return { name: r.name, path: r.path || undefined, line: r.line, of: r.of, opt: r.opt || undefined, nopt: r.nopt || undefined,
+        return { name: r.name, path: r.path || undefined, line: r.line, of: r.of, opt: r.opt || undefined,
+          okey: r.okey || undefined, nopt: r.nopt || undefined,
           amount: Math.round((hstIn ? r.incl : r.incl * (1 + HST)) * 100) / 100 };
-      }).map(function (p) { if (!p.opt) { delete p.opt; delete p.nopt; } if (!p.path) delete p.path; return p; });
+      }).map(function (p) { if (!p.opt) { delete p.opt; delete p.okey; delete p.nopt; } if (!p.path) delete p.path; return p; });
+    };
+    /* the option each row is, priced HST-included as the reading panel prices it */
+    var optOfFor = function (q) {
+      var r = bidOptOf(q);
+      r.amount = Math.round((hstIn ? q.sum : q.sum * (1 + HST)) * 100) / 100;
+      return r;
     };
     b0.parts = partsFor(iq[0]);
+    b0.optOf = optOfFor(iq[0]);
     iq.slice(1).forEach(function (q) {
       nj.bids.push({ contractor: b0.contractor, qno: b0.qno, amount: q.sum, hst: hstIn,
         notes: q.opt.line, qdate: b0.qdate,
         files: b0.files.map(function (f) { var c = {}; for (var k in f) c[k] = f[k]; return c; }),
-        parts: partsFor(q) });
+        parts: partsFor(q), optOf: optOfFor(q) });
     });
   }
   state.jobs.push(nj);

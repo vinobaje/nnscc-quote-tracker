@@ -973,14 +973,17 @@ exports.nnsccTrackerAi = onCall(
         if (b.total == null) continue;
         const files = Array.isArray(b.files) ? b.files.slice(0, 2) : [];
         for (const f of files) {
-          if (taken >= 6 || !f || !f.path) continue;
+          if (!f || !f.path) continue;
           const path = String(f.path);
           if (!path.startsWith("quoteAttachments/")) continue;   // only ever a quote attachment
+          // said before the cap: it costs nothing, and a row past the sixth
+          // file still needs telling that its document is already here
           if (sentAs.has(path)) {
             blocks.push({ text: "Quote " + b.i + "'s document is the one already attached to quote " +
               sentAs.get(path) + " (" + String(f.name || "") + ")." });
             continue;
           }
+          if (taken >= 6) continue;
           const name = String(f.name || "");
           const ext = name.toLowerCase().split(".").pop();
           const media = ext === "pdf" ? "application/pdf"
