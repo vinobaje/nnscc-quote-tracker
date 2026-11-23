@@ -5508,6 +5508,12 @@ function bidReadPanelHTML(jid, bi) {
   sum = Math.round(sum * 100) / 100;
   var nf = Object.keys(files).length;
   var plan = bidReadPlan(findJob(jid), bi);
+  var ans = bidRead.answer;
+  if (ans && !plan.ask)
+    h.push('<tr class="qrleft"><td></td><td colspan="3">' + (ans.same
+      ? "Read as the same quotation as " + esc(ans.opt) + " \u2014 its rows are tied to " + esc(ans.name) + " when you apply."
+      : "Read as a quote of its own: this row stops being " + esc(ans.opt) + " of the pasted-text quotation when you apply.") +
+      " Cancel to undo.</td></tr>");
   if (plan.ask) {
     h.push('<tr class="qrleft"><td></td><td colspan="3">This row is ' + esc(plan.ask) +
       " of a quotation that came in as pasted text, with no document. Is this document that same quotation?" +
@@ -5806,9 +5812,42 @@ function bidOwnOpt(b, o) {
   if (t.path && o.path) return t.path === o.path ? t : null;
   return (!t.name || !o.name || t.name === o.name) ? t : null;
 }
+/* The job's rows as this reading sees them, once she has answered the
+   pasted-text question. Nothing is changed by answering — a reading she
+   cancels must leave the job as it was — so the answer is worked out here,
+   on copies, and only made real by Apply. "Same": the row, and the rows that
+   share its quotation id and have no file, are taken as this document's.
+   "Different": the row is taken as no option at all, and the rows of the
+   quotation it was part of are left out of the matching altogether, so they
+   cannot claim this document's options. */
+function bidReadView(j, bi) {
+  var a = bidRead && bidRead.answer, b = j && j.bids[bi];
+  if (!a || !b) return j;
+  return { id: j.id, bids: j.bids.map(function (x, xi) {
+    var t = x && x.optOf;
+    var ours = t && !t.path && (xi === bi || (a.qid && t.qid === a.qid));
+    if (!ours) return x;
+    var v = {};
+    for (var k in x) v[k] = x[k];
+    if (a.same) {
+      v.optOf = {}; for (var k2 in t) v.optOf[k2] = t[k2];
+      v.optOf.path = a.path; v.optOf.name = a.name;
+      v.parts = (x.parts || []).map(function (p) {
+        var c = {}; for (var k3 in p) c[k3] = p[k3];
+        if (!c.path) { c.path = a.path; c.name = a.name; }
+        return c;
+      });
+    } else {
+      v.optOf = null; v.parts = [];
+      if (xi !== bi) { v.contractor = ""; v.qno = ""; v.files = []; }
+    }
+    return v;
+  }) };
+}
 function bidReadPlan(j, bi) {
   var quotes = optionQuotes(bidRead && bidRead.rows);
   var plan = { quotes: quotes, here: null, add: [], dup: [], dupAt: [], blocked: "" };
+  j = bidReadView(j, bi);
   var b = j && j.bids[bi];
   if (!quotes.length || !b) return plan;
   var first = quotes[0].opt ? quotes[0].opt.lines[0] : quotes[0].rows[0];
@@ -5818,7 +5857,9 @@ function bidReadPlan(j, bi) {
      can share the start of one — so she is asked, and nothing happens until
      she answers. */
   if (b.optOf && b.optOf.okey && (b.optOf.nopt || 0) >= 2 && !b.optOf.path && first && first.path) {
-    plan.ask = b.optOf.opt; return plan;
+    /* the file asked about is the one the reading's first quote came from */
+    plan.ask = b.optOf.opt; plan.askPath = first.path; plan.askName = first.name;
+    return plan;
   }
   var mine = first && bidOwnOpt(b, first);
   if (!quotes[0].opt) {
@@ -6026,32 +6067,37 @@ function bidReadRun(j, bi) {
     bidReadOne(f, ctx).then(function (r) { out = out.concat(r); next(); });
   })();
 }
-/* Her answer to "is this document that pasted-text quotation?" Same: the
-   quotation's rows are tied to this document's file, and the reading goes on
-   from there. Different: this row stops being an option of the old one, and
-   the document is read into it like any other. */
+/* Her answer to "is this document that pasted-text quotation?" is held with
+   the reading, and the panel shows what it would do; nothing is saved until
+   Apply, and Cancel forgets it. */
 function bidReadAnswer(same) {
   if (!bidRead || bidRead.busy) return;
   var j = findJob(bidRead.jid), b = j && j.bids[bidRead.bi];
   if (!b || !b.optOf) return;
-  var f = (bidRead.rows || []).filter(function (r) { return r.path; })[0];
-  var note;
-  if (same && f) {
-    var qid = b.optOf.qid;
+  var p = bidReadPlan(j, bidRead.bi);
+  if (!p.ask || !p.askPath) return;
+  bidRead.answer = { same: !!same, path: p.askPath, name: p.askName || "",
+                     qid: b.optOf.qid || "", opt: b.optOf.opt };
+  renderEditor();
+}
+/* ... and made real by Apply, in the same save as the amounts */
+function bidReadAnswerApply(j, b) {
+  var a = bidRead && bidRead.answer;
+  if (!a || !b.optOf || b.optOf.path) return "";
+  if (a.same) {
     j.bids.forEach(function (x) {
       var t = x.optOf;
-      if (t && !t.path && (x === b || (qid && t.qid === qid))) { t.path = f.path; t.name = f.name; }
+      if (!t || t.path || !(x === b || (a.qid && t.qid === a.qid))) return;
+      t.path = a.path; t.name = a.name;
+      (x.parts || []).forEach(function (p) { if (!p.path) { p.path = a.path; p.name = a.name; } });
     });
-    note = jobLabel(j) + ": " + (b.contractor || "quote") + " \u2014 " + b.optOf.opt +
-      " confirmed as the quotation in " + f.name;
-  } else {
-    note = jobLabel(j) + ": " + (b.contractor || "quote") + " \u2014 no longer " + b.optOf.opt +
-      " of the pasted-text quotation; read as a quote of its own";
-    delete b.optOf;
-    if (b.parts) delete b.parts;
+    return jobLabel(j) + ": " + (b.contractor || "quote") + " \u2014 " + a.opt +
+      " confirmed as the quotation in " + a.name;
   }
-  persist(null, [note], j.id);
-  renderEditor();
+  delete b.optOf;
+  if (b.parts) delete b.parts;
+  return jobLabel(j) + ": " + (b.contractor || "quote") + " \u2014 no longer " + a.opt +
+    " of the pasted-text quotation; read as a quote of its own";
 }
 function bidReadApply() {
   if (!bidRead || bidRead.busy) return;
@@ -6061,6 +6107,7 @@ function bidReadApply() {
   if (plan.ask) return;
   var det = bidRead.noDet ? [] : bidReadDetails();
   if (!plan.here && !det.length) return;
+  var answered = bidReadAnswerApply(j, b);
   var qid = (plan.here && plan.here.opt) || plan.add.length ? bidReadQid(j, b, plan) : "";
   /* every row of the quotation carries the id, the ones already split
      included, so none is left on a key of its own */
@@ -6069,6 +6116,7 @@ function bidReadApply() {
     if (d && d.optOf && d.optOf.okey && d.optOf.qid !== qid) d.optOf.qid = qid;
   });
   var notes = [];
+  if (answered) notes.push(answered);
   /* the details first, so a contractor name read off the PDF is the name the
      change log uses for the amount written in the same press */
   det.forEach(function (d) { b[d.f] = d.v; });

@@ -17,7 +17,7 @@ const X = new Function(["var HST = 0.13, bidRead = null, state = { jobs: [] }, L
   "var document = { querySelectorAll: function () { return []; } };",
   gv("BID_DET", '["notes", "Scope note"]];'),
   ["bidReadRows", "partsNote", "bidReadDetails", "bidReadDone", "bidReadTrim", "optLine", "optionQuotes",
-   "optKey", "bidHoldsOpt", "bidReadPlan", "bidPartsOf", "bidHeldOpts", "bidSameFile", "bidOptOf", "bidOwnOpt", "bidReadQid", "optBare", "jobCalc", "bidQuoteKey", "bidTotal", "conKey", "quoteFileHeld", "bidReadApply", "bidReadAnswer", "bidReadPanelHTML",
+   "optKey", "bidHoldsOpt", "bidReadPlan", "bidPartsOf", "bidHeldOpts", "bidSameFile", "bidOptOf", "bidOwnOpt", "bidReadQid", "optBare", "jobCalc", "bidQuoteKey", "bidTotal", "conKey", "quoteFileHeld", "bidReadApply", "bidReadAnswer", "bidReadAnswerApply", "bidReadView", "bidReadPanelHTML",
    "intakeLines", "intakeRows", "intakeQuotes", "intakeTicks"].map(grab).join("\n"),
   "return { bidReadRows, partsNote, bidReadDetails, bidReadDone, optionQuotes, bidReadPlan, quoteFileHeld, bidPartsOf,",
   "  bidReadApply, bidReadAnswer, bidReadPanelHTML, intakeQuotes, intakeRows, jobCalc,",
@@ -377,7 +377,7 @@ is([/data-act="readsame"/.test(ph), /data-act="readfresh"/.test(ph), /data-act="
 let snap = JSON.stringify(pt.bids); X.bidReadApply();
 is(JSON.stringify(pt.bids), snap, "apply does nothing before the answer");
 X.bidReadAnswer(false);
-is(pt.bids[0].optOf, undefined, "'different': the row is no longer the old option");
+is([!!pt.bids[0].optOf, X.jobCalc(pt).saving], [true, 0], "answering changes nothing yet");
 X.bidReadApply();
 is([pt.bids[0].optOf.qid !== "QX", pt.bids[1].optOf.qid, X.jobCalc(pt).saving > 0], [true, "QX", true], "read fresh: its own quotation, and the saving against the other firm stands");
 /* not renamed, a single-price quote from another firm — "different" reads normally */
@@ -394,11 +394,44 @@ const fzLong = JSON.parse(JSON.stringify(firenza)); fzLong.contractor = "Firenza
 X.set({ jid: "pf", bi: 0, rows: readAt(PATH, fzLong) }, [pf]);
 is(X.bidReadPlan(pf, 0).ask, "Option #2", "asks");
 X.bidReadAnswer(true);
-is(pf.bids[0].optOf.path, PATH, "'same': the quotation is tied to this file");
+is(pf.bids[0].optOf.path, undefined, "'same' is not saved before Apply");
 plan = X.bidReadPlan(pf, 0);
 is([plan.here && plan.here.opt.label, plan.add.map((q) => q.opt.label)], ["Option #2", ["Option #1"]], "and the row stays Option #2");
 X.bidReadApply();
 is([pf.bids[0].optOf.opt, pf.bids[0].optOf.qid, pf.bids[1].optOf.qid], ["Option #2", "QP", "QP"], "its quotation id is kept");
+is(pf.bids[0].optOf.path, PATH, "and Apply ties it to the file");
+
+/* round 8: 'different' on an un-renamed row: the old quotation's rows cannot claim the new document's options */
+pt = mkPt("X Co"); pt.bids[0].files = [{ name: "y.pdf", path: "qa/pt/y.pdf" }];
+const y2 = JSON.parse(JSON.stringify(q2("Y Inc"))); y2.lines[0].amount = 1500; y2.lines[1].amount = 2500;
+X.set({ jid: "pt", bi: 0, rows: readAt("qa/pt/y.pdf", y2, "y.pdf") }, [pt]);
+X.bidReadAnswer(false);
+plan = X.bidReadPlan(pt, 0);
+is([plan.here && plan.here.sum, plan.add.map((q) => q.sum), plan.dup.length], [1500, [2500], 0], "Y's two options: one here, one new; none taken by X's row");
+X.bidReadApply();
+is([pt.bids.length, pt.bids[1].optOf.qid, pt.bids[0].optOf.qid === pt.bids[2].optOf.qid, pt.bids[0].optOf.qid !== "QX"], [3, "QX", true, true], "X's row keeps X's id; Y's rows share their own");
+
+/* round 8: 'same' ties to the file the question was about, not the first attachment */
+const twoF = { id: "tw", bids: [
+  { contractor: "Firenza", qno: "1957", amount: 1000, hst: true, files: [{ name: "photos.pdf", path: "qa/tw/photos.pdf" }, { name: FILE, path: PATH }],
+    optOf: { opt: "Option #1", okey: "option1", nopt: 2, name: "", amount: 12831.15, own: 12831.15, line: "Option #1", qid: "QF" } },
+  { contractor: "Firenza", qno: "1957", amount: 2000, hst: true, files: [],
+    optOf: { opt: "Option #2", okey: "option2", nopt: 2, name: "", amount: 18091.3, own: 18091.3, line: "Option #2", qid: "QF" } }] };
+const photoRows = X.bidReadDone("photos.pdf", { data: { amount_cad: null } }).map((r) => Object.assign(r, { path: "qa/tw/photos.pdf" }));
+X.set({ jid: "tw", bi: 0, rows: photoRows.concat(readAt(PATH, firenza)) }, [twoF]);
+X.bidReadAnswer(true);
+plan = X.bidReadPlan(twoF, 0);
+is([plan.here && plan.here.opt.label, plan.add.length, plan.dup.length], ["Option #1", 0, 1], "tied to the quotation's file: Option #2's row is recognised");
+X.bidReadApply();
+is([twoF.bids.length, twoF.bids[0].optOf.path, twoF.bids[1].optOf.path], [2, PATH, PATH], "both rows tied to the quotation, not the photos");
+
+/* round 8: answer, then Cancel: nothing changed */
+pt = mkPt("X Co"); pt.bids[0].files = [{ name: "y.pdf", path: "qa/pt/y.pdf" }];
+snap = JSON.stringify(pt.bids);
+X.set({ jid: "pt", bi: 0, rows: readAt("qa/pt/y.pdf", y2, "y.pdf") }, [pt]);
+X.bidReadAnswer(false);
+X.set(null, [pt]);   /* Cancel: the reading is dropped */
+is([JSON.stringify(pt.bids) === snap, X.jobCalc(pt).saving], [true, 0], "cancelled after answering: the job is as it was");
 
 /* round 6: the row being read, tied, with one option left that no other row can be */
 const lt = { id: "lt", bids: [{ contractor: "", qno: "", amount: null, hst: false, notes: "", files: [{ name: "a.pdf", path: "qa/lt/a.pdf" }] }] };
