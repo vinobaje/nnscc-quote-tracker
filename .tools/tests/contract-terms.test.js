@@ -10,7 +10,7 @@ function at(iso) {   /* the register's functions, run as if today were iso */
   function D(...a) { return a.length ? new RealDate(...a) : new RealDate(fixed.getTime()); }
   D.prototype = RealDate.prototype; D.now = () => fixed.getTime(); D.UTC = RealDate.UTC;
   return new Function("Date", ["function jdDate(s) { return s; }",
-    ["conDaysUntil", "conTermEnd", "conAmountNow", "conAnnual", "conNoticeBy", "conCalc"].map(grab).join("\n"),
+    ["conDaysUntil", "conNum", "conAddMonths", "conTermEnd", "conAmountNow", "conAnnual", "conNoticeBy", "conCalc"].map(grab).join("\n"),
     "return { conTermEnd, conAmountNow, conAnnual, conNoticeBy, conCalc };"].join("\n"))(D);
 }
 let pass = 0, fail = 0;
@@ -33,5 +33,33 @@ const plain = { start: "2024-01-01", end: "2025-12-31", renew: false, amount: 12
 is([X.conCalc(plain).state, X.conAnnual(plain), X.conTermEnd(plain)], ["expired", 1200, "2025-12-31"], "a contract that does not renew still expires");
 const noYrs = { start: "2024-01-01", end: "2025-12-31", renew: true, amount: 100, period: "month" };
 is(X.conTermEnd(noYrs), "2025-12-31", "renews, but for how long unknown: the date is left as entered");
+/* review: what she types in the boxes */
+X = at("2026-11-22");
+const typed = Object.assign({}, hvac, { amount: "8688", escPct: "2.7%", renewYears: "3 years", noticeDays: "60" });
+is([X.conAmountNow(typed).amount, X.conCalc(typed).label], [9664.99, "Renewed to 2028-08-31"], "'2.7%' and '3 years' are read as 2.7 and 3");
+is(X.conAmountNow(Object.assign({}, hvac, { escPct: "2,7" })).amount, 9664.99, "a comma decimal too");
+/* review: Feb 29, and terms that are not whole years */
+const leap = { end: "2024-02-29", renew: true, renewYears: 3, noticeDays: 60, amount: 1, period: "year", start: "2021-03-01" };
+is([X.conTermEnd(leap), X.conNoticeBy(leap)], ["2027-02-28", "2026-12-30"], "Feb 29 rolls to Feb 28, a real day");
+is(X.conTermEnd({ end: "2025-06-30", renew: true, renewYears: 1.5 }), "2026-12-30", "an 18-month renewal steps in months");
+/* review: a renewing contract inside its last 90 days renews, it does not end */
+X = at("2028-07-15");
+is(X.conCalc(hvac).label, "Renews 2028-08-31", "notice passed: it renews");
+X = at("2028-06-15");
+is(X.conCalc(Object.assign({}, hvac, { noticeDays: "" })).label, "Renews in 77 days", "no notice period: 'Renews in N days'");
+/* review: an ended contract stops rising when it ends */
+X = at("2030-01-01");
+const ended = { start: "2022-09-01", end: "2025-08-31", renew: false, amount: 8688, period: "month", escPct: 2.7 };
+is(X.conAmountNow(ended), { amount: 9163.49, year: 3 }, "ended in year 3: its last price, not 2030's");
+/* the alert emails agree with the page */
+const fsrc = fs.readFileSync(require("path").join(__dirname, "../../functions/index.js"), "utf8");
+function fgrab(n) { const i = fsrc.indexOf("\nfunction " + n + "("); if (i < 0) throw new Error(n); return fsrc.slice(i + 1, fsrc.indexOf("\n}\n", i) + 3); }
+const S = new Function(["alertDaysUntil", "alertNum", "alertAddMonths", "alertTermEnd", "alertNoticeBy"].map(fgrab).join("\n") + "return { alertTermEnd, alertNoticeBy };")();
+const T = Date.UTC(2026, 10, 22);
+X = at("2026-11-22");
+[hvac, typed, leap, { end: "2025-06-30", renew: true, renewYears: 1.5, noticeDays: 30 }].forEach((c, i) => {
+  is([S.alertTermEnd(c, T), S.alertNoticeBy(c, T)], [X.conTermEnd(c), X.conNoticeBy(c)], "emails and page agree (" + i + ")");
+});
+
 console.log("\n" + pass + " passed, " + fail + " failed");
 process.exit(fail ? 1 : 0);

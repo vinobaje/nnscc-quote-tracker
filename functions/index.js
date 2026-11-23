@@ -1608,14 +1608,28 @@ function alertMoney(n) {
 // The end of the term a contract is in now. One that renews automatically runs
 // on, term after term, so its first end date is long gone and means nothing —
 // M.C. Mechanical's HVAC agreement "ended" in 2025 and renewed to 2028.
+// the same as the page's conNum / conAddMonths / conTermEnd, so the emails and
+// the register never disagree on a date
+function alertNum(v) {
+  let t = String(v == null ? "" : v).trim();
+  if (t.indexOf(",") >= 0 && t.indexOf(".") < 0) t = t.replace(",", ".");
+  const n = parseFloat(t.replace(/[^0-9.\-]/g, ""));
+  return isFinite(n) ? n : 0;
+}
+function alertAddMonths(iso, months) {
+  const p = iso.split("-");
+  let y = +p[0], m = +p[1] - 1 + months;
+  y += Math.floor(m / 12); m = ((m % 12) + 12) % 12;
+  const last = new Date(Date.UTC(y, m + 1, 0)).getUTCDate(), d = Math.min(+p[2], last);
+  return y + "-" + String(m + 1).padStart(2, "0") + "-" + String(d).padStart(2, "0");
+}
 function alertTermEnd(c, today) {
   const e = String(c.end || "").slice(0, 10);
-  const yrs = Math.round(+c.renewYears || 0);
-  if (!c.renew || !(yrs > 0) || !/^\d{4}-\d{2}-\d{2}$/.test(e)) return e;
-  const p = e.split("-");
-  let y = +p[0], guard = 0;
-  while (alertDaysUntil(y + "-" + p[1] + "-" + p[2], today) < 0 && guard++ < 50) y += yrs;
-  return y + "-" + p[1] + "-" + p[2];
+  const months = Math.round(alertNum(c.renewYears) * 12);
+  if (!c.renew || !(months > 0) || !/^\d{4}-\d{2}-\d{2}$/.test(e)) return e;
+  let t = e, n = 0, guard = 0;
+  while (alertDaysUntil(t, today) < 0 && guard++ < 600) { n += months; t = alertAddMonths(e, n); }
+  return t;
 }
 // the last day notice can be given before a contract renews itself
 function alertNoticeBy(c, today) {
