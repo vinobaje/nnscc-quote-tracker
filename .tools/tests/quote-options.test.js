@@ -17,7 +17,7 @@ const X = new Function(["var HST = 0.13, bidRead = null, state = { jobs: [] }, L
   "var document = { querySelectorAll: function () { return []; } };",
   gv("BID_DET", '["notes", "Scope note"]];'),
   ["bidReadRows", "partsNote", "bidReadDetails", "bidReadDone", "bidReadTrim", "optLine", "optionQuotes",
-   "optKey", "bidHoldsOpt", "bidReadPlan", "bidPartsOf", "bidHeldOpts", "bidSameFile", "bidOptOf", "bidOwnOpt", "bidReadQid", "optBare", "jobCalc", "bidQuoteKey", "bidTotal", "conKey", "quoteFileHeld", "bidReadApply", "bidReadAnswer", "bidReadAnswerApply", "bidReadView", "bidReadSync", "bidReadSig", "jobFilesOnce", "bidShareField", "bidShowOrder", "bidOwnFiles", "bidReadFiles", "bidReadPanelHTML",
+   "optKey", "bidHoldsOpt", "bidReadPlan", "bidPartsOf", "bidHeldOpts", "bidSameFile", "bidOptOf", "bidOwnOpt", "bidReadQid", "optBare", "jobCalc", "bidQuoteKey", "bidTotal", "conKey", "quoteFileHeld", "bidReadApply", "bidReadAnswer", "bidReadAnswerApply", "bidReadView", "bidReadSync", "bidReadSig", "jobFilesOnce", "bidShareField", "bidShowOrder", "bidOwnFiles", "bidReadFiles", "bidOwnDocs", "bidReadPanelHTML",
    "intakeLines", "intakeRows", "intakeQuotes", "intakeTicks"].map(grab).join("\n"),
   "return { bidReadRows, partsNote, bidReadDetails, bidReadDone, optionQuotes, bidReadPlan, quoteFileHeld, bidPartsOf,",
   "  bidReadApply, bidReadAnswer, bidReadPanelHTML, intakeQuotes, intakeRows, jobCalc, jobFilesOnce, bidReadSig, bidReadFiles,",
@@ -561,6 +561,51 @@ const pj = { id: "pj", bids: [
     optOf: { opt: "Option #2", okey: "option2", nopt: 2, name: "", amount: 18091.3, own: 18091.3, line: "Option #2", qid: "QP" } }] };
 X.set({ jid: "pj", bi: 0, rows: readAt(PATH, firenza) }, [pj]); X.bidReadAnswer(true); X.bidReadApply();
 is(pj.bids[1].files.map((f) => f.path), [PATH], "pasted text confirmed: the sibling row holds the PDF too");
+
+/* verification pass: a row priced from two documents re-reads both */
+const A = "qa/mf/A.pdf", B = "qa/mf/B.pdf";
+const two2 = (o1, o2) => ({ contractor: "Acme", quote_number: "5", lines_include_hst: true, lines: [
+  { description: "single", amount: o1, for_this_job: true, line_note: "", option: "Option #1" },
+  { description: "dual", amount: o2, for_this_job: true, line_note: "", option: "Option #2" }] });
+let mf = { id: "mf", bids: [{ contractor: "", qno: "", amount: null, hst: false, notes: "", files: [{ name: "A.pdf", path: A }, { name: "B.pdf", path: B }] }] };
+X.set({ jid: "mf", bi: 0, rows: readAt(A, two2(1000, 2000), "A.pdf").concat(readAt(B, two2(3000, 5000), "B.pdf")) }, [mf]); X.bidReadApply();
+is([mf.bids.map((b) => b.amount), X.bidReadFiles(mf, 0).map((f) => f.name), X.bidReadFiles(mf, 1).map((f) => f.name)],
+   [[4000, 7000], ["A.pdf", "B.pdf"], ["A.pdf", "B.pdf"]], "one PDF per building: both are the row's own, and both are read again");
+X.set({ jid: "mf", bi: 0, rows: readAt(A, two2(1000, 2000), "A.pdf").concat(readAt(B, two2(3000, 5000), "B.pdf")) }, [mf]);
+plan = X.bidReadPlan(mf, 0);
+is([plan.ask, plan.here && plan.here.sum, plan.add.length, plan.dup.length], [undefined, 4000, 0, 1], "read again: no question, nothing changes");
+/* a quotation and a charge that goes with either option */
+mf = { id: "mf", bids: [{ contractor: "", qno: "", amount: null, hst: false, notes: "", files: [{ name: "A.pdf", path: A }, { name: "B.pdf", path: B }] }] };
+const fee500 = { contractor: "Acme", amount_cad: 500, hst_included: true, lines: [] };
+X.set({ jid: "mf", bi: 0, rows: readAt(A, two2(1000, 2000), "A.pdf").concat(readAt(B, fee500, "B.pdf")) }, [mf]); X.bidReadApply();
+is([mf.bids.map((b) => b.amount), X.bidReadFiles(mf, 0).map((f) => f.name)], [[1500, 2500], ["A.pdf", "B.pdf"]], "options + a shared charge: re-read together, not the charge alone");
+/* one-price revisions, one after another */
+let rv2 = { id: "rv2", bids: [{ contractor: "", qno: "", amount: null, hst: false, notes: "", files: [{ name: "A.pdf", path: A }] }] };
+X.set({ jid: "rv2", bi: 0, rows: readAt(A, two2(1000, 2000), "A.pdf") }, [rv2]); X.bidReadApply();
+const one = (n) => ({ contractor: "Acme", amount_cad: n, hst_included: true, lines: [] });
+rv2.bids[0].files.push({ name: "r1.pdf", path: "qa/mf/r1.pdf" });
+is(X.bidReadFiles(rv2, 0).map((f) => f.name), ["r1.pdf"], "the first revision is read on its own");
+X.set({ jid: "rv2", bi: 0, rows: readAt("qa/mf/r1.pdf", one(900), "r1.pdf") }, [rv2]); X.bidReadApply();
+rv2.bids[0].files.push({ name: "r2.pdf", path: "qa/mf/r2.pdf" });
+is(X.bidReadFiles(rv2, 0).map((f) => f.name), ["r2.pdf"], "the second revision is read on its own, not added to the first");
+X.set({ jid: "rv2", bi: 0, rows: readAt("qa/mf/r2.pdf", one(800), "r2.pdf") }, [rv2]); X.bidReadApply();
+is([rv2.bids[0].amount, rv2.bids[0].optOf.opt, X.bidReadFiles(rv2, 0).map((f) => f.name)], [800, "Option #1", ["r2.pdf"]], "Option #1 at $800; a later read takes the latest revision");
+/* an attachment that is not a quotation does not stop the quotation being read again */
+let cert = { id: "ct", bids: [{ contractor: "", qno: "", amount: null, hst: false, notes: "", files: [{ name: "A.pdf", path: A }] }] };
+X.set({ jid: "ct", bi: 0, rows: readAt(A, two2(1000, 2000), "A.pdf") }, [cert]); X.bidReadApply();
+cert.bids[0].files.push({ name: "site-photo.jpg", path: "qa/mf/photo.jpg" });
+is(X.bidReadFiles(cert, 0).map((f) => f.name), ["A.pdf"], "a photo is not something new to read");
+cert.bids[0].files.push({ name: "wsib.pdf", path: "qa/mf/wsib.pdf" });
+X.set({ jid: "ct", bi: 0, rows: [{ name: "wsib.pdf", path: "qa/mf/wsib.pdf", incl: null, ok: false, why: "no total found in it", det: {} }].concat(readAt(A, two2(1000, 2000), "A.pdf")) }, [cert]);
+X.bidReadApply();
+is([cert.bids[0].amount, X.bidReadFiles(cert, 0).map((f) => f.name)], [1000, ["A.pdf"]], "a certificate, once read and found to hold no price, is not taken for new again");
+/* 'different', then read again: the earlier quotation's file is not taken for new */
+let df = { id: "df", bids: [{ contractor: "", qno: "", amount: null, hst: false, notes: "", files: [{ name: "A.pdf", path: A }] }] };
+X.set({ jid: "df", bi: 0, rows: readAt(A, two2(1000, 2000), "A.pdf") }, [df]); X.bidReadApply();
+df.bids[0].files.push({ name: "Y.pdf", path: "qa/mf/Y.pdf" }); df.bids[0].contractor = "Y Inc";
+X.set({ jid: "df", bi: 0, rows: readAt("qa/mf/Y.pdf", two2(1500, 2500), "Y.pdf") }, [df]);
+X.bidReadAnswer(false); X.bidReadApply();
+is([df.bids[0].optOf.path, X.bidReadFiles(df, 0).map((f) => f.name)], ["qa/mf/Y.pdf", ["Y.pdf"]], "after 'different' the row re-reads its own quotation, not the earlier one");
 
 /* AI intake: the same rule */
 const d = Object.assign({ file: { name: FILE, path: "p" } }, firenza);

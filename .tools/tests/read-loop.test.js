@@ -10,7 +10,7 @@ const X = new Function(["var bidRead = null, state = { jobs: [] }, cloud = { fns
   "function liveJobs() { return state.jobs; } function countsAsSpend() { return true; }",
   "function findJob(id) { return state.jobs.filter(function (x) { return x.id === id; })[0] || null; }",
   "var PENDING; function bidReadOne(f) { return new Promise(function (r) { PENDING.push(function () { r([{ name: f.name, incl: 1130, ok: true, why: '' }]); }); }); }",
-  grab("bidReadRun"), grab("bidReadSync"), grab("bidReadSig"), grab("conKey"), grab("bidReadFiles"), grab("bidShowOrder"), grab("bidOwnFiles"), grab("bidQuoteKey"), grab("jobCalc"), grab("bidTotal"), "var HST = 0.13;",
+  grab("bidReadRun"), grab("bidReadSync"), grab("bidReadSig"), grab("conKey"), grab("bidReadFiles"), grab("bidOwnDocs"), grab("bidShowOrder"), grab("bidOwnFiles"), grab("bidQuoteKey"), grab("jobCalc"), grab("bidTotal"), "var HST = 0.13;",
   "return { run: bidReadRun, setPending: function (p) { PENDING = p; }, jobs: function (j) { state.jobs = j; }, read: function () { return bidRead; }, close: function () { bidRead = null; } };"].join("\n"))();
 let pass = 0, fail = 0;
 const is = (g, w, t) => { JSON.stringify(g) === JSON.stringify(w) ? pass++ : (fail++, console.log("FAIL  " + t + "\n      got  " + JSON.stringify(g) + "\n      want " + JSON.stringify(w))); };

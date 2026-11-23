@@ -3019,7 +3019,7 @@ var BRAND_PATH = "nnsccQuoteTracker/brand";               /* the letterhead the 
 var WEEKLY_DRAFT_PATH = "nnsccQuoteTracker/weeklyDraft";   /* the report she is working on */
 var WEEKLY_COLL = "nnsccWeeklyReports";                   /* every one she has finished */
 var VIEW_BETA = CURRENT_PATH.indexOf("Beta") >= 0;   /* which report the passcode gate reads/protects */
-var BUILD_STAMP = "2026-11-23 04:39";   /* filled in by build.js — which copy of the page this is */
+var BUILD_STAMP = "2026-11-23 09:37";   /* filled in by build.js — which copy of the page this is */
 /* path of the report currently on screen */
 function reportPath() {
   return cloud.active.kind === "current" ? CURRENT_PATH : (REPORTS_COLL + "/" + cloud.active.id);
@@ -4435,6 +4435,7 @@ function approvedSub(d) {
      into every later period. It was read off the period's NAME, which stops
      being the start as soon as the report is copied forward or renamed. */
   var nm = String((state.meta && state.meta.since) || "").trim();
+  if (!nm) { var rn = String(activeReportName() || "").trim(); if (/^[A-Za-z]+ \d{4}$/.test(rn)) nm = rn; }
   var since = nm ? "since " + nm : "";
   var parts = [since, d.completedCount ? "incl. completed" : ""].filter(Boolean);
   return parts.length ? parts.join(" \u00b7 ") : "approved spend";
@@ -5396,6 +5397,7 @@ var ED_BUCKETS = [
   ["all",      "All",                null]
 ];
 var edBucket = "open";
+var edStatusUndo = null;      /* the decision date a status change has just replaced */
 function edBucketLabel(key) {
   var out = key;
   ED_BUCKETS.forEach(function (b) { if (b[0] === key) out = b[1]; });
@@ -6128,22 +6130,37 @@ function bidReadDetails() {
   }
   return out;
 }
-/* The files a read of this row takes. A plain row: all of them, added up. A
-   row that is an option of a quotation: any document it has not been read
-   from yet (a revision, or the quotation sent again), and only when there is
-   none, the quotation's own document — never both, which added a revision
-   to the original, and never one that a later document has replaced. */
+/* The files a read of this row takes. A plain row: all of them, added up.
+
+   A row that is an option of a quotation has its own documents — every file
+   its figure was read from (the paths in its parts: one PDF, or one per
+   building, or a quotation and a charge that goes with either option) — and
+   may be handed something new: a revision, or the quotation sent again. New
+   is a PDF or Word file it has never been read from; read on its own, never
+   added to the documents it revises. With nothing new, its own documents are
+   read again, all of them together. A document a later one replaced, or one
+   that turned out to hold no price (a certificate, a drawing), is in
+   optOf.was and is not taken for new a second time. */
+function bidOwnDocs(b) {
+  var t = b && b.optOf, own = {};
+  ((b && b.parts) || []).forEach(function (p) { if (p && p.path) own[p.path] = 1; });
+  if (!Object.keys(own).length && t && t.path) own[t.path] = 1;   /* a typed-over amount has no parts */
+  return own;
+}
 function bidReadFiles(j, bi) {
   var b = j.bids[bi], all = (b && b.files) || [];
   var t = b && b.optOf;
   if (!t || !t.okey) return all;
-  var known = {};
+  var own = bidOwnDocs(b), known = {};
+  Object.keys(own).forEach(function (p) { known[p] = 1; });
   if (t.path) known[t.path] = 1;
   (t.was || []).forEach(function (p) { known[p] = 1; });
-  var fresh = all.filter(function (f) { return f && f.path && !known[f.path]; });
+  var fresh = all.filter(function (f) {
+    return f && f.path && !known[f.path] && /\.(pdf|docx)$/i.test(String(f.name || ""));
+  });
   if (fresh.length) return fresh;
-  var own = all.filter(function (f) { return f && t.path && f.path === t.path; });
-  return own.length ? own : all;
+  var mine = all.filter(function (f) { return f && f.path && own[f.path]; });
+  return mine.length ? mine : all;
 }
 function bidReadRun(j, bi) {
   var b = j.bids[bi], files = b ? bidReadFiles(j, bi) : [];
@@ -6161,10 +6178,19 @@ function bidReadRun(j, bi) {
   var out = [], i = 0;
   /* this reading, and no other: one closed or replaced while Claude was
      still at it is let go, never written into the one open now */
-  var mine = bidRead;
+  var mine = bidRead, fellBack = false;
   (function next() {
     if (bidRead !== mine) return;
     if (i >= files.length) {
+      /* the "new" files held no price at all (a certificate, a drawing): the
+         quotation's own documents are read after all */
+      if (!fellBack && b.optOf && b.optOf.okey && !out.some(function (r) { return r.incl != null; })) {
+        fellBack = true;
+        var own = bidOwnDocs(b), seen = {};
+        files.forEach(function (f) { if (f && f.path) seen[f.path] = 1; });
+        var more = (b.files || []).filter(function (f) { return f && f.path && own[f.path] && !seen[f.path]; });
+        if (more.length) { files = files.concat(more); next(); return; }
+      }
       bidRead.busy = ""; bidRead.rows = out; renderEditor(); return;
     }
     var f = files[i++];
@@ -6226,6 +6252,11 @@ function bidReadApply() {
   if (plan.ask) return;
   var det = bidRead.noDet ? [] : bidReadDetails();
   if (!plan.here && !det.length) return;
+  /* the documents this row's figure rested on before, and the option record
+     it had — "a different quote" deletes the record, but its documents must
+     still not be taken for new the next time the row is read */
+  var hadOpt = b.optOf ? { was: (b.optOf.was || []).slice(), path: b.optOf.path || "" } : null;
+  var hadDocs = Object.keys(bidOwnDocs(b));
   /* "different" with nothing to put in the row would leave the old option's
      figure on a row no longer marked as that option: leave it as it was */
   var answered = (plan.here || (bidRead.answer && bidRead.answer.same)) ? bidReadAnswerApply(j, b) : "";
@@ -6256,14 +6287,23 @@ function bidReadApply() {
     /* what the figure is made of, kept with it — the board sees one number for
        three quotations and is entitled to know that is what it is */
     b.parts = bidPartsOf(plan.here);
-    if (plan.here.opt) {
-      var wasB = b.optOf && b.optOf.was;
-      b.optOf = bidOptOf(plan.here, qid, b.contractor);
-      if (wasB) b.optOf.was = wasB;
-    }
+    if (plan.here.opt) b.optOf = bidOptOf(plan.here, qid, b.contractor);
     /* a document with one price read into a row that is an option — a revised
        price for that option — leaves it that option, at its new price */
     else if (b.optOf) { b.optOf.amount = plan.here.sum; b.optOf.own = plan.here.sum; }
+    if (b.optOf) {
+      /* superseded: what it was read from before and is not read from now;
+         and anything in this reading that held no price */
+      var nowDocs = bidOwnDocs(b), was = hadOpt ? hadOpt.was.slice() : [];
+      if (b.optOf.path) nowDocs[b.optOf.path] = 1;
+      hadDocs.concat(hadOpt && hadOpt.path ? [hadOpt.path] : []).forEach(function (p) {
+        if (p && !nowDocs[p] && was.indexOf(p) < 0) was.push(p);
+      });
+      (bidRead.rows || []).forEach(function (r) {
+        if (r && r.incl == null && r.path && !nowDocs[r.path] && was.indexOf(r.path) < 0) was.push(r.path);
+      });
+      if (was.length) b.optOf.was = was; else delete b.optOf.was;
+    }
     var pn = partsNote(b.parts);
     notes.push(jobLabel(j) + ": " + (b.contractor || "quote") + " set to " + money(sum) +
       (pn ? " \u2014 " + pn + " (" + kept.map(function (r) {
@@ -7475,7 +7515,14 @@ document.getElementById("editor").addEventListener("change", function (e) {
        Quoted is no decision at all. Only on the change; her own date stands. */
     var grp = function (st) { return st === "quoted" ? "q" : APPROVED_SET[st] ? "ok" : st === "deferred" ? "def" : "dead"; };
     if (grp(wasSt) !== grp(j.status) && j.status !== "completed") {
-      if (j.status === "quoted") j.statusDate = ""; else j.statusDate = todayISO();
+      /* the wrong status picked and put straight within a couple of minutes
+         is a slip, not two decisions: the date she had comes back */
+      var un = edStatusUndo;
+      var slip = un && un.jid === j.id && un.grp === grp(j.status) && Date.now() - un.at < 120000;
+      edStatusUndo = { jid: j.id, grp: grp(wasSt), date: j.statusDate || "", at: Date.now() };
+      if (slip) j.statusDate = un.date;
+      else if (j.status === "quoted") j.statusDate = "";
+      else j.statusDate = todayISO();
     }
     if (j.status === "completed") j.pct = 100;   /* finished work is 100% by definition */
     persist(null, [jobLabel(j) + " marked " + statusLabel(j.status)], j.id);
@@ -7494,12 +7541,15 @@ document.getElementById("editor").addEventListener("change", function (e) {
   else if (f === "awardedTo") {
     j.awardedTo = e.target.value;
     if (j.awardedTo && !j.awardDate) j.awardDate = todayISO();
+    /* a quote counted only because of the award stops being counted when the
+       award is cleared or moves to someone else */
+    if (j.pickBy === "award") { delete j.pick; delete j.pickBy; }
     /* Awarded to someone other than the lowest: the totals must count the
        price the work will cost. With one priced quote from them it is carried
        at once; with several (options) she chooses, and the card says so. */
     var awRows = [];
     j.bids.forEach(function (b, bi) { if (j.awardedTo && conKey(b.contractor) === conKey(j.awardedTo) && bidTotal(b) != null) awRows.push(bi); });
-    if (awRows.length === 1 && !jobCalc(j).bids[awRows[0]].carried) j.pick = awRows[0];
+    if (awRows.length === 1 && !jobCalc(j).bids[awRows[0]].carried) { j.pick = awRows[0]; j.pickBy = "award"; }
     persist(null, [j.awardedTo
       ? jobLabel(j) + " awarded to " + j.awardedTo
       : jobLabel(j) + " award cleared"], j.id);
@@ -7828,7 +7878,7 @@ document.getElementById("editor").addEventListener("click", function (e) {
     Object.keys(edQOpen).forEach(function (k) { if (k.indexOf(j.id + ":") === 0) delete edQOpen[k]; });
     /* keep a manual "carry this quote" choice pointing at the same quote */
     if (typeof j.pick === "number") {
-      if (j.pick === dbi) delete j.pick;
+      if (j.pick === dbi) { delete j.pick; delete j.pickBy; }
       else if (j.pick > dbi) j.pick--;
     }
     /* the comparison was between quotes one of which is now gone */
@@ -7945,6 +7995,7 @@ function edWorkspaceAction(act, el, e) {
       }
       /* picking the quote the rules would have chosen anyway = back to automatic */
       var auto = jobCalcAutoIndex(pj);
+      delete pj.pickBy;                      /* chosen by hand: hers from here on */
       if (auto === bi) { delete pj.pick; persist(null, ['Job ' + pj.no + ': carrying the lowest quote again'], pj.id); }
       else {
         pj.pick = bi;
@@ -8024,6 +8075,7 @@ function edWorkspaceAction(act, el, e) {
       var cj = state.jobs[+cc.dataset.ji]; if (!cj) return true;
       var cbi = +el.dataset.bi, cbd = cj.bids[cbi];
       if (!cbd || bidTotal(cbd) == null) return true;
+      delete cj.pickBy;
       if (jobCalcAutoIndex(cj) === cbi) delete cj.pick; else cj.pick = cbi;
       persist(null, [jobLabel(cj) + ": carrying " +
         ((cbd.contractor || "").trim() || "another quote") + " " + money(bidTotal(cbd)) +
@@ -8380,7 +8432,9 @@ function conSectionHTML(ED) {
     var term = [];
     if (c.start) term.push("Started " + jdDate(c.start));
     term.push(!c.end ? "No end date recorded"
-      : k.rolled ? "Renewed automatically to " + jdDate(k.termEnd) : "Ends " + jdDate(c.end));
+      : k.rolled ? "Renewed automatically to " + jdDate(k.termEnd)
+      : (c.renew && k.days != null && k.days < 0) ? "First term ended " + jdDate(c.end) + "; renews automatically"
+      : "Ends " + jdDate(c.end));
     var cost = "";
     if (k.now) {
       cost = money(k.now.amount) + " " + conPeriodLabel(c.period);
@@ -9769,7 +9823,7 @@ function conNoticeBy(c) {
 /* A dollar amount as typed: "$8,688.00" — the comma is thousands, never a
    decimal point. (Number("8,688") was NaN, so such an amount counted as none.) */
 function conMoney(v) {
-  var m = String(v == null ? "" : v).replace(/,(?=\d{3}(\D|$))/g, "").match(/-?\d+(\.\d+)?/);
+  var m = String(v == null ? "" : v).replace(/(\d)[,\u00a0 ](?=\d{3}(\D|$))/g, "$1").match(/-?(?:\d+(?:\.\d+)?|\.\d+)/);
   var n = m ? parseFloat(m[0]) : NaN;
   return isFinite(n) ? n : 0;
 }
@@ -9778,7 +9832,7 @@ function conNum(v) {
   var t = String(v == null ? "" : v).trim();
   if (t.indexOf(",") >= 0 && t.indexOf(".") < 0) t = t.replace(",", ".");
   /* the first number she typed: "60 or 90 days" is 60, never 6090 */
-  var m = t.match(/-?\d+(\.\d+)?/);
+  var m = t.match(/-?(?:\d+(?:\.\d+)?|\.\d+)/);
   var n = m ? parseFloat(m[0]) : NaN;
   return isFinite(n) ? n : 0;
 }
@@ -9813,7 +9867,7 @@ function conAmountNow(c) {
   var sp = st.split("-"), now = new Date();
   var asOf = { y: now.getFullYear(), m: now.getMonth() + 1, d: now.getDate() };
   var te = conTermEnd(c);
-  if (/^\d{4}-\d{2}-\d{2}$/.test(te) && conDaysUntil(te) < 0) {
+  if (!c.renew && /^\d{4}-\d{2}-\d{2}$/.test(te) && conDaysUntil(te) < 0) {
     var tp = te.split("-"); asOf = { y: +tp[0], m: +tp[1], d: +tp[2] };
   }
   var yrs = asOf.y - +sp[0];
@@ -10348,6 +10402,21 @@ function actWeekEvents(oldJobs, newJobs) {
         if (k) tryOld(function (x) { return !(x.optOf && x.optOf.okey) && conKey(x.contractor) === k; });
         tryOld(function (x, i) { return i === bi && !conKey(x.contractor); });   /* a blank row, filled in */
       }
+      /* Not found by name: a row renamed, or split into options since, is
+         still the quote the board saw last week. An option whose earlier self
+         had no quotation id, or was the unsplit row; and failing those, the
+         row in the same place when it is plainly the same quote — the same
+         price, the same quote number, or the same document. */
+      if (t && t.okey) {
+        tryOld(function (x) { return x.optOf && x.optOf.okey === t.okey && !x.optOf.qid && conKey(x.contractor) === k; });
+        tryOld(function (x) { return !(x.optOf && x.optOf.okey) && k && conKey(x.contractor) === k && String(x.qno == null ? "" : x.qno).trim() === q; });
+      }
+      tryOld(function (x, i) {
+        if (i !== bi) return false;
+        var sameDoc = (b.files || []).some(function (f) { return f && f.path && (x.files || []).some(function (g) { return g && g.path === f.path; }); });
+        var xq = String(x.qno == null ? "" : x.qno).trim();
+        return sameDoc || (q && xq === q) || (bidTotal(b) != null && bidTotal(x) === bidTotal(b));
+      });
       if (hit >= 0) usedOld[hit] = 1;
       return hit >= 0 ? olds[hit] : null;
     };
@@ -11134,6 +11203,12 @@ function alertList() {
               ") — this agreement renews for another term."
             : "Notice to end this agreement must be given by " + jdDate(notice) + " (" + alertWhen(nd) +
               "), otherwise it renews automatically" + (tEnd ? " on " + jdDate(tEnd) : "") + "." });
+    } else if (c.renew && endD != null && endD < 0) {
+      /* it renews automatically and its first term is over: it has renewed,
+         not ended — what is missing is how long each renewal runs */
+      if (ED && endD > -60) out.push({ kind: "housekeeping", audience: "manager", days: null, severity: "info",
+        title: label, detail: "This agreement renewed on " + jdDate(tEnd) +
+          "; how long each renewal runs is not recorded \u2014 add it to the register." });
     } else if (endD != null && endD <= cfg.contractDays && endD > -60) {
       out.push({ kind: "contract", audience: "all", days: endD,
         severity: endD < 0 ? "passed" : (endD <= 14 ? "urgent" : "soon"), title: label,
@@ -11167,6 +11242,9 @@ function alertList() {
         : "Their insurance certificate expires " + jdDate(r.insuranceExp) + " (" + alertWhen(d) + ")." });
   });
   (state.jobs || []).forEach(function (j) {
+    /* on work already approved, finished or cancelled a lapsed quote is history */
+    var jst = j.status || "quoted";
+    if (j.archived || (jst !== "quoted" && jst !== "deferred")) return;
     (j.bids || []).forEach(function (b) {
       if (!b || b.amount == null || b.amount === "") return;
       var e = bidExpiryISO(b); if (!e) return;
@@ -13839,8 +13917,17 @@ function startNewReport(mode) {
     updatedBy: cloud.user.email
   }).then(function () {
     var ns = (mode === "copy")
-      ? { reportName: name, jobs: deepCopy(cur.jobs), meta: deepCopy(cur.meta), ai: cur.ai ? deepCopy(cur.ai) : null }
-      : { reportName: name, jobs: [], meta: (function () { var m = deepCopy(cur.meta); delete m.since; return m; })(), ai: null };   /* a fresh start begins its own records */
+      /* carried forward, the records still began when they began: the copy
+         keeps "since", taking it from the old period's name the first time */
+      ? { reportName: name, jobs: deepCopy(cur.jobs), meta: (function () {
+            var m = deepCopy(cur.meta), old = String(cur.reportName || "").trim();
+            if (!m.since && /^[A-Za-z]+ \d{4}$/.test(old)) m.since = old;
+            return m; })(), ai: cur.ai ? deepCopy(cur.ai) : null }
+      /* a fresh start begins its own records */
+      : { reportName: name, jobs: [], meta: (function () {
+            var m = deepCopy(cur.meta);
+            if (/^[A-Za-z]+ \d{4}$/.test(String(name || "").trim())) m.since = String(name).trim(); else delete m.since;
+            return m; })(), ai: null };
     state = normState(ns);
     lastSaved = deepCopy(state);
     persist("Started new report “" + name + "”", ["Started a new report period “" + name +

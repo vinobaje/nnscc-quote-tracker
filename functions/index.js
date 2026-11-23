@@ -1271,31 +1271,33 @@ function scryptHex(passcode, saltHex) {
 // one rate limiter behind both. Returns the config on success; throws otherwise.
 async function gateVerify(cfgRef, beta, pass) {
   const f = gateFields(beta), mv = masterFields(beta);
-  // The attempt is counted BEFORE it is checked, in a transaction. Counted
-  // afterwards, sixty guesses sent at the same moment all read the same count,
-  // all were checked, and the lock never came down: the limiter only slowed a
-  // caller polite enough to wait for each answer.
-  const cfg = await cfgRef.firestore.runTransaction(async (tx) => {
+  // The limiter used to read the count, check, then write: sixty guesses sent
+  // at the same moment all read the same count, all were checked, and the lock
+  // never came down.
+  const matches = (c, hash, salt) => c[hash] && c[salt] && pass.length > 0 &&
+    crypto.timingSafeEqual(Buffer.from(scryptHex(pass, c[salt]), "hex"), Buffer.from(c[hash], "hex"));
+  // Checked INSIDE the transaction, so the count and the answer cannot be
+  // pulled apart: a wrong guess is counted before anything else can read the
+  // count, and a right passcode is never counted at all (a reader opening five
+  // documents at once is five right answers, not five attempts).
+  const out = await cfgRef.firestore.runTransaction(async (tx) => {
     const snap = await tx.get(cfgRef);
     const c = snap.exists ? snap.data() : {};
-    if (!c[f.hash] && !c[mv.hash]) {
-      throw new HttpsError("failed-precondition", "Viewing isn’t protected yet — ask the manager to set a passcode.");
-    }
+    if (!c[f.hash] && !c[mv.hash]) return { err: ["failed-precondition", "Viewing isn’t protected yet — ask the manager to set a passcode."] };
     const now = Date.now();
-    if ((c[f.until] || 0) > now) throw new HttpsError("resource-exhausted", "Too many attempts — try again in a minute.");
+    if ((c[f.until] || 0) > now) return { err: ["resource-exhausted", "Too many attempts — try again in a minute."] };
+    if (matches(c, f.hash, f.salt) || matches(c, mv.hash, mv.salt)) {
+      if (c[f.fails] || c[f.until]) tx.set(cfgRef, { [f.fails]: 0, [f.until]: 0 }, { merge: true });
+      return { cfg: c };
+    }
     const fails = (c[f.fails] || 0) + 1;
     const upd = { [f.fails]: fails };
-    if (fails >= 5) { upd[f.until] = now + 60 * 1000; upd[f.fails] = 0; }   // the fifth try in a row is the last for 60s
+    if (fails >= 5) { upd[f.until] = now + 60 * 1000; upd[f.fails] = 0; }   // 5 wrong tries → 60s lock
     tx.set(cfgRef, upd, { merge: true });
-    return c;
+    return { err: ["permission-denied", "That passcode isn’t right."] };
   });
-  const matches = (hash, salt) => hash && salt && pass.length > 0 &&
-    crypto.timingSafeEqual(Buffer.from(scryptHex(pass, salt), "hex"), Buffer.from(hash, "hex"));
-  if (!matches(cfg[f.hash], cfg[f.salt]) && !matches(cfg[mv.hash], cfg[mv.salt])) {
-    throw new HttpsError("permission-denied", "That passcode isn’t right.");
-  }
-  await cfgRef.set({ [f.fails]: 0, [f.until]: 0 }, { merge: true });   // right: the count starts again
-  return cfg;
+  if (out.err) throw new HttpsError(out.err[0], out.err[1]);
+  return out.cfg;
 }
 
 exports.nnsccGate = onCall(
@@ -1647,7 +1649,9 @@ function alertMoney(n) {
 function alertNum(v) {
   let t = String(v == null ? "" : v).trim();
   if (t.indexOf(",") >= 0 && t.indexOf(".") < 0) t = t.replace(",", ".");
-  const n = parseFloat(t.replace(/[^0-9.\-]/g, ""));
+  // the first number typed, exactly as the page reads it: "60 or 90 days" is 60
+  const m = t.match(/-?(?:\d+(?:\.\d+)?|\.\d+)/);
+  const n = m ? parseFloat(m[0]) : NaN;
   return isFinite(n) ? n : 0;
 }
 function alertAddMonths(iso, months) {
@@ -1719,6 +1723,15 @@ function buildAlerts(data, cfg, todayISO) {
               (termEnd ? " on " + alertDate(termEnd) : "") + ".",
         });
       }
+    } else if (c.renew && endDays != null && endDays < 0) {
+      // renews automatically and its first term is over: renewed, not ended
+      if (endDays > -60) out.push({
+        key: "con-norenewlen-" + c.id + "-" + termEnd,
+        kind: "housekeeping", audience: "manager", severity: "info", days: null, when: "",
+        title: label,
+        detail: "This agreement renewed on " + alertDate(termEnd) +
+          "; how long each renewal runs is not recorded — add it to the register.",
+      });
     } else if (endDays != null && endDays <= cfg.contractDays && endDays > -60) {
       out.push({
         key: "con-end-" + c.id + "-" + termEnd,

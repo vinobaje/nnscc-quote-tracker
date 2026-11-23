@@ -34,6 +34,9 @@ const is = (g, w, t) => { JSON.stringify(g) === JSON.stringify(w) ? pass++ : (fa
   for (let i = 0; i < 4; i++) await G.gateVerify(ref, false, "no").catch(() => {});
   is(await G.gateVerify(ref, false, "right-one").then(() => "ok", (e) => e.code), "ok", "four wrong then right: opens, and the count starts again");
   is(data[f.fails], 0, "count cleared");
+  data = fresh(); ref = store(data);
+  res = await Promise.all(Array.from({ length: 12 }, () => G.gateVerify(ref, false, "right-one").then(() => "ok", (e) => e.code)));
+  is(res.filter((c) => c === "ok").length, 12, "twelve right at once (a reader opening every document): all open, none counted");
   console.log("\n" + pass + " passed, " + fail + " failed");
   process.exit(fail ? 1 : 0);
 })();

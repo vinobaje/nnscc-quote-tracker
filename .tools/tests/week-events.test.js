@@ -24,5 +24,14 @@ is(texts(J([{ contractor: "", amount: null }]), J([{ contractor: "Alpha", amount
    ["Quote received for Job 5 — Alpha, $11300.00."], "a blank row filled in is a quote received");
 is(X.actWeekEvents([J([{ contractor: "Alpha", amount: 10000, hst: false }])], [J([{ contractor: "Alpha", amount: 10000, hst: false }], { awardedTo: "Alpha", status: "approved" })]).map((e) => e.amount),
    [11300], "the award figure includes HST");
+/* verification pass: the same quote, renamed or split since, is not "received" again */
+is(texts(J([{ contractor: "Firenza", qno: "1957", amount: 12831.15, hst: true }]), J([{ contractor: "Firenza Plumbing & Heating Ltd.", qno: "1957", amount: 12831.15, hst: true }])),
+   [], "a contractor's name corrected is not a new quote");
+is(texts(J([{ contractor: "Firenza", qno: "1", amount: 12831.15, hst: true }]), J([o("Firenza", 12831.15, "Option #1", "QF"), o("Firenza", 18091.3, "Option #2", "QF")])),
+   ["Quote received for Job 5 — Firenza (Option #2), $18091.30."], "split into options: only the option that is new is announced");
+const noQid = (c, amt, opt) => ({ contractor: c, qno: "1", amount: amt, hst: true, optOf: { opt, okey: opt.toLowerCase().replace(/[^a-z0-9]/g, ""), nopt: 2 } });
+is(texts(J([noQid("Firenza", 12831.15, "Option #1"), noQid("Firenza", 18091.3, "Option #2")]), J([o("Firenza", 12831.15, "Option #1", "QF"), o("Firenza", 18091.3, "Option #2", "QF")])),
+   [], "rows given a quotation id since are the same rows");
+
 console.log("\n" + pass + " passed, " + fail + " failed");
 process.exit(fail ? 1 : 0);

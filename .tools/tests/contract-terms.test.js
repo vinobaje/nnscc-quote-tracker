@@ -73,5 +73,14 @@ is([X.conCalc(brock).state, X.conCalc(brock).label, X.conAnnual(brock)], ["open"
 is([X.conNum("60 or 90 days"), X.conNum("2.7%"), X.conMoney("$8,688.00 monthly"), X.conMoney("1,450.50"), X.conMoney("8688")], [60, 2.7, 8688, 1450.5, 8688], "the first number typed, commas as thousands");
 is([X.conFieldSame("escPct", "2.7%", "2.7"), X.conFieldSame("noticeDays", "60 days", "60"), X.conFieldSame("amount", "$8,688.00", "8688"), X.conFieldSame("amount", "9664.99", "8688")], [true, true, true, false], "the register's value and the document's compared as numbers");
 
+/* verification pass */
+is([X.conNum(".5"), X.conNum(".5%"), X.conMoney("8 688.00"), X.conMoney(".75"), X.conMoney("1,450.50")], [0.5, 0.5, 8688, 0.75, 1450.5], "a leading point, and a space for thousands");
+const brock2 = Object.assign({}, brock, { start: "2020-06-01", escPct: 3 });
+is(X.conAmountNow(brock2).year, 7, "renewed with the length unknown: the price still rises with the years");
+is(X.conAmountNow({ start: "2020-06-01", end: "2022-05-31", renew: false, amount: 100, period: "month", escPct: 3 }).year, 2, "one that really ended stops where it ended");
+[{ end: "2025-06-30", renew: true, renewYears: ".5", noticeDays: "60 or 90 days" }, Object.assign({}, hvac, { noticeDays: "60 or 90 days" })].forEach((c, i) => {
+  is([S.alertTermEnd(c, T), S.alertNoticeBy(c, T)], [at("2026-11-22").conTermEnd(c), at("2026-11-22").conNoticeBy(c)], "emails and page agree on typed values (" + i + ")");
+});
+
 console.log("\n" + pass + " passed, " + fail + " failed");
 process.exit(fail ? 1 : 0);
