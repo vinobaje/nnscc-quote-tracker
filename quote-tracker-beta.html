@@ -7857,7 +7857,14 @@ function edWorkspaceAction(act, el, e) {
       pj.priority = !pj.priority;
       orderJobs(state.jobs);   /* priority jobs move to the front, renumber */
       persist(null, [jobLabel(pj) + (pj.priority ? " marked high priority" : " no longer high priority")], pj.id);
+      edSel = pj.id;
       renderEditor(); renderReport();
+      /* the job has moved to its new place in the list: follow it there */
+      var pb = document.querySelector('#editor .jcard[data-jid="' + pj.id + '"]');
+      if (pb) {
+        pb.scrollIntoView({ block: "nearest" });
+        var pp = pb.querySelector('[data-act="jprio"]'); if (pp) pp.focus();
+      }
       return true;
     }
     case "jtoggle": {
