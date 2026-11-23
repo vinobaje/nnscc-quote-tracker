@@ -11708,8 +11708,10 @@ function wkCardHTML() {
 
   h.push('<div class="esrow"><label></label><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">' +
     '<button class="btn primary" type="button" data-act="wkgen">\u{1F4F0} Generate the report</button>' +
+    /* WKOUT-BEGIN (PDF and email need functions only Waterview has; cut from every building build) */
     (wkState.built ? '<button class="btn" type="button" data-act="wkpdf">\u2b07 Download the PDF</button>' +
       '<button class="btn" type="button" data-act="wksend">\u{1F4E8} Email it to the board</button>' : "") +
+    /* WKOUT-END */
     '<span class="savenote" id="wkNote">' + esc(wkState.busy) + "</span></div></div>");
   h.push("</div></div>");
   h.push(wkPickHTML());
