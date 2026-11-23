@@ -318,6 +318,58 @@ ru.bids[0].files = [{ name: "y.pdf", path: "qa/ru/y.pdf" }]; ru.bids[0].contract
 X.set({ jid: "ru", bi: 0, rows: readAt("qa/ru/y.pdf", q2("Y Inc"), "y.pdf") }, [ru]); X.bidReadApply();
 is([ru.bids[0].optOf.qid !== oldQ, ru.bids[0].optOf.qid === ru.bids[2].optOf.qid, ru.bids[1].optOf.qid === oldQ], [true, true, true], "Y's options get their own id; X's row keeps X's");
 
+/* round 5: ties are taken per price group; an option with no row is still added */
+const five = { contractor: "Acme", quote_number: "5", lines_include_hst: true, lines: [
+  { description: "Fix", amount: 5000, for_this_job: true, line_note: "", option: "Option A" },
+  { description: "Repair", amount: 5000, for_this_job: true, line_note: "", option: "Option B" },
+  { description: "Patch", amount: 5000, for_this_job: true, line_note: "", option: "Option C" },
+  { description: "Reline", amount: 7000, for_this_job: true, line_note: "", option: "Option D" },
+  { description: "Rebuild", amount: 9000, for_this_job: true, line_note: "", option: "Option E" }] };
+const fj = { id: "f5", bids: [{ contractor: "", qno: "", amount: null, hst: false, notes: "", files: [{ name: "q.pdf", path: "qa/f5/q.pdf" }] }] };
+X.set({ jid: "f5", bi: 0, rows: readAt("qa/f5/q.pdf", five, "q.pdf") }, [fj]); X.bidReadApply();
+const five2 = { contractor: "Acme", quote_number: "5", lines_include_hst: true, lines: [
+  { description: "Repair", amount: 5000, for_this_job: true, line_note: "", option: "Option 1" },
+  { description: "Patch", amount: 5000, for_this_job: true, line_note: "", option: "Option 2" },
+  { description: "Reline pipes", amount: 7000, for_this_job: true, line_note: "", option: "Option 3" },
+  { description: "Reline and coat", amount: 7000, for_this_job: true, line_note: "", option: "Option 4" },
+  { description: "Rebuild", amount: 9000, for_this_job: true, line_note: "", option: "Option 5" }] };
+X.set({ jid: "f5", bi: 4, rows: readAt("qa/f5/q.pdf", five2, "q.pdf") }, [fj]);
+plan = X.bidReadPlan(fj, 4);
+is(plan.dup.length + plan.add.length + (plan.here ? 1 : 0), 5, "every option is somewhere");
+is(plan.dup.length === 4 && new Set(plan.dupAt).size < plan.dupAt.length, false, "no row is said to hold two options");
+is(plan.add.length >= 1, true, "the $7,000 option with no row of its own is added, not lost");
+
+/* round 5: a tie group resolved gives the quotation id to each of its rows */
+const tg = { id: "tg", bids: [
+  { contractor: "Acme", qno: "77", amount: 6000, hst: true, files: [{ name: "q.pdf", path: "qa/tg/q.pdf" }],
+    optOf: { opt: "Option A", okey: "optiona", nopt: 3, name: "q.pdf", path: "qa/tg/q.pdf", amount: 5000, line: "Option A \u2013 Repair" } },
+  { contractor: "Acme", qno: "77", amount: 5000, hst: true, files: [{ name: "q.pdf", path: "qa/tg/q.pdf" }],
+    optOf: { opt: "Option B", okey: "optionb", nopt: 3, name: "q.pdf", path: "qa/tg/q.pdf", amount: 5000, line: "Option B \u2013 Patch" } },
+  { contractor: "Acme", qno: "77", amount: 7000, hst: true, files: [{ name: "q.pdf", path: "qa/tg/q.pdf" }],
+    optOf: { opt: "Option C", okey: "optionc", nopt: 3, name: "q.pdf", path: "qa/tg/q.pdf", amount: 7000, line: "Option C \u2013 Replace" } }] };
+const tgRead = { contractor: "Acme", quote_number: "77", lines_include_hst: true, lines: [
+  { description: "Fix it", amount: 5000, for_this_job: true, line_note: "", option: "Option 1" },
+  { description: "Mend it", amount: 5000, for_this_job: true, line_note: "", option: "Option 2" },
+  { description: "Replace", amount: 7000, for_this_job: true, line_note: "", option: "Option 3" }] };
+X.set({ jid: "tg", bi: 2, rows: readAt("qa/tg/q.pdf", tgRead, "q.pdf") }, [tg]);
+plan = X.bidReadPlan(tg, 2);
+is([plan.add.length, plan.dupAt.slice().sort()], [0, [0, 1]], "tied rows each hold one option");
+X.bidReadApply();
+is([tg.bids.length, new Set(tg.bids.map((b) => b.optOf.qid)).size, X.jobCalc(tg).saving], [3, 1, 0], "all three share one id; no saving between options");
+
+/* round 5: a row made from pasted text, reused for another contractor, starts its own quotation */
+const pt = { id: "pt", bids: [
+  { contractor: "X Co", qno: "1", amount: 1000, hst: true, files: [],
+    optOf: { opt: "Option 1", okey: "option1", nopt: 2, name: "", amount: 1000, own: 1000, line: "Option 1 \u2013 A", qid: "QX", con: "x co" } },
+  { contractor: "X Co", qno: "1", amount: 2000, hst: true, files: [],
+    optOf: { opt: "Option 2", okey: "option2", nopt: 2, name: "", amount: 2000, own: 2000, line: "Option 2 \u2013 B", qid: "QX", con: "x co" } }] };
+pt.bids[0].contractor = "Y Inc"; pt.bids[0].qno = ""; pt.bids[0].files = [{ name: "y.pdf", path: "qa/pt/y.pdf" }];
+X.set({ jid: "pt", bi: 0, rows: readAt("qa/pt/y.pdf", q2("Y Inc"), "y.pdf") }, [pt]);
+plan = X.bidReadPlan(pt, 0);
+X.bidReadApply();
+is([pt.bids[0].optOf.qid !== "QX", pt.bids[1].optOf.qid], [true, "QX"], "Y's quote does not take X's quotation id");
+is(X.jobCalc(pt).saving > 0, true, "so the saving between X and Y is still counted");
+
 /* AI intake: the same rule */
 const d = Object.assign({ file: { name: FILE, path: "p" } }, firenza);
 is(X.intakeQuotes(d, null).map((x) => [x.opt.label, x.sum]), [["Option #1", 11355], ["Option #2", 16010]], "intake: one quote per option, on the lines' footing");

@@ -3068,7 +3068,7 @@ var BRAND_PATH = "nnsccQuoteTrackerBeta/brand";               /* the letterhead 
 var WEEKLY_DRAFT_PATH = "nnsccQuoteTrackerBeta/weeklyDraft";   /* the report she is working on */
 var WEEKLY_COLL = "nnsccWeeklyReportsBeta";                   /* every one she has finished */
 var VIEW_BETA = CURRENT_PATH.indexOf("Beta") >= 0;   /* which report the passcode gate reads/protects */
-var BUILD_STAMP = "2026-11-22 20:31";   /* filled in by build.js — which copy of the page this is */
+var BUILD_STAMP = "2026-11-22 20:39";   /* filled in by build.js — which copy of the page this is */
 /* path of the report currently on screen */
 function reportPath() {
   return cloud.active.kind === "current" ? CURRENT_PATH : (REPORTS_COLL + "/" + cloud.active.id);
@@ -5748,7 +5748,12 @@ function bidHeldOpts(x) {
 }
 function bidSameFile(x, h, o, b) {
   if (h.path && o.path) return h.path === o.path;
-  if (x === b) return true;
+  if (x === b) {
+    /* this row's own record, kept without a path (a quote pasted as text):
+       its own unless it was another contractor's */
+    var tc = b.optOf && b.optOf.con, rc = conKey(o.det && o.det.contractor);
+    return !(tc && rc && tc !== rc);
+  }
   /* the row holds this very stored file */
   if (o.path && (x.files || []).some(function (f) { return f && f.path === o.path; })) return true;
   var ck = function (v) { return String(v || "").toLowerCase().replace(/[^a-z0-9]/g, ""); };
@@ -5796,6 +5801,8 @@ function bidOwnOpt(b, o) {
   var t = b && b.optOf;
   if (!t || !t.okey || (t.nopt || 0) < 2) return null;
   if (t.path && o.path) return t.path === o.path ? t : null;
+  var rc = conKey(o.det && o.det.contractor);
+  if (t.con && rc && t.con !== rc) return null;
   return (!t.name || !o.name || t.name === o.name) ? t : null;
 }
 function bidReadPlan(j, bi) {
@@ -5844,17 +5851,29 @@ function bidReadPlan(j, bi) {
   });
   /* rows that between them plainly hold these options, just not which is
      which: the options have rows already, and none is added again */
-  var held = {}, holders = 0;
+  /* taken group by group — the rows that fit exactly the same options still
+     free — and only where the group has a row for every option in it, each
+     option to a row of its own. A row whose options were all claimed since
+     counts for nothing. */
+  var groups = {};
   unsure.forEach(function (u) {
     if (u.xi === bi) return;
-    holders++;
-    u.fit.forEach(function (qi) { if (at[qi] == null) held[qi] = u.xi; });
+    var free = u.fit.filter(function (qi) { return at[qi] == null; });
+    if (!free.length) return;
+    var k = free.join(",");
+    (groups[k] = groups[k] || { opts: free, rows: [] }).rows.push(u.xi);
   });
-  if (holders && holders >= Object.keys(held).length)
-    Object.keys(held).forEach(function (qi) { at[+qi] = held[qi]; used[held[qi]] = true; });
+  Object.keys(groups).forEach(function (k) {
+    var g = groups[k];
+    if (g.opts.some(function (qi) { return at[qi] != null; })) return;
+    if (g.rows.length < g.opts.length) return;
+    g.opts.forEach(function (qi, n) { at[qi] = g.rows[n]; used[g.rows[n]] = true; });
+  });
   /* this row is an option of this file and could not be told apart: change
      nothing, rather than make it into its sibling */
   if (mine && !used[bi]) { plan.blocked = mine.opt; return plan; }
+  /* the row's own quotation id is kept only when the row is this file's */
+  plan.mine = !!mine;
   quotes.forEach(function (q, qi) {
     if (at[qi] === bi) { plan.here = q; plan.matched = true; }
     else if (at[qi] != null) { plan.dup.push(q); plan.dupAt.push(at[qi]); }
@@ -5867,10 +5886,11 @@ function bidReadPlan(j, bi) {
   return plan;
 }
 /* the option a row is, kept apart from what its figure is made of */
-function bidOptOf(q, qid) {
+function bidOptOf(q, qid, contractor) {
   var g = q.opt, o = g.lines[0];
   var r = { opt: g.label, okey: g.key, nopt: g.nopt || 0, name: o.name || "", amount: q.sum,
-            own: Math.round(g.incl * 100) / 100, line: g.line, qid: qid || "" };
+            own: Math.round(g.incl * 100) / 100, line: g.line, qid: qid || "",
+            con: conKey(contractor || (o.det && o.det.contractor) || "") };
   if (o.path) r.path = o.path;
   return r;
 }
@@ -5879,7 +5899,7 @@ function bidOptOf(q, qid) {
 function bidReadQid(j, b, plan) {
   /* this row's own id only when it was matched to the file being read: a row
      reused for another contractor's quote starts a quotation of its own */
-  if (b.optOf && b.optOf.qid && plan.matched) return b.optOf.qid;
+  if (b.optOf && b.optOf.qid && plan.matched && plan.mine) return b.optOf.qid;
   for (var i = 0; i < plan.dupAt.length; i++) {
     var d = j.bids[plan.dupAt[i]];
     if (d && d.optOf && d.optOf.qid) return d.optOf.qid;
@@ -6017,7 +6037,7 @@ function bidReadApply() {
     /* what the figure is made of, kept with it — the board sees one number for
        three quotations and is entitled to know that is what it is */
     b.parts = bidPartsOf(plan.here);
-    if (plan.here.opt) b.optOf = bidOptOf(plan.here, qid); else if (b.optOf) delete b.optOf;
+    if (plan.here.opt) b.optOf = bidOptOf(plan.here, qid, b.contractor); else if (b.optOf) delete b.optOf;
     var pn = partsNote(b.parts);
     notes.push(jobLabel(j) + ": " + (b.contractor || "quote") + " set to " + money(sum) +
       (pn ? " \u2014 " + pn + " (" + kept.map(function (r) {
@@ -6033,7 +6053,7 @@ function bidReadApply() {
       notes: q.opt.line, qdate: b.qdate || "",
       files: (b.files || []).filter(function (f) { return from[f.name || "attachment"]; })
         .map(function (f) { var c = {}; for (var k in f) c[k] = f[k]; return c; }),
-      parts: bidPartsOf(q), optOf: bidOptOf(q, qid) };
+      parts: bidPartsOf(q), optOf: bidOptOf(q, qid, b.contractor) };
     if (b.validDays) nb.validDays = b.validDays;
     j.bids.push(nb);
     notes.push(jobLabel(j) + ": " + (nb.contractor || "quote") + " \u2014 " + q.opt.line +
@@ -11784,7 +11804,7 @@ function aiIntakeCommit() {
     /* the option each row is, priced HST-included as the reading panel prices it */
     var qid = genId();
     var optOfFor = function (q) {
-      var r = bidOptOf(q, qid);
+      var r = bidOptOf(q, qid, b0.contractor);
       r.amount = Math.round((hstIn ? q.sum : q.sum * (1 + HST)) * 100) / 100;
       r.own = Math.round((hstIn ? q.opt.incl : q.opt.incl * (1 + HST)) * 100) / 100;
       return r;
