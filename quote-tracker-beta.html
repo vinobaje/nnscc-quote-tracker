@@ -3068,7 +3068,7 @@ var BRAND_PATH = "nnsccQuoteTrackerBeta/brand";               /* the letterhead 
 var WEEKLY_DRAFT_PATH = "nnsccQuoteTrackerBeta/weeklyDraft";   /* the report she is working on */
 var WEEKLY_COLL = "nnsccWeeklyReportsBeta";                   /* every one she has finished */
 var VIEW_BETA = CURRENT_PATH.indexOf("Beta") >= 0;   /* which report the passcode gate reads/protects */
-var BUILD_STAMP = "2026-11-22 20:11";   /* filled in by build.js — which copy of the page this is */
+var BUILD_STAMP = "2026-11-22 20:19";   /* filled in by build.js — which copy of the page this is */
 /* path of the report currently on screen */
 function reportPath() {
   return cloud.active.kind === "current" ? CURRENT_PATH : (REPORTS_COLL + "/" + cloud.active.id);
@@ -6675,8 +6675,8 @@ function qcNoteHTML(j, colspan) {
    read any of them back. Every comparison records which model produced it,
    so two readings of the same job can be set against each other fairly. */
 var QC_ENGINES = [
-  { k: "claude", l: "Claude Sonnet 5", m: "claude-sonnet-5",
-    n: "$3 / $15 per million — about 4¢ a job. What the first comparisons were read with." },
+  { k: "claude", l: "Claude Opus 5.5", m: "claude-opus-5-5",
+    n: "$4 / $20 per million — about 6¢ a job, paid from the Max plan’s monthly API credit. The first comparisons were read with Claude Sonnet 5." },
   { k: "gemini", l: "Gemini Flash-Lite", m: "gemini-3.5-flash-lite",
     n: "3.5 Flash-Lite is $0.30 / $2.50 — under a penny a job. gemini-3.1-flash-lite is cheaper again ($0.25 / $1.50). Google has closed 2.5 to new projects, so it will be refused." },
   { k: "openai", l: "GPT-5.6 Luna", m: "gpt-5.6-luna",

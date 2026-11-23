@@ -528,7 +528,9 @@ const COMPARE_SCHEMA = {
 // from the same documents. What comes back is normalised to one shape, so the
 // rest of the app neither knows nor cares which one answered.
 const ENGINES = {
-  claude: { label: "Claude Sonnet 5", model: "claude-sonnet-5", keyField: "anthropicKey" },
+  // Opus 5.5 since 22 Nov 2026: the comparison is where accuracy is worth the
+  // money, and the Max plan's monthly API credit pays for it.
+  claude: { label: "Claude Opus 5.5", model: "claude-opus-5-5", keyField: "anthropicKey" },
   gemini: { label: "Gemini Flash-Lite", model: "gemini-3.5-flash-lite", keyField: "geminiKey" },
   openai: { label: "GPT-5.6 Luna", model: "gpt-5.6-luna", keyField: "openaiKey" },
 };
