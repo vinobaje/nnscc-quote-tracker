@@ -3068,7 +3068,7 @@ var BRAND_PATH = "nnsccQuoteTrackerBeta/brand";               /* the letterhead 
 var WEEKLY_DRAFT_PATH = "nnsccQuoteTrackerBeta/weeklyDraft";   /* the report she is working on */
 var WEEKLY_COLL = "nnsccWeeklyReportsBeta";                   /* every one she has finished */
 var VIEW_BETA = CURRENT_PATH.indexOf("Beta") >= 0;   /* which report the passcode gate reads/protects */
-var BUILD_STAMP = "2026-11-22 20:59";   /* filled in by build.js — which copy of the page this is */
+var BUILD_STAMP = "2026-11-22 21:06";   /* filled in by build.js — which copy of the page this is */
 /* path of the report currently on screen */
 function reportPath() {
   return cloud.active.kind === "current" ? CURRENT_PATH : (REPORTS_COLL + "/" + cloud.active.id);
@@ -3353,6 +3353,20 @@ function bidTotal(b) {
    price of choosing the bigger one, not money saved by tendering, so it is
    never counted as a saving; every other count treats each row as a quote,
    as it always has. */
+/* every file attached to a job's quotes, each once: two options of one
+   quotation are two rows holding the same PDF */
+function jobFilesOnce(j) {
+  var seen = {}, all = [];
+  (j.bids || []).forEach(function (b) {
+    ((b && b.files) || []).forEach(function (f) {
+      if (!f) return;
+      var k = f.path || f.url || f.name;
+      if (seen[k]) return;
+      seen[k] = 1; all.push(f);
+    });
+  });
+  return all;
+}
 function bidQuoteKey(b, i) {
   var o = b && b.optOf;
   if (!o || !o.okey) return "row" + i;
@@ -3926,8 +3940,7 @@ function jdSummaryHTML(j, c) {
   h.push("</div>");
 
   /* quick actions — only ones that lead somewhere for this reader */
-  var acts = [], nf = 0;
-  j.bids.forEach(function (b) { nf += ((b && b.files) || []).length; });
+  var acts = [], nf = jobFilesOnce(j).length;
   if (nf) acts.push('<button class="jdact" type="button" data-jdact="files">\u{1F4CE} View attachment' +
     (nf === 1 ? " (1 file)" : "s (" + nf + " files)") + '<span class="arw">›</span></button>');
   if (isEditor()) {
@@ -3992,8 +4005,7 @@ function jdAction(what) {
      are only rendered for them, and this refuses if one is reached anyway */
   if ((what === "note" || what === "edit") && !isEditor()) return;
   if (what === "files") {
-    var all = [];
-    j.bids.forEach(function (b) { ((b && b.files) || []).forEach(function (f) { all.push(f); }); });
+    var all = jobFilesOnce(j);
     if (all.length) openFileViewer(all, 0, (j.desc || "job") + " — attached quotes");
     return;
   }
@@ -5478,8 +5490,23 @@ function edParseAmt(v) {
    Amounts are levelled to HST-included before they are added, because a quote
    that states its tax and one that does not cannot be added as they stand. */
 var bidRead = null;   /* { jid, bi, busy, err, rows:[{name, amt, incl, ok, why}] } */
+/* The reading belongs to a row, not to a position in the list. A row deleted
+   above it — by her, or by another editor's change arriving — used to move
+   the open reading onto the next row down, and Apply then wrote one
+   contractor's price into another's row. So the row itself is kept, its
+   place found again before every use, and a reading whose row is gone, or
+   whose job was replaced by a newer copy from the cloud, is closed. */
+function bidReadSync(j) {
+  if (!bidRead) return false;
+  if (!bidRead.bref) return true;                 /* (tests set a position directly) */
+  var i = j && j.id === bidRead.jid ? j.bids.indexOf(bidRead.bref) : -1;
+  if (i < 0) { bidRead = null; return false; }
+  bidRead.bi = i;
+  return true;
+}
 function bidReadPanelHTML(jid, bi) {
-  if (!bidRead || bidRead.jid !== jid || bidRead.bi !== bi) return "";
+  if (!bidRead || bidRead.jid !== jid) return "";
+  if (!bidReadSync(findJob(jid)) || bidRead.bi !== bi) return "";
   if (bidRead.busy)
     return '<div class="qread"><p class="qreadnote">' + esc(bidRead.busy) + "</p></div>";
   if (bidRead.err)
@@ -5823,6 +5850,9 @@ function bidOwnOpt(b, o) {
 function bidReadView(j, bi) {
   var a = bidRead && bidRead.answer, b = j && j.bids[bi];
   if (!a || !b) return j;
+  /* only for the row and the document it was given for */
+  var qs = optionQuotes(bidRead.rows), f0 = qs.length && (qs[0].opt ? qs[0].opt.lines[0] : qs[0].rows[0]);
+  if (!b.optOf || b.optOf.path || b.optOf.opt !== a.opt || !f0 || f0.path !== a.path) return j;
   return { id: j.id, bids: j.bids.map(function (x, xi) {
     var t = x && x.optOf;
     var ours = t && !t.path && (xi === bi || (a.qid && t.qid === a.qid));
@@ -6020,6 +6050,7 @@ var BID_DET = [["contractor", "Contractor"], ["qno", "Quote #"],
 function bidReadDetails() {
   if (!bidRead) return [];
   var j = findJob(bidRead.jid); if (!j) return [];
+  if (!bidReadSync(j)) return [];
   var b = j.bids[bidRead.bi]; if (!b) return [];
   var rows = (bidRead.rows || []).filter(function (r) { return r.ok && r.det; })
     .concat((bidRead.rows || []).filter(function (r) { return !r.ok && r.det; }));
@@ -6047,7 +6078,7 @@ function bidReadRun(j, bi) {
   var b = j.bids[bi], files = (b && b.files) || [];
   if (!files.length) return;
   if (!cloud.fns || !cloud.user) { alert("Sign in first."); return; }
-  bidRead = { jid: j.id, bi: bi, busy: "Claude is reading " + files.length + " file" +
+  bidRead = { jid: j.id, bi: bi, bref: b, busy: "Claude is reading " + files.length + " file" +
     (files.length === 1 ? "" : "s") + "\u2026", err: "", rows: [] };
   renderEditor();
   /* the job this is for, and the other open work, so a line that is plainly
@@ -6072,7 +6103,9 @@ function bidReadRun(j, bi) {
    Apply, and Cancel forgets it. */
 function bidReadAnswer(same) {
   if (!bidRead || bidRead.busy) return;
-  var j = findJob(bidRead.jid), b = j && j.bids[bidRead.bi];
+  var j = findJob(bidRead.jid);
+  if (!j || !bidReadSync(j)) { renderEditor(); return; }
+  var b = j.bids[bidRead.bi];
   if (!b || !b.optOf) return;
   var p = bidReadPlan(j, bidRead.bi);
   if (!p.ask || !p.askPath) return;
@@ -6083,7 +6116,7 @@ function bidReadAnswer(same) {
 /* ... and made real by Apply, in the same save as the amounts */
 function bidReadAnswerApply(j, b) {
   var a = bidRead && bidRead.answer;
-  if (!a || !b.optOf || b.optOf.path) return "";
+  if (!a || !b.optOf || b.optOf.path || b.optOf.opt !== a.opt) return "";
   if (a.same) {
     j.bids.forEach(function (x) {
       var t = x.optOf;
@@ -6102,12 +6135,15 @@ function bidReadAnswerApply(j, b) {
 function bidReadApply() {
   if (!bidRead || bidRead.busy) return;
   var j = findJob(bidRead.jid); if (!j) { bidRead = null; renderEditor(); return; }
+  if (!bidReadSync(j)) { renderEditor(); return; }
   var b = j.bids[bidRead.bi]; if (!b) { bidRead = null; renderEditor(); return; }
   var plan = bidReadPlan(j, bidRead.bi);
   if (plan.ask) return;
   var det = bidRead.noDet ? [] : bidReadDetails();
   if (!plan.here && !det.length) return;
-  var answered = bidReadAnswerApply(j, b);
+  /* "different" with nothing to put in the row would leave the old option's
+     figure on a row no longer marked as that option: leave it as it was */
+  var answered = (plan.here || (bidRead.answer && bidRead.answer.same)) ? bidReadAnswerApply(j, b) : "";
   var qid = (plan.here && plan.here.opt) || plan.add.length ? bidReadQid(j, b, plan) : "";
   /* every row of the quotation carries the id, the ones already split
      included, so none is left on a key of its own */
@@ -6487,7 +6523,7 @@ function edJobCardHTML(j, ji) {
     }
     /* what Claude read, shown under the row it belongs to whether or not the
        row happens to be expanded */
-    if (bidRead && bidRead.jid === j.id && bidRead.bi === bi)
+    if (bidRead && bidRead.jid === j.id && bidReadSync(j) && bidRead.bi === bi)
       h.push('<tr class="qrow qxtra" data-bi="' + bi + '"><td colspan="9">' +
         bidReadPanelHTML(j.id, bi) + "</td></tr>");
   });
@@ -7475,6 +7511,8 @@ document.getElementById("editor").addEventListener("click", function (e) {
     var ri = +e.target.getAttribute("data-ri");
     if (bidRead && bidRead.rows && bidRead.rows[ri]) {
       bidRead.rows[ri].ok = !bidRead.rows[ri].ok;
+      /* a different set of ticks may be a different document: ask again */
+      if (bidRead.answer) delete bidRead.answer;
       renderEditor();
     }
     return;

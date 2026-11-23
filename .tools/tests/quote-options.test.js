@@ -17,10 +17,10 @@ const X = new Function(["var HST = 0.13, bidRead = null, state = { jobs: [] }, L
   "var document = { querySelectorAll: function () { return []; } };",
   gv("BID_DET", '["notes", "Scope note"]];'),
   ["bidReadRows", "partsNote", "bidReadDetails", "bidReadDone", "bidReadTrim", "optLine", "optionQuotes",
-   "optKey", "bidHoldsOpt", "bidReadPlan", "bidPartsOf", "bidHeldOpts", "bidSameFile", "bidOptOf", "bidOwnOpt", "bidReadQid", "optBare", "jobCalc", "bidQuoteKey", "bidTotal", "conKey", "quoteFileHeld", "bidReadApply", "bidReadAnswer", "bidReadAnswerApply", "bidReadView", "bidReadPanelHTML",
+   "optKey", "bidHoldsOpt", "bidReadPlan", "bidPartsOf", "bidHeldOpts", "bidSameFile", "bidOptOf", "bidOwnOpt", "bidReadQid", "optBare", "jobCalc", "bidQuoteKey", "bidTotal", "conKey", "quoteFileHeld", "bidReadApply", "bidReadAnswer", "bidReadAnswerApply", "bidReadView", "bidReadSync", "jobFilesOnce", "bidReadPanelHTML",
    "intakeLines", "intakeRows", "intakeQuotes", "intakeTicks"].map(grab).join("\n"),
   "return { bidReadRows, partsNote, bidReadDetails, bidReadDone, optionQuotes, bidReadPlan, quoteFileHeld, bidPartsOf,",
-  "  bidReadApply, bidReadAnswer, bidReadPanelHTML, intakeQuotes, intakeRows, jobCalc,",
+  "  bidReadApply, bidReadAnswer, bidReadPanelHTML, intakeQuotes, intakeRows, jobCalc, jobFilesOnce,",
   "  set: function (b, jobs) { bidRead = b; state.jobs = jobs; LOG = []; }, log: function () { return LOG; }, read: function () { return bidRead; } };"].join("\n"))();
 let pass = 0, fail = 0;
 const is = (g, w, t) => { JSON.stringify(g) === JSON.stringify(w) ? pass++ : (fail++, console.log("FAIL  " + t + "\n      got  " + JSON.stringify(g) + "\n      want " + JSON.stringify(w))); };
@@ -443,6 +443,42 @@ const fp2 = JSON.parse(JSON.stringify(fixPatch)); fp2.lines[0].option = "Option 
 X.set({ jid: "lt", bi: 0, rows: readAt("qa/lt/a.pdf", fp2, "a.pdf") }, [lt]);
 plan = X.bidReadPlan(lt, 0);
 is([plan.blocked, plan.here && plan.here.opt.label, plan.dupAt, plan.add.length], ["", "Option 1", [1], 0], "the one option left is this row's");
+
+/* round 9: a row deleted above the open reading: Apply goes to the right row, or nowhere */
+const rj = { id: "rj", bids: [
+  { contractor: "", qno: "", amount: null, hst: false, notes: "", files: [] },
+  { contractor: "Firenza", qno: "", amount: null, hst: false, notes: "", files: [{ name: "f.pdf", path: "qa/rj/f.pdf" }] },
+  { contractor: "Other", qno: "", amount: 9000, hst: true, notes: "", files: [] }] };
+X.set({ jid: "rj", bi: 1, bref: rj.bids[1], rows: X.bidReadDone("f.pdf", { data: { contractor: "Firenza", amount_cad: 1000, hst_included: true } }) }, [rj]);
+rj.bids.splice(0, 1);                      /* the blank row is deleted */
+X.bidReadApply();
+is([rj.bids[0].contractor, rj.bids[0].amount, rj.bids[1].amount], ["Firenza", 1000, 9000], "the price goes to Firenza's row, not the one below");
+X.set({ jid: "rj", bi: 0, bref: rj.bids[0], rows: X.bidReadDone("f.pdf", { data: { contractor: "Firenza", amount_cad: 2000, hst_included: true } }) }, [rj]);
+rj.bids.splice(0, 1);                      /* the row itself is deleted */
+X.bidReadApply();
+is([rj.bids.length, rj.bids[0].amount, X.read()], [1, 9000, null], "its row gone: nothing written, the reading closed");
+
+/* round 9: changing the ticks after answering asks again */
+const tk = mkPt("X Co"); tk.bids[0].files = [{ name: "y.pdf", path: "qa/pt/y.pdf" }];
+X.set({ jid: "pt", bi: 0, rows: readAt("qa/pt/y.pdf", y2, "y.pdf") }, [tk]);
+X.bidReadAnswer(true);
+is(X.bidReadPlan(tk, 0).ask, undefined, "answered");
+X.read().rows[0].ok = false; delete X.read().answer;   /* what the tick handler does */
+is(X.bidReadPlan(tk, 0).ask, "Option 1", "re-ticked: asked again");
+
+/* round 9: 'different' with nothing to put in the row leaves it as it was */
+const nd = mkPt("X Co"); nd.id = "nd"; nd.bids[0].files = [{ name: "y.pdf", path: "qa/nd/y.pdf" }];
+nd.bids.push({ contractor: "Y Inc", qno: "22", amount: 1500, hst: true, files: [{ name: "y.pdf", path: "qa/nd/y.pdf" }],
+  optOf: { opt: "Option 1", okey: "option1", nopt: 2, name: "y.pdf", path: "qa/nd/y.pdf", amount: 1500, own: 1500, line: "Option 1 \u2013 One unit", qid: "QY", con: "y inc" } });
+nd.bids.push({ contractor: "Y Inc", qno: "22", amount: 2500, hst: true, files: [{ name: "y.pdf", path: "qa/nd/y.pdf" }],
+  optOf: { opt: "Option 2", okey: "option2", nopt: 2, name: "y.pdf", path: "qa/nd/y.pdf", amount: 2500, own: 2500, line: "Option 2 \u2013 Two units", qid: "QY", con: "y inc" } });
+X.set({ jid: "nd", bi: 0, rows: readAt("qa/nd/y.pdf", y2, "y.pdf"), noDet: true }, [nd]);
+X.bidReadAnswer(false);
+const ndBefore = JSON.stringify(nd.bids[0]); X.bidReadApply();
+is([JSON.stringify(nd.bids[0]) === ndBefore, nd.bids[0].optOf.qid, X.jobCalc({ bids: nd.bids.slice(0, 2) }).saving], [true, "QX", 0], "nothing to put in it: the row keeps its option");
+
+/* round 9: a PDF shared by two option rows is listed once */
+is(X.jobFilesOnce(job).length <= 1 && X.jobFilesOnce({ bids: [{ files: [{ path: "a" }] }, { files: [{ path: "a" }, { path: "b" }] }] }).length, 2, "shared PDFs counted once");
 
 /* AI intake: the same rule */
 const d = Object.assign({ file: { name: FILE, path: "p" } }, firenza);
