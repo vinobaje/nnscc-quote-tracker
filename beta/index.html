@@ -1620,6 +1620,10 @@ body[data-view="edit"] .wrap { max-width:none; }
 .jtitle:focus { border-color:var(--accent); background:var(--card); outline:none; }
 .jchip { flex:none; font-size:11px; font-weight:700; border-radius:99px; padding:3px 10px; white-space:nowrap; }
 .jchip.prio { color:var(--prio); background:var(--prio-soft); }
+.jchip.jprio { border:1px solid transparent; font-family:inherit; cursor:pointer; }
+.jchip.prio.jprio:hover { border-color:var(--prio); }
+.jchip.prio-off { color:var(--muted); background:none; border:1px dashed var(--line); }
+.jchip.prio-off:hover { color:var(--prio); border-color:var(--prio); border-style:solid; background:var(--prio-soft); }
 .jchip.match { color:var(--amber); background:var(--amber-soft); font-weight:650;
   max-width:260px; overflow:hidden; text-overflow:ellipsis; }
 /* the search bar that sits above the cards */
@@ -3076,7 +3080,7 @@ var BRAND_PATH = "nnsccQuoteTrackerBeta/brand";               /* the letterhead 
 var WEEKLY_DRAFT_PATH = "nnsccQuoteTrackerBeta/weeklyDraft";   /* the report she is working on */
 var WEEKLY_COLL = "nnsccWeeklyReportsBeta";                   /* every one she has finished */
 var VIEW_BETA = CURRENT_PATH.indexOf("Beta") >= 0;   /* which report the passcode gate reads/protects */
-var BUILD_STAMP = "2026-11-22 21:59";   /* filled in by build.js — which copy of the page this is */
+var BUILD_STAMP = "2026-11-22 22:05";   /* filled in by build.js — which copy of the page this is */
 /* path of the report currently on screen */
 function reportPath() {
   return cloud.active.kind === "current" ? CURRENT_PATH : (REPORTS_COLL + "/" + cloud.active.id);
@@ -6447,7 +6451,12 @@ function edJobCardHTML(j, ji) {
     '<span class="draghandle" draggable="true" title="Drag to reorder">⠿</span>' +
     '<span class="jno">' + (j.archived ? "—" : esc(j.no)) + "</span>" +
     '<input class="jtitle" type="text" value="' + esc(j.desc) + '" data-f="desc" placeholder="Job description">' +
-    (j.priority ? '<span class="jchip prio">↑ High priority</span>' : "") +
+    /* the pill is the switch: on a high-priority job it says so and turns it
+       off; on an open card of any other job it offers to turn it on. (It was a
+       small checkbox in the corner of the card, easy to miss.) */
+    (j.priority
+      ? '<button class="jchip prio jprio" type="button" data-act="jprio" title="High priority \u2014 click to remove">↑ High priority</button>'
+      : (open ? '<button class="jchip prio-off jprio" type="button" data-act="jprio" title="Move this job to the top, as high priority">↑ Set high priority</button>' : "")) +
     '<span class="jchip st-' + esc(j.status || "quoted") + '">' + esc(statusLabel(j.status || "quoted")) + "</span>" +
     edMatchChip(j));
   if (!open) {
@@ -6477,15 +6486,24 @@ function edJobCardHTML(j, ji) {
     return '<option value="' + esc(nm) + '"' + (awHit === nm ? " selected" : "") + ">" + esc(nm) + "</option>";
   }).join("");
   var pv = j.pct == null ? (j.status === "completed" ? 100 : 0) : j.pct;
+  /* A field shows when the job's status calls for it: the decision date once
+     the board has decided, who it went to once it is approved, site progress
+     once the work is booked. Before that they were empty boxes on every quoted
+     job, and the progress bar read like a second status. A field that already
+     holds something always shows, so nothing is ever hidden from her. */
+  var st0 = j.status || "quoted";
+  var showDec = st0 !== "quoted" || !!j.statusDate;
+  var showAw = !!APPROVED_SET[st0] || !!j.awardedTo || !!j.awardDate;
+  var showPct = st0 === "scheduled" || st0 === "inprogress" || (st0 !== "completed" && j.pct != null && j.pct > 0);
   h.push('<div class="jbody"><div class="jctl">' +
     /* set to today when the job is created; the manager can correct it to when
        the work was actually raised */
     '<div class="f"><label>Date added</label><input type="date" value="' + esc(j.created || "") +
     '" data-f="created" title="When this job was raised"></div>' +
     '<div class="f"><label>Status</label><select data-f="status">' + sopts + "</select></div>" +
-    '<div class="f"><label>' + (j.status === "completed" ? "Completed on" : "Decision date") +
-      '</label><input type="date" value="' + esc(j.statusDate || "") + '" data-f="statusDate"></div>' +
-    '<div class="f"><label>Awarded to</label><select data-f="awardedTo">' + awOpts + "</select>" +
+    (showDec ? '<div class="f"><label>' + (j.status === "completed" ? "Completed on" : "Decision date") +
+      '</label><input type="date" value="' + esc(j.statusDate || "") + '" data-f="statusDate"></div>' : "") +
+    (!showAw ? "" : '<div class="f"><label>Awarded to</label><select data-f="awardedTo">' + awOpts + "</select>" +
       (APPROVED_SET[j.status || "quoted"] && !j.awardedTo
         ? '<span class="fwarn">\u2691 Approved with no contractor recorded</span>'
         /* a name no quote on this job carries: a different spelling the key
@@ -6493,14 +6511,13 @@ function edJobCardHTML(j, ji) {
         : (awKey && !awHit
           ? '<span class="fwarn">\u2691 Awarded to \u201c' + esc(String(j.awardedTo).trim()) +
             '\u201d, who has no quote on this job</span>' : "")) + "</div>" +
-    '<div class="f"><label>Award date</label><input type="date" value="' + esc(j.awardDate || "") + '" data-f="awardDate"></div>' +
-    '<div class="f" style="flex:1;min-width:210px"><label>Site progress</label><div class="pgrp">' +
-    '<input type="range" min="0" max="100" step="5" value="' + pv + '" data-f="pct" data-live="1">' +
-    '<span class="pval">' + pv + "%</span></div></div>" +
+      '<div class="f"><label>Award date</label><input type="date" value="' + esc(j.awardDate || "") + '" data-f="awardDate"></div>') +
+    (!showPct ? "" : '<div class="f" style="flex:1;min-width:210px"><label>Site progress</label><div class="pgrp">' +
+      '<input type="range" min="0" max="100" step="5" value="' + pv + '" data-f="pct" data-live="1">' +
+      '<span class="pval">' + pv + "%</span></div></div>") +
     '<div class="f" style="flex:1;min-width:200px"><label>Decision note (open items)</label>' +
     '<input type="text" style="width:100%" value="' + esc(j.statusNote || "") + '" data-f="statusNote" placeholder="why it was deferred, what’s outstanding…"></div>' +
-    '<div class="f"><label>Priority</label><label class="echk" style="margin:0"><input type="checkbox" data-f="priority"' +
-    (j.priority ? " checked" : "") + "> High</label></div></div>");
+    "</div>");
 
   /* ---- 1. progress updates ---- */
   h.push('<div class="jsec"><div class="jsechead"><span class="n">1</span><h4>Progress updates</h4>' +
@@ -7796,6 +7813,15 @@ function edWorkspaceAction(act, el, e) {
       edOpen = {};
       if (!any) state.jobs.forEach(function (j) { edOpen[j.id] = true; });
       renderEditor(); return true;
+    }
+    case "jprio": {
+      var pc = el.closest(".jcard"); if (!pc) return true;
+      var pj = state.jobs[+pc.dataset.ji]; if (!pj) return true;
+      pj.priority = !pj.priority;
+      orderJobs(state.jobs);   /* priority jobs move to the front, renumber */
+      persist(null, [jobLabel(pj) + (pj.priority ? " marked high priority" : " no longer high priority")], pj.id);
+      renderEditor(); renderReport();
+      return true;
     }
     case "jtoggle": {
       if (e.target.closest("input,select,textarea,a")) return true;   /* let the field work */
