@@ -3080,7 +3080,7 @@ var BRAND_PATH = "nnsccQuoteTrackerBeta/brand";               /* the letterhead 
 var WEEKLY_DRAFT_PATH = "nnsccQuoteTrackerBeta/weeklyDraft";   /* the report she is working on */
 var WEEKLY_COLL = "nnsccWeeklyReportsBeta";                   /* every one she has finished */
 var VIEW_BETA = CURRENT_PATH.indexOf("Beta") >= 0;   /* which report the passcode gate reads/protects */
-var BUILD_STAMP = "2026-11-22 23:57";   /* filled in by build.js — which copy of the page this is */
+var BUILD_STAMP = "2026-11-23 00:02";   /* filled in by build.js — which copy of the page this is */
 /* path of the report currently on screen */
 function reportPath() {
   return cloud.active.kind === "current" ? CURRENT_PATH : (REPORTS_COLL + "/" + cloud.active.id);
@@ -4515,12 +4515,12 @@ function statCards(d) {
       s: d.completedCount + " job" + (d.completedCount === 1 ? "" : "s") + " finished" }
   ];
   /* the figure only means something once there is a register to count */
+  /* always the money: what is committed under contract each year. (It turned
+     into a count of contracts needing attention whenever there was one; the
+     board asked for the total back — the renewals have their own list.) */
   if (canSeeContracts() && conState.list.length) {
-    var nAtt = conAttentionCount();
-    cards.push({ k: "contracts", c: nAtt ? "pd" : "tt", ic: "📄",
-      v: nAtt ? String(nAtt) : money(conTotalAnnual()),
-      l: nAtt ? "Contracts need attention" : "Under contract",
-      s: nAtt ? "within 90 days" : "committed each year" });
+    cards.push({ k: "contracts", c: "tt", ic: "📄", v: money(conTotalAnnual()),
+      l: "Under contract", s: "committed each year" });
   }
   return '<div class="statgrid">' + cards.map(function (k) {
     return '<div class="statcard statlink ' + k.c + '" data-stat="' + k.k +
@@ -5224,12 +5224,8 @@ function renderClassicReport() {
   tile("completed", "ap", money(d.completedTotal), "Completed",
     d.completedCount + " job" + (d.completedCount === 1 ? "" : "s") + " finished");
   tile("pending", "pd", String(d.pendingCount), "Bids pending", "open for quotes");
-  if (canSeeContracts() && conState.list.length) {
-    var nAtt2 = conAttentionCount();
-    tile("contracts", nAtt2 ? "pd" : "", nAtt2 ? String(nAtt2) : money(conTotalAnnual()),
-      nAtt2 ? "Contracts to check" : "Under contract",
-      nAtt2 ? "ending within 90 days" : "committed each year");
-  }
+  if (canSeeContracts() && conState.list.length)
+    tile("contracts", "", money(conTotalAnnual()), "Under contract", "committed each year");
   h.push("</div>");
   /* pipeline: where every job sits in the lifecycle */
   var pl = [];
