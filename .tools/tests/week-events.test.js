@@ -33,5 +33,14 @@ const noQid = (c, amt, opt) => ({ contractor: c, qno: "1", amount: amt, hst: tru
 is(texts(J([noQid("Firenza", 12831.15, "Option #1"), noQid("Firenza", 18091.3, "Option #2")]), J([o("Firenza", 12831.15, "Option #1", "QF"), o("Firenza", 18091.3, "Option #2", "QF")])),
    [], "rows given a quotation id since are the same rows");
 
+/* second verification: a new contractor in a deleted one's place is a new quote */
+is(texts(J([{ contractor: "Alpha", qno: "1", amount: 10000, hst: true }]), J([{ contractor: "Beta", qno: "1", amount: 15000, hst: true }])),
+   ["Quote received for Job 5 — Beta, $15000.00."], "not 'Beta changed its price'");
+is(texts(J([{ contractor: "Alpha", amount: 10000, hst: true }]), J([{ contractor: "Beta", amount: 10000, hst: true }])),
+   ["Quote received for Job 5 — Beta, $10000.00."], "nor swallowed for having the same price");
+is(texts(J([{ contractor: "Alpha", qno: "7", amount: 10000, hst: true }, { contractor: "Beta", qno: "8", amount: 12000, hst: true }]),
+         J([{ contractor: "Alfa Roofing", qno: "9", amount: 12000, hst: true }, { contractor: "Beta", qno: "8", amount: 12000, hst: true }])),
+   ["Quote received for Job 5 — Alfa Roofing, $12000.00."], "a row named for an old row keeps it");
+
 console.log("\n" + pass + " passed, " + fail + " failed");
 process.exit(fail ? 1 : 0);

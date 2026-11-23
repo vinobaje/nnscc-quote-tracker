@@ -3019,7 +3019,7 @@ var BRAND_PATH = "nnsccQuoteTracker/brand";               /* the letterhead the 
 var WEEKLY_DRAFT_PATH = "nnsccQuoteTracker/weeklyDraft";   /* the report she is working on */
 var WEEKLY_COLL = "nnsccWeeklyReports";                   /* every one she has finished */
 var VIEW_BETA = CURRENT_PATH.indexOf("Beta") >= 0;   /* which report the passcode gate reads/protects */
-var BUILD_STAMP = "2026-11-23 09:37";   /* filled in by build.js — which copy of the page this is */
+var BUILD_STAMP = "2026-11-23 16:23";   /* filled in by build.js — which copy of the page this is */
 /* path of the report currently on screen */
 function reportPath() {
   return cloud.active.kind === "current" ? CURRENT_PATH : (REPORTS_COLL + "/" + cloud.active.id);
@@ -4435,7 +4435,9 @@ function approvedSub(d) {
      into every later period. It was read off the period's NAME, which stops
      being the start as soon as the report is copied forward or renamed. */
   var nm = String((state.meta && state.meta.since) || "").trim();
-  if (!nm) { var rn = String(activeReportName() || "").trim(); if (/^[A-Za-z]+ \d{4}$/.test(rn)) nm = rn; }
+  if (!nm && !(state.meta && state.meta.sinceUnknown)) {
+    var rn = String(activeReportName() || "").trim(); if (/^[A-Za-z]+ \d{4}$/.test(rn)) nm = rn;
+  }
   var since = nm ? "since " + nm : "";
   var parts = [since, d.completedCount ? "incl. completed" : ""].filter(Boolean);
   return parts.length ? parts.join(" \u00b7 ") : "approved spend";
@@ -6035,6 +6037,7 @@ function bidOptOf(q, qid, contractor) {
   var g = q.opt, o = g.lines[0];
   var r = { opt: g.label, okey: g.key, nopt: g.nopt || 0, name: o.name || "", amount: q.sum,
             own: Math.round(g.incl * 100) / 100, line: g.line, qid: qid || "",
+            docs: q.rows.map(function (x) { return x.path; }).filter(function (p, i, a) { return p && a.indexOf(p) === i; }),
             con: conKey(contractor || (o.det && o.det.contractor) || "") };
   if (o.path) r.path = o.path;
   return r;
@@ -6144,7 +6147,11 @@ function bidReadDetails() {
 function bidOwnDocs(b) {
   var t = b && b.optOf, own = {};
   ((b && b.parts) || []).forEach(function (p) { if (p && p.path) own[p.path] = 1; });
-  if (!Object.keys(own).length && t && t.path) own[t.path] = 1;   /* a typed-over amount has no parts */
+  /* a typed-over amount has no parts: the record keeps its documents itself */
+  if (!Object.keys(own).length && t) {
+    (t.docs || []).forEach(function (p) { own[p] = 1; });
+    if (!Object.keys(own).length && t.path) own[t.path] = 1;
+  }
   return own;
 }
 function bidReadFiles(j, bi) {
@@ -6290,7 +6297,10 @@ function bidReadApply() {
     if (plan.here.opt) b.optOf = bidOptOf(plan.here, qid, b.contractor);
     /* a document with one price read into a row that is an option — a revised
        price for that option — leaves it that option, at its new price */
-    else if (b.optOf) { b.optOf.amount = plan.here.sum; b.optOf.own = plan.here.sum; }
+    else if (b.optOf) {
+      b.optOf.amount = plan.here.sum; b.optOf.own = plan.here.sum;
+      b.optOf.docs = plan.here.rows.map(function (x) { return x.path; }).filter(function (p, i, a) { return p && a.indexOf(p) === i; });
+    }
     if (b.optOf) {
       /* superseded: what it was read from before and is not read from now;
          and anything in this reading that held no price */
@@ -6316,10 +6326,13 @@ function bidReadApply() {
   if (bidRead.answer && bidRead.answer.same) plan.dup.forEach(function (q, n) {
     var d = j.bids[plan.dupAt[n]];
     if (!d || !d.optOf) return;
-    var before = d.amount, wasD = d.optOf.was;
+    var before = d.amount, wasD = (d.optOf.was || []).slice();
+    var prevD = Object.keys(bidOwnDocs(d)).concat(d.optOf.path ? [d.optOf.path] : []);
     d.amount = q.sum; d.hst = true; d.parts = bidPartsOf(q);
     d.optOf = bidOptOf(q, qid || d.optOf.qid, d.contractor);
-    if (wasD) d.optOf.was = wasD;
+    var nowD = bidOwnDocs(d);
+    prevD.forEach(function (p) { if (p && !nowD[p] && p !== d.optOf.path && wasD.indexOf(p) < 0) wasD.push(p); });
+    if (wasD.length) d.optOf.was = wasD;
     if (before !== q.sum)
       notes.push(jobLabel(j) + ": " + (d.contractor || "quote") + " \u2014 " + q.opt.line + " set to " +
         money(q.sum) + " from the same quotation" + (before != null ? " (was " + money(before) + ")" : ""));
@@ -10392,7 +10405,7 @@ function actWeekEvents(oldJobs, newJobs) {
        not. An option is itself by its quotation and label; any other quote by
        its contractor and quote number; a row that was blank, by its place. */
     var olds = (o.bids || []).slice(), usedOld = {};
-    var pairOf = function (b, bi) {
+    var pairOf = function (b, bi, late) {
       var k = conKey(b.contractor), q = String(b.qno == null ? "" : b.qno).trim(), t = b.optOf, hit = -1;
       var tryOld = function (test) { if (hit >= 0) return; for (var i = 0; i < olds.length; i++) if (!usedOld[i] && olds[i] && test(olds[i], i)) { hit = i; return; } };
       if (t && t.okey) tryOld(function (x) { return x.optOf && x.optOf.okey === t.okey && ((t.qid && x.optOf.qid === t.qid) || (!t.qid && conKey(x.contractor) === k)); });
@@ -10411,17 +10424,26 @@ function actWeekEvents(oldJobs, newJobs) {
         tryOld(function (x) { return x.optOf && x.optOf.okey === t.okey && !x.optOf.qid && conKey(x.contractor) === k; });
         tryOld(function (x) { return !(x.optOf && x.optOf.okey) && k && conKey(x.contractor) === k && String(x.qno == null ? "" : x.qno).trim() === q; });
       }
-      tryOld(function (x, i) {
+      /* the same place: only once every row has had its chance by name (so a
+         renamed row cannot take the old row another is named for), and where
+         both rows name different contractors, only on real evidence — the
+         same document, or the same quote number AND price. A new contractor's
+         quote in a deleted one's place is a new quote. */
+      if (late) tryOld(function (x, i) {
         if (i !== bi) return false;
         var sameDoc = (b.files || []).some(function (f) { return f && f.path && (x.files || []).some(function (g) { return g && g.path === f.path; }); });
-        var xq = String(x.qno == null ? "" : x.qno).trim();
-        return sameDoc || (q && xq === q) || (bidTotal(b) != null && bidTotal(x) === bidTotal(b));
+        var xq = String(x.qno == null ? "" : x.qno).trim(), xk = conKey(x.contractor);
+        var sameNo = !!q && xq === q, sameAmt = bidTotal(b) != null && bidTotal(x) === bidTotal(b);
+        if (k && xk && k !== xk) return sameDoc || (sameNo && sameAmt);
+        return sameDoc || sameNo || sameAmt;
       });
       if (hit >= 0) usedOld[hit] = 1;
       return hit >= 0 ? olds[hit] : null;
     };
+    var pairs = (j.bids || []).map(function (b, bi) { return pairOf(b, bi, false); });
+    (j.bids || []).forEach(function (b, bi) { if (!pairs[bi]) pairs[bi] = pairOf(b, bi, true); });
     (j.bids || []).forEach(function (b, bi) {
-      var ob = pairOf(b, bi);
+      var ob = pairs[bi];
       var now = bidTotal(b), was = ob ? bidTotal(ob) : null;
       var had = was != null, has = now != null;
       var who = (b.contractor || "").trim() || "a contractor";
@@ -13892,6 +13914,11 @@ function renameActive() {
   if (nn == null) return;
   nn = nn.replace(/\s+/g, " ").trim();
   if (!nn || nn === activeReportName()) return;
+  /* the records began when they began, whatever the report is called next */
+  if (state.meta && !state.meta.since && !state.meta.sinceUnknown) {
+    var oldNm = String(activeReportName() || "").trim();
+    if (/^[A-Za-z]+ \d{4}$/.test(oldNm)) state.meta.since = oldNm; else state.meta.sinceUnknown = true;
+  }
   state.reportName = nn;
   if (cloud.active.kind === "archived") cloud.active.name = nn;
   persist("Renamed report to “" + nn + "”");
@@ -13921,11 +13948,12 @@ function startNewReport(mode) {
          keeps "since", taking it from the old period's name the first time */
       ? { reportName: name, jobs: deepCopy(cur.jobs), meta: (function () {
             var m = deepCopy(cur.meta), old = String(cur.reportName || "").trim();
-            if (!m.since && /^[A-Za-z]+ \d{4}$/.test(old)) m.since = old;
+            if (!m.since) { if (/^[A-Za-z]+ \d{4}$/.test(old)) m.since = old; else m.sinceUnknown = true; }
             return m; })(), ai: cur.ai ? deepCopy(cur.ai) : null }
       /* a fresh start begins its own records */
       : { reportName: name, jobs: [], meta: (function () {
             var m = deepCopy(cur.meta);
+            delete m.sinceUnknown;
             if (/^[A-Za-z]+ \d{4}$/.test(String(name || "").trim())) m.since = String(name).trim(); else delete m.since;
             return m; })(), ai: null };
     state = normState(ns);

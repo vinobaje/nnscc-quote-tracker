@@ -607,6 +607,18 @@ X.set({ jid: "df", bi: 0, rows: readAt("qa/mf/Y.pdf", two2(1500, 2500), "Y.pdf")
 X.bidReadAnswer(false); X.bidReadApply();
 is([df.bids[0].optOf.path, X.bidReadFiles(df, 0).map((f) => f.name)], ["qa/mf/Y.pdf", ["Y.pdf"]], "after 'different' the row re-reads its own quotation, not the earlier one");
 
+/* second verification: a typed-over amount keeps both documents the row's own */
+mf = { id: "mf", bids: [{ contractor: "", qno: "", amount: null, hst: false, notes: "", files: [{ name: "A.pdf", path: A }, { name: "B.pdf", path: B }] }] };
+X.set({ jid: "mf", bi: 0, rows: readAt(A, two2(1000, 2000), "A.pdf").concat(readAt(B, fee500, "B.pdf")) }, [mf]); X.bidReadApply();
+mf.bids[0].amount = 1600; delete mf.bids[0].parts;
+is(X.bidReadFiles(mf, 0).map((f) => f.name), ["A.pdf", "B.pdf"], "amount typed over: both documents are still read together");
+/* a repriced sibling does not take its old second document for new */
+mf = { id: "mf", bids: [{ contractor: "", qno: "", amount: null, hst: false, notes: "", files: [{ name: "A.pdf", path: A }, { name: "B.pdf", path: B }] }] };
+X.set({ jid: "mf", bi: 0, rows: readAt(A, two2(1000, 2000), "A.pdf").concat(readAt(B, two2(3000, 5000), "B.pdf")) }, [mf]); X.bidReadApply();
+mf.bids[0].files.push({ name: "A2.pdf", path: "qa/mf/A2.pdf" });
+X.set({ jid: "mf", bi: 0, rows: readAt("qa/mf/A2.pdf", two2(1100, 2100), "A2.pdf") }, [mf]); X.bidReadAnswer(true); X.bidReadApply();
+is([mf.bids.map((b) => b.amount), X.bidReadFiles(mf, 1).map((f) => f.name), X.bidReadFiles(mf, 0).map((f) => f.name)], [[1100, 2100], ["A2.pdf"], ["A2.pdf"]], "after a revision both rows read the revision, not an old building PDF");
+
 /* AI intake: the same rule */
 const d = Object.assign({ file: { name: FILE, path: "p" } }, firenza);
 is(X.intakeQuotes(d, null).map((x) => [x.opt.label, x.sum]), [["Option #1", 11355], ["Option #2", 16010]], "intake: one quote per option, on the lines' footing");
