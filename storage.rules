@@ -92,7 +92,10 @@ service firebase.storage {
             || request.auth.token.email.lower() in
                firestore.get(/databases/(default)/documents/nnsccQuoteTrackerConfig/main).data.get('editors', []) );
       }
-      allow read: if true;
+      // Open one file by its link, yes; list the folder, no. Under rules v2
+      // "read" is get + list, and list let anyone who knew the bucket name
+      // enumerate and download every quote. Nothing in the app lists here.
+      allow get: if true;
       allow create, update: if nnsccStorageEditor() && request.resource.size < 15 * 1024 * 1024;
       allow delete: if nnsccStorageEditor();
     }
