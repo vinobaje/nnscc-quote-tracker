@@ -11,13 +11,13 @@ const X = new Function(["var HST = 0.13, bidRead = null, state = { jobs: [] }, L
   "function money(n) { return '$' + Number(n).toFixed(2); }",
   "function esc(s) { return String(s == null ? '' : s).replace(/[&<>\"]/g, function (c) { return '&#' + c.charCodeAt(0) + ';'; }); }",
   "function jobLabel(j) { return 'Job ' + j.id; }",
-  "function qcTouch() {} function renderEditor() {} function renderReport() {}",
+  "function qcTouch() {} function renderEditor() {} function renderReport() {} var _id = 0; function genId() { return 'q' + (++_id); }",
   "function persist(a, notes) { LOG = LOG.concat(notes || []); }",
   "var intakePending = null;",
   "var document = { querySelectorAll: function () { return []; } };",
   gv("BID_DET", '["notes", "Scope note"]];'),
   ["bidReadRows", "partsNote", "bidReadDetails", "bidReadDone", "bidReadTrim", "optLine", "optionQuotes",
-   "optKey", "bidHoldsOpt", "bidReadPlan", "bidPartsOf", "bidHeldOpts", "bidSameFile", "bidOptOf", "quoteFileHeld", "bidReadApply", "bidReadPanelHTML",
+   "optKey", "bidHoldsOpt", "bidReadPlan", "bidPartsOf", "bidHeldOpts", "bidSameFile", "bidOptOf", "bidOwnOpt", "bidReadQid", "quoteFileHeld", "bidReadApply", "bidReadPanelHTML",
    "intakeLines", "intakeRows", "intakeQuotes", "intakeTicks"].map(grab).join("\n"),
   "return { bidReadRows, partsNote, bidReadDetails, bidReadDone, optionQuotes, bidReadPlan, quoteFileHeld, bidPartsOf,",
   "  bidReadApply, bidReadPanelHTML, intakeQuotes, intakeRows,",
@@ -237,6 +237,44 @@ X.set({ jid: "g1", bi: 0, rows: gRead(), noDet: true }, [gj]); X.bidReadApply();
 X.set({ jid: "g1", bi: 0, rows: gRead(), noDet: true }, [gj]);
 plan = X.bidReadPlan(gj, 0);
 is([gj.bids.length, plan.add.length, plan.dup.length], [2, 0, 1], "no-path attachment: second read adds nothing");
+
+/* round 3: a quotation with a shared line, relabelled on a re-read: no duplicate */
+const shq = { contractor: "Acme", quote_number: "9", lines_include_hst: true, lines: [
+  { description: "Mobilisation", amount: 500, for_this_job: true, line_note: "", option: "" },
+  { description: "Repair", amount: 1000, for_this_job: true, line_note: "", option: "Option A" },
+  { description: "Replace", amount: 4000, for_this_job: true, line_note: "", option: "Option B" }] };
+const shj = { id: "h1", bids: [{ contractor: "", qno: "", amount: null, hst: false, notes: "", files: [{ name: "s.pdf", path: "qa/h1/s.pdf" }] }] };
+X.set({ jid: "h1", bi: 0, rows: readAt("qa/h1/s.pdf", shq, "s.pdf") }, [shj]); X.bidReadApply();
+is([shj.bids.map((b) => b.amount), shj.bids.map((b) => b.optOf.own)], [[1500, 4500], [1000, 4000]], "own price kept apart from the total");
+is(shj.bids[0].optOf.qid && shj.bids[0].optOf.qid === shj.bids[1].optOf.qid, true, "both rows carry one quotation id");
+const shq2 = JSON.parse(JSON.stringify(shq)); shq2.lines[1].option = "Option 1"; shq2.lines[2].option = "Option 2";
+X.set({ jid: "h1", bi: 0, rows: readAt("qa/h1/s.pdf", shq2, "s.pdf") }, [shj]);
+plan = X.bidReadPlan(shj, 0);
+is([plan.here && plan.here.sum, plan.add.length, plan.dup.length], [1500, 0, 1], "relabelled with a shared line: matched by own price");
+
+/* round 3: equal prices AND relabelled: no guess — the row is left alone */
+const eq = JSON.parse(JSON.stringify(same)); eq.lines[0].option = "Option 1"; eq.lines[1].option = "Option 2";
+X.set({ jid: "s1", bi: 1, rows: readAt("qa/s1/a.pdf", eq, "a.pdf") }, [sj]);
+plan = X.bidReadPlan(sj, 1);
+is([plan.blocked, plan.here, plan.add.length], ["Option B", null, 0], "equal prices relabelled: refuses to guess");
+is(/could not tell which of its options/.test(X.bidReadPanelHTML("s1", 1)), true, "and says so");
+const before = JSON.stringify(sj.bids); X.bidReadApply();
+is(JSON.stringify(sj.bids), before, "nothing changes");
+
+/* round 3: an option row re-read by a reading that found no options */
+const noopt = JSON.parse(JSON.stringify(firenza)); noopt.lines.forEach((l) => { l.option = ""; });
+const nj2 = liveJob(); X.set({ jid: "j25", bi: 1, rows: readAt(PATH, firenza) }, [nj2]); X.bidReadApply();
+X.set({ jid: "j25", bi: 2, rows: readAt(PATH, noopt) }, [nj2]);
+plan = X.bidReadPlan(nj2, 2);
+is([plan.blocked, plan.here], ["Option #2", null], "no options found: an option row is not summed");
+
+/* round 3: another contractor's old same-named file, contractor blank: not a match */
+const bl = { id: "b1", bids: [
+  { contractor: "", qno: "", amount: 1000, files: [{ name: "Quote.pdf", url: "u" }],
+    parts: [{ name: "Quote.pdf", opt: "Option 1", okey: "option1", amount: 1000, line: "x" }] },
+  { contractor: "", qno: "", amount: null, notes: "", files: [{ name: "Quote.pdf", path: "qa/b1/new.pdf" }] }] };
+X.set({ jid: "b1", bi: 1, rows: readAt("qa/b1/new.pdf", q2("Y Inc"), "Quote.pdf") }, [bl]);
+is(X.bidReadPlan(bl, 1).dup.length, 0, "a stored file is not matched by name to an old one");
 
 /* AI intake: the same rule */
 const d = Object.assign({ file: { name: FILE, path: "p" } }, firenza);
