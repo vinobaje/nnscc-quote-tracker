@@ -1836,6 +1836,7 @@ body[data-view="edit"] .wrap { max-width:none; }
 .qtable tr.picked td { background:var(--good-soft); }
 /* an option row under its quotation's first row: one quotation, two prices */
 .qtable tr.qsame td { border-top:1px dashed var(--line-soft); }
+@media (max-width:600px) { .qtable tr.qsame td { border-top:none; } }
 .qtable .qatt .fx { cursor:pointer; color:var(--muted); font-size:11px; margin:0 4px 0 -2px; }
 .qtable .qatt .fx:hover { color:var(--bad, #b42318); }
 .qtable input[type=text], .qtable input[type=number], .qtable select { font:inherit; font-size:13px; width:100%;
@@ -2866,7 +2867,12 @@ function stChip(j) {
   if (!j.status || j.status === "quoted") return "";
   return ' <span class="stchip st-' + esc(j.status) + '">' + esc(statusLabel(j.status)) + "</span>";
 }
-function todayISO() { return new Date().toISOString().slice(0, 10); }
+/* today, by her own calendar. (It was the UTC date: after 7 pm in Toronto — when
+   board meetings are — every decision, award and completion was dated tomorrow.) */
+function todayISO() {
+  var d = new Date();
+  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+}
 /* the day a quoted price stops being good: the quote date plus its validity
    window (60 days unless the contractor said otherwise) */
 function bidExpiryISO(b) {
@@ -3559,7 +3565,9 @@ function computeAll() {
     if (APPROVED_SET[st]) approvedTotal += x.c.cost;
     /* finished work, a part of the approved spend the board asked to see on its own */
     if (st === "completed") { completedTotal += x.c.cost; completedCount++; }
-    x.j.bids.forEach(function (b) { if (bidExpired(b)) staleBids++; });
+    /* a lapsed quote matters while the decision is still to come; on work
+       approved, finished or cancelled it is history */
+    if (st === "quoted" || st === "deferred") x.j.bids.forEach(function (b) { if (bidExpired(b)) staleBids++; });
   });
   return { jobs: jobs, spend: spend, dead: dead, hp: hp, nhp: nhp, total: total, hpTotal: hpTotal,
            wait: wait, decided: decided, drafts: drafts, hpW: hpW, nhpW: nhpW,
@@ -4488,11 +4496,13 @@ function donutSVG(slices, top, bot) {
 
    The tables and the donut were moved onto this basis already. These were the
    last figures on the page still counting the wider set. */
-/* "since July 2026": approved spend is counted from when this report's
-   records began, which is the current period's name when that is a month */
+/* "since July 2026": approved spend is counted from when this report's records began */
 function approvedSub(d) {
-  var nm = String(activeReportName() || "").trim();
-  var since = /^[A-Za-z]+ \d{4}$/.test(nm) ? "since " + nm : "";
+  /* when these records began — kept with the report (meta.since) and carried
+     into every later period. It was read off the period's NAME, which stops
+     being the start as soon as the report is copied forward or renamed. */
+  var nm = String((state.meta && state.meta.since) || "").trim();
+  var since = nm ? "since " + nm : "";
   var parts = [since, d.completedCount ? "incl. completed" : ""].filter(Boolean);
   return parts.length ? parts.join(" \u00b7 ") : "approved spend";
 }
@@ -5635,11 +5645,13 @@ function bidReadPanelHTML(jid, bi) {
   if (ans && !plan.ask)
     h.push('<tr class="qrleft"><td></td><td colspan="3">' + (ans.same
       ? "Read as the same quotation as " + esc(ans.opt) + " \u2014 its rows are tied to " + esc(ans.name) + " when you apply."
-      : "Read as a quote of its own: this row stops being " + esc(ans.opt) + " of the pasted-text quotation when you apply.") +
+      : "Read as a quote of its own: this row stops being " + esc(ans.opt) + " of the earlier quotation when you apply.") +
       " Cancel to undo.</td></tr>");
   if (plan.ask) {
     h.push('<tr class="qrleft"><td></td><td colspan="3">This row is ' + esc(plan.ask) +
-      " of a quotation that came in as pasted text, with no document. Is this document that same quotation?" +
+      (plan.askPasted
+        ? " of a quotation that came in as pasted text, with no document. Is this document that same quotation?"
+        : " of a quotation read from another document. Is this the same quotation, sent again or revised?") +
       '<div class="qreadacts" style="margin-top:6px">' +
       '<button class="btn" type="button" data-act="readsame">Same quotation \u2014 this row stays ' + esc(plan.ask) + "</button>" +
       '<button class="edbtn" type="button" data-act="readfresh">A different quote \u2014 read it fresh</button>' +
@@ -5663,7 +5675,12 @@ function bidReadPanelHTML(jid, bi) {
     };
     if (plan.here) optRow(plan.here, "This row");
     plan.add.forEach(function (q) { optRow(q, "New row"); });
-    plan.dup.forEach(function (q) { optRow(q, "Already its own row", " qrdup"); });
+    var jNow = findJob(jid);
+    plan.dup.forEach(function (q, n) {
+      var dRow = jNow && jNow.bids[plan.dupAt[n]];
+      var upd = ans && ans.same && dRow && dRow.amount !== q.sum;
+      optRow(q, upd ? "Its own row, updated" : "Already its own row", upd ? "" : " qrdup");
+    });
     if (plan.quotes.length > 1)
       h.push('<tr class="qrleft"><td></td><td colspan="3">Options are never added together \u2014 ' +
         "each is a quote of its own, and the board chooses between them.</td></tr>");
@@ -5948,10 +5965,10 @@ function bidReadView(j, bi) {
   if (!a || !b) return j;
   /* only for the row and the document it was given for */
   var qs = optionQuotes(bidRead.rows), f0 = qs.length && (qs[0].opt ? qs[0].opt.lines[0] : qs[0].rows[0]);
-  if (!b.optOf || b.optOf.path || b.optOf.opt !== a.opt || !f0 || f0.path !== a.path) return j;
+  if (!b.optOf || b.optOf.path === a.path || b.optOf.opt !== a.opt || !f0 || f0.path !== a.path) return j;
   return { id: j.id, bids: j.bids.map(function (x, xi) {
     var t = x && x.optOf;
-    var ours = t && !t.path && (xi === bi || (a.qid && t.qid === a.qid));
+    var ours = t && t.path !== a.path && (xi === bi || (a.qid && t.qid === a.qid));
     if (!ours) return x;
     var v = {};
     for (var k in x) v[k] = x[k];
@@ -5960,7 +5977,7 @@ function bidReadView(j, bi) {
       v.optOf.path = a.path; v.optOf.name = a.name;
       v.parts = (x.parts || []).map(function (p) {
         var c = {}; for (var k3 in p) c[k3] = p[k3];
-        if (!c.path) { c.path = a.path; c.name = a.name; }
+        if (!c.path || c.path === t.path) { c.path = a.path; c.name = a.name; }
         return c;
       });
     } else {
@@ -5982,9 +5999,17 @@ function bidReadPlan(j, bi) {
      reused for another one, is not something a name can settle — two firms
      can share the start of one — so she is asked, and nothing happens until
      she answers. */
-  if (b.optOf && b.optOf.okey && (b.optOf.nopt || 0) >= 2 && !b.optOf.path && first && first.path) {
+  /* The same goes for a row split from one document and now read from
+     another that lists options too: the contractor has sent the quotation
+     again, or revised it — or the row is being reused. Taken for a new
+     quotation, the old option rows stayed behind at their old prices and a
+     job with one contractor showed a saving. (A document with a single price
+     is a revised price for this row's option, and needs no question.) */
+  if (b.optOf && b.optOf.okey && (b.optOf.nopt || 0) >= 2 && first && first.path &&
+      (!b.optOf.path || (b.optOf.path !== first.path && quotes[0].opt))) {
     /* the file asked about is the one the reading's first quote came from */
     plan.ask = b.optOf.opt; plan.askPath = first.path; plan.askName = first.name;
+    plan.askPasted = !b.optOf.path;
     return plan;
   }
   var mine = first && bidOwnOpt(b, first);
@@ -6170,14 +6195,21 @@ function bidReadDetails() {
   }
   return out;
 }
-/* The files a read of this row takes: its own. An option row under its
-   quotation holds the shared PDF too; if it also has a revision of its own,
-   reading both would add the revision to the original. */
+/* The files a read of this row takes. A plain row: all of them, added up. A
+   row that is an option of a quotation: any document it has not been read
+   from yet (a revision, or the quotation sent again), and only when there is
+   none, the quotation's own document — never both, which added a revision
+   to the original, and never one that a later document has replaced. */
 function bidReadFiles(j, bi) {
-  var g = bidShowOrder(j, jobCalc(j)).filter(function (x) { return x.bi === bi; })[0];
-  var all = (j.bids[bi] && j.bids[bi].files) || [];
-  if (!g || g.first) return all;
-  var own = bidOwnFiles(j, g).map(function (o) { return o.f; });
+  var b = j.bids[bi], all = (b && b.files) || [];
+  var t = b && b.optOf;
+  if (!t || !t.okey) return all;
+  var known = {};
+  if (t.path) known[t.path] = 1;
+  (t.was || []).forEach(function (p) { known[p] = 1; });
+  var fresh = all.filter(function (f) { return f && f.path && !known[f.path]; });
+  if (fresh.length) return fresh;
+  var own = all.filter(function (f) { return f && t.path && f.path === t.path; });
   return own.length ? own : all;
 }
 function bidReadRun(j, bi) {
@@ -6226,13 +6258,23 @@ function bidReadAnswer(same) {
 /* ... and made real by Apply, in the same save as the amounts */
 function bidReadAnswerApply(j, b) {
   var a = bidRead && bidRead.answer;
-  if (!a || !b.optOf || b.optOf.path || b.optOf.opt !== a.opt) return "";
+  if (!a || !b.optOf || b.optOf.path === a.path || b.optOf.opt !== a.opt) return "";
   if (a.same) {
+    var doc = (b.files || []).filter(function (f) { return f && f.path === a.path; })[0];
     j.bids.forEach(function (x) {
       var t = x.optOf;
-      if (!t || t.path || !(x === b || (a.qid && t.qid === a.qid))) return;
+      if (!t || t.path === a.path || !(x === b || (a.qid && t.qid === a.qid))) return;
+      /* the document it was read from before is kept as superseded, so a
+         later read of the row does not take it for something new */
+      if (t.path) t.was = (t.was || []).concat([t.path]);
+      (x.parts || []).forEach(function (p) { if (!p.path || p.path === t.path) { p.path = a.path; p.name = a.name; } });
       t.path = a.path; t.name = a.name;
-      (x.parts || []).forEach(function (p) { if (!p.path) { p.path = a.path; p.name = a.name; } });
+      /* every option row holds the quotation's document, so removing one row
+         does not take the document off the job */
+      if (doc && !(x.files || []).some(function (f) { return f && f.path === a.path; })) {
+        var c = {}; for (var k in doc) c[k] = doc[k];
+        (x.files = x.files || []).push(c);
+      }
     });
     return jobLabel(j) + ": " + (b.contractor || "quote") + " \u2014 " + a.opt +
       " confirmed as the quotation in " + a.name;
@@ -6240,7 +6282,7 @@ function bidReadAnswerApply(j, b) {
   delete b.optOf;
   if (b.parts) delete b.parts;
   return jobLabel(j) + ": " + (b.contractor || "quote") + " \u2014 no longer " + a.opt +
-    " of the pasted-text quotation; read as a quote of its own";
+    " of the earlier quotation; read as a quote of its own";
 }
 function bidReadApply() {
   if (!bidRead || bidRead.busy) return;
@@ -6281,7 +6323,11 @@ function bidReadApply() {
     /* what the figure is made of, kept with it — the board sees one number for
        three quotations and is entitled to know that is what it is */
     b.parts = bidPartsOf(plan.here);
-    if (plan.here.opt) b.optOf = bidOptOf(plan.here, qid, b.contractor);
+    if (plan.here.opt) {
+      var wasB = b.optOf && b.optOf.was;
+      b.optOf = bidOptOf(plan.here, qid, b.contractor);
+      if (wasB) b.optOf.was = wasB;
+    }
     /* a document with one price read into a row that is an option — a revised
        price for that option — leaves it that option, at its new price */
     else if (b.optOf) { b.optOf.amount = plan.here.sum; b.optOf.own = plan.here.sum; }
@@ -6291,6 +6337,20 @@ function bidReadApply() {
         return (r.line ? r.line + " " : "") + money(r.incl);
       }).join(" + ") + ")" : " from the attached quotation"));
   }
+  /* She has said this document IS the quotation these rows came from, sent
+     again or revised: its other options are already rows, and they take the
+     document's figures too — a revised quotation revises every option. */
+  if (bidRead.answer && bidRead.answer.same) plan.dup.forEach(function (q, n) {
+    var d = j.bids[plan.dupAt[n]];
+    if (!d || !d.optOf) return;
+    var before = d.amount, wasD = d.optOf.was;
+    d.amount = q.sum; d.hst = true; d.parts = bidPartsOf(q);
+    d.optOf = bidOptOf(q, qid || d.optOf.qid, d.contractor);
+    if (wasD) d.optOf.was = wasD;
+    if (before !== q.sum)
+      notes.push(jobLabel(j) + ": " + (d.contractor || "quote") + " \u2014 " + q.opt.line + " set to " +
+        money(q.sum) + " from the same quotation" + (before != null ? " (was " + money(before) + ")" : ""));
+  });
   /* every other option goes in as a quote of its own, on the end of the list so
      the row the totals are carrying stays the row it was */
   plan.add.forEach(function (q) {
@@ -6520,6 +6580,13 @@ function edJobCardHTML(j, ji) {
   var awOpts = '<option value="">— not awarded —</option>' + awNames.map(function (nm) {
     return '<option value="' + esc(nm) + '"' + (awHit === nm ? " selected" : "") + ">" + esc(nm) + "</option>";
   }).join("");
+  var awMiscount = "";
+  if (awKey && awHit) {
+    var awPriced = c.bids.filter(function (x) { return x.total != null && conKey(x.b.contractor) === awKey; });
+    var carriedX = c.carriedBids[0];
+    if (awPriced.length && carriedX && conKey(carriedX.b.contractor) !== awKey)
+      awMiscount = (carriedX.b.contractor || "").trim() || "another contractor";
+  }
   var pv = j.pct == null ? (j.status === "completed" ? 100 : 0) : j.pct;
   /* A field shows when the job's status calls for it: the decision date once
      the board has decided, who it went to once it is approved, site progress
@@ -6545,7 +6612,12 @@ function edJobCardHTML(j, ji) {
            cannot bridge, or the wrong contractor recorded altogether */
         : (awKey && !awHit
           ? '<span class="fwarn">\u2691 Awarded to \u201c' + esc(String(j.awardedTo).trim()) +
-            '\u201d, who has no quote on this job</span>' : "")) + "</div>" +
+            '\u201d, who has no quote on this job</span>'
+          /* awarded to one contractor while the totals count another's quote:
+             the report's Completed and Board approved are then the wrong money */
+          : (awMiscount ? '<span class="fwarn">\u2691 The totals count ' + esc(awMiscount) +
+            '\u2019s quote, not ' + esc(String(j.awardedTo).trim()) + '\u2019s \u2014 select ' +
+            esc(String(j.awardedTo).trim()) + '\u2019s quote below to count it</span>' : ""))) + "</div>" +
       '<div class="f"><label>Award date</label><input type="date" value="' + esc(j.awardDate || "") + '" data-f="awardDate"></div>') +
     (!showPct ? "" : '<div class="f" style="flex:1;min-width:210px"><label>Site progress</label><div class="pgrp">' +
       '<input type="range" min="0" max="100" step="5" value="' + pv + '" data-f="pct" data-live="1">' +
@@ -6615,9 +6687,12 @@ function edJobCardHTML(j, ji) {
         /* A row that says "enter the amount" and offers no way to is a rebuke.
            The quotations are attached to this very row; the button that reads
            them belongs here, not behind the \u22ef menu where it was. */
-        : x.unpriced ? '<button class="qst pen qstbtn" type="button" data-act="readfiles" ' +
-          'title="Claude reads the attached quote' + (b.files.length > 1 ? "s and adds their totals up" : "") +
-          '">\u2728 Read ' + (b.files.length > 1 ? "the " + b.files.length + " quotes" : "the quote") + "</button>"
+        : x.unpriced ? (function () {
+            var nS = bidReadFiles(j, bi).length;
+            return '<button class="qst pen qstbtn" type="button" data-act="readfiles" ' +
+              'title="Claude reads the attached quote' + (nS > 1 ? "s and adds their totals up" : "") +
+              '">\u2728 Read ' + (nS > 1 ? "the " + nS + " quotes" : "the quote") + "</button>";
+          })()
         : ((b.contractor || "").trim() ? '<span class="qst pen">Pending</span>' : ""));
     /* each file once: in this cell, with its ✕ beside it while the row is open */
     var files = bidOwnFiles(j, g).map(function (o) {
@@ -6892,6 +6967,10 @@ function qcRun(j) {
     state.jobs.forEach(function (x) { if (x.id === jid) cur = x; });
     if (!cur) return;
     if (!d) { qcErr[jid] = "no answer came back"; qcRedraw(); return; }
+    /* The quotes changed while this was being read — a row removed, a price
+       typed. The answer names rows by position as they were, so stored now
+       "best value" would land on a different quote. Drop it and read again. */
+    if (qcFP(cur) !== fp) { if (qcCan(cur)) qcRun(cur); else qcRedraw(); return; }
     cur.compare = {
       fp: fp, at: todayISO(), read: (res.data && res.data.read) || 0,
       by: (res.data && res.data.engine) || "", model: (res.data && res.data.model) || "",
@@ -7457,9 +7536,24 @@ document.getElementById("editor").addEventListener("change", function (e) {
        finishing a job stamps today over whatever decision date it carried.
        Only on the change itself: correcting the date by hand still stands. */
     if (j.status === "completed" && wasSt !== "completed") j.statusDate = todayISO();
+    /* A different decision is a new date: approved in July, deferred in
+       November, is "deferred in November". Moving along after an approval
+       (awarded, scheduled, in progress) keeps the approval's date, and back to
+       Quoted is no decision at all. Only on the change; her own date stands. */
+    var grp = function (st) { return st === "quoted" ? "q" : APPROVED_SET[st] ? "ok" : st === "deferred" ? "def" : "dead"; };
+    if (grp(wasSt) !== grp(j.status) && j.status !== "completed") {
+      if (j.status === "quoted") j.statusDate = ""; else j.statusDate = todayISO();
+    }
     if (j.status === "completed") j.pct = 100;   /* finished work is 100% by definition */
     persist(null, [jobLabel(j) + " marked " + statusLabel(j.status)], j.id);
-    renderEditor(); renderReport(); return;
+    /* the job has just moved to another folder of the list: go with it, so the
+       fields the new status opens (decision date, who it was awarded to) and
+       any warning are in front of her, not on a card that left the screen */
+    if (edBucket !== "all" && edBucketOf(j) !== edBucket) edBucket = edBucketOf(j);
+    renderEditor(); renderReport();
+    var sc = document.querySelector('#editor .jcard[data-jid="' + j.id + '"]');
+    if (sc) sc.scrollIntoView({ block: "nearest" });
+    return;
   }
   else if (f === "created") j.created = e.target.value;
   else if (f === "statusDate") j.statusDate = e.target.value;
@@ -7467,6 +7561,12 @@ document.getElementById("editor").addEventListener("change", function (e) {
   else if (f === "awardedTo") {
     j.awardedTo = e.target.value;
     if (j.awardedTo && !j.awardDate) j.awardDate = todayISO();
+    /* Awarded to someone other than the lowest: the totals must count the
+       price the work will cost. With one priced quote from them it is carried
+       at once; with several (options) she chooses, and the card says so. */
+    var awRows = [];
+    j.bids.forEach(function (b, bi) { if (j.awardedTo && conKey(b.contractor) === conKey(j.awardedTo) && bidTotal(b) != null) awRows.push(bi); });
+    if (awRows.length === 1 && !jobCalc(j).bids[awRows[0]].carried) j.pick = awRows[0];
     persist(null, [j.awardedTo
       ? jobLabel(j) + " awarded to " + j.awardedTo
       : jobLabel(j) + " award cleared"], j.id);
@@ -7775,13 +7875,24 @@ document.getElementById("editor").addEventListener("click", function (e) {
     persist(); qcTouch(fj); renderEditor(); renderReport(); return;
   }
   var card = e.target.closest(".ecard"); if (!card) return;
+  var explicitNote = "";   /* a change-log line an action writes for itself */
   var ji = +card.dataset.ji, j = state.jobs[ji];
   if (act === "addbidfile") { startAttach(ji, -1); return; }   /* the file makes the row */
   if (act === "addbid") j.bids.push({ contractor: "", qno: "", amount: null, hst: false, notes: "", files: [] });
   else if (act === "delbid") {
     var row = e.target.closest("[data-bi]");
     var dbi = +row.dataset.bi;
+    var gone = j.bids[dbi];
     j.bids.splice(dbi, 1);
+    /* said in so many words: left to the before-and-after comparison, removing
+       one of a contractor's two option rows was logged as that contractor's
+       price changing */
+    if (gone) explicitNote = jobLabel(j) + ": removed " + ((gone.contractor || "").trim() || "a blank quote row") +
+      (gone.optOf && gone.optOf.opt ? " \u2014 " + gone.optOf.opt : "") +
+      (bidTotal(gone) != null ? ", " + money(bidTotal(gone)) : "");
+    /* the open panels were keyed by position, and every row below has moved
+       up one: left open, a second click removed the next row as well */
+    Object.keys(edQOpen).forEach(function (k) { if (k.indexOf(j.id + ":") === 0) delete edQOpen[k]; });
     /* keep a manual "carry this quote" choice pointing at the same quote */
     if (typeof j.pick === "number") {
       if (j.pick === dbi) delete j.pick;
@@ -7804,7 +7915,8 @@ document.getElementById("editor").addEventListener("click", function (e) {
     state.jobs.splice(ji, 1);
     orderJobs(state.jobs);
   }
-  persist(); renderEditor(); renderReport();
+  if (explicitNote) persist(null, [explicitNote], j.id); else persist();
+  renderEditor(); renderReport();
 });
 
 /* ---------- workspace actions (navigation, cards, per-job tools) ----------
@@ -8445,11 +8557,19 @@ function conOpenFiles(cid, startIdx) {
   if (!c || !(c.files || []).length) return;
   var note = document.getElementById("conNote");
   if (note) note.textContent = "Opening the document…";
+  /* each document on its own: one that cannot be opened does not stop the others */
+  var firstErr = null;
   Promise.all(c.files.map(function (f) {
-    return conFileURL(f.path).then(function (url) { return { name: f.name, url: url, size: f.size }; });
-  })).then(function (files) {
-    if (note) note.textContent = "";
-    openFileViewer(files, startIdx || 0, (c.contractor || "Contract") + " — " + (c.title || "agreement"));
+    return conFileURL(f.path).then(function (url) { return { name: f.name, url: url, size: f.size }; },
+      function (e) { if (!firstErr) firstErr = e; return null; });
+  })).then(function (got) {
+    var files = got.filter(Boolean);
+    if (!files.length) throw firstErr || { code: "error" };
+    var want = got[startIdx || 0], at = want ? files.indexOf(want) : 0;
+    if (note) note.textContent = files.length < got.length
+      ? (got.length - files.length) + " of the " + got.length + " documents could not be opened" +
+        (firstErr && firstErr.message ? " \u2014 " + firstErr.message : "") : "";
+    openFileViewer(files, Math.max(0, at), (c.contractor || "Contract") + " — " + (c.title || "agreement"));
   }).catch(function (e) {
     var code = (e && e.code) || "error";
     var msg = code === "permission-denied"
@@ -8461,6 +8581,8 @@ function conOpenFiles(cid, startIdx) {
       ? "The document is no longer in the file store — attach it again from Edit data → Contracts."
       : code === "no-connection"
       ? "The document could not be downloaded — check the connection and try again."
+      : /failed-precondition/.test(code) && e && e.message
+      ? e.message                                    /* the server's own reason */
       : "Could not open the document (" + esc(code) + "). Try again in a moment.";
     if (note) note.textContent = msg; else alert(msg);
   });
@@ -8474,6 +8596,14 @@ document.addEventListener("click", function (e) {
 });
 
 var conAttachId = null;
+/* her choices in Claude's proposal, kept as she makes them */
+document.getElementById("editor").addEventListener("change", function (e) {
+  var f = e.target.getAttribute && e.target.getAttribute("data-conaif");
+  if (f && conAiPending) (conAiPending.ticks = conAiPending.ticks || {})[f] = !!e.target.checked;
+});
+document.getElementById("editor").addEventListener("input", function (e) {
+  if (e.target.id === "conAiSum" && conAiPending) conAiPending.sum = e.target.value;
+});
 /* typing in a contract field */
 document.getElementById("editor").addEventListener("change", function (e) {
   var f = e.target.getAttribute && e.target.getAttribute("data-conf"); if (!f) return;
@@ -8600,6 +8730,13 @@ var CON_AI_FIELDS = [
   ["escPct", "Yearly increase", function (d) { return d.increase_pct == null ? "" : String(d.increase_pct); }],
   ["noticeDays", "Notice needed", function (d) { return d.notice_days == null ? "" : String(d.notice_days); }]
 ];
+/* the register's value and the document's, compared as what they mean:
+   "2.7%" is 2.7, "60 days" is 60, "$8,688.00" is 8688 */
+function conFieldSame(f, a, b) {
+  if (f === "amount") return conMoney(a) === conMoney(b);
+  if (f === "escPct" || f === "renewYears" || f === "noticeDays") return conNum(a) === conNum(b);
+  return a === b;
+}
 function conFieldNow(c, f) {
   /* an unticked "renews automatically" is the box's default, not something the
      manager said — so a document that says it renews is news, not a conflict */
@@ -8615,10 +8752,10 @@ function conFieldShow(f, v) {
   if (!v) return "—";
   if (f === "start" || f === "end") return jdDate(v);
   if (f === "period") return conPeriodLabel(v);
-  if (f === "noticeDays") return v + " days";
-  if (f === "escPct") return v + "% a year";
-  if (f === "renewYears") return v + " year" + (+v === 1 ? "" : "s");
-  if (f === "amount") return isNaN(Number(v)) ? v : money(Number(v));
+  if (f === "noticeDays") return conNum(v) + " days";
+  if (f === "escPct") return conNum(v) + "% a year";
+  if (f === "renewYears") return conNum(v) + " year" + (conNum(v) === 1 ? "" : "s");
+  if (f === "amount") return conMoney(v) ? money(conMoney(v)) : v;
   return v;
 }
 function conFieldSet(c, f, v) {
@@ -8636,23 +8773,37 @@ function conAiBoxHTML(c) {
   var d = conAiPending.d || {};
   var h = ['<div class="conprop"><div class="conproph">\u{2728} Claude read “' + esc(conAiPending.src) + "”</div>"];
   var rows = [];
+  /* her ticks and her edits to the summary are kept with the proposal, so a
+     redraw of the page (a field corrected, another editor's save) shows what
+     she chose and not the defaults again */
+  var ticks = conAiPending.ticks || (conAiPending.ticks = {});
+  /* the amount in the register differs from the document's and stays unless
+     she ticks it: then it is today's price, not year one's, and adding the
+     yearly increase on top would raise it a second time */
+  var amtClash = (function () {
+    var nvA = d.amount_cad == null ? "" : String(d.amount_cad), cvA = conFieldNow(c, "amount");
+    return !!cvA && !!nvA && !conFieldSame("amount", cvA, nvA);
+  })();
   CON_AI_FIELDS.forEach(function (F) {
     var nv = F[2](d), cv = conFieldNow(c, F[0]);
-    if (!nv || nv === cv) return;                       /* nothing new to offer */
+    if (!nv || conFieldSame(F[0], cv, nv)) return;      /* nothing new to offer */
     if (F[0] === "renew" && nv === "no" && !cv) return; /* "no" over blank is not news */
-    var clash = !!cv && cv !== nv;
+    var clash = !!cv && !conFieldSame(F[0], cv, nv);
+    var on = ticks[F[0]] != null ? !!ticks[F[0]] : !(clash || (F[0] === "escPct" && amtClash));
     rows.push('<label class="conproprow' + (clash ? " clash" : "") + '">' +
-      '<input type="checkbox" data-conaif="' + F[0] + '"' + (clash ? "" : " checked") + ">" +
+      '<input type="checkbox" data-conaif="' + F[0] + '"' + (on ? " checked" : "") + ">" +
       '<span class="pl">' + esc(F[1]) + "</span>" +
       '<span class="pv">' + esc(conFieldShow(F[0], nv)) + "</span>" +
-      (clash ? '<span class="pw">replaces ' + esc(conFieldShow(F[0], cv)) + "</span>" : "") + "</label>");
+      (clash ? '<span class="pw">replaces ' + esc(conFieldShow(F[0], cv)) + "</span>" : "") +
+      (F[0] === "escPct" && amtClash ? '<span class="pw">applies from the document\u2019s first-year amount \u2014 tick Amount too, or leave both</span>' : "") +
+      "</label>");
   });
   h.push(rows.length
     ? '<p class="conpropl">Tick what to keep. Anything already filled in is left alone unless you tick it.</p>' +
       '<div class="conproprows">' + rows.join("") + "</div>"
     : '<p class="conpropl">Everything in the register already matches the document.</p>');
   h.push('<label class="conpropsum">Summary for the board' +
-    '<textarea id="conAiSum" rows="7">' + esc(d.board_summary || "") + "</textarea></label>");
+    '<textarea id="conAiSum" rows="7">' + esc(conAiPending.sum != null ? conAiPending.sum : (d.board_summary || "")) + "</textarea></label>");
   if (d.watch_out) h.push('<p class="conpropwatch">\u{26A0} ' + esc(d.watch_out) + "</p>");
   if ((d.unclear || []).length)
     h.push('<div class="conpropun"><strong>Worth checking against the paper copy:</strong><ul>' +
@@ -8774,6 +8925,9 @@ function snapRestore(day) {
 }
 function snapApply(day, v) {
   if (!v) { alert("That version could not be read."); return; }
+  /* the daily copies are of the CURRENT report: restored while a past report
+     is open, one overwrote that past report with the current one's jobs */
+  if (cloud.active && cloud.active.kind !== "current") { alert("Go back to the current report first \u2014 earlier versions are copies of the current report."); return; }
   if (!confirm("Put the report back to how it was on " + jdDate(day) + "?\n\n" +
     (v.jobs || []).length + " jobs will replace what is on screen now. " +
     "Today's version is kept, so this can be undone.")) return;
@@ -9682,14 +9836,17 @@ function conNoticeBy(c) {
 /* A dollar amount as typed: "$8,688.00" — the comma is thousands, never a
    decimal point. (Number("8,688") was NaN, so such an amount counted as none.) */
 function conMoney(v) {
-  var n = parseFloat(String(v == null ? "" : v).replace(/[^0-9.\-]/g, ""));
+  var m = String(v == null ? "" : v).replace(/,(?=\d{3}(\D|$))/g, "").match(/-?\d+(\.\d+)?/);
+  var n = m ? parseFloat(m[0]) : NaN;
   return isFinite(n) ? n : 0;
 }
 /* A number out of a box she typed in: "2.7%", "2,7", "3 years" all count. */
 function conNum(v) {
   var t = String(v == null ? "" : v).trim();
   if (t.indexOf(",") >= 0 && t.indexOf(".") < 0) t = t.replace(",", ".");
-  var n = parseFloat(t.replace(/[^0-9.\-]/g, ""));
+  /* the first number she typed: "60 or 90 days" is 60, never 6090 */
+  var m = t.match(/-?\d+(\.\d+)?/);
+  var n = m ? parseFloat(m[0]) : NaN;
   return isFinite(n) ? n : 0;
 }
 /* an ISO date moved on by whole months, kept to a real day (Feb 29 → Feb 28) */
@@ -9744,6 +9901,11 @@ function conCalc(c) {
   var days = conDaysUntil(term), notice = conNoticeBy(c), nDays = conDaysUntil(notice);
   var state2, label;
   if (!c.end) { state2 = "open"; label = "No end date"; }
+  /* marked as renewing automatically, first term over, and how long each
+     renewal runs not recorded: it has renewed — to when, the register cannot
+     say. It was shown "Expired" and left out of the yearly total while the
+     same card said it renews. */
+  else if (c.renew && days < 0 && !(conNum(c.renewYears) > 0)) { state2 = "open"; label = "Renewed \u2014 term not recorded"; }
   else if (rolled && days > 90) { state2 = "active"; label = "Renewed to " + jdDate(term); }
   /* renewing, and the notice date for this term has gone by: it renews,
      nothing can stop it now, so it is not something "ending" */
@@ -9807,6 +9969,7 @@ function conRenewals(days) {
   return conSorted().filter(function (c) {
     var k = conCalc(c);
     if (k.state === "expired") return false;
+    if (k.days != null && k.days < 0) return false;   /* renewed, to a date the register cannot work out: nothing to decide by a date */
     if (k.noticeDays != null && k.noticeDays <= win) return true;
     return k.days != null && k.days <= win;
   });
@@ -10213,14 +10376,15 @@ function actWeekEvents(oldJobs, newJobs) {
        one counts; failing that the report gives a company and no figure,
        because guessing between two of their prices is how a wrong number gets
        in front of the board. */
+    /* every figure in the board's report includes HST, as its tables do */
     var amount = null;
-    if (theirs.length === 1) amount = theirs[0].amount;
+    if (theirs.length === 1) amount = bidTotal(theirs[0]);
     else {
       /* the one of theirs the totals carry — the option the board took, when
          their quotation was split into options. (This read b.override, which a
          stored quote never has, so a second price always lost the figure.) */
       var picked = jobCalc(j).bids.filter(function (x) { return x.carried && theirs.indexOf(x.b) >= 0; });
-      if (picked.length === 1) amount = picked[0].b.amount;
+      if (picked.length === 1) amount = picked[0].total;
     }
     return { who: who, amount: amount, date: j.awardDate || "" };
   };
@@ -10235,18 +10399,38 @@ function actWeekEvents(oldJobs, newJobs) {
         text: "Added " + jn + (priced.length ? " with " + priced.length + " quote" + (priced.length === 1 ? "" : "s") : "") + "." });
       return;
     }
+    /* Each quote is set against ITSELF in the earlier copy, not against
+       whatever sat in the same position: a row removed above moved every row
+       up one, and the board was told contractors had changed prices they had
+       not. An option is itself by its quotation and label; any other quote by
+       its contractor and quote number; a row that was blank, by its place. */
+    var olds = (o.bids || []).slice(), usedOld = {};
+    var pairOf = function (b, bi) {
+      var k = conKey(b.contractor), q = String(b.qno == null ? "" : b.qno).trim(), t = b.optOf, hit = -1;
+      var tryOld = function (test) { if (hit >= 0) return; for (var i = 0; i < olds.length; i++) if (!usedOld[i] && olds[i] && test(olds[i], i)) { hit = i; return; } };
+      if (t && t.okey) tryOld(function (x) { return x.optOf && x.optOf.okey === t.okey && ((t.qid && x.optOf.qid === t.qid) || (!t.qid && conKey(x.contractor) === k)); });
+      else {
+        tryOld(function (x, i) { return i === bi && !(x.optOf && x.optOf.okey) && conKey(x.contractor) === k && String(x.qno == null ? "" : x.qno).trim() === q; });
+        if (k) tryOld(function (x) { return !(x.optOf && x.optOf.okey) && conKey(x.contractor) === k && String(x.qno == null ? "" : x.qno).trim() === q; });
+        if (k) tryOld(function (x) { return !(x.optOf && x.optOf.okey) && conKey(x.contractor) === k; });
+        tryOld(function (x, i) { return i === bi && !conKey(x.contractor); });   /* a blank row, filled in */
+      }
+      if (hit >= 0) usedOld[hit] = 1;
+      return hit >= 0 ? olds[hit] : null;
+    };
     (j.bids || []).forEach(function (b, bi) {
-      var ob = (o.bids || [])[bi];
-      var had = ob && ob.amount != null && ob.amount !== "";
-      var has = b.amount != null && b.amount !== "";
+      var ob = pairOf(b, bi);
+      var now = bidTotal(b), was = ob ? bidTotal(ob) : null;
+      var had = was != null, has = now != null;
       var who = (b.contractor || "").trim() || "a contractor";
+      if (b.optOf && b.optOf.opt) who += " (" + b.optOf.opt + ")";
       if (has && !had)
-        ev.push({ kind: "quote", what: "quote received", no: j.no, desc: desc, contractor: who, amount: b.amount,
-          text: "Quote received for " + jn + " — " + who + ", " + money(b.amount) + "." });
-      else if (has && had && Number(b.amount) !== Number(ob.amount))
+        ev.push({ kind: "quote", what: "quote received", no: j.no, desc: desc, contractor: who, amount: now,
+          text: "Quote received for " + jn + " — " + who + ", " + money(now) + "." });
+      else if (has && had && Math.abs(now - was) >= 0.005)
         ev.push({ kind: "quote", what: "price changed", no: j.no, desc: desc, contractor: who,
-          amount: b.amount, wasAmount: ob.amount,
-          text: "Price changed on " + jn + " — " + who + ", " + money(ob.amount) + " to " + money(b.amount) + "." });
+          amount: now, wasAmount: was,
+          text: "Price changed on " + jn + " — " + who + ", " + money(was) + " to " + money(now) + "." });
       else if (!ob && (b.contractor || "").trim())
         ev.push({ kind: "quote", what: "invited to quote", no: j.no, desc: desc, contractor: who, amount: null,
           text: who + " was invited to quote on " + jn + "." });
@@ -13585,6 +13769,7 @@ function viewPassCardHTML() {
       '<button class="btn primary" data-act="viewpass-set" type="button">Save passcode</button>' +
       '<span class="savenote" id="viewPassMsg"></span></div>');
     h.push('<p class="edithint" style="margin:8px 0 0;font-size:12px">You (the property manager) and board members always view without a passcode. Everyone else must enter it. It’s stored encrypted (scrypt) and never shown again — share it with whoever should see the report.</p>');
+/* HVACBOX-BEGIN (Waterview's archive; cut from every building build) */
     /* The HVAC archive's embed code. Kept here rather than in the Firestore
        console because the console can read a value back and put it on a screen,
        which is how the API keys ended up in a screenshot. Saved through the same
@@ -13603,6 +13788,7 @@ function viewPassCardHTML() {
       'pressing <strong>HVAC records</strong> signs a permit for that one reader — good for two minutes ' +
       'and one use — and the archive opens without a prompt. Leave it blank and the archive asks for its ' +
       'own passcode, which is how it worked before.</p>');
+    /* HVACBOX-END */
   }
   h.push("</div></div>");
   return h.join("");
@@ -14467,7 +14653,7 @@ function startNewReport(mode) {
   }).then(function () {
     var ns = (mode === "copy")
       ? { reportName: name, jobs: deepCopy(cur.jobs), meta: deepCopy(cur.meta), ai: cur.ai ? deepCopy(cur.ai) : null }
-      : { reportName: name, jobs: [], meta: deepCopy(cur.meta), ai: null };
+      : { reportName: name, jobs: [], meta: (function () { var m = deepCopy(cur.meta); delete m.since; return m; })(), ai: null };   /* a fresh start begins its own records */
     state = normState(ns);
     lastSaved = deepCopy(state);
     persist("Started new report “" + name + "”", ["Started a new report period “" + name +
@@ -14794,6 +14980,7 @@ document.getElementById("fileRestore").addEventListener("change", function () {
     try {
       var d = JSON.parse(r.result);
       if (!d || !Array.isArray(d.jobs)) throw new Error("bad shape");
+      if (cloud.active && cloud.active.kind !== "current") { alert("Go back to the current report first \u2014 a backup is restored into the current report."); return; }
       state = normState(d); persist("Backup restored"); renderReport(); renderEditor();
     } catch (e) { alert("That file is not a valid quote-tracker backup."); }
   };

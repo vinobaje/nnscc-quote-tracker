@@ -101,6 +101,12 @@ async function callClaude(key, system, user, schema, maxTokens, model, effort) {
   }
   let txt = "";
   (j.content || []).forEach((b) => { if (b.type === "text") txt += b.text; });
+  // a model that declines answers 200 with no text: say that, not "could not be read back"
+  if (j.stop_reason === "refusal") {
+    console.error("Claude declined", { model: j.model, usage: j.usage });
+    throw new HttpsError("failed-precondition",
+      "Claude declined to read this one. Try again, or choose another model under Reading the quotes.");
+  }
   try {
     return JSON.parse(txt);
   } catch (e) {
@@ -433,6 +439,8 @@ const MINUTES_SCHEMA = {
 const COMPARE_SYSTEM =
   "You compare the quotes a condominium property manager has received for ONE job, for the board of " +
   "directors who must decide which to accept.\n" +
+  "Never refer to a quote by its number (\u201cQuote 2\u201d) in difference, best_reason or cautions: the " +
+  "board sees the quotes in another order. Name the contractor, and the option where it is one.\n" +
   "Read only what each quote itself says — its scope note and any document attached to it. Never carry " +
   "a detail from one quote onto another, and never add a detail no quote states.\n" +
   "Two quotes may be two alternatives priced in ONE quotation (the quote says which option it is). " +
@@ -961,7 +969,15 @@ exports.nnsccTrackerAi = onCall(
       }
       const engModel = String(request.data.model || "").trim() || eng.model;
       const job = request.data.job || {};
-      const bids = Array.isArray(job.bids) ? job.bids.slice(0, 8) : [];
+      const allBids = Array.isArray(job.bids) ? job.bids : [];
+      // each option of a quotation is a row of its own now, so three contractors
+      // with three options each is nine: the old cap of eight left the last row
+      // unread while the page showed the comparison as complete
+      if (allBids.filter((b) => b && b.total != null).length > 16) {
+        throw new HttpsError("invalid-argument",
+          "This job has more than 16 priced quotes — too many to compare in one reading. Remove the ones no longer in play and try again.");
+      }
+      const bids = allBids.slice(0, 40);
       const priced = bids.filter((b) => b && b.total != null);
       if (priced.length < 2) {
         throw new HttpsError("invalid-argument", "Two priced quotes are needed before there is anything to compare.");
@@ -1255,28 +1271,35 @@ function scryptHex(passcode, saltHex) {
 // one rate limiter behind both. Returns the config on success; throws otherwise.
 async function gateVerify(cfgRef, beta, pass) {
   const f = gateFields(beta), mv = masterFields(beta);
-  const cfgSnap = await cfgRef.get();
-  const cfg = cfgSnap.exists ? cfgSnap.data() : {};
-  if (!cfg[f.hash] && !cfg[mv.hash]) {
-    throw new HttpsError("failed-precondition", "Viewing isn’t protected yet — ask the manager to set a passcode.");
-  }
-  const now = Date.now();
-  if ((cfg[f.until] || 0) > now) throw new HttpsError("resource-exhausted", "Too many attempts — try again in a minute.");
+  // The attempt is counted BEFORE it is checked, in a transaction. Counted
+  // afterwards, sixty guesses sent at the same moment all read the same count,
+  // all were checked, and the lock never came down: the limiter only slowed a
+  // caller polite enough to wait for each answer.
+  const cfg = await cfgRef.firestore.runTransaction(async (tx) => {
+    const snap = await tx.get(cfgRef);
+    const c = snap.exists ? snap.data() : {};
+    if (!c[f.hash] && !c[mv.hash]) {
+      throw new HttpsError("failed-precondition", "Viewing isn’t protected yet — ask the manager to set a passcode.");
+    }
+    const now = Date.now();
+    if ((c[f.until] || 0) > now) throw new HttpsError("resource-exhausted", "Too many attempts — try again in a minute.");
+    const fails = (c[f.fails] || 0) + 1;
+    const upd = { [f.fails]: fails };
+    if (fails >= 5) { upd[f.until] = now + 60 * 1000; upd[f.fails] = 0; }   // the fifth try in a row is the last for 60s
+    tx.set(cfgRef, upd, { merge: true });
+    return c;
+  });
   const matches = (hash, salt) => hash && salt && pass.length > 0 &&
     crypto.timingSafeEqual(Buffer.from(scryptHex(pass, salt), "hex"), Buffer.from(hash, "hex"));
   if (!matches(cfg[f.hash], cfg[f.salt]) && !matches(cfg[mv.hash], cfg[mv.salt])) {
-    const fails = (cfg[f.fails] || 0) + 1;
-    const upd = { [f.fails]: fails };
-    if (fails >= 5) { upd[f.until] = now + 60 * 1000; upd[f.fails] = 0; }   // 5 wrong tries → 60s lock
-    await cfgRef.set(upd, { merge: true });
     throw new HttpsError("permission-denied", "That passcode isn’t right.");
   }
-  await cfgRef.set({ [f.fails]: 0, [f.until]: 0 }, { merge: true });
+  await cfgRef.set({ [f.fails]: 0, [f.until]: 0 }, { merge: true });   // right: the count starts again
   return cfg;
 }
 
 exports.nnsccGate = onCall(
-  { region: "us-central1", memory: "256MiB", timeoutSeconds: 30, maxInstances: 5 },
+  { region: "us-central1", memory: "512MiB", timeoutSeconds: 60, maxInstances: 5 },
   async (request) => {
     const db = admin.firestore();
     const cfgRef = db.doc("nnsccQuoteTrackerConfig/main");
@@ -1329,13 +1352,17 @@ exports.nnsccGate = onCall(
       // the caller has just proved the same right to read it. It never sits in
       // the tracker's JavaScript: a reader who cannot answer this gate cannot
       // get it, and it is not the code the board types at that site directly.
-      const gcfg = (await cfgRef.get()).data() || {};
+      // Only what the page shows a reader: the day windows for its own list of
+      // dates. Not who the alert emails go to, and not the archive's permanent
+      // embed code — the page opens the archive with a two-minute grant
+      // (hvacGrant below), so nothing durable needs to leave here.
+      const al = (con.exists && con.data().alerts) || {};
       return {
         ok: true,
         report: { jobs: d.jobs || [], meta: d.meta || null, ai: d.ai || null, reportName: d.reportName || null },
         contracts: cl,
-        alertSettings: (con.exists && con.data().alerts) || {},
-        hvac: String(gcfg.hvacEmbedCode || ""),
+        alertSettings: { contractDays: al.contractDays || null, insuranceDays: al.insuranceDays || null,
+                         quoteDays: al.quoteDays || null },
       };
     }
 
@@ -1436,7 +1463,10 @@ exports.nnsccGate = onCall(
       } catch (e) {
         throw new HttpsError("not-found", "That document is no longer in the file store.");
       }
-      if (buf.length > 9 * 1024 * 1024) {
+      // the register takes documents up to 20 MB, so a board member who came in
+      // with the passcode can open any of them (it was 9 MB: a 12 MB scan
+      // attached and read, and then could not be opened by the board)
+      if (buf.length > 20 * 1024 * 1024) {
         throw new HttpsError("failed-precondition", "That document is too large to open this way — sign in to read it.");
       }
       return { ok: true, name: named.name || "contract.pdf", b64: buf.toString("base64") };
@@ -1588,6 +1618,10 @@ const ALERT_DEFAULTS = {
   enabled: true,
 };
 
+// today's date in Toronto, winter and summer (a fixed four hours was an hour out half the year)
+function torontoToday() {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Toronto", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+}
 function alertDaysUntil(iso, todayMs) {
   const s = String(iso || "").slice(0, 10);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
@@ -1736,6 +1770,9 @@ function buildAlerts(data, cfg, todayISO) {
 
   // a quoted price stops being good; the board decides on figures that hold
   jobs.forEach((j) => {
+    // on work already approved, finished or cancelled a lapsed quote is history
+    const jst = (j && j.status) || "quoted";
+    if (j && (j.archived || (jst !== "quoted" && jst !== "deferred"))) return;
     (j.bids || []).forEach((b, bi) => {
       if (!b || !b.qdate || b.amount == null || b.amount === "") return;
       const days = +b.validDays > 0 ? Math.round(+b.validDays) : 60;
@@ -1884,7 +1921,7 @@ exports.nnsccAlerts = onSchedule(
   { schedule: "0 8 * * *", timeZone: "America/Toronto", region: "us-central1",
     memory: "256MiB", timeoutSeconds: 120 },
   async () => {
-    const today = new Date(Date.now() - 4 * 3600 * 1000).toISOString().slice(0, 10);  // Toronto morning
+    const today = torontoToday();
     const r = await alertRun(today, false);
     console.log("alerts:", JSON.stringify(r));
   }
@@ -1905,7 +1942,7 @@ exports.nnsccAlertNow = onCall(
     if (email !== OWNER && !editors.includes(email)) {
       throw new HttpsError("permission-denied", "This account is not the property manager.");
     }
-    const today = new Date(Date.now() - 4 * 3600 * 1000).toISOString().slice(0, 10);
+    const today = torontoToday();
     if (request.data && request.data.preview === true) {
       const { cfg, data, resendKey } = await alertGather();
       const items = buildAlerts(data, cfg, today);

@@ -10,8 +10,8 @@ function at(iso) {   /* the register's functions, run as if today were iso */
   function D(...a) { return a.length ? new RealDate(...a) : new RealDate(fixed.getTime()); }
   D.prototype = RealDate.prototype; D.now = () => fixed.getTime(); D.UTC = RealDate.UTC;
   return new Function("Date", ["function jdDate(s) { return s; }",
-    ["conDaysUntil", "conMoney", "conNum", "conAddMonths", "conTermEnd", "conAmountNow", "conAnnual", "conNoticeBy", "conCalc"].map(grab).join("\n"),
-    "return { conTermEnd, conAmountNow, conAnnual, conNoticeBy, conCalc };"].join("\n"))(D);
+    ["conDaysUntil", "conMoney", "conNum", "conAddMonths", "conTermEnd", "conAmountNow", "conAnnual", "conNoticeBy", "conCalc", "conFieldSame"].map(grab).join("\n"),
+    "return { conTermEnd, conAmountNow, conAnnual, conNoticeBy, conCalc, conNum, conMoney, conFieldSame };"].join("\n"))(D);
 }
 let pass = 0, fail = 0;
 const is = (g, w, t) => { JSON.stringify(g) === JSON.stringify(w) ? pass++ : (fail++, console.log("FAIL  " + t + "\n      got  " + JSON.stringify(g) + "\n      want " + JSON.stringify(w))); };
@@ -65,6 +65,13 @@ X = at("2026-11-22");
 [hvac, typed, leap, { end: "2025-06-30", renew: true, renewYears: 1.5, noticeDays: 30 }, Object.assign({}, hvac, { noticeDays: "60 days" })].forEach((c, i) => {
   is([S.alertTermEnd(c, T), S.alertNoticeBy(c, T)], [X.conTermEnd(c), X.conNoticeBy(c)], "emails and page agree (" + i + ")");
 });
+
+/* deep review */
+X = at("2026-11-23");
+const brock = { start: "2020-06-01", end: "2025-05-31", renew: true, renewYears: "", amount: "1300", period: "month" };
+is([X.conCalc(brock).state, X.conCalc(brock).label, X.conAnnual(brock)], ["open", "Renewed \u2014 term not recorded", 15600], "renews, length unknown: not 'Expired', and still counted");
+is([X.conNum("60 or 90 days"), X.conNum("2.7%"), X.conMoney("$8,688.00 monthly"), X.conMoney("1,450.50"), X.conMoney("8688")], [60, 2.7, 8688, 1450.5, 8688], "the first number typed, commas as thousands");
+is([X.conFieldSame("escPct", "2.7%", "2.7"), X.conFieldSame("noticeDays", "60 days", "60"), X.conFieldSame("amount", "$8,688.00", "8688"), X.conFieldSame("amount", "9664.99", "8688")], [true, true, true, false], "the register's value and the document's compared as numbers");
 
 console.log("\n" + pass + " passed, " + fail + " failed");
 process.exit(fail ? 1 : 0);

@@ -317,7 +317,9 @@ const ru = { id: "ru", bids: [{ contractor: "", qno: "", amount: null, hst: fals
 X.set({ jid: "ru", bi: 0, rows: readAt("qa/ru/x.pdf", lqRead, "x.pdf") }, [ru]); X.bidReadApply();
 const oldQ = ru.bids[0].optOf.qid;
 ru.bids[0].files = [{ name: "y.pdf", path: "qa/ru/y.pdf" }]; ru.bids[0].contractor = "Y Inc"; ru.bids[0].qno = "";
-X.set({ jid: "ru", bi: 0, rows: readAt("qa/ru/y.pdf", q2("Y Inc"), "y.pdf") }, [ru]); X.bidReadApply();
+X.set({ jid: "ru", bi: 0, rows: readAt("qa/ru/y.pdf", q2("Y Inc"), "y.pdf") }, [ru]);
+is(X.bidReadPlan(ru, 0).ask, "Option 1", "an option row read from another document with options: asked first");
+X.bidReadAnswer(false); X.bidReadApply();
 is([ru.bids[0].optOf.qid !== oldQ, ru.bids[0].optOf.qid === ru.bids[2].optOf.qid, ru.bids[1].optOf.qid === oldQ], [true, true, true], "Y's options get their own id; X's row keeps X's");
 
 /* round 5: ties are taken per price group; an option with no row is still added */
@@ -507,6 +509,58 @@ const noDate = JSON.parse(JSON.stringify(firenza)); noDate.quote_date = ""; noDa
 X.set({ jid: "dd", bi: 0, rows: readAt(PATH, noDate) }, [dd]); X.bidReadApply();
 X.set({ jid: "dd", bi: 1, rows: readAt(PATH, firenza) }, [dd]); X.bidReadApply();
 is(dd.bids.map((b) => [b.contractor, b.qdate]), [["Firenza Plumbing & Heating Ltd.", "2026-11-20"], ["Firenza Plumbing & Heating Ltd.", "2026-11-20"]], "contractor and date read on Option #2 reach Option #1 too");
+
+/* deep review: the same quotation sent again, or revised, under a new file */
+const mkSplit = () => { const j = { id: "rs", bids: [{ contractor: "", qno: "", amount: null, hst: false, notes: "", files: [{ name: FILE, path: PATH }] }] };
+  X.set({ jid: "rs", bi: 0, rows: readAt(PATH, firenza) }, [j]); X.bidReadApply(); return j; };
+/* (B) the PDF removed and the very same one attached again */
+let rs = mkSplit();
+rs.bids.forEach((b) => { b.files = []; });
+rs.bids[0].files = [{ name: FILE, path: "qa/rs/again.pdf" }];
+X.set({ jid: "rs", bi: 0, rows: readAt("qa/rs/again.pdf", firenza) }, [rs]);
+plan = X.bidReadPlan(rs, 0);
+is([plan.ask, plan.askPasted], ["Option #1", false], "re-attached: asked whether it is the same quotation");
+X.bidReadAnswer(true);
+plan = X.bidReadPlan(rs, 0);
+is([plan.here && plan.here.opt.label, plan.add.length, plan.dup.length], ["Option #1", 0, 1], "same: both options are still their own rows");
+X.bidReadApply();
+is([rs.bids.length, rs.bids.map((b) => b.amount), X.jobCalc(rs).saving, rs.bids[1].files.map((f) => f.path), rs.bids[0].optOf.qid === rs.bids[1].optOf.qid],
+   [2, [12831.15, 18091.3], 0, ["qa/rs/again.pdf"], true], "two rows, no saving, and the second row holds the document too");
+/* a revised quotation: every option takes the new figure */
+rs = mkSplit();
+rs.bids[0].files.push({ name: "rev.pdf", path: "qa/rs/rev.pdf" });
+const revised = JSON.parse(JSON.stringify(firenza)); revised.lines[0].amount = 12000; revised.lines[1].amount = 17000;
+is(X.bidReadFiles(rs, 0).map((f) => f.path), ["qa/rs/rev.pdf"], "the first row reads the new document only, not old + new");
+X.set({ jid: "rs", bi: 0, rows: readAt("qa/rs/rev.pdf", revised, "rev.pdf") }, [rs]);
+X.bidReadAnswer(true);
+is(/Its own row, updated/.test(X.bidReadPanelHTML("rs", 0)), true, "the panel says the other option's row will be updated");
+X.bidReadApply();
+is([rs.bids.length, rs.bids.map((b) => b.amount), X.jobCalc(rs).saving], [2, [13560, 19210], 0], "revised: both rows repriced, none added, no saving");
+is([X.bidReadFiles(rs, 0).map((f) => f.path), rs.bids[0].optOf.was], [["qa/rs/rev.pdf"], [PATH]], "a later read takes the revision, not the document it replaced");
+/* (A) the revised two-option PDF attached to the Option #2 row */
+rs = mkSplit();
+rs.bids[1].files.push({ name: "rev.pdf", path: "qa/rs/rev.pdf" });
+X.set({ jid: "rs", bi: 1, rows: readAt("qa/rs/rev.pdf", revised, "rev.pdf") }, [rs]);
+X.bidReadAnswer(true);
+plan = X.bidReadPlan(rs, 1);
+is(plan.here && plan.here.opt.label, "Option #2", "read on the Option #2 row: it stays Option #2");
+X.bidReadApply();
+is([rs.bids.length, rs.bids.map((b) => [b.optOf.opt, b.amount])], [2, [["Option #1", 13560], ["Option #2", 19210]]], "and Option #1's row is repriced, not left stale");
+/* a one-price revision on the first row is that option's new price, not added to it */
+rs = mkSplit();
+rs.bids[0].files.push({ name: "one.pdf", path: "qa/rs/one.pdf" });
+X.set({ jid: "rs", bi: 0, rows: readAt("qa/rs/one.pdf", { contractor: "Firenza", amount_cad: 10000, hst_included: false, lines: [] }, "one.pdf") }, [rs]);
+is(X.bidReadPlan(rs, 0).ask, undefined, "one price: no question");
+X.bidReadApply();
+is([rs.bids[0].amount, rs.bids[0].optOf.opt, rs.bids[1].amount], [11300, "Option #1", 18091.3], "Option #1 at its revised price; Option #2 untouched");
+/* pasted-text rows confirmed as a PDF: every row gets the document */
+const pj = { id: "pj", bids: [
+  { contractor: "Firenza", qno: "1957", amount: 11355, hst: false, files: [{ name: FILE, path: PATH }],
+    optOf: { opt: "Option #1", okey: "option1", nopt: 2, name: "", amount: 12831.15, own: 12831.15, line: "Option #1", qid: "QP" } },
+  { contractor: "Firenza", qno: "1957", amount: 16010, hst: false, files: [],
+    optOf: { opt: "Option #2", okey: "option2", nopt: 2, name: "", amount: 18091.3, own: 18091.3, line: "Option #2", qid: "QP" } }] };
+X.set({ jid: "pj", bi: 0, rows: readAt(PATH, firenza) }, [pj]); X.bidReadAnswer(true); X.bidReadApply();
+is(pj.bids[1].files.map((f) => f.path), [PATH], "pasted text confirmed: the sibling row holds the PDF too");
 
 /* AI intake: the same rule */
 const d = Object.assign({ file: { name: FILE, path: "p" } }, firenza);
