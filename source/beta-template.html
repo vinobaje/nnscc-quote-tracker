@@ -1830,6 +1830,10 @@ body[data-view="edit"] .wrap { max-width:none; }
 .qtable td { padding:5px 9px; border-bottom:1px solid var(--line-soft); vertical-align:middle; }
 .qtable tr:last-child td { border-bottom:0; }
 .qtable tr.picked td { background:var(--good-soft); }
+/* an option row under its quotation's first row: one quotation, two prices */
+.qtable tr.qsame td { border-top:1px dashed var(--line-soft); }
+.qtable .qatt .fx { cursor:pointer; color:var(--muted); font-size:11px; margin:0 4px 0 -2px; }
+.qtable .qatt .fx:hover { color:var(--bad, #b42318); }
 .qtable input[type=text], .qtable input[type=number], .qtable select { font:inherit; font-size:13px; width:100%;
   min-width:0; padding:5px 7px; border:1px solid transparent; border-radius:6px; background:none; color:var(--ink); }
 .qtable input:hover, .qtable select:hover { border-color:var(--line); }
@@ -2225,6 +2229,8 @@ body[data-view="edit"] .wrap { max-width:none; }
   .qtable td.c-amt input { text-align:left; }
   .qxtra td { background:none; }
   .qtable tr.qxtra { padding:0 11px 10px; margin-top:-9px; border-top:none; border-radius:0 0 9px 9px; }
+  .qtable tr.qrow.qsame { margin-top:-9px; border-top:1px dashed var(--line); border-radius:0 0 9px 9px; }
+  .qtable td.c-same { display:none; }
   .photoprev { width:100%; height:120px; }
 }
 @media screen and (max-width:900px){
@@ -3367,6 +3373,28 @@ function jobFilesOnce(j) {
   });
   return all;
 }
+/* The order quote rows are SHOWN in. The stored order is left alone — j.pick
+   and the comparison's choice are positions in it — but a quotation's options
+   are shown together (a new option row is stored at the end, so two
+   contractors' options would otherwise alternate), and an empty row goes
+   last. Each entry carries the row's true position, so every control on it
+   still acts on the right row; head is the position of its quotation's first
+   row, and first is true on that row and on every row that is not an option. */
+function bidShowOrder(j, c) {
+  var out = [], tail = [], done = {};
+  (j.bids || []).forEach(function (b, i) {
+    if (done[i]) return;
+    done[i] = 1;
+    if (c && c.bids[i] && c.bids[i].blank) { tail.push({ bi: i, first: true, head: i }); return; }
+    out.push({ bi: i, first: true, head: i });
+    var k = bidQuoteKey(b, i);
+    if (k.indexOf("row") === 0) return;
+    j.bids.forEach(function (x, xi) {
+      if (!done[xi] && bidQuoteKey(x, xi) === k) { done[xi] = 1; out.push({ bi: xi, first: false, head: i }); }
+    });
+  });
+  return out.concat(tail);
+}
 function bidQuoteKey(b, i) {
   var o = b && b.optOf;
   if (!o || !o.okey) return "row" + i;
@@ -3870,9 +3898,11 @@ function jdFactCard(icon, label, value, sub, good) {
     (sub ? "<small>" + esc(sub) + "</small>" : "") + "</span></div>";
 }
 function jdQuotesHTML(j, c) {
-  var live = c.bids.filter(function (x) { return !x.blank; });
-  if (!live.length) return '<p class="histempty">No quotes have been entered for this job yet.</p>';
-  var rows = live.map(function (x) {
+  /* a quotation's options together; its file shown on its first row only */
+  var order = bidShowOrder(j, c).filter(function (g) { return !c.bids[g.bi].blank; });
+  if (!order.length) return '<p class="histempty">No quotes have been entered for this job yet.</p>';
+  var rows = order.map(function (g) {
+    var x = c.bids[g.bi];
     var note;
     /* "counted in the totals" is bookkeeping, not a decision — the board may
        not have approved the job at all, so never word it like an award */
@@ -3889,7 +3919,7 @@ function jdQuotesHTML(j, c) {
     var pnote = partsNote(x.b.parts);
     if (pnote) note += (note ? " · " : "") + pnote;
     if (x.b.notes) note += (note ? " · " : "") + x.b.notes;
-    var n = (x.b.files || []).length;
+    var n = g.first ? (x.b.files || []).length : 0;
     var files = n
       ? '<span class="attlink" role="button" tabindex="0" data-attstash="' + fvStashRef(x.b.files) +
         '" data-atti="0" data-attcap="' + esc((x.b.contractor || "quote")) + '">\u{1F4CE} ' +
@@ -4616,20 +4646,23 @@ function packetSecB(d, ctx) {
   var cards = [];
   multi.forEach(function (x, idx) {
     var rows = [];
-    x.c.bids.forEach(function (cb, bi) {
+    bidShowOrder(x.j, x.c).forEach(function (g) {
+      var cb = x.c.bids[g.bi], bi = g.bi;
       if (!ctx.ED && !(cb.b.contractor || "").trim() && cb.total == null) return;
       var name = cb.b.contractor || "—", jid = x.j.id;
       /* contractor / scope / amount are click-to-edit for the signed-in property manager */
       var cName = tEdit("bid:" + jid + ":" + bi + ":contractor", cb.b.contractor, "Contractor");
       /* click the paperclip line to read the quote in the in-page viewer */
-      var att = (cb.b.files && cb.b.files.length)
+      /* the file and the date belong to the quotation: on its first row only */
+      var att = (g.first && cb.b.files && cb.b.files.length)
         ? '<span class="pk-att attlink" role="button" tabindex="0" data-att="' + jid + ":" + bi +
           '" data-attcap="' + esc(name) + '" title="View the attached quote">📎 ' + cb.b.files.length +
           ' attachment' + (cb.b.files.length > 1 ? "s" : "") + "</span>" : "";
       var con = '<td class="pk-c-con"><div class="pk-cflex">' + pkAvatar(name) + '<span class="pk-cwrap"><span class="pk-cn">' + cName + "</span>" + att + "</span></div></td>";
       var scope = ctx.ED ? tEdit("bid:" + jid + ":" + bi + ":notes", cb.b.notes, "Add scope note") : (esc(cb.b.notes) || "—");
-      var dateCell = '<td class="pk-c-date' + (cb.b.qdate ? '' : ' pk-nodate') + '"><span class="pk-lbl">Quoted </span>' +
-        (cb.b.qdate ? esc(cb.b.qdate) : "—") + "</td>";
+      var dateCell = !g.first ? '<td class="pk-c-date pk-nodate"></td>'
+        : '<td class="pk-c-date' + (cb.b.qdate ? '' : ' pk-nodate') + '"><span class="pk-lbl">Quoted </span>' +
+          (cb.b.qdate ? esc(cb.b.qdate) : "—") + "</td>";
       if (cb.total == null) {
         var amtP = ctx.ED ? tEdit("bid:" + jid + ":" + bi + ":amount", "", "Enter amount") : '<em>Quote pending</em>';
         rows.push('<tr class="pk-pend">' + con + '<td class="pk-c-scope">' + (ctx.ED ? scope : '<em>Quote pending</em>') +
@@ -5015,12 +5048,13 @@ function cmpRows(x) {
   var ed = isEditor();
   var jid = x.j.id;
   var r = [];
-  x.c.bids.forEach(function (cb, bi) {
+  bidShowOrder(x.j, x.c).forEach(function (g) {
+    var cb = x.c.bids[g.bi], bi = g.bi;
     if (!ed && !(cb.b.contractor || "").trim() && cb.total == null) return;   /* hide empty rows for viewers only */
     var cName = tEdit("bid:" + jid + ":" + bi + ":contractor", cb.b.contractor, "Contractor");
     var cNote = ed ? tEdit("bid:" + jid + ":" + bi + ":notes", cb.b.notes, "Add scope note")
                    : (esc(cb.b.notes) || '<span class="nonote">—</span>');
-    cNote += bidMetaHTML(cb.b, jid, bi);
+    if (g.first) cNote += bidMetaHTML(cb.b, jid, bi);      /* date and file: once per quotation */
     if (cb.total == null) {
       var amtP = ed ? tEdit("bid:" + jid + ":" + bi + ":amount", "", "Enter amount") : "Quote pending";
       r.push('<tr class="pend"><td>' + cName + "</td><td>" + cNote +
@@ -6479,20 +6513,29 @@ function edJobCardHTML(j, ji) {
     '<span class="spacer"></span>' +
     '<button class="edbtn" type="button" data-act="addbidfile" title="Pick the contractor\u2019s PDF \u2014 ' +
     'Claude reads it and fills the row in">\u{1F4CE} Upload a quote</button>' +
-    '<button class="edbtn" type="button" data-act="addbid">+ Add quote / bid</button></div>');
+    '<button class="edbtn" type="button" data-act="addbid" title="A contractor still to quote, or a price ' +
+    'typed in without a PDF">+ Add by hand</button></div>');
   h.push('<div class="qwrap"><table class="qtable"><colgroup><col style="width:34px"><col style="width:20%">' +
     '<col style="width:9%"><col style="width:13%"><col style="width:9%"><col style="width:20%">' +
     '<col style="width:14%"><col style="width:10%"><col style="width:34px"></colgroup>' +
     '<thead><tr><th></th><th>Contractor</th><th>Quote #</th>' +
     '<th style="text-align:right">Amount (CAD)</th><th>HST</th><th>Notes</th><th>Attachments</th><th>Status</th><th></th></tr></thead><tbody>');
-  j.bids.forEach(function (b, bi) {
+  bidShowOrder(j, c).forEach(function (g) {
+    var bi = g.bi, b = j.bids[bi];
     var x = c.bids[bi], qk = j.id + ":" + bi, xo = !!edQOpen[qk];
+    /* an option row under its quotation's first row shares its contractor,
+       quote number, date and PDF, and does not say them again */
+    var same = !g.first;
+    var headPaths = {};
+    if (same) ((j.bids[g.head] && j.bids[g.head].files) || []).forEach(function (f) { if (f && f.path) headPaths[f.path] = 1; });
     var st = x.bestValue
       ? '<span class="qst best">★ Best value</span>'
       : x.carried
       ? '<span class="qst ' + (x.override ? "over" : "sel") + '">' +
         (x.override ? "Counted ⚑" : "Counted in totals") + "</span>"
-      : (x.total != null ? '<span class="qst hi">Not counted</span>'
+      /* the radio and the green row already say which one counts; a grey
+         "Not counted" on every other row said nothing more */
+      : (x.total != null ? ''
         /* A row that says "enter the amount" and offers no way to is a rebuke.
            The quotations are attached to this very row; the button that reads
            them belongs here, not behind the \u22ef menu where it was. */
@@ -6500,16 +6543,21 @@ function edJobCardHTML(j, ji) {
           'title="Claude reads the attached quote' + (b.files.length > 1 ? "s and adds their totals up" : "") +
           '">\u2728 Read ' + (b.files.length > 1 ? "the " + b.files.length + " quotes" : "the quote") + "</button>"
         : ((b.contractor || "").trim() ? '<span class="qst pen">Pending</span>' : ""));
+    /* each file once: in this cell, with its ✕ beside it while the row is open */
     var files = (b.files || []).map(function (f, fi) {
+      if (!f || (same && f.path && headPaths[f.path])) return "";
       return '<a class="attlink" href="' + esc(f.url) + '" data-att="' + esc(j.id) + ":" + bi + ":" + fi +
-        '" data-attcap="' + esc(b.contractor || "") + '" title="View this attachment">📎 ' +
-        esc(f.name.length > 16 ? f.name.slice(0, 15) + "…" : f.name) + "</a>";
+        '" data-attcap="' + esc(b.contractor || "") + '" title="' + esc(f.name) + '">📎 ' +
+        esc(f.name.length > 16 ? f.name.slice(0, 15) + "…" : f.name) + "</a>" +
+        (xo ? '<span class="fx" data-act="delfile" data-fi="' + fi + '" title="Remove attachment">✕</span>' : "");
     }).join("");
-    h.push('<tr class="qrow' + (x.carried ? " picked" : "") + '" data-bi="' + bi + '">' +
+    h.push('<tr class="qrow' + (x.carried ? " picked" : "") + (same ? " qsame" : "") + '" data-bi="' + bi + '">' +
       '<td class="c-pick"><input type="radio" name="pick-' + esc(j.id) + '" data-act="pick"' +
       (x.carried ? " checked" : "") + ' title="Carry this quote in the report totals"></td>' +
-      '<td data-l="Contractor"><input type="text" value="' + esc(b.contractor) + '" data-f="contractor" placeholder="Contractor"></td>' +
-      '<td data-l="Quote #"><input type="text" value="' + esc(b.qno == null ? "" : b.qno) + '" data-f="qno" placeholder="—"></td>' +
+      (same
+        ? '<td class="c-same" data-l="Contractor"></td><td class="c-same" data-l="Quote #"></td>'
+        : '<td data-l="Contractor"><input type="text" value="' + esc(b.contractor) + '" data-f="contractor" placeholder="Contractor"></td>' +
+          '<td data-l="Quote #"><input type="text" value="' + esc(b.qno == null ? "" : b.qno) + '" data-f="qno" placeholder="—"></td>') +
       '<td class="c-amt" data-l="Amount (CAD)"><input type="text" inputmode="decimal" value="' + (b.amount == null ? "" : esc(edAmt(b.amount))) +
       '" data-f="amount" placeholder="waiting…"></td>' +
       '<td data-l="HST"><select data-f="hst"><option value="no"' + (!b.hst ? " selected" : "") + ">Excluded</option>" +
@@ -6523,24 +6571,25 @@ function edJobCardHTML(j, ji) {
       '<td data-l="Status">' + st + "</td>" +
       '<td class="c-act"><button class="qmore" type="button" data-act="qmore" title="More for this quote">⋯</button></td></tr>');
     if (xo) {
+      var isOpt = !!(b.optOf && b.optOf.okey);
+      /* what the quotation's rows share — its date, how long it holds, reading
+         it again — is on its first row; an option row below has only its own
+         removal. Attaching is the "+" in the row, and an unpriced row's read
+         is the button in its Status cell, so neither is repeated here. */
       h.push('<tr class="qrow qxtra" data-bi="' + bi + '"><td colspan="9"><div class="xin">' +
-        '<label>Quote date <input type="date" value="' + esc(b.qdate || "") + '" data-f="qdate"></label>' +
-        '<label>Valid <input type="number" min="1" style="width:64px" value="' + esc(b.validDays || 60) + '" data-f="validDays"> days</label>' +
-        (bidExpired(b) ? ' <span class="expired">⚠ expired</span>' : "") +
-        '<button class="edbtn" type="button" data-act="attach">📎 Attach quote…</button>' +
-        ((b.files || []).length
-          ? '<button class="edbtn" type="button" data-act="readfiles" title="Claude reads the ' +
-            'attached quotes and adds their totals up">\u2728 Read ' +
-            ((b.files || []).length > 1 ? "and add up these " + b.files.length + " quotes" : "this quote") +
-            "</button>"
-          : "") +
-        (b.files || []).map(function (f, fi) {
-          return '<span class="filechip"><a href="' + esc(f.url) + '" data-att="' + esc(j.id) + ":" + bi + ":" + fi +
-            '" data-attcap="' + esc(b.contractor || "") + '">📎 ' + esc(f.name) +
-            '</a><span class="fx" data-act="delfile" data-fi="' + fi + '" title="Remove attachment">✕</span></span>';
-        }).join("") +
+        (same ? "" :
+          '<label>Quote date <input type="date" value="' + esc(b.qdate || "") + '" data-f="qdate"></label>' +
+          '<label>Valid <input type="number" min="1" style="width:64px" value="' + esc(b.validDays || 60) + '" data-f="validDays"> days</label>' +
+          (bidExpired(b) ? ' <span class="expired">⚠ expired</span>' : "") +
+          ((b.files || []).length && x.total != null
+            ? '<button class="edbtn" type="button" data-act="readfiles" title="Claude reads the ' +
+              'attached quote' + ((b.files || []).length > 1 ? "s and adds their totals up" : " again") + '">\u2728 Read ' +
+              ((b.files || []).length > 1 ? "and add up these " + b.files.length + " quotes" : "again") +
+              "</button>"
+            : "")) +
         '<span class="spacer" style="flex:1"></span>' +
-        '<button class="edbtn danger" type="button" data-act="delbid">Delete quote</button></div></td></tr>');
+        '<button class="edbtn danger" type="button" data-act="delbid">' + (isOpt ? "Remove this option" : "Delete quote") +
+        "</button></div></td></tr>");
     }
     /* what Claude read, shown under the row it belongs to whether or not the
        row happens to be expanded */
@@ -7366,6 +7415,15 @@ document.getElementById("editor").addEventListener("change", function (e) {
     else if (f === "hst") b.hst = e.target.value === "yes";
     else if (f === "validDays") b.validDays = Math.max(1, +e.target.value || 60);
     else b[f] = e.target.value;
+    /* what a quotation's options share is edited once, on its first row, and
+       holds for every option of it (the key is the quotation's id, which an
+       edit to the name or number cannot change) */
+    if (f === "contractor" || f === "qno" || f === "qdate" || f === "validDays") {
+      var bi0 = +row.dataset.bi, k0 = bidQuoteKey(b, bi0);
+      if (k0.indexOf("row") !== 0) j.bids.forEach(function (x, xi) {
+        if (xi !== bi0 && bidQuoteKey(x, xi) === k0) x[f] = b[f];
+      });
+    }
     /* a price or a scope note changed — read the quotes against each other again */
     if (f === "amount" || f === "hst" || f === "notes" || f === "contractor") qcTouch(j);
   }

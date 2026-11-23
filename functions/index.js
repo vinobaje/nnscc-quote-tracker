@@ -138,7 +138,9 @@ const QUOTE_EXTRACT_SYSTEM =
   "label as the quote words it (\u201cOption #1\u201d, \u201cOption B\u201d, \u201cAlternate 2\u201d), and leave " +
   "option empty on every other line. A charge that applies whichever alternative is chosen has an " +
   "empty option. An optional extra bought on top of the work is not an alternative: its option is " +
-  "empty. Alternatives are never added together — their sum is a price nobody quoted.\n" +
+  "empty. Alternatives are never added together — their sum is a price nobody quoted. On a line that " +
+  "carries an option, description says in a few words what that alternative is (\u201csingle PRV\u201d, " +
+  "\u201cdual PRV\u201d), not a heading the quote happens to print above the price such as \u201cPricing\u201d.\n" +
   "amount_cad: the sum of the lines marked for_this_job, on the same footing as the lines (so " +
   "hst_included equals lines_include_hst) — where some lines are alternatives, the lines with no " +
   "option plus the FIRST alternative only. NEVER give the quote's grand total as the price of one " +
