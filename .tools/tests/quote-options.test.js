@@ -17,10 +17,10 @@ const X = new Function(["var HST = 0.13, bidRead = null, state = { jobs: [] }, L
   "var document = { querySelectorAll: function () { return []; } };",
   gv("BID_DET", '["notes", "Scope note"]];'),
   ["bidReadRows", "partsNote", "bidReadDetails", "bidReadDone", "bidReadTrim", "optLine", "optionQuotes",
-   "optKey", "bidHoldsOpt", "bidReadPlan", "bidPartsOf", "bidHeldOpts", "bidSameFile", "bidOptOf", "bidOwnOpt", "bidReadQid", "optBare", "jobCalc", "bidQuoteKey", "bidTotal", "conKey", "quoteFileHeld", "bidReadApply", "bidReadAnswer", "bidReadAnswerApply", "bidReadView", "bidReadSync", "jobFilesOnce", "bidReadPanelHTML",
+   "optKey", "bidHoldsOpt", "bidReadPlan", "bidPartsOf", "bidHeldOpts", "bidSameFile", "bidOptOf", "bidOwnOpt", "bidReadQid", "optBare", "jobCalc", "bidQuoteKey", "bidTotal", "conKey", "quoteFileHeld", "bidReadApply", "bidReadAnswer", "bidReadAnswerApply", "bidReadView", "bidReadSync", "bidReadSig", "jobFilesOnce", "bidReadPanelHTML",
    "intakeLines", "intakeRows", "intakeQuotes", "intakeTicks"].map(grab).join("\n"),
   "return { bidReadRows, partsNote, bidReadDetails, bidReadDone, optionQuotes, bidReadPlan, quoteFileHeld, bidPartsOf,",
-  "  bidReadApply, bidReadAnswer, bidReadPanelHTML, intakeQuotes, intakeRows, jobCalc, jobFilesOnce,",
+  "  bidReadApply, bidReadAnswer, bidReadPanelHTML, intakeQuotes, intakeRows, jobCalc, jobFilesOnce, bidReadSig,",
   "  set: function (b, jobs) { bidRead = b; state.jobs = jobs; LOG = []; }, log: function () { return LOG; }, read: function () { return bidRead; } };"].join("\n"))();
 let pass = 0, fail = 0;
 const is = (g, w, t) => { JSON.stringify(g) === JSON.stringify(w) ? pass++ : (fail++, console.log("FAIL  " + t + "\n      got  " + JSON.stringify(g) + "\n      want " + JSON.stringify(w))); };
@@ -479,6 +479,16 @@ is([JSON.stringify(nd.bids[0]) === ndBefore, nd.bids[0].optOf.qid, X.jobCalc({ b
 
 /* round 9: a PDF shared by two option rows is listed once */
 is(X.jobFilesOnce(job).length <= 1 && X.jobFilesOnce({ bids: [{ files: [{ path: "a" }] }, { files: [{ path: "a" }, { path: "b" }] }] }).length, 2, "shared PDFs counted once");
+
+/* round 10: the cloud hands back fresh copies of every row while Claude reads: the reading stays */
+let cj = { id: "cj", bids: [
+  { contractor: "", qno: "", amount: null, hst: false, notes: "", files: [] },
+  { contractor: "Firenza", qno: "", amount: null, hst: false, notes: "", files: [{ name: "f.pdf", path: "qa/cj/f.pdf" }] }] };
+X.set({ jid: "cj", bi: 1, bref: cj.bids[1], sig: X.bidReadSig(cj.bids[1]),
+  rows: X.bidReadDone("f.pdf", { data: { contractor: "Firenza", amount_cad: 1000, hst_included: true } }) }, [cj]);
+cj = JSON.parse(JSON.stringify(cj)); X.set(X.read(), [cj]);   /* a snapshot: same rows, new objects */
+X.bidReadApply();
+is([cj.bids[1].amount, cj.bids[0].amount], [1000, null], "a fresh copy of the job: the price still goes to the right row");
 
 /* AI intake: the same rule */
 const d = Object.assign({ file: { name: FILE, path: "p" } }, firenza);

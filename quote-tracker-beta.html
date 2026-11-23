@@ -3068,7 +3068,7 @@ var BRAND_PATH = "nnsccQuoteTrackerBeta/brand";               /* the letterhead 
 var WEEKLY_DRAFT_PATH = "nnsccQuoteTrackerBeta/weeklyDraft";   /* the report she is working on */
 var WEEKLY_COLL = "nnsccWeeklyReportsBeta";                   /* every one she has finished */
 var VIEW_BETA = CURRENT_PATH.indexOf("Beta") >= 0;   /* which report the passcode gate reads/protects */
-var BUILD_STAMP = "2026-11-22 21:06";   /* filled in by build.js — which copy of the page this is */
+var BUILD_STAMP = "2026-11-22 21:07";   /* filled in by build.js — which copy of the page this is */
 /* path of the report currently on screen */
 function reportPath() {
   return cloud.active.kind === "current" ? CURRENT_PATH : (REPORTS_COLL + "/" + cloud.active.id);
@@ -5496,12 +5496,29 @@ var bidRead = null;   /* { jid, bi, busy, err, rows:[{name, amt, incl, ok, why}]
    contractor's price into another's row. So the row itself is kept, its
    place found again before every use, and a reading whose row is gone, or
    whose job was replaced by a newer copy from the cloud, is closed. */
+/* what a row is, for finding it again after the cloud hands back fresh copies
+   of every row: its files, contractor, quote number, price and option */
+function bidReadSig(b) {
+  if (!b) return "";
+  return JSON.stringify([((b.files || []).map(function (f) { return f && (f.path || f.name); })),
+    conKey(b.contractor), String(b.qno == null ? "" : b.qno), b.amount == null ? null : b.amount,
+    b.optOf ? [b.optOf.qid || "", b.optOf.okey || ""] : null]);
+}
 function bidReadSync(j) {
   if (!bidRead) return false;
   if (!bidRead.bref) return true;                 /* (tests set a position directly) */
-  var i = j && j.id === bidRead.jid ? j.bids.indexOf(bidRead.bref) : -1;
+  if (!j || j.id !== bidRead.jid) { bidRead = null; return false; }
+  var i = j.bids.indexOf(bidRead.bref);
+  if (i < 0) {
+    /* a newer copy of the job from the cloud: the same row, if exactly one
+       row is it, or the one still in its old place */
+    var sig = bidRead.sig, hits = [];
+    j.bids.forEach(function (x, xi) { if (bidReadSig(x) === sig) hits.push(xi); });
+    if (hits.length === 1) i = hits[0];
+    else if (hits.indexOf(bidRead.bi) >= 0) i = bidRead.bi;
+  }
   if (i < 0) { bidRead = null; return false; }
-  bidRead.bi = i;
+  bidRead.bi = i; bidRead.bref = j.bids[i]; bidRead.sig = bidReadSig(j.bids[i]);
   return true;
 }
 function bidReadPanelHTML(jid, bi) {
@@ -6078,7 +6095,7 @@ function bidReadRun(j, bi) {
   var b = j.bids[bi], files = (b && b.files) || [];
   if (!files.length) return;
   if (!cloud.fns || !cloud.user) { alert("Sign in first."); return; }
-  bidRead = { jid: j.id, bi: bi, bref: b, busy: "Claude is reading " + files.length + " file" +
+  bidRead = { jid: j.id, bi: bi, bref: b, sig: bidReadSig(b), busy: "Claude is reading " + files.length + " file" +
     (files.length === 1 ? "" : "s") + "\u2026", err: "", rows: [] };
   renderEditor();
   /* the job this is for, and the other open work, so a line that is plainly
