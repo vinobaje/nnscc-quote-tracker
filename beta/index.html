@@ -3068,7 +3068,7 @@ var BRAND_PATH = "nnsccQuoteTrackerBeta/brand";               /* the letterhead 
 var WEEKLY_DRAFT_PATH = "nnsccQuoteTrackerBeta/weeklyDraft";   /* the report she is working on */
 var WEEKLY_COLL = "nnsccWeeklyReportsBeta";                   /* every one she has finished */
 var VIEW_BETA = CURRENT_PATH.indexOf("Beta") >= 0;   /* which report the passcode gate reads/protects */
-var BUILD_STAMP = "2026-11-22 21:07";   /* filled in by build.js — which copy of the page this is */
+var BUILD_STAMP = "2026-11-22 21:13";   /* filled in by build.js — which copy of the page this is */
 /* path of the report currently on screen */
 function reportPath() {
   return cloud.active.kind === "current" ? CURRENT_PATH : (REPORTS_COLL + "/" + cloud.active.id);
@@ -6105,14 +6105,18 @@ function bidReadRun(j, bi) {
       return x.id !== j.id && countsAsSpend(x) && x.status !== "completed" && String(x.desc || "").trim();
     }).map(function (x) { return "Job " + x.no + ": " + String(x.desc).trim(); }).slice(0, 80) };
   var out = [], i = 0;
+  /* this reading, and no other: one closed or replaced while Claude was
+     still at it is let go, never written into the one open now */
+  var mine = bidRead;
   (function next() {
+    if (bidRead !== mine) return;
     if (i >= files.length) {
       bidRead.busy = ""; bidRead.rows = out; renderEditor(); return;
     }
     var f = files[i++];
     bidRead.busy = "Reading " + i + " of " + files.length + " \u2014 " + (f.name || "attachment") + "\u2026";
     renderEditor();
-    bidReadOne(f, ctx).then(function (r) { out = out.concat(r); next(); });
+    bidReadOne(f, ctx).then(function (r) { if (bidRead !== mine) return; out = out.concat(r); next(); });
   })();
 }
 /* Her answer to "is this document that pasted-text quotation?" is held with

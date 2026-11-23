@@ -6105,14 +6105,18 @@ function bidReadRun(j, bi) {
       return x.id !== j.id && countsAsSpend(x) && x.status !== "completed" && String(x.desc || "").trim();
     }).map(function (x) { return "Job " + x.no + ": " + String(x.desc).trim(); }).slice(0, 80) };
   var out = [], i = 0;
+  /* this reading, and no other: one closed or replaced while Claude was
+     still at it is let go, never written into the one open now */
+  var mine = bidRead;
   (function next() {
+    if (bidRead !== mine) return;
     if (i >= files.length) {
       bidRead.busy = ""; bidRead.rows = out; renderEditor(); return;
     }
     var f = files[i++];
     bidRead.busy = "Reading " + i + " of " + files.length + " \u2014 " + (f.name || "attachment") + "\u2026";
     renderEditor();
-    bidReadOne(f, ctx).then(function (r) { out = out.concat(r); next(); });
+    bidReadOne(f, ctx).then(function (r) { if (bidRead !== mine) return; out = out.concat(r); next(); });
   })();
 }
 /* Her answer to "is this document that pasted-text quotation?" is held with
