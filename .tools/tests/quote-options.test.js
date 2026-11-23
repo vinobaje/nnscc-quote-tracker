@@ -17,7 +17,7 @@ const X = new Function(["var HST = 0.13, bidRead = null, state = { jobs: [] }, L
   "var document = { querySelectorAll: function () { return []; } };",
   gv("BID_DET", '["notes", "Scope note"]];'),
   ["bidReadRows", "partsNote", "bidReadDetails", "bidReadDone", "bidReadTrim", "optLine", "optionQuotes",
-   "optKey", "bidHoldsOpt", "bidReadPlan", "bidPartsOf", "bidHeldOpts", "bidSameFile", "bidOptOf", "bidOwnOpt", "bidReadQid", "optBare", "jobCalc", "bidQuoteKey", "bidTotal", "conKey", "quoteFileHeld", "bidReadApply", "bidReadPanelHTML",
+   "optKey", "bidHoldsOpt", "bidReadPlan", "bidPartsOf", "bidHeldOpts", "bidSameFile", "bidOptOf", "bidOwnOpt", "bidReadQid", "optBare", "conLoose", "optConOwn", "jobCalc", "bidQuoteKey", "bidTotal", "conKey", "quoteFileHeld", "bidReadApply", "bidReadPanelHTML",
    "intakeLines", "intakeRows", "intakeQuotes", "intakeTicks"].map(grab).join("\n"),
   "return { bidReadRows, partsNote, bidReadDetails, bidReadDone, optionQuotes, bidReadPlan, quoteFileHeld, bidPartsOf,",
   "  bidReadApply, bidReadPanelHTML, intakeQuotes, intakeRows, jobCalc,",
@@ -369,6 +369,34 @@ plan = X.bidReadPlan(pt, 0);
 X.bidReadApply();
 is([pt.bids[0].optOf.qid !== "QX", pt.bids[1].optOf.qid], [true, "QX"], "Y's quote does not take X's quotation id");
 is(X.jobCalc(pt).saving > 0, true, "so the saving between X and Y is still counted");
+
+/* round 6: a pasted-text row ("Firenza Plumbing") read from the PDF ("… & Heating Ltd.") keeps its option */
+const pf = { id: "pf", bids: [{ contractor: "Firenza Plumbing", qno: "1957HTGRC", amount: 16010, hst: false, notes: "Option #2", files: [{ name: FILE, path: PATH }],
+  optOf: { opt: "Option #2", okey: "option2", nopt: 2, name: "", amount: 18091.3, own: 18091.3, line: "Option #2", qid: "QP", con: "firenza plumbing" } }] };
+const fzLong = JSON.parse(JSON.stringify(firenza)); fzLong.contractor = "Firenza Plumbing & Heating Ltd.";
+X.set({ jid: "pf", bi: 0, rows: readAt(PATH, fzLong) }, [pf]);
+plan = X.bidReadPlan(pf, 0);
+is([plan.here && plan.here.opt.label, plan.add.map((q) => q.opt.label)], ["Option #2", ["Option #1"]], "the letterhead's longer name is the same firm");
+X.bidReadApply();
+is([pf.bids[0].optOf.opt, pf.bids[0].optOf.qid, pf.bids[1].optOf.qid], ["Option #2", "QP", "QP"], "its option and quotation id are kept");
+
+/* round 6: a reused row whose reading has no contractor name: the row's own contractor decides */
+const rn = { id: "rn", bids: [{ contractor: "Y Inc", qno: "", amount: 1000, hst: true, files: [{ name: "y.pdf", path: "qa/rn/y.pdf" }],
+  optOf: { opt: "Option 1", okey: "option1", nopt: 2, name: "", amount: 1000, own: 1000, line: "Option 1", qid: "QX", con: "x co" } }] };
+const noName = JSON.parse(JSON.stringify(q2("Y Inc"))); noName.contractor = "";
+X.set({ jid: "rn", bi: 0, rows: readAt("qa/rn/y.pdf", noName, "y.pdf") }, [rn]); X.bidReadApply();
+is(rn.bids[0].optOf.qid !== "QX", true, "Y's row does not keep X's quotation id");
+
+/* round 6: the row being read, tied, with one option left that no other row can be */
+const lt = { id: "lt", bids: [{ contractor: "", qno: "", amount: null, hst: false, notes: "", files: [{ name: "a.pdf", path: "qa/lt/a.pdf" }] }] };
+const fixPatch = { contractor: "Acme", quote_number: "3", lines_include_hst: true, lines: [
+  { description: "Fix", amount: 5000, for_this_job: true, line_note: "", option: "Option A" },
+  { description: "Patch", amount: 5000, for_this_job: true, line_note: "", option: "Option B" }] };
+X.set({ jid: "lt", bi: 0, rows: readAt("qa/lt/a.pdf", fixPatch, "a.pdf") }, [lt]); X.bidReadApply();
+const fp2 = JSON.parse(JSON.stringify(fixPatch)); fp2.lines[0].option = "Option 1"; fp2.lines[0].description = "Fix it"; fp2.lines[1].option = "Option 2";
+X.set({ jid: "lt", bi: 0, rows: readAt("qa/lt/a.pdf", fp2, "a.pdf") }, [lt]);
+plan = X.bidReadPlan(lt, 0);
+is([plan.blocked, plan.here && plan.here.opt.label, plan.dupAt, plan.add.length], ["", "Option 1", [1], 0], "the one option left is this row's");
 
 /* AI intake: the same rule */
 const d = Object.assign({ file: { name: FILE, path: "p" } }, firenza);

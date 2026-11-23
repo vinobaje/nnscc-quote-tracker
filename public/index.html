@@ -3001,7 +3001,7 @@ var BRAND_PATH = "nnsccQuoteTracker/brand";               /* the letterhead the 
 var WEEKLY_DRAFT_PATH = "nnsccQuoteTracker/weeklyDraft";   /* the report she is working on */
 var WEEKLY_COLL = "nnsccWeeklyReports";                   /* every one she has finished */
 var VIEW_BETA = CURRENT_PATH.indexOf("Beta") >= 0;   /* which report the passcode gate reads/protects */
-var BUILD_STAMP = "2026-11-22 20:39";   /* filled in by build.js — which copy of the page this is */
+var BUILD_STAMP = "2026-11-22 20:45";   /* filled in by build.js — which copy of the page this is */
 /* path of the report currently on screen */
 function reportPath() {
   return cloud.active.kind === "current" ? CURRENT_PATH : (REPORTS_COLL + "/" + cloud.active.id);
@@ -5681,12 +5681,7 @@ function bidHeldOpts(x) {
 }
 function bidSameFile(x, h, o, b) {
   if (h.path && o.path) return h.path === o.path;
-  if (x === b) {
-    /* this row's own record, kept without a path (a quote pasted as text):
-       its own unless it was another contractor's */
-    var tc = b.optOf && b.optOf.con, rc = conKey(o.det && o.det.contractor);
-    return !(tc && rc && tc !== rc);
-  }
+  if (x === b) return optConOwn(b, o);
   /* the row holds this very stored file */
   if (o.path && (x.files || []).some(function (f) { return f && f.path === o.path; })) return true;
   var ck = function (v) { return String(v || "").toLowerCase().replace(/[^a-z0-9]/g, ""); };
@@ -5734,9 +5729,32 @@ function bidOwnOpt(b, o) {
   var t = b && b.optOf;
   if (!t || !t.okey || (t.nopt || 0) < 2) return null;
   if (t.path && o.path) return t.path === o.path ? t : null;
-  var rc = conKey(o.det && o.det.contractor);
-  if (t.con && rc && t.con !== rc) return null;
+  if (!optConOwn(b, o)) return null;
   return (!t.name || !o.name || t.name === o.name) ? t : null;
+}
+/* Is a row's option record, kept without a stored path (a quote pasted as
+   text), still this contractor's? Yes unless neither the row's contractor
+   now nor the name on the document being read is the one it was made for —
+   which is what happens when a row is reused for another contractor. Names
+   are compared loosely: the email said "Firenza Plumbing", the letterhead
+   says "Firenza Plumbing & Heating Ltd.", and that is one firm. */
+function conLoose(a, b) {
+  function n(v) {
+    return conKey(v).replace(/\b(ltd|limited|inc|incorporated|corp|corporation|co|company|llc)\b/g, " ")
+      .replace(/[^a-z0-9]/g, "");
+  }
+  var x = n(a), y = n(b);
+  if (!x || !y) return false;
+  if (x === y) return true;
+  var s = x.length < y.length ? x : y, l = s === x ? y : x;
+  return s.length >= 4 && l.indexOf(s) === 0;
+}
+function optConOwn(b, o) {
+  var tc = b && b.optOf && b.optOf.con;
+  if (!tc) return true;
+  var names = [b.contractor, o && o.det && o.det.contractor].filter(function (v) { return String(v || "").trim(); });
+  if (!names.length) return true;
+  return names.some(function (v) { return conLoose(v, tc); });
 }
 function bidReadPlan(j, bi) {
   var quotes = optionQuotes(bidRead && bidRead.rows);
@@ -5801,6 +5819,15 @@ function bidReadPlan(j, bi) {
     if (g.opts.some(function (qi) { return at[qi] != null; })) return;
     if (g.rows.length < g.opts.length) return;
     g.opts.forEach(function (qi, n) { at[qi] = g.rows[n]; used[g.rows[n]] = true; });
+  });
+  /* the row being read, tied and now left with a single option no other
+     undecided row could be, is that option */
+  if (!used[bi]) unsure.forEach(function (u) {
+    if (u.xi !== bi || used[bi]) return;
+    var free = u.fit.filter(function (qi) { return at[qi] == null; });
+    if (free.length !== 1) return;
+    var rival = unsure.some(function (v) { return v.xi !== bi && !used[v.xi] && v.fit.indexOf(free[0]) >= 0; });
+    if (!rival) { at[free[0]] = bi; used[bi] = true; }
   });
   /* this row is an option of this file and could not be told apart: change
      nothing, rather than make it into its sibling */
