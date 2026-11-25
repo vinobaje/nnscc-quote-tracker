@@ -8531,10 +8531,14 @@ function conSectionHTML(ED) {
       (k.notice
         ? (k.noticeDays != null && k.noticeDays < 0
             ? '<div class="connotice past">The deadline to give notice passed on <strong>' + esc(jdDate(k.notice)) +
-              "</strong> — this agreement renews for another term.</div>"
-            : '<div class="connotice">To end it, notice must be given by <strong>' + esc(jdDate(k.notice)) +
-              "</strong>" + (k.noticeDays != null ? " — " + (k.noticeDays === 0 ? "today" : k.noticeDays + " days away") : "") +
-              ", otherwise it renews automatically.</div>")
+              "</strong> — this agreement renews for another term. To cancel: <strong>" +
+              conNum(c.noticeDays) + " days\u2019 written notice</strong>.</div>"
+            /* every contract says how much notice cancelling takes; one still in
+               its first term also says the date that works out to */
+            : '<div class="connotice">To cancel: <strong>' + conNum(c.noticeDays) + " days\u2019 written notice</strong>" +
+              " \u2014 to stop it renewing, by <strong>" + esc(jdDate(k.notice)) + "</strong>" +
+              (k.noticeDays != null ? " (" + (k.noticeDays === 0 ? "today" : k.noticeDays + " days away") + ")" : "") +
+              ".</div>")
         : (c.renew ? '<div class="connotice">Renews automatically.' +
             (conNum(c.noticeDays) > 0 ? " To cancel: <strong>" + conNum(c.noticeDays) + " days\u2019 written notice</strong>." : "") +
             "</div>"

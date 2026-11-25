@@ -3019,7 +3019,7 @@ var BRAND_PATH = "nnsccQuoteTracker/brand";               /* the letterhead the 
 var WEEKLY_DRAFT_PATH = "nnsccQuoteTracker/weeklyDraft";   /* the report she is working on */
 var WEEKLY_COLL = "nnsccWeeklyReports";                   /* every one she has finished */
 var VIEW_BETA = CURRENT_PATH.indexOf("Beta") >= 0;   /* which report the passcode gate reads/protects */
-var BUILD_STAMP = "2026-11-25 12:06";   /* filled in by build.js — which copy of the page this is */
+var BUILD_STAMP = "2026-11-25 12:14";   /* filled in by build.js — which copy of the page this is */
 /* path of the report currently on screen */
 function reportPath() {
   return cloud.active.kind === "current" ? CURRENT_PATH : (REPORTS_COLL + "/" + cloud.active.id);
@@ -8464,10 +8464,14 @@ function conSectionHTML(ED) {
       (k.notice
         ? (k.noticeDays != null && k.noticeDays < 0
             ? '<div class="connotice past">The deadline to give notice passed on <strong>' + esc(jdDate(k.notice)) +
-              "</strong> — this agreement renews for another term.</div>"
-            : '<div class="connotice">To end it, notice must be given by <strong>' + esc(jdDate(k.notice)) +
-              "</strong>" + (k.noticeDays != null ? " — " + (k.noticeDays === 0 ? "today" : k.noticeDays + " days away") : "") +
-              ", otherwise it renews automatically.</div>")
+              "</strong> — this agreement renews for another term. To cancel: <strong>" +
+              conNum(c.noticeDays) + " days\u2019 written notice</strong>.</div>"
+            /* every contract says how much notice cancelling takes; one still in
+               its first term also says the date that works out to */
+            : '<div class="connotice">To cancel: <strong>' + conNum(c.noticeDays) + " days\u2019 written notice</strong>" +
+              " \u2014 to stop it renewing, by <strong>" + esc(jdDate(k.notice)) + "</strong>" +
+              (k.noticeDays != null ? " (" + (k.noticeDays === 0 ? "today" : k.noticeDays + " days away") + ")" : "") +
+              ".</div>")
         : (c.renew ? '<div class="connotice">Renews automatically.' +
             (conNum(c.noticeDays) > 0 ? " To cancel: <strong>" + conNum(c.noticeDays) + " days\u2019 written notice</strong>." : "") +
             "</div>"
