@@ -1672,6 +1672,8 @@ function alertTermEnd(c, today) {
 // the last day notice can be given before a contract renews itself
 function alertNoticeBy(c, today) {
   if (!c.renew || !c.end || !(alertNum(c.noticeDays) > 0)) return "";
+  // only in the term it was signed for: after a renewal no deadline is invented (as on the page)
+  if (alertTermEnd(c, today) !== String(c.end).slice(0, 10)) return "";
   const p = alertTermEnd(c, today).split("-");
   if (p.length !== 3) return "";
   const d = new Date(Date.UTC(+p[0], +p[1] - 1, +p[2]));

@@ -22,7 +22,7 @@ const k = X.conCalc(hvac);
 is([k.state, k.label, k.rolled], ["active", "Renewed to 2028-08-31", true], "active, not 'Expired Aug 31, 2025'");
 is(X.conAmountNow(hvac), { amount: 9664.99, year: 5 }, "year 5 (from Sep 2026): $8,688 × 1.027⁴");
 is(X.conAnnual(hvac), 115979.88, "a year at today's price");
-is(X.conNoticeBy(hvac), "2028-07-02", "notice before the current term renews");
+is(X.conNoticeBy(hvac), "", "after a renewal: no deadline is invented from the renewed term");
 X = at("2023-03-01");
 is([X.conAmountNow(hvac).amount, X.conTermEnd(hvac)], [8688, "2025-08-31"], "year 1: the stated price, the first term");
 X = at("2023-09-01");
@@ -41,17 +41,18 @@ is(X.conAmountNow(Object.assign({}, hvac, { escPct: "2,7" })).amount, 9664.99, "
 is([X.conAmountNow(Object.assign({}, hvac, { amount: "8,688" })).amount, X.conAmountNow(Object.assign({}, hvac, { amount: "$8,688.00" })).amount], [9664.99, 9664.99], "an amount's comma is thousands");
 /* review: Feb 29, and terms that are not whole years */
 const leap = { end: "2024-02-29", renew: true, renewYears: 3, noticeDays: 60, amount: 1, period: "year", start: "2021-03-01" };
-is([X.conTermEnd(leap), X.conNoticeBy(leap)], ["2027-02-28", "2026-12-30"], "Feb 29 rolls to Feb 28, a real day");
+is([X.conTermEnd(leap), X.conNoticeBy(leap)], ["2027-02-28", ""], "Feb 29 rolls to Feb 28, a real day");
 is(X.conTermEnd({ end: "2025-06-30", renew: true, renewYears: 1.5 }), "2026-12-30", "an 18-month renewal steps in months");
 /* review: a renewing contract inside its last 90 days renews, it does not end */
 X = at("2028-07-15");
-is(X.conCalc(hvac).label, "Renews 2028-08-31", "notice passed: it renews");
+is(X.conCalc(hvac).label, "Renews in 47 days", "near the end of a renewed term: it renews");
 X = at("2028-06-15");
 is(X.conCalc(Object.assign({}, hvac, { noticeDays: "" })).label, "Renews in 77 days", "no notice period: 'Renews in N days'");
 X = at("2028-08-31");
 is(X.conCalc(Object.assign({}, hvac, { noticeDays: "" })).label, "Renews today", "on its last day it renews today");
 X = at("2026-11-22");
-is(X.conNoticeBy(Object.assign({}, hvac, { noticeDays: "60 days" })), "2028-07-02", "'60 days' is 60 days");
+const gen = { start: "2024-07-01", end: "2027-06-30", renew: true, renewYears: 1, noticeDays: "60 days", amount: 4985, period: "year" };
+is([X.conNoticeBy(gen), X.conCalc(gen).noticeDays > 0], ["2027-05-01", true], "still in its first term: notice by a date, '60 days' read as 60");
 /* review: an ended contract stops rising when it ends */
 X = at("2030-01-01");
 const ended = { start: "2022-09-01", end: "2025-08-31", renew: false, amount: 8688, period: "month", escPct: 2.7 };

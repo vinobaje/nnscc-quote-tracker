@@ -3086,7 +3086,7 @@ var BRAND_PATH = "nnsccQuoteTrackerBeta/brand";               /* the letterhead 
 var WEEKLY_DRAFT_PATH = "nnsccQuoteTrackerBeta/weeklyDraft";   /* the report she is working on */
 var WEEKLY_COLL = "nnsccWeeklyReportsBeta";                   /* every one she has finished */
 var VIEW_BETA = CURRENT_PATH.indexOf("Beta") >= 0;   /* which report the passcode gate reads/protects */
-var BUILD_STAMP = "2026-11-23 17:31";   /* filled in by build.js — which copy of the page this is */
+var BUILD_STAMP = "2026-11-25 12:06";   /* filled in by build.js — which copy of the page this is */
 /* path of the report currently on screen */
 function reportPath() {
   return cloud.active.kind === "current" ? CURRENT_PATH : (REPORTS_COLL + "/" + cloud.active.id);
@@ -8535,7 +8535,11 @@ function conSectionHTML(ED) {
             : '<div class="connotice">To end it, notice must be given by <strong>' + esc(jdDate(k.notice)) +
               "</strong>" + (k.noticeDays != null ? " — " + (k.noticeDays === 0 ? "today" : k.noticeDays + " days away") : "") +
               ", otherwise it renews automatically.</div>")
-        : (c.renew ? '<div class="connotice">Renews automatically.</div>' : "")) +
+        : (c.renew ? '<div class="connotice">Renews automatically.' +
+            (conNum(c.noticeDays) > 0 ? " To cancel: <strong>" + conNum(c.noticeDays) + " days\u2019 written notice</strong>." : "") +
+            "</div>"
+          : (conNum(c.noticeDays) > 0 ? '<div class="connotice">To cancel: <strong>' + conNum(c.noticeDays) +
+            " days\u2019 written notice</strong>.</div>" : ""))) +
       conCertChips(c.contractor) +
       (c.summary ? '<div class="consum"><div class="consumh">What this agreement says</div>' +
         '<div class="consumt">' + esc(c.summary) + "</div></div>" : "") +
@@ -9894,6 +9898,12 @@ function conDaysUntil(iso) {
    can be given before it rolls over for another term */
 function conNoticeBy(c) {
   if (!c.renew || !c.end || !(conNum(c.noticeDays) > 0)) return "";
+  /* A deadline only in the term the contract was signed for. Once it has
+     renewed, a date worked back from the renewed term's end is the register's
+     invention: M.C. Mechanical's 60 days can be given at any time, and the card
+     said "by Jul 2, 2028". After a renewal the card states the notice needed
+     and leaves the date to the contract. */
+  if (conTermEnd(c) !== String(c.end).slice(0, 10)) return "";
   var p3 = conTermEnd(c).split("-");
   if (p3.length !== 3) return "";
   var d = new Date(+p3[0], +p3[1] - 1, +p3[2]);
